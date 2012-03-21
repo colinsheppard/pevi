@@ -1,20 +1,59 @@
 ; ***UPDATES***
+; 1.6 3-20 ah&jb
+; "Query-Chargers" now assigns open chargers to first vehicle to arrive. If unavailable, they currently default to wait.
+; Initialize driver satisfaction of 1 in "Setup-drivers"
+; Driver satisfaction is now reduced during "query-chargers" if driver must wait for charger.
+; Total-driver-satisfaction now reports the mean driver satisfaction
+; If "waiting" at end of day, driver becomes "stranded"
+; 1.6 3-20dh
+; added finish charging procedure
+; added update soc for charging vehicles
+;JB 1.5 3-20
+;fixed so that the driver partners with the appropriate charger
+;added a phanom turtle so we can keep taz numbering 1-25 rather than 0-24 
 ; ___________________________________________________
-; 
+; 3.13 - ZS
+; added from/current TAZ column to schedule and switched the order of destination TAZ and departure time
+; added current-taz and driver satisfaction as driver state variables
+; added global debug? switch, debug-print procedures, and output interface
 
-; ***ISSUES***
+; changed satisfaction reporter to total-satisfaction
+; added travel-time and travel-dist state variables
+; added update-soc procedure
+
+;3.15 JB
+; Added coordinates for driver locations
+; updated done traveling to be waiting till new status is determined from charge needed
+; sorted TAZs from 0-24 and made them stay in position
+; positioned drivers at home TAZS
+; changed colors and size of nodes and drivers to indicate status
+; read in sample text file with originated and destination TAZ, distance, and travel, however this may be cumbersome to use
+; Charger number is now set in the TAZ location file. The setup-chargers procedure associates chargers with their 
+; appropriate TAZ and plots an open circle in that location. The circle currently covers the car icon.
+
+;3.19
+;reduced size of circle to not cover car
+;added partner to drivers variable, setup driver
+; started querry charger submodel
+;JB 3-20
+;fixed so that the driver partners with the appropriate charger
+;added a phanom turtle so we can keep taz numbering 1-25 rather than 0-24 
+; 1.6 dh
+; added finish charging procedure
+; added update soc for charging vehicles
+; ***ISSUES/NEEDS***
 ; ___________________________________________________
-; need to be able to assign schedules with multiple destinations
+; need to be able to assign schedules with multiple destinations.  
+; -- We prob need to make schedule a matrix and not a list.
+; finish procedure skeleton code
+; start producing output plots
+
 
 ; ***Questions***
 ; ___________________________________________________
-; what is the $ for in $row, $from, etc.
-; is current-node needed as a state variable
-; do we need a list to store the status variables
-; do we want buttons for batt cap or enrgy eff means and stdv
-; should we have a driver satisfaction state variable even though it can be calculated by other variables
-; is it possible to read a .csv file or does it have to be white-space delimited
-; should we track which destination each driver is located within their schedule
+; what to do with current-taz variable when traveling
+; if we are not using links, how do we store information about each trip (e.g., avg. speed, energy-efficiency multiplier)
+; what is the best way to step through the model one tick (or several ticks) at a time?
 
 extensions [matrix]
 
@@ -26,8 +65,8 @@ globals
   time            ; current time in fractional hours
   display-time    ; current time, a character string hh:mm
   
-  od              ; origin-destination matrix assumes the TAZ's are 
-                  ; numbered from 1 to n-nodes and the row number is calculated at (FromTAZ-1)*n-nodes+ToTAZ
+  od              ; origin-destination matrix assumes the taz's are 
+                  ; numbered from 1 to n-nodes and the row number is calculated at (Fromtaz-1)*n-nodes+Totaz
                   ; The columns correspond to the following definitions:
                   ; 1 - 24 Hour Traffic Demand
                   ; 2 - AM Rush Hour Traffic Demand
@@ -37,6 +76,7 @@ globals
   ; n-nodes        ; number of nodes set by interface
   ; n-drivers      ; number of drivers set by interface
   temperature     ; ambient temperature
+  ; debug?          ; switch to control output of print statements -- controlled from interface
 ]
 
 breed [drivers driver]
@@ -47,31 +87,46 @@ drivers-own [
   ;anxiety ; could assign a range of proneness or could keep track of simulated anxiety *wish list*
   ;charge-compatibility ; whether level 1, 2, or 3 charging is supported *wish list*
   ;dynamic state variables
-  ;driver-satisfaction ; do we want a variable for this here
-  current-node ;this one actually might not be needed
-  SoC ; represents battery the state of charge at each timestep
+  driver-satisfaction ; do we want a variable for this here
+  partner ;a variable used in to interact a driver and a charger
+  total-trip-time ; the total time needed to drive from A to B
+  total-trip-dist ; the total distance for a given trip
+  state-of-charge ; represents battery the state of charge at each timestep
+      ; if soc is calculated from travel-dist and energy-efficiency, is it a state variable still?
   energy-efficiency ; energy required to travel 1 mile (kWh/mile)
-  schedule ; a matrix of departure times, destinations, distances and drive times
+  arrival-time ; when a car is supposed to arrive
+  ;schedule ; a matrix of: (1)from/current TAZ, (2)destination taz, (3)departure time, (4)distance and (5)drive time
+             ; one row for each trip. (row 1, col 1) is the home TAZ
   status ; discrete value from list:Home,Traveling,Staging,Charging,Waiting,Stranded
   ;destination-number ;keep track of which destination the vehicle is located
-]
+  current-taz ; keeps track of the current location of each vehicle
+  destination-taz ;from the schedule, this is where we're going
+  departure-time ;When the vehicle is set to leave the taz
+  travel-dist ; used to store distance driven since departure
+  travel-time ; used to store traveling time since departure
+]   ; travel-dist and travel-time have no real use, we may want to delete.
 
 breed [chargers charger]
 chargers-own[
-  TAZ-location ; where the charger is located
+  taz-location ; where the charger is located
   available ; boolean to represent either available(TRUE) or occupied(FALSE) 
-]
+ ]
 
 breed [nodes node]
 nodes-own[
-  TAZ-ID ; a unique integer identifier for each TAZ
-  TAZ-distance ; the distance between each node and every other node
-  travel-time ; the time required to travel from each node to every other node
+  taz-id ; a unique integer identifier for each taz
+  taz-distance ; the distance between each node and every other node
+  taz-time ; the time required to travel from each node to every other node
+  taz-chargers ; the number of chargers in a given taz
 ]
 to setup
   
-  clear-all
-  
+  ;; (for this model to work with NetLogo's new plotting features,
+  ;; __clear-all-and-reset-ticks should be replaced with clear-all at
+  ;; the beginning of your setup procedure and reset-ticks at the end
+  ;; of the procedure.)
+  __clear-all-and-reset-ticks
+  set debug? TRUE
   ; Set the time parameters
   set start-hour 0        ; starting time, an hour
   set stop-hour  24       ; time to end simulation, in whole or fractional hours
@@ -83,29 +138,35 @@ to setup
   
   reset-ticks
   
-  ;set n-nodes 4 ;number of TAZs
+  ;set n-nodes 4 ;number of tazs
   ;set n-drivers 6500 ;number of drivers
-  
+  create-turtles 1 [ setxy 0 0 set color black] ;This invisible turtle makes sure we start at node 1 not node 0
   setup-matrix ; create a matrix of fabricated data
-  setup-drivers
   setup-nodes
+  setup-drivers
   setup-chargers
  
 end ;setup
   
 to setup-matrix 
-  ; currently just creates a random matrix
-  set od matrix:make-constant (n-nodes * n-nodes) 5 0
+  set od matrix:make-constant (n-nodes * n-nodes) 4 0 ;reading in fake data
   
+  ifelse (file-exists? "sample_time&distance_matrix.txt")
+    [
+      file-close
+      file-open "sample_time&distance_matrix.txt"
   ; make up some fake data to fill the od matrix for now
   foreach n-values n-nodes [?] [
     let $from ?
     foreach n-values n-nodes [?] [
       let $row ($from * n-nodes + ?)
-      matrix:set-row od $row (list random-float 50 random-float 10 random-float 10 random-float 100 random-float 2)
+      matrix:set-row od $row (list file-read file-read file-read file-read)
     ]
   ]
-  ;print matrix:pretty-print-text od
+  file-close
+    ]
+    [ user-message "There is no sample_time&distance_matrix.txt file in current directory!" ]
+  print matrix:pretty-print-text od
 end ;setup-matrix
 
 to setup-drivers
@@ -114,13 +175,17 @@ to setup-drivers
   setup-schedule
   ask drivers[
     set shape "car"
-    set current-node random n-nodes ;change this to hatch each driver at home
+    set color green
+    set size 2
+    set driver-satisfaction 1  ;initialize driver satisfaction
+    ;set current-taz random n-nodes ;change this to hatch each driver at home
     ; let battery capacity deviate a little bit but no less than 20 kWh
-    set battery-capacity max (list min-batt-cap random-normal batt-cap-mean batt-cap-stdv) 
+    set battery-capacity max (list min-batt-cap random-normal batt-cap-mean batt-cap-stdv) ; is this just a kWh rating?
     ; let energy efficiency deviate a little but no less than 0.5
     set energy-efficiency max (list 0.5 random-normal .74 .05)
-    set SoC 100
+    set state-of-charge 100
     set status "Home"
+    set partner nobody
   ]
 end ;setup-drivers
 
@@ -134,13 +199,24 @@ to setup-schedule
     foreach sort drivers[
     ;; Read in all the data in the file
       ask ? [
-        ; read in departure time, destination TAZ, distance, and drive time
+        ; read in current taz, destination taz, departure time, distance, and drive time
         ; this only works if each agent has a single destination 
         ; should be modified to incorporate multiple destinations
         ; maybe read in a variable for number of destinations
-        set schedule (list file-read file-read file-read file-read)
-        show schedule
-      ]
+        ; AH: Commented out the "set schedule," reading in each as a variable
+        ;set schedule (list file-read file-read file-read file-read file-read)
+        set current-taz file-read
+        setxy [xcor] of node current-taz [ycor] of node current-taz
+        set destination-taz file-read
+        set departure-time file-read
+        show list "departure time is" departure-time
+        set total-trip-dist file-read
+        set total-trip-time file-read
+        show list "total trip time is "total-trip-time
+        set arrival-time 99 ; The arrival time is re-set when a vehicle departs - this prevents an arrival time of 0.
+        debug-print-self "has a schedule"
+        ;show schedule "Schedule" still exists as a variable, but it is no longer defined
+      ]   
     ]
     user-message "File loading complete!"
     ;; Done reading in schedule.  Close the file.
@@ -151,26 +227,45 @@ end ;setup-schedule
 
 to setup-nodes
   create-nodes n-nodes
-  ask nodes [
+      ask nodes [
     set shape "star"
+    set color yellow
+    set size 0.5
   ]
-    ifelse ( file-exists? "sample_TAZs.txt" )
+    ifelse ( file-exists? "sample_tazs.txt" )
     [  
       file-close ; is this really necessary?
-      file-open "sample_TAzs.txt"      
-      ask nodes [
-        set TAZ-ID file-read
+      file-open "sample_tazs.txt"      
+      foreach sort nodes[
+        ask ? [
+        set taz-id file-read
         setxy file-read file-read
+        set taz-chargers file-read ; Sets the number of chargers in each node
+        ]
       ]
     user-message "File loading complete!"
     ;; Done reading in schedule.  Close the file.
     file-close
     ]
-    [ user-message "There is no sample_schedule.txt file in current directory!" ]   
+   
+    [ user-message "There is no sample_TAZs.txt file in current directory!" ]   
 end ;setup-nodes
 
 to setup-chargers
-  ask chargers [set available TRUE]
+
+  foreach sort nodes [                       ; At each node, chargers equal to "taz-chargers"are created.
+      create-chargers [taz-chargers] of ? [  ; The location of each charger created is then set as the current TAZ location
+      set shape "Circle 2"
+      set color red
+      set size 1
+      set taz-location [taz-id] of ?
+      set xcor [xcor] of ?
+      set ycor [ycor] of ?]
+  ]  
+  ask chargers [
+    set available TRUE
+    ]
+  
 end ;setup-chargers
 
 to go
@@ -178,24 +273,15 @@ to go
   ; Advance the time and update time variables
   tick
   set time time + (time-step-size / 60)  ; Convert time step to hours and add to current time
-  if time > stop-hour [ stop ]           ; stop the simulation
+  
+  if time > stop-hour [ 
+    ask drivers with [status = "Waiting"] [set status "Stranded"]
+    stop ]           ; stop the simulation
   
   update-display-time
   
   ; Put the rest of the schedule here
-  
-;;;;;  ask drivers[
-;;;;;   let $from random n-nodes
-;;;;;   let $to $from
-;;;;;   while [ $to = $from] [ set $to random n-nodes ]  
-;;;;;   ; make sure $to != $from because routes are undefined from and to the same node
-;;;;;   matrix-go $from $to
-;;;;;   ;routes-go $from $to 
-;;;;;   
-;;;;;   ; for now just assume the driver immediately goes there
-;;;;;   set current-node $to
-;;;;;   ]
-   
+
    done-traveling
    query-chargers
    finish-charging
@@ -227,14 +313,19 @@ to update-display-time
 end
 
 to update-variables
-  ; update satisfaction
+  ask drivers [
+    update-soc
+  ]
+  ; update total-satisfaction
   ; update duty factor
 end ;update-variables
 
-to-report satisfaction 
-  ; specify context here
-  report 1 ; calculate satisfaction here -- currently just garbage
-end ;satisfaction
+to-report total-satisfaction 
+  
+  ; For now, total-satisfaction is an average of all driver's satisfaction   
+  report mean [driver-satisfaction] of drivers 
+  
+end ;total-satisfaction
 
 to-report duty-factor
   ; specify context here
@@ -242,15 +333,82 @@ to-report duty-factor
 end ;duty-factor
 
 to done-traveling
-  
+    ask drivers [ 
+    if status = "Traveling" [
+     
+    ; TRYING TO GET TRAVELING CARS TO DO THINGS
+      if time >= arrival-time [
+        show list "is done traveling" display-time ;; If we've arrived, change status.
+        setxy [xcor] of node destination-taz [ycor] of node destination-taz
+              
+        ;let minimum-acceptable-charge 
+     ;   show list "SoC is" state-of-charge ; debugging message
+        if state-of-charge > minimum-acceptable-charge [set status "Staging"  set color blue]
+        if state-of-charge <= minimum-acceptable-charge [set status "Waiting"
+        show "charge needed"  set color red]
+        set current-taz destination-taz 
+        ;need to set new destination-taz here
+        ;minimum acceptable charge could be calculated based on charge needed for next destination
+        ] 
+    ]
+  ]
 end ;done-traveling
 
-to query-chargers
-  
+to query-chargers ;Jb added 3.19
+          foreach sort nodes
+            [
+              let available-chargers chargers with [available = TRUE and taz-location = [taz-id] of ?] 
+              ;show count available-chargers
+              let waiting-drivers drivers with [status = "Waiting" and current-taz = [taz-id] of ?]
+              ifelse count waiting-drivers <= count available-chargers
+              [
+                ask waiting-drivers 
+                [
+                  set status "Charging"
+                  set color orange
+                  debug-print-self status
+              
+                  ;let singles waiting-drivers with [partner = nobody]
+                  ;if not any? singles [ stop ]
+              
+                  set partner one-of available-chargers 
+                  ask partner [set available FALSE]
+                ]
+              ]
+              [
+                foreach sort available-chargers 
+                [
+                  set available FALSE
+                  ask one-of waiting-drivers with [status = "Waiting"]
+                  
+                  [
+                    set status "Charging"
+                    set partner ?
+                  ] 
+              
+                ]
+                foreach sort waiting-drivers with [status = "Waiting"]
+                [ ask ? [
+                set driver-satisfaction (driver-satisfaction * 0.99)]
+                show list "Driver satisfaction decreased at" display-time
+                
+                ]
+                  
+              ] 
+            ]
+                 
 end ;query-chargers
 
-to finish-charging
-  
+to finish-charging ;added by dh and zs 3-20
+  ask drivers with [status = "Charging"]
+  [
+    if state-of-charge >= 100
+    [
+      ask partner [set available TRUE]
+      set partner nobody
+      set status "Staging"
+    ]
+  ]    
 end ;finish-charging
 
 to wait-or-not
@@ -259,30 +417,54 @@ end ;wait-or-not
 
 to depart
   ; do we need these local variables or should we just modify the current schedule variable
-  ; let next-dest 0
-  ; let next-dist 0
-  ; let next-time 0
   ask drivers [
-    if (status = "Home") or (status = "Staging") and (time >= item 0 schedule)[ ;find out which drivers are departing this time step
-      ;read destination TAZ
-      ;set next-dest item 1 schedule
-      ;set next-dist item 2 schedule
-      ;set next-time (time + item 3 schedule)
-      set schedule replace-item 3 schedule (time + item 3 schedule)
+    if (status = "Home") or (status = "Staging") and ((time + 0.001 >= departure-time) and (time - 0.001 <= departure-time)) [ ;find out which drivers are departing this time step
+      set arrival-time (time + total-trip-time) ;calculate arrival time based on length of trip and current time
+  ;    show list "Arrival time is"  arrival-time
       set status "Traveling"
+      set color grey
+  ;    show status
+  
     ]
     
   ]
-end ;wait-or-not
+end ;depart
+
+to debug-print[msg]
+  if debug?[output-print msg]
+end
+to debug-print-self[msg]
+  debug-print(word self " is " msg)
+end
+
+to update-soc ;should be executed each time step by each driver
+  if status = "Traveling" [
+    set travel-time (time - departure-time) ; calculate traveling time based on current time and departure time
+  ;  show list "Travel time is " travel-time
+    let speed (total-trip-dist / total-trip-time) ; calculate average speed based on total trip distance and total trip time
+    set travel-dist (speed * travel-time) ; calculate the distance the driver has traveled thus far
+  ;  show list "Travel distance is " travel-dist
+    set state-of-charge (state-of-charge - time-step-size / 60 * speed * energy-efficiency) ; AH: updated this calculaton; was previously
+  ;  show list "SoC is " state-of-charge   ; subtracting SoC for entire elapsed trip each time. We just want the single step distance.
+    if (state-of-charge <= 0)[
+      set status "Stranded" ]; any vehicle that runs out of charge is stranded immediately
+  ;    show list "SoC is " state-of-charge]
+  ]
+  if status = "Charging"
+  [
+    set state-of-charge state-of-charge + 0.1 * time-step-size ;0.1 needs to be a charger variable
+  ]
+  
+end ;update-soc
 @#$#@#$#@
 GRAPHICS-WINDOW
 375
 19
-814
-479
-16
-16
-13.0
+760
+425
+-1
+-1
+15.0
 1
 10
 1
@@ -292,15 +474,15 @@ GRAPHICS-WINDOW
 0
 0
 1
--16
-16
--16
-16
+0
+24
+0
+24
 0
 0
 1
 ticks
-1.0
+30.0
 
 MONITOR
 16
@@ -397,7 +579,7 @@ MONITOR
 298
 472
 average driver satisfaction
-satisfaction
+total-satisfaction
 17
 1
 11
@@ -419,45 +601,74 @@ INPUTBOX
 79
 316
 n-nodes
-4
+25
+1
+0
+Number
+
+OUTPUT
+17
+323
+335
+415
+11
+
+SWITCH
+115
+191
+218
+224
+debug?
+debug?
+0
+1
+-1000
+
+INPUTBOX
+115
+260
+289
+320
+minimum-acceptable-charge
+95
 1
 0
 Number
 
 @#$#@#$#@
-## WHAT IS IT?
+## ## WHAT IS IT?
 
 (a general understanding of what the model is trying to show or explain)
 
-## HOW IT WORKS
+## ## HOW IT WORKS
 
 (what rules the agents use to create the overall behavior of the model)
 
-## HOW TO USE IT
+## ## HOW TO USE IT
 
 (how to use the model, including a description of each of the items in the Interface tab)
 
-## THINGS TO NOTICE
+## ## THINGS TO NOTICE
 
 (suggested things for the user to notice while running the model)
 
-## THINGS TO TRY
+## ## THINGS TO TRY
 
 (suggested things for the user to try to do (move sliders, switches, etc.) with the model)
 
-## EXTENDING THE MODEL
+## ## EXTENDING THE MODEL
 
 (suggested things to add or change in the Code tab to make the model more complicated, detailed, accurate, etc.)
 
-## NETLOGO FEATURES
+## ## NETLOGO FEATURES
 
 (interesting or unusual features of NetLogo that the model uses, particularly in the Code tab; or where workarounds were needed for missing features)
 
-## RELATED MODELS
+## ## RELATED MODELS
 
 (models in the NetLogo Models Library and elsewhere which are of related interest)
 
-## CREDITS AND REFERENCES
+## ## CREDITS AND REFERENCES
 
 (a reference to the model's URL on the web if it has one, as well as any other necessary credits, citations, and links)
 @#$#@#$#@

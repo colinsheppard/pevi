@@ -2,6 +2,7 @@
 ; 2.0 3-23 cs
 ; reformatting a couple pieces of code for readability
 ; added a plot to show the running number of vehicles in each state
+; added historgrams for driver-satisfaction and state-of-charge
 ; 
 ; 2.0 3-22 ah, dh, jb, zs
 ; In "finish-charging" routine, if it is time for a driver to depart and they have enough charge (but less than 100,
@@ -252,7 +253,7 @@ to setup-schedule
     ]
     ]
     
-    user-message "File loading complete!"
+    ;; user-message "File loading complete!"
     ;; Done reading in schedule.  Close the file.
     file-close
 end ;setup-schedule
@@ -450,7 +451,7 @@ to query-chargers ;Jb added 3.19
       ask waiting-drivers[
         set status "Charging"
         set color orange
-        debug-print-self status
+        ;debug-print-self status
         
         ;let singles waiting-drivers with [partner = nobody]
         ;if not any? singles [ stop ]
@@ -555,17 +556,17 @@ to update-soc ;should be executed each time step by each driver
   ]
   if status = "Charging"
   [
-    show state-of-charge
+    ;show state-of-charge
     set state-of-charge state-of-charge + 100 * ( ( [charger-rate] of partner * time-step-size / 60 ) / battery-capacity ) ; Charger-rate is set in setup-chargers, based on level.
     ; State of charge + update factor, update factor = time (hours) * charger power (kW) / capacity (kWh) ; multiply by 100 changed by JB 3-22
-    show list "Charged to" state-of-charge 
+    ;show list "Charged to" state-of-charge 
   ]
   
 end ;update-soc
 
 to update-custom-plots
   set-current-plot "Driver Status"
-  set-plot-pen-interval 1
+  set-plot-pen-interval 1 / 60
   set-plot-pen-color green
   set-plot-pen-mode 2
   plot count drivers with [status = "Home"]
@@ -573,7 +574,7 @@ to update-custom-plots
   set-plot-pen-color orange
   set-plot-pen-mode 2
   plot count drivers with [status = "Charging"]
-  set-plot-pen-color white
+  set-plot-pen-color black
   set-plot-pen-mode 2  
   plot count drivers with [status = "Traveling"]
   set-plot-pen-color blue
@@ -695,7 +696,7 @@ Number
 INPUTBOX
 210
 95
-289
+309
 155
 batt-cap-stdv
 2
@@ -749,7 +750,7 @@ INPUTBOX
 289
 320
 minimum-acceptable-charge
-95
+90
 1
 0
 Number
@@ -760,7 +761,7 @@ INPUTBOX
 334
 243
 pev-penetration
-5
+8
 1
 0
 Number
@@ -779,11 +780,11 @@ count drivers
 PLOT
 12
 547
-573
+438
 844
 Driver Status
 Hour
-State
+Number of Drivers
 0.0
 10.0
 0.0
@@ -793,6 +794,42 @@ false
 "" ""
 PENS
 "pen-0" 1.0 0 -7500403 false "" ""
+
+PLOT
+469
+543
+669
+693
+State of Charge
+State of Charge
+Frequency
+0.0
+100.0
+0.0
+100.0
+true
+false
+"" ""
+PENS
+"default" 5.0 1 -16777216 true "" "histogram [state-of-charge] of drivers"
+
+PLOT
+473
+711
+673
+861
+Driver Satisfaction
+Satisfaction
+Frequency
+0.0
+1.0
+0.0
+100.0
+true
+false
+"set-histogram-num-bars 10" ""
+PENS
+"default" 0.1 1 -16777216 true "" "histogram [driver-satisfaction] of drivers"
 
 @#$#@#$#@
 ## ## WHAT IS IT?

@@ -1,4 +1,8 @@
 ; ***UPDATES***
+; 2.0 3-23 cs
+; reformatting a couple pieces of code for readability
+; added a plot to show the running number of vehicles in each state
+; 
 ; 2.0 3-22 ah, dh, jb, zs
 ; In "finish-charging" routine, if it is time for a driver to depart and they have enough charge (but less than 100,
 ; they depart.
@@ -232,6 +236,7 @@ to setup-schedule
     foreach n-values n-nodes [?] 
     [
       let $row ($from * n-nodes + ?)  
+      ;debug-print (list $from "," ? ": " (matrix:get od $row 2) " drivers")
       create-drivers matrix:get od $row 2 
       [
         set current-taz matrix:get od $row 0
@@ -356,6 +361,7 @@ to go
    wait-or-not
    depart
    update-variables
+   update-custom-plots
  
 ;  wait 1  ; This temporary statement pauses execution so you can see the time on the display.
   
@@ -437,50 +443,39 @@ to done-traveling
 end ;done-traveling
 
 to query-chargers ;Jb added 3.19
-          foreach sort nodes
-            [
-              let available-chargers chargers with [available = TRUE and taz-location = [taz-id] of ?] 
-              let waiting-drivers drivers with [status = "Waiting" and current-taz = [taz-id] of ?]
-              ifelse count waiting-drivers <= count available-chargers
-              [
-                ask waiting-drivers 
-                [
-                  set status "Charging"
-                  set color orange
-                  debug-print-self status
-              
-                  ;let singles waiting-drivers with [partner = nobody]
-                  ;if not any? singles [ stop ]
-              
-                  set partner one-of available-chargers 
-                  ask partner [set available FALSE]
-                ]
-              ]
-              [
-                foreach sort available-chargers 
-                [
-                  ask ? [
-                  set available FALSE
-                  ask one-of waiting-drivers with [status = "Waiting"]
-                  
-                  [
-                    set status "Charging"
-                    set partner ?
-                  ] 
-              
-                ]
-                ]
-                foreach sort waiting-drivers with [status = "Waiting"]
-                [ ask ? 
-                  [
-                    set driver-satisfaction (driver-satisfaction * 0.99)
-                  ]
-               ; show list "Driver satisfaction decreased at" display-time
-                ]
-                  
-              ] 
-            ]
-                 
+  foreach sort nodes[
+    let available-chargers chargers with [available = TRUE and taz-location = [taz-id] of ?] 
+    let waiting-drivers drivers with [status = "Waiting" and current-taz = [taz-id] of ?]
+    ifelse count waiting-drivers <= count available-chargers[
+      ask waiting-drivers[
+        set status "Charging"
+        set color orange
+        debug-print-self status
+        
+        ;let singles waiting-drivers with [partner = nobody]
+        ;if not any? singles [ stop ]
+        
+        set partner one-of available-chargers 
+        ask partner [set available FALSE]
+      ]
+    ][
+      foreach sort available-chargers[
+        ask ? [
+          set available FALSE
+          ask one-of waiting-drivers with [status = "Waiting"] [
+            set status "Charging"
+            set partner ?
+          ]
+        ]
+      ]
+      foreach sort waiting-drivers with [status = "Waiting"] [ 
+        ask ? [
+         set driver-satisfaction (driver-satisfaction * 0.99)
+        ]
+        ; show list "Driver satisfaction decreased at" display-time
+      ]
+    ]
+  ]         
 end ;query-chargers
 
 to finish-charging ;added by dh and zs 3-20
@@ -567,6 +562,30 @@ to update-soc ;should be executed each time step by each driver
   ]
   
 end ;update-soc
+
+to update-custom-plots
+  set-current-plot "Driver Status"
+  set-plot-pen-interval 1
+  set-plot-pen-color green
+  set-plot-pen-mode 2
+  plot count drivers with [status = "Home"]
+  set-plot-pen-interval 0
+  set-plot-pen-color orange
+  set-plot-pen-mode 2
+  plot count drivers with [status = "Charging"]
+  set-plot-pen-color white
+  set-plot-pen-mode 2  
+  plot count drivers with [status = "Traveling"]
+  set-plot-pen-color blue
+  set-plot-pen-mode 2  
+  plot count drivers with [status = "Staging"]
+  set-plot-pen-color red
+  set-plot-pen-mode 2  
+  plot count drivers with [status = "Waiting"]
+  set-plot-pen-color grey
+  set-plot-pen-mode 2  
+  plot count drivers with [status = "Stranded"]
+end
 @#$#@#$#@
 GRAPHICS-WINDOW
 375
@@ -707,10 +726,10 @@ n-nodes
 Number
 
 OUTPUT
-17
-323
-335
-415
+783
+18
+1338
+906
 11
 
 SWITCH
@@ -756,6 +775,24 @@ count drivers
 3
 1
 11
+
+PLOT
+12
+547
+573
+844
+Driver Status
+Hour
+State
+0.0
+10.0
+0.0
+25.0
+true
+false
+"" ""
+PENS
+"pen-0" 1.0 0 -7500403 false "" ""
 
 @#$#@#$#@
 ## ## WHAT IS IT?

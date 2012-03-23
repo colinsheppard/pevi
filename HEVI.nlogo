@@ -1,4 +1,7 @@
 ; ***UPDATES***
+; 2.0 3-22 ah, dh, jb, zs
+; In "finish-charging" routine, if it is time for a driver to depart and they have enough charge (but less than 100,
+; they depart.
 ; 1.9 3-21 ah & dh
 ; in setup-nodes
  ; created time-and-distance matrix for each node 
@@ -21,6 +24,7 @@
  ; Modified setup-schedule to create drivers and initialize schedule based on scaled sum column of od matrix
 ; removed n-drivers, replaced window with an indicator for pev-penetration percentage.
 ; driver and schedule creation has been verified
+; Drivers currently leave in the morning (will be based on AM data in full model), then they leave in the evening to their original TAZ.
 ; 
 ; 1.6 3-20 ah&jb
 ; "Query-Chargers" now assigns open chargers to first vehicle to arrive. If unavailable, they currently default to wait.
@@ -73,6 +77,7 @@
 ; Drivers currently only search their current TAZ for chargers, will wait until end of day if none are available.
 ; All data is fake; need to update input files with actual data
 ; Nothing in "wait or not" submodel
+; Battery-capacity needs to be incorporated, for determining the state-of-charge, depletion rate, and charging rate.
 ;
 ;
 ; ***Questions***
@@ -213,7 +218,7 @@ to setup-drivers
     ; let battery capacity deviate a little bit but no less than 20 kWh
     set battery-capacity max (list min-batt-cap random-normal batt-cap-mean batt-cap-stdv) ; is this just a kWh rating?
     ; let energy efficiency deviate a little but no less than 0.5
-    set energy-efficiency max (list 0.5 random-normal .74 .05)
+    set energy-efficiency max (list 0.2 random-normal .34 .05)
     set state-of-charge 100
     set status "Home"
     set partner nobody
@@ -299,7 +304,7 @@ to setup-chargers
       set color red
       set size 1
       set charger-level 1
-      set charger-rate 0.1
+      set charger-rate 2.4 ; Charger rate is the charger power in kW. Data from (Markel 2010), see project document
       set taz-location [taz-id] of ?
       set xcor [xcor] of ?
       set ycor [ycor] of ?]
@@ -309,7 +314,7 @@ to setup-chargers
       set color red
       set size 1
       set charger-level 2
-      set charger-rate 0.2
+      set charger-rate 19.2 ; Charger rate is the charger power in kW. Data from (Markel 2010), see project document
       set taz-location [taz-id] of ?
       set xcor [xcor] of ?
       set ycor [ycor] of ?]
@@ -319,7 +324,7 @@ to setup-chargers
       set color red
       set size 1
       set charger-level 3
-      set charger-rate 0.3
+      set charger-rate 30 ; Charger rate is the charger power in kW. Data from (Markel 2010), see project document
       set taz-location [taz-id] of ?
       set xcor [xcor] of ?
       set ycor [ycor] of ?]
@@ -337,7 +342,8 @@ to go
   set time time + (time-step-size / 60)  ; Convert time step to hours and add to current time
   
   if time > stop-hour [ 
-    ask drivers with [status = "Waiting"] [set status "Stranded" set color grey set driver-satisfaction 0]
+    ask drivers with [status != "Home"] [set status "Stranded" set color grey set driver-satisfaction 0]
+    ; If anyone isn't home by midnight, they are stranded. If shape was available, car would turn into pumpkin.
     stop ]           ; stop the simulation
   
   update-display-time
@@ -480,7 +486,20 @@ end ;query-chargers
 to finish-charging ;added by dh and zs 3-20
   ask drivers with [status = "Charging"]
   [
-    if state-of-charge >= 100
+    if time >= departure-time ; First, check and see if it is time to leave.
+    [
+      ifelse state-of-charge >= minimum-acceptable-charge ;If you need to go and have the charge, go.
+      [
+        ask partner [set available TRUE]
+        set partner nobody
+        set status "Staging"
+      ]
+      [
+        set driver-satisfaction driver-satisfaction * 0.98 ; If you need to keep charging to get home, punish driver satisfaction.  
+        ; Derek pointed this out: since depart is set to "time >= departure-time", they'll depart as soon as they are able.
+      ]
+    ]
+    if state-of-charge >= 99 ; If you've got full charge, stop charging.
     [
       ask partner [set available TRUE]
       set partner nobody
@@ -489,7 +508,7 @@ to finish-charging ;added by dh and zs 3-20
   ]    
 end ;finish-charging
 
-to wait-or-not
+to wait-or-not 
   
 end ;wait-or-not
 
@@ -532,8 +551,8 @@ to update-soc ;should be executed each time step by each driver
     set travel-time (time - departure-time) ; calculate traveling time based on current time and departure time
     let speed (total-trip-dist / total-trip-time) ; calculate average speed based on total trip distance and total trip time
     set travel-dist (speed * travel-time) ; calculate the distance the driver has traveled thus far
-    set state-of-charge (state-of-charge - time-step-size / 60 * speed * energy-efficiency) ; AH: updated this calculaton; was previously
-      ; subtracting SoC for entire elapsed trip each time. We just want the single step distance.
+    set state-of-charge (state-of-charge - 100 * (time-step-size / 60 * speed * energy-efficiency) / battery-capacity) ; Here's the calculation:
+    ; State of charge - update factor, update factor = time (hours) * speed (miles/hr) * efficiency (kWh/mi) / capacity (kWh) multiply by 100 changed by JB 3-22
     if (state-of-charge <= 0)[
       set status "Stranded"
       set driver-satisfaction 0 
@@ -541,7 +560,10 @@ to update-soc ;should be executed each time step by each driver
   ]
   if status = "Charging"
   [
-    set state-of-charge state-of-charge + [charger-rate] of partner * time-step-size ; Charger-rate is set in setup-chargers, based on level.
+    show state-of-charge
+    set state-of-charge state-of-charge + 100 * ( ( [charger-rate] of partner * time-step-size / 60 ) / battery-capacity ) ; Charger-rate is set in setup-chargers, based on level.
+    ; State of charge + update factor, update factor = time (hours) * charger power (kW) / capacity (kWh) ; multiply by 100 changed by JB 3-22
+    show list "Charged to" state-of-charge 
   ]
   
 end ;update-soc
@@ -646,7 +668,7 @@ INPUTBOX
 199
 155
 batt-cap-mean
-74
+24
 1
 0
 Number
@@ -657,7 +679,7 @@ INPUTBOX
 289
 155
 batt-cap-stdv
-0.1
+2
 1
 0
 Number
@@ -708,7 +730,7 @@ INPUTBOX
 289
 320
 minimum-acceptable-charge
-70
+95
 1
 0
 Number

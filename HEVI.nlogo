@@ -1,4 +1,74 @@
 ; ***UPDATES***
+; 3.6 4-10 zs
+; added ifelse statements to the reporters so they don't try to compute the mean of an empty agentset
+; 3.5 4-10 ah
+; Fixed the query-chargers. If there are more chargers than people, higher level chargers are assigned first.
+; 3.4 4-10 dh
+; added code in done-traveling to reassign fuel-economy after every trip
+; fixed error in fuel-economy assignment equations
+; 3.3 4-9 dh&ah
+; phevs created during schedule setup
+; new interface inputs for phev fuel economy and battery capacity
+; the minimum-acceptable-charge now calculated from mean fuel economy and mean battery capacity
+; cut tails off normal distribution assignments of fuel economy and battery capacity
+; driver satisfaction equations updated to handle different time step sizes
+; 3.2 4-9 dh
+; added 2 new sliders to interface: PHEV-charge and BEV-charge-anyway. Probabilities that cars will charge even though not necessary.
+; created random-bernoulli reporter from Railsback text
+; created a new driver boolean variable- phev?
+; "doomed" drivers become PHEVs by setting phev? = true
+; in done-travelling procedure:
+    ; phevs call random-bernoulli to determine if they want to charge. if true status changed to waiting. else status changed to staging.
+    ; BEVs with sufficient charge call random-bernoulli to determine if they want to charge anyway 
+; in finish-charging procedure: PHEVs can depart according to their schedule and are not held up for charging    
+; stranded vehicles redefined so that they only include non-PHEVs    
+; added code so that state-of-charge can't be negative (in consideration of now their are PHEVs)
+; 3.0 4-3 ah
+; Added alternative 0, with no chargers
+; Added charger-service; counts the number of people serviced by each charger. Charger-owned.
+; added kWh-charged, a charger variable ; kWh-received, a driver variable ; removed pev-penetration
+; Drivers whose next trip requires more than a full charge are set to "doomed" and turn into a fish. because fish are FUN.
+; Minimum acceptable charge is now set in a separate submodel.
+; 2.8 3-29 dh&ah
+; in setup-schedule, now creating drivers and their schedules from Colin's schedule.
+; 2.6 3-29 dh
+; combined v2.5 with 2.4 (Andy and I were working in parallel)
+; urgent issue: in go procedure, cars not at home at midnight are stranded. This should be changed.
+; 2.5 3-29 dh
+; in setup-od-matrix procedure:
+;   now reading in am trips and appending to od matrix column 5 (scaled for pev penetration)
+;   modify 24 hr trip column of od matrix by subtracting am trips (trips are subtracted before pev scaling occurs)
+;   for trips from-to the same TAZ, 24 hr trip column and am trips column are set to 0
+; in setup-schedule procedure
+;   create drivers based on 24hr trip column of od matrix
+;      they're schedule is set to randomly depart btwn. 0-6, 8-16, or 18-24. and return trip randomly begins 2-6 hrs later
+;   create drivers based on am trip column of od matrix
+;      they're schedule is set to randomly depart btwn. 6-8am and return trip randomly begins btwn. 4-6pm
+; 2.4 3-29 ah
+; Updated query-chargers to stop the program from crashing; originally had drivers with time >= arrival time and state-of-charge >= 0.99 BOTH setting to charging.
+; Input file now specified on interface, not hard-coded.
+; Set pen mode to 1 on driver-satisfaction histogram
+; Calculated duty factor in "update-soc" submodel, currently only tracks after 6AM.
+; TAZ input file now specified by chooser on interface. Must make sure all possible input files are available in the directory.
+;
+; 2.3 3-25 ah
+; In query-chargers, replaced the foreach statements with an ask statements, as per Colin's comments.
+; Reformatted brackets so that the first bracket is on the same line that calls the procedure, as per Colin's request. May have missed a few, keep an eye out if I did.
+; Replaced "energy-efficiency" with "fuel-economy" as per Colin's request
+; Set state-of-charge and pev-penetration to a 0-1 scale and removed the * 100 required by the old scale.
+; Renamed setup-matrix setup-od-matrix, as per Colin's request
+; Labeled columns in sample_driver_input.txt and sample_TAZs and commented out headings.
+; Trip distance and time is now read in from the od matrix; there is no "time&distance" matrix in each node.
+; Added drivers-own variable "current-scheudle-row," this variable is used to find the next schedule.
+; "Home" status is no longer hard coded to the end of the second trip; a driver is home if the next row in their schedule matrix does not exist.
+; Minimum-acceptable-charge is now a driver-owned variable, determined by the charge needed to reach the next destination.
+; Drivers now check if they have enough charge after their next destination is set.
+; Removed input for minimum-acceptable-cahrge, added a slider for "safety-factor," which currently allows us to increase the minimum-state-of-charge by up to 0.25
+;
+; 2.2 3-24 dh
+; wrote code to read in am and pm GEATM data files (in setup-matrix procedure), appends to od matrix 
+; calculated the new node-schedule (in setup-node procedure) variable (matrix) for every node, which contains the probability points discussed in our mtg. with Colin 
+; at this point the node-schedule variable is not being used by the model, reworking will be necessary to incorporate
 ; 2.0 3-23 cs
 ; reformatting a couple pieces of code for readability
 ; added a plot to show the running number of vehicles in each state
@@ -78,17 +148,15 @@
 ; need to be able to assign schedules with multiple destinations.  
 ; -- We prob need to make schedule a matrix and not a list.
 ; start producing output plots
-; Calculate the minimum-state-of-charge (it is currently set to force some drivers to need to charge)
 ; Drivers currently only search their current TAZ for chargers, will wait until end of day if none are available.
-; All data is fake; need to update input files with actual data
 ; Nothing in "wait or not" submodel
-; Battery-capacity needs to be incorporated, for determining the state-of-charge, depletion rate, and charging rate.
-;
+; Same-TAZ travel 
+; Need to verify time step size changes
 ;
 ; ***Questions***
 ; ___________________________________________________
 ; what to do with current-taz variable when traveling
-; if we are not using links, how do we store information about each trip (e.g., avg. speed, energy-efficiency multiplier)
+; if we are not using links, how do we store information about each trip (e.g., avg. speed, fuel-economy multiplier)
 ; what is the best way to step through the model one tick (or several ticks) at a time?
 
 extensions [matrix]
@@ -106,9 +174,10 @@ globals
                   ; The columns correspond to the following definitions:
                   ; 1 - Origin TAZ
                   ; 2 - Destination TAZ
-                  ; 3 - Number of AM trips from 1 to 2
+                  ; 3 - Number of 24hr trips from 1 to 2 minus am trips, scaled for pev penetration
                   ; 4 - Distance in miles
                   ; 5 - Distance in travel time (minutes)
+
   
   ; n-nodes        ; number of nodes set by interface
   ; n-drivers      ; number of drivers set by interface
@@ -129,36 +198,44 @@ drivers-own [
   total-trip-time ; the total time needed to drive from A to B
   total-trip-dist ; the total distance for a given trip
   state-of-charge ; represents battery the state of charge at each timestep
-      ; if soc is calculated from travel-dist and energy-efficiency, is it a state variable still?
-  energy-efficiency ; energy required to travel 1 mile (kWh/mile)
+      ; if soc is calculated from travel-dist and fuel-economy, is it a state variable still?
+  fuel-economy ; energy required to travel 1 mile (kWh/mile)
+  minimum-acceptable-charge ; The charge required to reach the next destination
   arrival-time ; when a car is supposed to arrive
   schedule ; a matrix of: (1)from/current TAZ, (2)to/destination taz, (3)departure time. One row for each trip. (row 1, col 1) is the home TAZ
   status ; discrete value from list:Home,Traveling,Staging,Charging,Waiting,Stranded
   ;destination-number ;keep track of which destination the vehicle is located
   current-taz ; keeps track of the current location of each vehicle
+  current-schedule-row ; keeps track of which row in the schedule each driver is on
   destination-taz ;from the schedule, this is where we're going
   departure-time ;When the vehicle is set to leave the taz
   travel-dist ; used to store distance driven since departure
   travel-time ; used to store traveling time since departure
-]   ; travel-dist and travel-time have no real use, we may want to delete.
+  kWh-received ; a count of how much energy each driver has charged
+  wait-time
+  phev?  ;boolean variable 
+]
 
 breed [chargers charger]
 chargers-own[
   taz-location ; where the charger is located
   available ; boolean to represent either available(TRUE) or occupied(FALSE)
   charger-level ; Sets the charger level of each charger
-  charger-rate ; The rate of recharge for each charger.  
+  charger-rate ; The rate of recharge for each charger.
+  charger-in-use ; A counter increased every time the charger is in use. Used to calculate duty factor. (Not attached to the name -ah)
+  duty-factor ; The fraction of time a charger is in use vs. time idle  
+  charger-service ; a counter for the number of drivers each charger services
+  kWh-charged ; a count of how much energy a charger has given
  ]
 
 breed [nodes node]
 nodes-own[
   taz-id ; a unique integer identifier for each taz
   time-and-distance ;matrix containing time and distance info for every other node
-;  taz-distance ; the distance between each node and every other node
-;  taz-time ; the time required to travel from each node to every other node
   taz-chargers-lvl-1 ; the number of level 1 chargers in a given taz
   taz-chargers-lvl-2 ; the number of level 2 chargers in a given taz
   taz-chargers-lvl-3 ; the number of level 3 chargers in a given taz
+
 ]
 to setup
   
@@ -180,79 +257,104 @@ to setup
   reset-ticks
   
   create-turtles 1 [ setxy 0 0 set color black] ;This invisible turtle makes sure we start at node 1 not node 0
-  setup-matrix ; create a matrix of fabricated data
+  setup-od-matrix 
   setup-nodes
   setup-drivers
   setup-chargers
  
 end ;setup
   
-to setup-matrix 
+to setup-od-matrix 
   ; Reads in main driver input file: Origin, destination, # of trips, distance, time
-  set od matrix:make-constant (n-nodes * n-nodes) 5 0 ;as of 3-21, reading in fake data
+  set od matrix:make-constant (n-nodes * n-nodes) 5 0 
   
-  ifelse (file-exists? "sample_driver_input.txt") 
-    [
-      file-close
-      file-open "sample_driver_input.txt"
-  ; make up some fake data to fill the od matrix for now
-  foreach n-values n-nodes [?] [
-    let $from ?
+  ifelse (file-exists? "test_input.txt") [
+    file-close
+    file-open "test_input.txt"
     foreach n-values n-nodes [?] [
-      let $row ($from * n-nodes + ?)
-      matrix:set-row od $row (list file-read file-read round (file-read * pev-penetration / 100) file-read (file-read / 60))
-      ; Reads in: origin, destination, number of trips (modified for PEV penetration and rounded to nearest integer), drive distance, drive time
-      ; Drive time is in the file as minutes, so to get into hours, we divide by 60 here.
+      let $from ?
+      foreach n-values n-nodes [?] [
+        let $row ($from * n-nodes + ?)
+        matrix:set-row od $row (list file-read file-read (round file-read) file-read (file-read / 60))
+        ; Reads in: origin, destination, number of trips (modified by am trips and PEV penetration and rounded to nearest integer), drive distance, drive time
+        ; Drive time is in the file as minutes, so to get into hours, we divide by 60 here.
+      ]
     ]
+    file-close
   ]
-  file-close
-    ]
-    [ user-message "There is no sample_driver_input.txt file in current directory!" ]
-    ;print matrix:pretty-print-text od ; debugging print command
+  [ user-message "Input file not found in current directory!" ]
 
-end ;setup-matrix
-
+end 
 to setup-drivers
-  ; Will creating drivers based on GEATM data, in setup-schedule procedure. For now, drivers are created by a random number.
+  ; creating drivers based on GEATM data, in setup-schedule procedure. 
   setup-schedule
-  ask drivers[
+  ask drivers [
     set shape "car"
     set color green
     set size 2
     set driver-satisfaction 1  ;initialize driver satisfaction
     ; let battery capacity deviate a little bit but no less than 20 kWh
-    set battery-capacity max (list min-batt-cap random-normal batt-cap-mean batt-cap-stdv) ; is this just a kWh rating?
-    ; let energy efficiency deviate a little but no less than 0.5
-    set energy-efficiency max (list 0.2 random-normal .34 .05)
-    set state-of-charge 100
+    ifelse phev? = false [
+      set battery-capacity min ( list max (list min-batt-cap random-normal batt-cap-mean batt-cap-stdv) max-batt-cap) ; is this just a kWh rating?
+                                                                                             ; let energy efficiency deviate a little but no less than 0.5
+      set fuel-economy max ( list min (list min-fuel-economy random-normal fuel-economy-mean fuel-economy-stdv) max-fuel-economy )
+    ]
+    [ set battery-capacity phev-batt-cap
+      set fuel-economy phev-fuel-economy
+    ]
+    set state-of-charge 1
     set status "Home"
     set partner nobody
+    find-minimum-charge
   ]
 end ;setup-drivers
 
 to setup-schedule
-  foreach n-values n-nodes [?] 
-  [
-    let $from ?
-    foreach n-values n-nodes [?] 
-    [
-      let $row ($from * n-nodes + ?)  
-      ;debug-print (list $from "," ? ": " (matrix:get od $row 2) " drivers")
-      create-drivers matrix:get od $row 2 
-      [
-        set current-taz matrix:get od $row 0
-        set destination-taz matrix:get od $row 1
-        setxy [xcor] of node current-taz [ycor] of node current-taz
-        set schedule matrix:make-constant 2 3 0 ; this just creates the schedule matrix which is populated below
-        matrix:set-row schedule 0 (list current-taz destination-taz (random-float 1 * (8 - 6) + 6)) ;sets departure time btwn 6-8am       
-        matrix:set-row schedule 1 (list destination-taz current-taz (random-float 1 * (18 - 16) + 16)) ;sets departure time btwn 4-6pm      
-       ; print matrix:pretty-print-text schedule
-        set departure-time matrix:get schedule 0 2
-        set arrival-time 99 ; The arrival time is re-set when a vehicle departs - this prevents an arrival time of 0.
+  
+  ifelse (file-exists? driver-input-file) [
+    file-close
+    file-open driver-input-file
+    let index1 0
+    let index2 0
+    let dummy-logic false
+    
+    while [file-at-end? = false] [
+      set index1 index1 + 1
+      if index1 = 1 [let dummy file-read]
+      create-drivers 1 [
+        set phev? false
+        set dummy-logic true
+        set schedule matrix:make-constant 15 3 99
+        set index2 0
+        while [dummy-logic] [
+          set current-taz file-read
+          set destination-taz file-read
+          matrix:set-row schedule index2 (list current-taz destination-taz file-read)
+          find-minimum-charge
+          let dummy-read (file-read)
+          set index2 index2 + 1
+          ifelse (file-at-end? = false) [
+           let next-driver file-read
+            if next-driver != index1 [
+              set dummy-logic false
+            ]
+          ]
+          [set dummy-logic false]
+        ]
+        
       ]
     ]
-    ]
-    
+  ]
+  [ user-message "Input file not found in current directory!" ]
+  
+  ;Now each driver has a schedule. Let's place them where they need to be.
+  
+  ask drivers [
+    set current-taz matrix:get schedule 0 0 
+    set destination-taz matrix:get schedule 0 1 
+    set departure-time matrix:get schedule 0 2
+    setxy [xcor] of node current-taz [ycor] of node current-taz   
+  ]
     ;; user-message "File loading complete!"
     ;; Done reading in schedule.  Close the file.
     file-close
@@ -264,11 +366,27 @@ to setup-nodes
     set shape "star"
     set color yellow
     set size 0.5
-  ]
-    ifelse ( file-exists? "sample_tazs.txt" )
-    [  
+      ]
+      ; Select the TAZ input file based on the alternative chooser on the interface. If the file does not exist, stop.
+    if alternative = 0 [  
       file-close ; is this really necessary?
-      file-open "sample_tazs.txt"      
+      file-open "alternative_0.txt" ]
+    if alternative = 1 [  
+      file-close ; is this really necessary?
+      file-open "alternative_1.txt" ]
+    if alternative = 2 [  
+      file-close ; is this really necessary?
+      file-open "alternative_2.txt" ]
+    if alternative = 3 [  
+      file-close ; is this really necessary?
+      file-open "alternative_3.txt" ]
+    if alternative = 4 [  
+      file-close ; is this really necessary?
+      file-open "alternative_4.txt" ]
+    if alternative = 5 [  
+      file-close ; is this really necessary?
+      file-open "alternative_5.txt" ]
+         
       foreach sort nodes[ ;this block reads taz-id, location, and charger info into each node
         ask ? [
         set taz-id file-read
@@ -278,23 +396,8 @@ to setup-nodes
         set taz-chargers-lvl-3 file-read ; Sets the number of level 3 chargers in each node
         ]    
       ]
-       foreach n-values n-nodes [?]  ;this block loads time-and-distance matrix for each node
-       [ 
-         ask node (? + 1) 
-         [
-           set time-and-distance matrix:make-constant 25 3 0
-         
-           let $to ?        
-           foreach n-values n-nodes [?] 
-           [
-             let $row ($to * n-nodes + ?)
-             matrix:set-row time-and-distance ? (list (? + 1) matrix:get od $row 3 matrix:get od $row 4)
-           ]
-           ; print matrix:pretty-print-text time-and-distance
-          ]
-         ]
-    ]
-    [ user-message "There is no sample_TAZs.txt file in current directory!" ]   
+
+   
 end ;setup-nodes
 
 to setup-chargers
@@ -346,16 +449,10 @@ to go
   ; Advance the time and update time variables
   tick
   set time time + (time-step-size / 60)  ; Convert time step to hours and add to current time
-  
   if time > stop-hour [ 
-    ask drivers with [status != "Home"] [set status "Stranded" set color grey set driver-satisfaction 0]
-    ; If anyone isn't home by midnight, they are stranded. If shape was available, car would turn into pumpkin.
     stop ]           ; stop the simulation
   
   update-display-time
-  
-  ; Put the rest of the schedule here
-
    done-traveling
    query-chargers
    finish-charging
@@ -367,15 +464,6 @@ to go
 ;  wait 1  ; This temporary statement pauses execution so you can see the time on the display.
   
 end ;go
-
-
-to matrix-go [from-node to-node]
-  ; in reality, something would be done with this info, for now, just access it
-  let $row (from-node * n-nodes + to-node)
-  let $temp-distance-miles matrix:get od $row 3
-  let $temp-distance-hours matrix:get od $row 4
-end
-
 
 to update-display-time
   
@@ -393,115 +481,172 @@ end ;update-variables
 to-report total-satisfaction 
   
   ; For now, total-satisfaction is an average of all driver's satisfaction   
-  report mean [driver-satisfaction] of drivers 
+  report mean [driver-satisfaction] of drivers with [phev? = false]
   
 end ;total-satisfaction
 
-to-report duty-factor
-  ; specify context here
-  report 1 ; calculate duty factor here -- currently just garbage
-end ;duty-factor
+to-report average-duty-factor
+  ; Each charger has a unique duty factor - average them here
+  ifelse (count chargers > 0)
+    [report mean [duty-factor] of chargers]
+    [report 0]
+end ;average-duty-factor
+
+to-report average-charger-service
+  ifelse (count chargers > 0)
+    [report mean [charger-service] of chargers]
+    [report 0]
+end ;average-charger-service
+
+to-report total-wait
+  report sum [wait-time] of drivers
+end ;wait time
 
 to done-traveling
     ask drivers [ 
     if status = "Traveling" [
-     
-    ; TRYING TO GET TRAVELING CARS TO DO THINGS
+
       if time >= arrival-time [
         ; If we've arrived, change status and location
-        setxy [xcor] of node destination-taz [ycor] of node destination-taz
-              
-        if state-of-charge > minimum-acceptable-charge [
-          set status "Staging"  
-          set color blue
-          
-          ]
-        if state-of-charge <= minimum-acceptable-charge [set status "Waiting"
-        ;show "charge needed"  
-        set color red]
+        setxy [xcor] of node destination-taz [ycor] of node destination-taz   
         
-        ; We've arrived and analyzed charge. Next: Set our next destination. We can read in our current-taz from our destination-taz,
+        ; We've arrived. Next: Set our next destination. We can read in our current-taz from our destination-taz,
         ; but the next destiantion and arrival time is based on our schedule. 
         
-        ifelse (arrival-time < matrix:get schedule 1 2) ; If driver is past second arrival time, driver is done.
-        [
-          set current-taz destination-taz 
-          set destination-taz matrix:get schedule 1 1
-          set departure-time matrix:get schedule 1 2
-          ;minimum acceptable charge could be calculated based on charge needed for next destination
-        ]
-        [    
+        set current-schedule-row current-schedule-row + 1 ; Set driver to the next schedule
+        
+        carefully [ ; If the next row in the schedule matrix does not exist, "carefully" will supress the error and send them home. ah 3.25
+          set current-taz destination-taz ; Resets the current-taz. "Carefully" won't hit until the next line, so we don't need to set the current-taz in the next block.
+          set destination-taz matrix:get schedule current-schedule-row 1
+          set departure-time matrix:get schedule current-schedule-row 2
           
+          if phev? = false [ ; added 4-10 dh, reassign bat capacity and fuel economy
+            set fuel-economy max ( list min (list min-fuel-economy random-normal fuel-economy-mean fuel-economy-stdv) max-fuel-economy )
+          ]          
+          
+          ifelse departure-time < 99 [
+            find-minimum-charge
+            ifelse state-of-charge > minimum-acceptable-charge + safety-factor and phev? = false [
+              ifelse random-bernoulli bev-charge-anyway [ ; 4-9 added this ifelse- dh
+                set status "Waiting"
+                set color red
+              ] [ set status "Staging" set color blue]
+                
+            ] [ ; Changed the double if statement to an ifelse - we either have the charge, or we don't.
+            set status "Waiting" 
+            set color red
+            ]
+            if phev? = true [ ; added 4-9 dh
+              ifelse random-bernoulli phev-charge [
+                set status "Waiting"
+              ]
+              [ set status "Staging" ]
+            ]
+          ] 
+          [
+            set status "Home" ;Driver is home again. Yay! 
+            set color green
+          ] 
+                    
+        ] [
           set status "Home" ;Driver is home again. Yay!
-          set current-taz destination-taz
           set departure-time 99
           set color green
         ]
-        
+       
         ] 
     ]
   ]
 end ;done-traveling
 
-to query-chargers ;Jb added 3.19
-  foreach sort nodes[
-    let available-chargers chargers with [available = TRUE and taz-location = [taz-id] of ?] 
-    let waiting-drivers drivers with [status = "Waiting" and current-taz = [taz-id] of ?]
-    ifelse count waiting-drivers <= count available-chargers[
-      ask waiting-drivers[
-        set status "Charging"
-        set color orange
-        ;debug-print-self status
-        
-        ;let singles waiting-drivers with [partner = nobody]
-        ;if not any? singles [ stop ]
-        
-        set partner one-of available-chargers 
-        ask partner [set available FALSE]
-      ]
-    ][
-      foreach sort available-chargers[
-        ask ? [
-          set available FALSE
-          ask one-of waiting-drivers with [status = "Waiting"] [
+to query-chargers ;Jb added 3.19, modified by ah 3.25
+  ask nodes[ ; 3.25 ah: Changed from "foreach" loop to "ask" loop
+    let available-chargers chargers with [available = TRUE and taz-location = [taz-id] of myself] 
+    let waiting-drivers drivers with [status = "Waiting" and current-taz = [taz-id] of myself]
+    ifelse count waiting-drivers <= count available-chargers [
+      while [count waiting-drivers > 0 and count available-chargers > 0] [
+        ; Start with the level 3 chargers - have them ask available drivers to pair up.
+        ask available-chargers with [taz-location = [taz-id] of myself and charger-level = 3] [
+          if count waiting-drivers > 0 [
+          ask one-of waiting-drivers [
             set status "Charging"
-            set partner ?
+            set color orange
+            ; Once we have the driver, pair them with the partner
+            set partner myself
+            ask partner [set available FALSE set charger-service charger-service + 1]
+            ; Reset available-chargers and waiting drivers to trigger the while loop
+            set available-chargers chargers with [available = TRUE and taz-location = [current-taz] of myself] 
+            set waiting-drivers drivers with [status = "Waiting" and current-taz = [current-taz] of myself]
+          ]
+        ]
+        ]
+        ; Rinse and repeat
+        ask available-chargers with [taz-location = [taz-id] of myself and charger-level = 2] [
+          if count waiting-drivers > 0 [
+          ask one-of waiting-drivers [
+            set status "Charging"
+            set color orange
+            ; Once we have the driver, pair them with the partner
+            set partner myself
+            ask partner [set available FALSE set charger-service charger-service + 1]
+            set available-chargers chargers with [available = TRUE and taz-location = [current-taz] of myself] 
+            set waiting-drivers drivers with [status = "Waiting" and current-taz = [current-taz] of myself]
+          ]
+        ]
+        ]
+
+        ask available-chargers with [taz-location = [taz-id] of myself and charger-level = 1] [
+          if count waiting-drivers > 0 [
+          ask one-of waiting-drivers [
+            set status "Charging"
+            set color orange
+            ; Once we have the driver, pair them with the partner
+            set partner myself
+            ask partner [set available FALSE set charger-service charger-service + 1]
+            set available-chargers chargers with [available = TRUE and taz-location = [current-taz] of myself] 
+            set waiting-drivers drivers with [status = "Waiting" and current-taz = [current-taz] of myself]
           ]
         ]
       ]
-      foreach sort waiting-drivers with [status = "Waiting"] [ 
-        ask ? [
-         set driver-satisfaction (driver-satisfaction * 0.99)
-        ]
-        ; show list "Driver satisfaction decreased at" display-time
+    ]
+    ]
+      [
+       ask available-chargers [ ; 3.25 ah: Changed from "foreach" loop to "ask" loop
+         set available FALSE
+         set charger-service charger-service + 1
+         ask one-of waiting-drivers with [status = "Waiting"] [
+           set status "Charging"
+           set partner myself
+         ]
+       ]
+      
+      ask waiting-drivers with [status = "Waiting"] [ ; 3.25 ah: Changed from "foreach" loop to "ask" loop
+         set driver-satisfaction (driver-satisfaction * 0.99 ^ time-step-size)
+         set wait-time wait-time + time-step-size
       ]
     ]
   ]         
 end ;query-chargers
 
 to finish-charging ;added by dh and zs 3-20
-  ask drivers with [status = "Charging"]
-  [
-    if time >= departure-time ; First, check and see if it is time to leave.
-    [
-      ifelse state-of-charge >= minimum-acceptable-charge ;If you need to go and have the charge, go.
-      [
-        ask partner [set available TRUE]
-        set partner nobody
-        set status "Staging"
-      ]
-      [
-        set driver-satisfaction driver-satisfaction * 0.98 ; If you need to keep charging to get home, punish driver satisfaction.  
-        ; Derek pointed this out: since depart is set to "time >= departure-time", they'll depart as soon as they are able.
-      ]
-    ]
-    if state-of-charge >= 99 ; If you've got full charge, stop charging.
-    [
+  ask drivers with [status = "Charging"] [
+      ifelse state-of-charge >= 0.99 [; If you've got full charge, stop charging.
       ask partner [set available TRUE]
       set partner nobody
       set status "Staging"
+    ][
+    if time >= departure-time [ ; First, check and see if it is time to leave.
+      ifelse state-of-charge >= minimum-acceptable-charge + safety-factor or phev? = true [ ;If you need to go and have the charge, go.
+        ask partner [set available TRUE]
+        set partner nobody
+        set status "Staging"
+        set color blue
+      ] [
+        set driver-satisfaction driver-satisfaction * 0.98 ^ time-step-size ; If you need to keep charging to get home, punish driver satisfaction.
+;        if driver-satisfaction < 0.5 [set status "Stranded" set driver-satisfaction 0 set color grey]   
+      ]
     ]
-  ]    
+  ]]    
 end ;finish-charging
 
 to wait-or-not 
@@ -510,19 +655,19 @@ end ;wait-or-not
 
 to depart
   ; do we need these local variables or should we just modify the current schedule variable
-  ;show time
   ask drivers [
     if (status = "Home") or (status = "Staging") and (time >= departure-time) [ ;find out which drivers are departing this time step
       
-      ; Time to depart. Step one: calculate their total trip time, and how far they will drive.
-      
-      set total-trip-dist [matrix:get time-and-distance ([destination-taz] of myself - 1) 1] of node current-taz
-      set total-trip-time [matrix:get time-and-distance ([destination-taz] of myself - 1) 2] of node current-taz
+       ; Time to depart. Step one: calculate their total trip time, and how far they will drive.
+       
+       ; ah 3-25: now reading total-trip-dist and total-trip-time from od matrix, not from time&distance matrix.
+       set total-trip-dist matrix:get od (([current-taz] of self - 1) * 25 + [destination-taz] of self - 1) 3
+       set total-trip-time matrix:get od (([current-taz] of self - 1) * 25 + [destination-taz] of self - 1) 4 
+       
       
       ; Now we know how long and far they are driving. Step 2: When do they arrive?
       
       set arrival-time (time + total-trip-time) ;calculate arrival time based on length of trip and current time
-  ;    show list "Arrival time is"  arrival-time
 
       ; And they're off!
 
@@ -547,51 +692,69 @@ to update-soc ;should be executed each time step by each driver
     set travel-time (time - departure-time) ; calculate traveling time based on current time and departure time
     let speed (total-trip-dist / total-trip-time) ; calculate average speed based on total trip distance and total trip time
     set travel-dist (speed * travel-time) ; calculate the distance the driver has traveled thus far
-    set state-of-charge (state-of-charge - 100 * (time-step-size / 60 * speed * energy-efficiency) / battery-capacity) ; Here's the calculation:
-    ; State of charge - update factor, update factor = time (hours) * speed (miles/hr) * efficiency (kWh/mi) / capacity (kWh) multiply by 100 changed by JB 3-22
-    if (state-of-charge <= 0)[
+    if state-of-charge > 0 [set state-of-charge (state-of-charge - (time-step-size / 60 * speed * fuel-economy) / battery-capacity)] ; Here's the calculation:
+    ; State of charge - update factor, update factor = time (hours) * speed (miles/hr) * efficiency (kWh/mi) / capacity (kWh) No longer multiplied by 100 ah 3-25
+    if (state-of-charge <= 0 and phev? = false)[
       set status "Stranded"
       set driver-satisfaction 0 
       set color grey]; any vehicle that runs out of charge is stranded immediately
   ]
-  if status = "Charging"
-  [
-    ;show state-of-charge
-    set state-of-charge state-of-charge + 100 * ( ( [charger-rate] of partner * time-step-size / 60 ) / battery-capacity ) ; Charger-rate is set in setup-chargers, based on level.
-    ; State of charge + update factor, update factor = time (hours) * charger power (kW) / capacity (kWh) ; multiply by 100 changed by JB 3-22
-    ;show list "Charged to" state-of-charge 
+  if status = "Charging" [
+    set state-of-charge state-of-charge + ( ( [charger-rate] of partner * time-step-size / 60 ) / battery-capacity ) ; Charger-rate is set in setup-chargers, based on level.
+    ; State of charge + update factor, update factor = time (hours) * charger power (kW) / capacity (kWh) ; no longer multiplied by 100 ah 3-25
+    set kWh-received kWh-received + ( [charger-rate] of partner * time-step-size / 60 )
+    ask partner [
+      set charger-in-use charger-in-use + 1   ;Charger is use - increase the duty factor
+      set kWh-charged kWh-charged + charger-rate * time-step-size / 60
+      set duty-factor charger-in-use / (ticks) ; Don't calculate before 6AM, and disregard the morning when no one will charge.
+    ]
   ]
   
 end ;update-soc
 
+to-report random-bernoulli [probability-true]
+  if (probability-true < 0.0 or probability-true > 1.0) [
+    user-message (word
+      "Warning in random-bernoulli: probability-true equals"
+      probability-true)
+  ]
+  report random-float 1.0 < probability-true
+end ;random-bernoulli
+
 to update-custom-plots
   set-current-plot "Driver Status"
-  set-plot-pen-interval 1 / 60
+  set-plot-pen-interval time-step-size / 60
   set-plot-pen-color green
   set-plot-pen-mode 2
   plot count drivers with [status = "Home"]
   set-plot-pen-interval 0
   set-plot-pen-color orange
-  set-plot-pen-mode 2
   plot count drivers with [status = "Charging"]
   set-plot-pen-color black
-  set-plot-pen-mode 2  
   plot count drivers with [status = "Traveling"]
   set-plot-pen-color blue
-  set-plot-pen-mode 2  
   plot count drivers with [status = "Staging"]
   set-plot-pen-color red
-  set-plot-pen-mode 2  
   plot count drivers with [status = "Waiting"]
   set-plot-pen-color grey
-  set-plot-pen-mode 2  
   plot count drivers with [status = "Stranded"]
+end
+
+to find-minimum-charge
+  ; To determine minimum-acceptable-charge, we set a local variable equal to the distance of the next trip, multiply that by fuel-economy to get the required
+  ; kWh, and then divide by the battery capacity to get the required state-of-charge. Since the total-trip-dist and total-trip-times need to be set in "to depart" 
+  ; so that cars will leave at the start of the day, I do not set those values here.
+  
+    let next-trip-range matrix:get od (([current-taz] of self - 1) * 25 + [destination-taz] of self - 1) 3
+    set minimum-acceptable-charge (fuel-economy-mean * next-trip-range) / batt-cap-mean
+    if phev? = false [if minimum-acceptable-charge > 1 [set phev? true]]
+    
 end
 @#$#@#$#@
 GRAPHICS-WINDOW
 375
 19
-760
+775
 425
 -1
 -1
@@ -606,7 +769,7 @@ GRAPHICS-WINDOW
 0
 1
 0
-24
+25
 0
 24
 0
@@ -616,10 +779,10 @@ ticks
 30.0
 
 MONITOR
-16
+291
+381
+370
 426
-95
-471
 NIL
 display-time
 17
@@ -705,10 +868,10 @@ batt-cap-stdv
 Number
 
 MONITOR
-173
-425
-312
-470
+817
+381
+956
+426
 average driver satisfaction
 total-satisfaction
 3
@@ -716,61 +879,32 @@ total-satisfaction
 11
 
 INPUTBOX
-15
-256
-79
-316
+1016
+38
+1080
+98
 n-nodes
 25
 1
 0
 Number
 
-OUTPUT
-783
-18
-1338
-906
-11
-
 SWITCH
-115
-191
-218
-224
+95
+184
+198
+217
 debug?
 debug?
 0
 1
 -1000
 
-INPUTBOX
-115
-260
-289
-320
-minimum-acceptable-charge
-90
-1
-0
-Number
-
-INPUTBOX
-240
-183
-334
-243
-pev-penetration
-8
-1
-0
-Number
-
 MONITOR
-12
-187
-69
-232
+818
+63
+875
+108
 Drivers
 count drivers
 3
@@ -778,10 +912,10 @@ count drivers
 11
 
 PLOT
-12
-547
-438
-844
+14
+429
+440
+726
 Driver Status
 Hour
 Number of Drivers
@@ -790,39 +924,39 @@ Number of Drivers
 0.0
 25.0
 true
-false
+true
 "" ""
 PENS
 "pen-0" 1.0 0 -7500403 false "" ""
 
 PLOT
-469
-543
-669
-693
+468
+430
+668
+580
 State of Charge
 State of Charge
 Frequency
 0.0
-100.0
+1.1
 0.0
 100.0
 true
 false
-"" ""
+"set-histogram-num-bars 10" "set-plot-pen-mode 1"
 PENS
-"default" 5.0 1 -16777216 true "" "histogram [state-of-charge] of drivers"
+"pen-1" 1.0 0 -16777216 true "" "histogram [state-of-charge] of drivers"
 
 PLOT
-473
-711
-673
-861
+467
+580
+667
+730
 Driver Satisfaction
 Satisfaction
 Frequency
 0.0
-1.0
+1.1
 0.0
 100.0
 true
@@ -830,6 +964,295 @@ false
 "set-histogram-num-bars 10" ""
 PENS
 "default" 0.1 1 -16777216 true "" "histogram [driver-satisfaction] of drivers"
+
+SLIDER
+198
+184
+370
+217
+safety-factor
+safety-factor
+0
+.25
+0.1
+0.01
+1
+NIL
+HORIZONTAL
+
+INPUTBOX
+876
+545
+1127
+605
+driver-input-file
+p3i3.txt
+1
+0
+String
+
+MONITOR
+916
+125
+1021
+170
+Stranded drivers
+count drivers with [status = \"Stranded\" ]
+17
+1
+11
+
+MONITOR
+956
+381
+1033
+426
+Duty factor
+average-duty-factor
+3
+1
+11
+
+CHOOSER
+4
+175
+96
+220
+alternative
+alternative
+0 1 2 3 4 5
+5
+
+MONITOR
+899
+434
+1056
+479
+Average vehicles serviced
+average-charger-service
+3
+1
+11
+
+PLOT
+667
+430
+867
+580
+Vehicles Serviced per Charger
+Number of vehicles serviced
+Frequency
+0.0
+20.0
+0.0
+10.0
+true
+false
+"set-histogram-num-bars 20" "set-plot-pen-mode 1"
+PENS
+"default" 1.0 0 -16777216 true "" "histogram [charger-service] of chargers"
+
+PLOT
+667
+579
+867
+729
+kWh-charged
+kWh-charged
+Frequency
+0.0
+100.0
+0.0
+10.0
+true
+false
+"" "set-plot-pen-mode 1"
+PENS
+"default" 1.0 0 -16777216 true "" "histogram [kWh-charged] of chargers"
+
+MONITOR
+818
+125
+916
+170
+PHEVs
+count drivers with [phev? = true]
+0
+1
+11
+
+MONITOR
+823
+194
+880
+239
+home
+count drivers with [status = \"Home\"]
+17
+1
+11
+
+MONITOR
+822
+257
+879
+302
+waiting
+count drivers with [status = \"Waiting\"]
+17
+1
+11
+
+MONITOR
+826
+318
+883
+363
+staging
+count drivers with [status = \"Staging\"]
+17
+1
+11
+
+MONITOR
+883
+318
+1117
+363
+Charging
+count drivers with [status = \"Charging\"]
+17
+1
+11
+
+MONITOR
+880
+194
+1118
+239
+Traveling
+count drivers with [status = \"Traveling\"]
+17
+1
+11
+
+MONITOR
+879
+257
+945
+302
+NIL
+total-wait
+17
+1
+11
+
+SLIDER
+199
+216
+371
+249
+phev-charge
+phev-charge
+0
+1
+0.1
+.05
+1
+NIL
+HORIZONTAL
+
+SLIDER
+199
+249
+373
+282
+bev-charge-anyway
+bev-charge-anyway
+0
+1
+0.1
+.05
+1
+NIL
+HORIZONTAL
+
+INPUTBOX
+3
+224
+158
+284
+fuel-economy-mean
+0.34
+1
+0
+Number
+
+INPUTBOX
+5
+287
+113
+347
+fuel-economy-stdv
+0.05
+1
+0
+Number
+
+INPUTBOX
+119
+287
+229
+347
+phev-fuel-economy
+0.5
+1
+0
+Number
+
+INPUTBOX
+7
+353
+103
+413
+phev-batt-cap
+16
+1
+0
+Number
+
+INPUTBOX
+213
+19
+314
+79
+max-batt-cap
+27
+1
+0
+Number
+
+INPUTBOX
+236
+288
+337
+348
+max-fuel-economy
+0.25
+1
+0
+Number
+
+INPUTBOX
+114
+355
+222
+415
+min-fuel-economy
+0.5
+1
+0
+Number
 
 @#$#@#$#@
 ## ## WHAT IS IT?
@@ -1164,6 +1587,78 @@ NetLogo 5.0
 @#$#@#$#@
 @#$#@#$#@
 @#$#@#$#@
+<experiments>
+  <experiment name="every-timestep-p3" repetitions="1" runMetricsEveryStep="true">
+    <setup>setup</setup>
+    <go>go</go>
+    <metric>count drivers</metric>
+    <metric>count drivers with [status = "Stranded"]</metric>
+    <metric>count drivers with [driver-satisfaction &lt; 0.1 and driver-satisfaction &gt; 0]</metric>
+    <metric>count drivers with [phev? = true]</metric>
+    <metric>sum [kWh-received] of drivers</metric>
+    <metric>total-satisfaction</metric>
+    <metric>average-duty-factor</metric>
+    <metric>average-charger-service</metric>
+    <metric>total-wait</metric>
+    <enumeratedValueSet variable="batt-cap-stdv">
+      <value value="2"/>
+    </enumeratedValueSet>
+    <enumeratedValueSet variable="min-batt-cap">
+      <value value="20"/>
+    </enumeratedValueSet>
+    <enumeratedValueSet variable="max-batt-cap">
+      <value value="27"/>
+    </enumeratedValueSet>
+    <enumeratedValueSet variable="fuel-economy-mean">
+      <value value="0.34"/>
+    </enumeratedValueSet>
+    <enumeratedValueSet variable="bev-charge-anyway">
+      <value value="0.1"/>
+    </enumeratedValueSet>
+    <enumeratedValueSet variable="n-nodes">
+      <value value="25"/>
+    </enumeratedValueSet>
+    <enumeratedValueSet variable="safety-factor">
+      <value value="0.1"/>
+    </enumeratedValueSet>
+    <enumeratedValueSet variable="phev-charge">
+      <value value="0.1"/>
+    </enumeratedValueSet>
+    <enumeratedValueSet variable="max-fuel-economy">
+      <value value="0.25"/>
+    </enumeratedValueSet>
+    <enumeratedValueSet variable="fuel-economy-stdv">
+      <value value="0.05"/>
+    </enumeratedValueSet>
+    <enumeratedValueSet variable="phev-fuel-economy">
+      <value value="0.5"/>
+    </enumeratedValueSet>
+    <steppedValueSet variable="alternative" first="1" step="1" last="5"/>
+    <enumeratedValueSet variable="debug?">
+      <value value="true"/>
+    </enumeratedValueSet>
+    <enumeratedValueSet variable="time-step-size">
+      <value value="1"/>
+    </enumeratedValueSet>
+    <enumeratedValueSet variable="min-fuel-economy">
+      <value value="0.5"/>
+    </enumeratedValueSet>
+    <enumeratedValueSet variable="batt-cap-mean">
+      <value value="24"/>
+    </enumeratedValueSet>
+    <enumeratedValueSet variable="phev-batt-cap">
+      <value value="16"/>
+    </enumeratedValueSet>
+    <enumeratedValueSet variable="driver-input-file">
+      <value value="&quot;p3i0.txt&quot;"/>
+      <value value="&quot;p3i1.txt&quot;"/>
+      <value value="&quot;p3i2.txt&quot;"/>
+      <value value="&quot;p3i3.txt&quot;"/>
+      <value value="&quot;p3i4.txt&quot;"/>
+      <value value="&quot;p3i5.txt&quot;"/>
+    </enumeratedValueSet>
+  </experiment>
+</experiments>
 @#$#@#$#@
 @#$#@#$#@
 default

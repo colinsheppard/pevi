@@ -1,4 +1,8 @@
 ; ***UPDATES***
+; 3.8 4-17 ZS
+; added some additional reporters to the interface
+; 3.7 4-13 zs
+; changed normal distribution parameters for battery capacity and fuel economy to have just a single range instead of a min and max
 ; 3.6 4-10 zs
 ; added ifelse statements to the reporters so they don't try to compute the mean of an empty agentset
 ; 3.5 4-10 ah
@@ -295,9 +299,10 @@ to setup-drivers
     set driver-satisfaction 1  ;initialize driver satisfaction
     ; let battery capacity deviate a little bit but no less than 20 kWh
     ifelse phev? = false [
-      set battery-capacity min ( list max (list min-batt-cap random-normal batt-cap-mean batt-cap-stdv) max-batt-cap) ; is this just a kWh rating?
-                                                                                             ; let energy efficiency deviate a little but no less than 0.5
-      set fuel-economy max ( list min (list min-fuel-economy random-normal fuel-economy-mean fuel-economy-stdv) max-fuel-economy )
+      ; set randomness of battery capacity
+      set battery-capacity min ( list max (list (batt-cap-mean - batt-cap-range) random-normal batt-cap-mean batt-cap-stdv) (batt-cap-mean + batt-cap-range)) 
+      ; set randomness of fuel economy
+      set fuel-economy max ( list min (list (fuel-economy-mean - fuel-economy-range) random-normal fuel-economy-mean fuel-economy-stdv) (fuel-economy-mean + fuel-economy-range) )
     ]
     [ set battery-capacity phev-batt-cap
       set fuel-economy phev-fuel-economy
@@ -492,6 +497,27 @@ to-report average-duty-factor
     [report 0]
 end ;average-duty-factor
 
+to-report level1-duty-factor
+  ; Each charger has a unique duty factor - average them here
+  ifelse (count chargers with [charger-level = 1] > 0)
+    [report mean [duty-factor] of chargers with [charger-level = 1]]
+    [report 0]
+end ;average-duty-factor
+
+to-report level2-duty-factor
+  ; Each charger has a unique duty factor - average them here
+  ifelse (count chargers with [charger-level = 2] > 0)
+    [report mean [duty-factor] of chargers with [charger-level = 2]]
+    [report 0]
+end ;average-duty-factor
+
+to-report level3-duty-factor
+  ; Each charger has a unique duty factor - average them here
+  ifelse (count chargers with [charger-level = 3] > 0)
+    [report mean [duty-factor] of chargers with [charger-level = 3]]
+    [report 0]
+end ;average-duty-factor
+
 to-report average-charger-service
   ifelse (count chargers > 0)
     [report mean [charger-service] of chargers]
@@ -521,7 +547,7 @@ to done-traveling
           set departure-time matrix:get schedule current-schedule-row 2
           
           if phev? = false [ ; added 4-10 dh, reassign bat capacity and fuel economy
-            set fuel-economy max ( list min (list min-fuel-economy random-normal fuel-economy-mean fuel-economy-stdv) max-fuel-economy )
+            set fuel-economy max ( list min (list (fuel-economy-mean - fuel-economy-range) random-normal fuel-economy-mean fuel-economy-stdv) (fuel-economy-mean + fuel-economy-range) )
           ]          
           
           ifelse departure-time < 99 [
@@ -835,17 +861,6 @@ time-step-size
 Number
 
 INPUTBOX
-107
-21
-198
-81
-min-batt-cap
-20
-1
-0
-Number
-
-INPUTBOX
 109
 95
 199
@@ -862,7 +877,7 @@ INPUTBOX
 309
 155
 batt-cap-stdv
-2
+1
 1
 0
 Number
@@ -870,19 +885,19 @@ Number
 MONITOR
 817
 381
-956
+980
 426
-average driver satisfaction
+Average driver satisfaction
 total-satisfaction
 3
 1
 11
 
 INPUTBOX
-1016
-38
-1080
-98
+229
+23
+293
+83
 n-nodes
 25
 1
@@ -901,10 +916,10 @@ debug?
 -1000
 
 MONITOR
-818
-63
-875
-108
+828
+136
+885
+181
 Drivers
 count drivers
 3
@@ -981,22 +996,22 @@ NIL
 HORIZONTAL
 
 INPUTBOX
-876
-545
-1127
-605
+825
+34
+1076
+94
 driver-input-file
-p3i3.txt
+p1r1.txt
 1
 0
 String
 
 MONITOR
-916
-125
-1021
-170
-Stranded drivers
+1006
+136
+1111
+181
+Stranded
 count drivers with [status = \"Stranded\" ]
 17
 1
@@ -1071,10 +1086,10 @@ PENS
 "default" 1.0 0 -16777216 true "" "histogram [kWh-charged] of chargers"
 
 MONITOR
-818
-125
-916
-170
+908
+136
+1006
+181
 PHEVs
 count drivers with [phev? = true]
 0
@@ -1086,7 +1101,7 @@ MONITOR
 194
 880
 239
-home
+Home
 count drivers with [status = \"Home\"]
 17
 1
@@ -1097,7 +1112,7 @@ MONITOR
 257
 879
 302
-waiting
+Waiting
 count drivers with [status = \"Waiting\"]
 17
 1
@@ -1108,7 +1123,7 @@ MONITOR
 318
 883
 363
-staging
+Staging
 count drivers with [status = \"Staging\"]
 17
 1
@@ -1200,10 +1215,10 @@ fuel-economy-stdv
 Number
 
 INPUTBOX
-119
-287
-229
-347
+113
+355
+223
+415
 phev-fuel-economy
 0.5
 1
@@ -1222,37 +1237,103 @@ phev-batt-cap
 Number
 
 INPUTBOX
-213
-19
-314
-79
-max-batt-cap
-27
+109
+23
+203
+83
+batt-cap-range
+5
 1
 0
 Number
 
 INPUTBOX
-236
+120
 288
-337
+237
 348
-max-fuel-economy
-0.25
+fuel-economy-range
+0.1
 1
 0
 Number
 
-INPUTBOX
-114
-355
-222
-415
-min-fuel-economy
-0.5
+MONITOR
+957
+257
+1046
+302
+total-kwh
+sum [kwh-received] of drivers
+4
 1
-0
-Number
+11
+
+MONITOR
+898
+492
+1014
+537
+effective stranded
+count drivers with [driver-satisfaction < 0.1 and driver-satisfaction > 0]
+17
+1
+11
+
+MONITOR
+898
+556
+1001
+601
+high satisfaction
+count drivers with [driver-satisfaction <= 1.0 and driver-satisfaction >= 0.7]
+17
+1
+11
+
+MONITOR
+901
+619
+1014
+664
+chargers available
+count chargers with [available = true]
+1
+1
+11
+
+MONITOR
+906
+677
+998
+722
+kWh delivered
+sum [kWh-charged] of chargers
+4
+1
+11
+
+MONITOR
+1041
+497
+1139
+542
+low satisfaction
+count drivers with [driver-satisfaction < 0.4 and driver-satisfaction >= 0.1]
+17
+1
+11
+
+MONITOR
+1037
+561
+1158
+606
+medium satisfaction
+count drivers with [driver-satisfaction < 0.7 and driver-satisfaction >= 0.4]
+17
+1
+11
 
 @#$#@#$#@
 ## ## WHAT IS IT?
@@ -1588,7 +1669,7 @@ NetLogo 5.0
 @#$#@#$#@
 @#$#@#$#@
 <experiments>
-  <experiment name="every-timestep-p3" repetitions="1" runMetricsEveryStep="true">
+  <experiment name="Alt5_batt-cap-std" repetitions="1" runMetricsEveryStep="false">
     <setup>setup</setup>
     <go>go</go>
     <metric>count drivers</metric>
@@ -1600,9 +1681,7 @@ NetLogo 5.0
     <metric>average-duty-factor</metric>
     <metric>average-charger-service</metric>
     <metric>total-wait</metric>
-    <enumeratedValueSet variable="batt-cap-stdv">
-      <value value="2"/>
-    </enumeratedValueSet>
+    <steppedValueSet variable="batt-cap-stdv" first="0" step="0.5" last="4"/>
     <enumeratedValueSet variable="min-batt-cap">
       <value value="20"/>
     </enumeratedValueSet>
@@ -1633,7 +1712,9 @@ NetLogo 5.0
     <enumeratedValueSet variable="phev-fuel-economy">
       <value value="0.5"/>
     </enumeratedValueSet>
-    <steppedValueSet variable="alternative" first="1" step="1" last="5"/>
+    <enumeratedValueSet variable="alternative">
+      <value value="5"/>
+    </enumeratedValueSet>
     <enumeratedValueSet variable="debug?">
       <value value="true"/>
     </enumeratedValueSet>
@@ -1650,12 +1731,404 @@ NetLogo 5.0
       <value value="16"/>
     </enumeratedValueSet>
     <enumeratedValueSet variable="driver-input-file">
-      <value value="&quot;p3i0.txt&quot;"/>
-      <value value="&quot;p3i1.txt&quot;"/>
-      <value value="&quot;p3i2.txt&quot;"/>
-      <value value="&quot;p3i3.txt&quot;"/>
-      <value value="&quot;p3i4.txt&quot;"/>
-      <value value="&quot;p3i5.txt&quot;"/>
+      <value value="&quot;p1r1.txt&quot;"/>
+      <value value="&quot;p2r1.txt&quot;"/>
+      <value value="&quot;p3r1.txt&quot;"/>
+      <value value="&quot;p4r1.txt&quot;"/>
+      <value value="&quot;p5r1.txt&quot;"/>
+    </enumeratedValueSet>
+  </experiment>
+  <experiment name="Alt5_bat_cap_range" repetitions="1" runMetricsEveryStep="true">
+    <setup>setup</setup>
+    <go>go</go>
+    <metric>count drivers</metric>
+    <metric>count drivers with [status = "Stranded"]</metric>
+    <metric>count drivers with [driver-satisfaction &lt; 0.1 and driver-satisfaction &gt; 0]</metric>
+    <metric>count drivers with [phev? = true]</metric>
+    <metric>sum [kWh-received] of drivers</metric>
+    <metric>total-satisfaction</metric>
+    <metric>average-duty-factor</metric>
+    <metric>average-charger-service</metric>
+    <metric>total-wait</metric>
+    <steppedValueSet variable="batt-cap-range" first="1" step="1" last="10"/>
+    <enumeratedValueSet variable="alternative">
+      <value value="5"/>
+    </enumeratedValueSet>
+    <enumeratedValueSet variable="batt-cap-mean">
+      <value value="24"/>
+    </enumeratedValueSet>
+    <enumeratedValueSet variable="fuel-economy-stdv">
+      <value value="0.05"/>
+    </enumeratedValueSet>
+    <enumeratedValueSet variable="phev-batt-cap">
+      <value value="16"/>
+    </enumeratedValueSet>
+    <enumeratedValueSet variable="phev-fuel-economy">
+      <value value="0.5"/>
+    </enumeratedValueSet>
+    <enumeratedValueSet variable="time-step-size">
+      <value value="1"/>
+    </enumeratedValueSet>
+    <enumeratedValueSet variable="bev-charge-anyway">
+      <value value="0.1"/>
+    </enumeratedValueSet>
+    <enumeratedValueSet variable="max-fuel-economy">
+      <value value="0.25"/>
+    </enumeratedValueSet>
+    <enumeratedValueSet variable="batt-cap-stdv">
+      <value value="4"/>
+    </enumeratedValueSet>
+    <enumeratedValueSet variable="debug?">
+      <value value="true"/>
+    </enumeratedValueSet>
+    <enumeratedValueSet variable="safety-factor">
+      <value value="0.1"/>
+    </enumeratedValueSet>
+    <enumeratedValueSet variable="phev-charge">
+      <value value="0.1"/>
+    </enumeratedValueSet>
+    <enumeratedValueSet variable="n-nodes">
+      <value value="25"/>
+    </enumeratedValueSet>
+    <enumeratedValueSet variable="driver-input-file">
+      <value value="&quot;p1r1.txt&quot;"/>
+      <value value="&quot;p2r1.txt&quot;"/>
+      <value value="&quot;p3r1.txt&quot;"/>
+      <value value="&quot;p4r1.txt&quot;"/>
+      <value value="&quot;p5r1.txt&quot;"/>
+    </enumeratedValueSet>
+    <enumeratedValueSet variable="min-fuel-economy">
+      <value value="0.5"/>
+    </enumeratedValueSet>
+    <enumeratedValueSet variable="fuel-economy-mean">
+      <value value="0.34"/>
+    </enumeratedValueSet>
+  </experiment>
+  <experiment name="Alt5_batt-cap-mean" repetitions="1" runMetricsEveryStep="false">
+    <setup>setup</setup>
+    <go>go</go>
+    <metric>count drivers</metric>
+    <metric>count drivers with [status = "Stranded"]</metric>
+    <metric>count drivers with [driver-satisfaction &lt; 0.1 and driver-satisfaction &gt; 0]</metric>
+    <metric>count drivers with [phev? = true]</metric>
+    <metric>sum [kWh-received] of drivers</metric>
+    <metric>total-satisfaction</metric>
+    <metric>average-duty-factor</metric>
+    <metric>average-charger-service</metric>
+    <metric>total-wait</metric>
+    <enumeratedValueSet variable="alternative">
+      <value value="5"/>
+    </enumeratedValueSet>
+    <steppedValueSet variable="batt-cap-mean" first="24" step="6" last="48"/>
+    <enumeratedValueSet variable="fuel-economy-stdv">
+      <value value="0.05"/>
+    </enumeratedValueSet>
+    <enumeratedValueSet variable="phev-batt-cap">
+      <value value="16"/>
+    </enumeratedValueSet>
+    <enumeratedValueSet variable="phev-fuel-economy">
+      <value value="0.5"/>
+    </enumeratedValueSet>
+    <enumeratedValueSet variable="time-step-size">
+      <value value="1"/>
+    </enumeratedValueSet>
+    <enumeratedValueSet variable="bev-charge-anyway">
+      <value value="0.1"/>
+    </enumeratedValueSet>
+    <enumeratedValueSet variable="max-fuel-economy">
+      <value value="0.25"/>
+    </enumeratedValueSet>
+    <enumeratedValueSet variable="batt-cap-stdv">
+      <value value="1"/>
+    </enumeratedValueSet>
+    <enumeratedValueSet variable="debug?">
+      <value value="true"/>
+    </enumeratedValueSet>
+    <enumeratedValueSet variable="safety-factor">
+      <value value="0.1"/>
+    </enumeratedValueSet>
+    <enumeratedValueSet variable="phev-charge">
+      <value value="0.1"/>
+    </enumeratedValueSet>
+    <enumeratedValueSet variable="batt-cap-range">
+      <value value="5"/>
+    </enumeratedValueSet>
+    <enumeratedValueSet variable="n-nodes">
+      <value value="25"/>
+    </enumeratedValueSet>
+    <enumeratedValueSet variable="driver-input-file">
+      <value value="&quot;p1r1.txt&quot;"/>
+      <value value="&quot;p1r2.txt&quot;"/>
+      <value value="&quot;p1r3.txt&quot;"/>
+      <value value="&quot;p1r4.txt&quot;"/>
+      <value value="&quot;p1r5.txt&quot;"/>
+      <value value="&quot;p2r1.txt&quot;"/>
+      <value value="&quot;p2r2.txt&quot;"/>
+      <value value="&quot;p2r3.txt&quot;"/>
+      <value value="&quot;p2r4.txt&quot;"/>
+      <value value="&quot;p2r5.txt&quot;"/>
+      <value value="&quot;p3r1.txt&quot;"/>
+      <value value="&quot;p3r2.txt&quot;"/>
+      <value value="&quot;p3r3.txt&quot;"/>
+      <value value="&quot;p3r4.txt&quot;"/>
+      <value value="&quot;p3r5.txt&quot;"/>
+      <value value="&quot;p4r1.txt&quot;"/>
+      <value value="&quot;p4r2.txt&quot;"/>
+      <value value="&quot;p4r3.txt&quot;"/>
+      <value value="&quot;p4r4.txt&quot;"/>
+      <value value="&quot;p4r5.txt&quot;"/>
+      <value value="&quot;p5r1.txt&quot;"/>
+      <value value="&quot;p5r2.txt&quot;"/>
+      <value value="&quot;p5r3.txt&quot;"/>
+      <value value="&quot;p5r4.txt&quot;"/>
+      <value value="&quot;p5r5.txt&quot;"/>
+    </enumeratedValueSet>
+    <enumeratedValueSet variable="min-fuel-economy">
+      <value value="0.5"/>
+    </enumeratedValueSet>
+    <enumeratedValueSet variable="fuel-economy-mean">
+      <value value="0.34"/>
+    </enumeratedValueSet>
+  </experiment>
+  <experiment name="Alt5_batt-cap-stdv-2" repetitions="1" runMetricsEveryStep="false">
+    <setup>setup</setup>
+    <go>go</go>
+    <metric>count drivers</metric>
+    <metric>count drivers with [status = "Stranded"]</metric>
+    <metric>count drivers with [driver-satisfaction &lt; 0.1 and driver-satisfaction &gt; 0]</metric>
+    <metric>count drivers with [phev? = true]</metric>
+    <metric>sum [kWh-received] of drivers</metric>
+    <metric>total-satisfaction</metric>
+    <metric>average-duty-factor</metric>
+    <metric>average-charger-service</metric>
+    <metric>total-wait</metric>
+    <enumeratedValueSet variable="alternative">
+      <value value="5"/>
+    </enumeratedValueSet>
+    <enumeratedValueSet variable="fuel-economy-range">
+      <value value="0.1"/>
+    </enumeratedValueSet>
+    <enumeratedValueSet variable="batt-cap-mean">
+      <value value="24"/>
+    </enumeratedValueSet>
+    <enumeratedValueSet variable="fuel-economy-stdv">
+      <value value="0.05"/>
+    </enumeratedValueSet>
+    <enumeratedValueSet variable="phev-batt-cap">
+      <value value="16"/>
+    </enumeratedValueSet>
+    <enumeratedValueSet variable="phev-fuel-economy">
+      <value value="0.5"/>
+    </enumeratedValueSet>
+    <enumeratedValueSet variable="time-step-size">
+      <value value="1"/>
+    </enumeratedValueSet>
+    <enumeratedValueSet variable="bev-charge-anyway">
+      <value value="0.1"/>
+    </enumeratedValueSet>
+    <steppedValueSet variable="batt-cap-stdv" first="0" step="1" last="4"/>
+    <enumeratedValueSet variable="debug?">
+      <value value="true"/>
+    </enumeratedValueSet>
+    <enumeratedValueSet variable="safety-factor">
+      <value value="0.1"/>
+    </enumeratedValueSet>
+    <enumeratedValueSet variable="phev-charge">
+      <value value="0.1"/>
+    </enumeratedValueSet>
+    <enumeratedValueSet variable="batt-cap-range">
+      <value value="5"/>
+    </enumeratedValueSet>
+    <enumeratedValueSet variable="n-nodes">
+      <value value="25"/>
+    </enumeratedValueSet>
+    <enumeratedValueSet variable="driver-input-file">
+      <value value="&quot;p1r1.txt&quot;"/>
+      <value value="&quot;p1r2.txt&quot;"/>
+      <value value="&quot;p1r3.txt&quot;"/>
+      <value value="&quot;p1r4.txt&quot;"/>
+      <value value="&quot;p1r5.txt&quot;"/>
+      <value value="&quot;p2r1.txt&quot;"/>
+      <value value="&quot;p2r2.txt&quot;"/>
+      <value value="&quot;p2r3.txt&quot;"/>
+      <value value="&quot;p2r4.txt&quot;"/>
+      <value value="&quot;p2r5.txt&quot;"/>
+      <value value="&quot;p3r1.txt&quot;"/>
+      <value value="&quot;p3r2.txt&quot;"/>
+      <value value="&quot;p3r3.txt&quot;"/>
+      <value value="&quot;p3r4.txt&quot;"/>
+      <value value="&quot;p3r5.txt&quot;"/>
+      <value value="&quot;p4r1.txt&quot;"/>
+      <value value="&quot;p4r2.txt&quot;"/>
+      <value value="&quot;p4r3.txt&quot;"/>
+      <value value="&quot;p4r4.txt&quot;"/>
+      <value value="&quot;p4r5.txt&quot;"/>
+      <value value="&quot;p5r1.txt&quot;"/>
+      <value value="&quot;p5r2.txt&quot;"/>
+      <value value="&quot;p5r3.txt&quot;"/>
+      <value value="&quot;p5r4.txt&quot;"/>
+      <value value="&quot;p5r5.txt&quot;"/>
+    </enumeratedValueSet>
+    <enumeratedValueSet variable="fuel-economy-mean">
+      <value value="0.34"/>
+    </enumeratedValueSet>
+  </experiment>
+  <experiment name="Alt5_fuel-econ-mean" repetitions="1" runMetricsEveryStep="false">
+    <setup>setup</setup>
+    <go>go</go>
+    <metric>count drivers</metric>
+    <metric>count drivers with [status = "Stranded"]</metric>
+    <metric>count drivers with [driver-satisfaction &lt; 0.1 and driver-satisfaction &gt; 0]</metric>
+    <metric>count drivers with [phev? = true]</metric>
+    <metric>sum [kWh-received] of drivers</metric>
+    <metric>total-satisfaction</metric>
+    <metric>average-duty-factor</metric>
+    <metric>average-charger-service</metric>
+    <metric>total-wait</metric>
+    <enumeratedValueSet variable="alternative">
+      <value value="5"/>
+    </enumeratedValueSet>
+    <enumeratedValueSet variable="fuel-economy-range">
+      <value value="0.1"/>
+    </enumeratedValueSet>
+    <enumeratedValueSet variable="batt-cap-mean">
+      <value value="24"/>
+    </enumeratedValueSet>
+    <enumeratedValueSet variable="fuel-economy-stdv">
+      <value value="0.05"/>
+    </enumeratedValueSet>
+    <enumeratedValueSet variable="phev-batt-cap">
+      <value value="16"/>
+    </enumeratedValueSet>
+    <enumeratedValueSet variable="phev-fuel-economy">
+      <value value="0.5"/>
+    </enumeratedValueSet>
+    <enumeratedValueSet variable="time-step-size">
+      <value value="1"/>
+    </enumeratedValueSet>
+    <enumeratedValueSet variable="bev-charge-anyway">
+      <value value="0.1"/>
+    </enumeratedValueSet>
+    <enumeratedValueSet variable="batt-cap-stdv">
+      <value value="1"/>
+    </enumeratedValueSet>
+    <enumeratedValueSet variable="debug?">
+      <value value="true"/>
+    </enumeratedValueSet>
+    <enumeratedValueSet variable="safety-factor">
+      <value value="0.1"/>
+    </enumeratedValueSet>
+    <enumeratedValueSet variable="phev-charge">
+      <value value="0.1"/>
+    </enumeratedValueSet>
+    <enumeratedValueSet variable="batt-cap-range">
+      <value value="5"/>
+    </enumeratedValueSet>
+    <enumeratedValueSet variable="n-nodes">
+      <value value="25"/>
+    </enumeratedValueSet>
+    <enumeratedValueSet variable="driver-input-file">
+      <value value="&quot;p1r1.txt&quot;"/>
+      <value value="&quot;p1r2.txt&quot;"/>
+      <value value="&quot;p1r3.txt&quot;"/>
+      <value value="&quot;p1r4.txt&quot;"/>
+      <value value="&quot;p1r5.txt&quot;"/>
+      <value value="&quot;p2r1.txt&quot;"/>
+      <value value="&quot;p2r2.txt&quot;"/>
+      <value value="&quot;p2r3.txt&quot;"/>
+      <value value="&quot;p2r4.txt&quot;"/>
+      <value value="&quot;p2r5.txt&quot;"/>
+      <value value="&quot;p3r1.txt&quot;"/>
+      <value value="&quot;p3r2.txt&quot;"/>
+      <value value="&quot;p3r3.txt&quot;"/>
+      <value value="&quot;p3r4.txt&quot;"/>
+      <value value="&quot;p3r5.txt&quot;"/>
+      <value value="&quot;p4r1.txt&quot;"/>
+      <value value="&quot;p4r2.txt&quot;"/>
+      <value value="&quot;p4r3.txt&quot;"/>
+      <value value="&quot;p4r4.txt&quot;"/>
+      <value value="&quot;p4r5.txt&quot;"/>
+      <value value="&quot;p5r1.txt&quot;"/>
+      <value value="&quot;p5r2.txt&quot;"/>
+      <value value="&quot;p5r3.txt&quot;"/>
+      <value value="&quot;p5r4.txt&quot;"/>
+      <value value="&quot;p5r5.txt&quot;"/>
+    </enumeratedValueSet>
+    <steppedValueSet variable="fuel-economy-mean" first="0.26" step="0.04" last="0.43"/>
+  </experiment>
+  <experiment name="more output" repetitions="1" runMetricsEveryStep="true">
+    <setup>setup</setup>
+    <go>go</go>
+    <metric>count drivers</metric>
+    <metric>count drivers with [phev? = true]</metric>
+    <metric>count drivers with [status = "Stranded"]</metric>
+    <metric>count drivers with [status = "Traveling"]</metric>
+    <metric>count drivers with [status = "Waiting"]</metric>
+    <metric>count drivers with [status = "Staging"]</metric>
+    <metric>count drivers with [status = "Charging"]</metric>
+    <metric>count drivers with [status = "Home"]</metric>
+    <metric>count drivers with [driver-satisfaction &lt; 0.1 and driver-satisfaction &gt; 0]</metric>
+    <metric>count drivers with [driver-satisfaction &lt; 0.4 and driver-satisfaction &gt;= 0.1]</metric>
+    <metric>count drivers with [driver-satisfaction &lt; 0.7 and driver-satisfaction &gt;= 0.4]</metric>
+    <metric>count drivers with [driver-satisfaction &lt;= 1 and driver-satisfaction &gt;= 0.7]</metric>
+    <metric>sum [kWh-received] of drivers</metric>
+    <metric>average-duty-factor</metric>
+    <metric>level1-duty-factor</metric>
+    <metric>level2-duty-factor</metric>
+    <metric>average-charger-service</metric>
+    <metric>mean [charger-service] of chargers with [charger-level = 1]</metric>
+    <metric>mean [charger-service] of chargers with [charger-level = 2]</metric>
+    <metric>count chargers with [available = true]</metric>
+    <metric>sum [kWh-charged] of chargers</metric>
+    <metric>total-wait</metric>
+    <metric>total-satisfaction</metric>
+    <enumeratedValueSet variable="driver-input-file">
+      <value value="&quot;p1r1.txt&quot;"/>
+    </enumeratedValueSet>
+    <enumeratedValueSet variable="batt-cap-range">
+      <value value="5"/>
+    </enumeratedValueSet>
+    <enumeratedValueSet variable="fuel-economy-mean">
+      <value value="0.34"/>
+    </enumeratedValueSet>
+    <enumeratedValueSet variable="fuel-economy-range">
+      <value value="0.1"/>
+    </enumeratedValueSet>
+    <enumeratedValueSet variable="bev-charge-anyway">
+      <value value="0.1"/>
+    </enumeratedValueSet>
+    <enumeratedValueSet variable="alternative">
+      <value value="5"/>
+    </enumeratedValueSet>
+    <enumeratedValueSet variable="time-step-size">
+      <value value="1"/>
+    </enumeratedValueSet>
+    <enumeratedValueSet variable="n-nodes">
+      <value value="25"/>
+    </enumeratedValueSet>
+    <enumeratedValueSet variable="debug?">
+      <value value="true"/>
+    </enumeratedValueSet>
+    <enumeratedValueSet variable="phev-batt-cap">
+      <value value="16"/>
+    </enumeratedValueSet>
+    <enumeratedValueSet variable="phev-fuel-economy">
+      <value value="0.5"/>
+    </enumeratedValueSet>
+    <enumeratedValueSet variable="safety-factor">
+      <value value="0.1"/>
+    </enumeratedValueSet>
+    <enumeratedValueSet variable="fuel-economy-stdv">
+      <value value="0.05"/>
+    </enumeratedValueSet>
+    <enumeratedValueSet variable="batt-cap-mean">
+      <value value="24"/>
+    </enumeratedValueSet>
+    <enumeratedValueSet variable="phev-charge">
+      <value value="0.1"/>
+    </enumeratedValueSet>
+    <enumeratedValueSet variable="batt-cap-stdv">
+      <value value="1"/>
     </enumeratedValueSet>
   </experiment>
 </experiments>

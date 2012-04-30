@@ -27,4 +27,6 @@ set.dir('',path.to.hevi)
 
 NLStart(nl.path,gui=F,obj.name='nl.handle',nl.version=nl.version)
 
-NLLoadModel(paste(path.to.hev,'/HEVI.nlogo',sep=''),nl.handle)
+NLLoadModel(paste(path.to.hevi,'/HEVI.nlogo',sep=''),nl.handle)
+
+NLCommand("set driver-input-file 'p1r1.txt'",nl.handle)

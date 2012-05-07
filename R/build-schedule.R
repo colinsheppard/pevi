@@ -227,6 +227,33 @@ if(!file.exists(paste(path.to.outputs,'schedules-20120425.Rdata',sep=''))){
   load(file=paste(path.to.outputs,'schedules-20120425.Rdata',sep=''))
 }
 
+for(pev.penetration in pev.pens){
+  pev.pen.char <- roundC(pev.penetration,2)
+  print(pev.pen.char)
+  print(nrow(schedule[[pev.pen.char]])/length(unique(schedule[[pev.pen.char]]$driver)))
+}
+
+#[1] "0.01"
+#[1] 2.406499
+#[1] "0.02"
+#[1] 2.513825
+#[1] "0.03"
+#[1] 2.548458
+#[1] "0.04"
+#[1] 2.580726
+#[1] "0.05"
+#[1] 2.677658
+#[1] "0.10"
+#[1] 2.781892
+#[1] "0.15"
+#[1] 2.850939
+#[1] "0.20"
+#[1] 2.986366
+#[1] "0.25"
+#[1] 3.003536
+
+
+
 # analyze and plot the schedules, compare them to NHTS and GEATM
 
 ks.tests <- data.frame(penetration=pev.pens,test='tours.per.driver',factor=NA,level=NA,stat=NA,p.value=NA)

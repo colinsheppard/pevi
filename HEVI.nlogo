@@ -1,4 +1,8 @@
 ; ***UPDATES***
+; 3.9 4-29 ZS
+; added kw reporter
+; need to integrate color fix from demonstration version
+; should try to add reporter for percentage of vehicles that need to charge by TAZ
 ; 3.8 4-17 ZS
 ; added some additional reporters to the interface
 ; 3.7 4-13 zs
@@ -528,6 +532,10 @@ to-report total-wait
   report sum [wait-time] of drivers
 end ;wait time
 
+to-report kw
+  report sum [charger-rate] of (chargers with [available = false])
+end
+
 to done-traveling
     ask drivers [ 
     if status = "Traveling" [
@@ -1001,7 +1009,7 @@ INPUTBOX
 1076
 94
 driver-input-file
-p1r1.txt
+p5r3.txt
 1
 0
 String
@@ -1036,7 +1044,7 @@ CHOOSER
 alternative
 alternative
 0 1 2 3 4 5
-5
+1
 
 MONITOR
 899
@@ -2056,7 +2064,7 @@ NetLogo 5.0
     </enumeratedValueSet>
     <steppedValueSet variable="fuel-economy-mean" first="0.26" step="0.04" last="0.43"/>
   </experiment>
-  <experiment name="more output" repetitions="1" runMetricsEveryStep="true">
+  <experiment name="pev135_alt135_Power" repetitions="1" runMetricsEveryStep="true">
     <setup>setup</setup>
     <go>go</go>
     <metric>count drivers</metric>
@@ -2078,12 +2086,28 @@ NetLogo 5.0
     <metric>average-charger-service</metric>
     <metric>mean [charger-service] of chargers with [charger-level = 1]</metric>
     <metric>mean [charger-service] of chargers with [charger-level = 2]</metric>
-    <metric>count chargers with [available = true]</metric>
+    <metric>count chargers with [available = true and charger-level = 1]</metric>
+    <metric>count chargers with [available = true and charger-level = 2]</metric>
     <metric>sum [kWh-charged] of chargers</metric>
     <metric>total-wait</metric>
     <metric>total-satisfaction</metric>
+    <metric>kw</metric>
     <enumeratedValueSet variable="driver-input-file">
       <value value="&quot;p1r1.txt&quot;"/>
+      <value value="&quot;p1r2.txt&quot;"/>
+      <value value="&quot;p1r3.txt&quot;"/>
+      <value value="&quot;p1r4.txt&quot;"/>
+      <value value="&quot;p1r5.txt&quot;"/>
+      <value value="&quot;p3r1.txt&quot;"/>
+      <value value="&quot;p3r2.txt&quot;"/>
+      <value value="&quot;p3r3.txt&quot;"/>
+      <value value="&quot;p3r4.txt&quot;"/>
+      <value value="&quot;p3r5.txt&quot;"/>
+      <value value="&quot;p5r1.txt&quot;"/>
+      <value value="&quot;p5r2.txt&quot;"/>
+      <value value="&quot;p5r3.txt&quot;"/>
+      <value value="&quot;p5r4.txt&quot;"/>
+      <value value="&quot;p5r5.txt&quot;"/>
     </enumeratedValueSet>
     <enumeratedValueSet variable="batt-cap-range">
       <value value="5"/>
@@ -2098,6 +2122,8 @@ NetLogo 5.0
       <value value="0.1"/>
     </enumeratedValueSet>
     <enumeratedValueSet variable="alternative">
+      <value value="1"/>
+      <value value="3"/>
       <value value="5"/>
     </enumeratedValueSet>
     <enumeratedValueSet variable="time-step-size">

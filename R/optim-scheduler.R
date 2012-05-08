@@ -26,7 +26,7 @@ de.params[['max.iter']] <- 300    # max iterations
 stop.params <- list()
 stop.params[['diff.from.best.threshold']]          <- .005    # stopping threshold, when all ptx are 
                                                               # within this fraction of the best return T
-decision.vars <- data.frame(lbound=c(0,rep(1e-6,6)),ubound=c(10,rep(1,6)))
+decision.vars <- data.frame(lbound=c(0.01,rep(1e-6,6)),ubound=c(10,rep(1,6)))
 
 pev.penetration <- 0.01
 location <- 'colin-serc'

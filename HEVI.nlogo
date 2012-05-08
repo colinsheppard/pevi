@@ -953,10 +953,10 @@ PENS
 "pen-0" 1.0 0 -7500403 false "" ""
 
 PLOT
-468
-430
-668
-580
+615
+436
+815
+586
 State of Charge
 State of Charge
 Frequency
@@ -971,10 +971,10 @@ PENS
 "pen-1" 1.0 0 -16777216 true "" "histogram [state-of-charge] of drivers"
 
 PLOT
-467
-580
-667
-730
+614
+586
+814
+736
 Driver Satisfaction
 Satisfaction
 Frequency
@@ -1009,7 +1009,7 @@ INPUTBOX
 1076
 94
 driver-input-file
-p5r3.txt
+p1r1.txt
 1
 0
 String
@@ -1047,10 +1047,10 @@ alternative
 1
 
 MONITOR
-899
-434
-1056
-479
+1036
+446
+1193
+491
 Average vehicles serviced
 average-charger-service
 3
@@ -1058,10 +1058,10 @@ average-charger-service
 11
 
 PLOT
-667
-430
-867
-580
+814
+436
+1014
+586
 Vehicles Serviced per Charger
 Number of vehicles serviced
 Frequency
@@ -1076,10 +1076,10 @@ PENS
 "default" 1.0 0 -16777216 true "" "histogram [charger-service] of chargers"
 
 PLOT
-667
-579
-867
-729
+814
+585
+1014
+735
 kWh-charged
 kWh-charged
 Frequency
@@ -1278,10 +1278,10 @@ sum [kwh-received] of drivers
 11
 
 MONITOR
-898
-492
-1014
-537
+1035
+504
+1151
+549
 effective stranded
 count drivers with [driver-satisfaction < 0.1 and driver-satisfaction > 0]
 17
@@ -1289,10 +1289,10 @@ count drivers with [driver-satisfaction < 0.1 and driver-satisfaction > 0]
 11
 
 MONITOR
-898
-556
-1001
-601
+1035
+568
+1138
+613
 high satisfaction
 count drivers with [driver-satisfaction <= 1.0 and driver-satisfaction >= 0.7]
 17
@@ -1300,10 +1300,10 @@ count drivers with [driver-satisfaction <= 1.0 and driver-satisfaction >= 0.7]
 11
 
 MONITOR
-901
-619
-1014
-664
+1038
+631
+1151
+676
 chargers available
 count chargers with [available = true]
 1
@@ -1311,10 +1311,10 @@ count chargers with [available = true]
 11
 
 MONITOR
-906
-677
-998
-722
+1043
+689
+1135
+734
 kWh delivered
 sum [kWh-charged] of chargers
 4
@@ -1322,10 +1322,10 @@ sum [kWh-charged] of chargers
 11
 
 MONITOR
-1041
-497
-1139
-542
+1178
+509
+1276
+554
 low satisfaction
 count drivers with [driver-satisfaction < 0.4 and driver-satisfaction >= 0.1]
 17
@@ -1333,15 +1333,25 @@ count drivers with [driver-satisfaction < 0.4 and driver-satisfaction >= 0.1]
 11
 
 MONITOR
-1037
-561
-1158
-606
+1174
+573
+1295
+618
 medium satisfaction
 count drivers with [driver-satisfaction < 0.7 and driver-satisfaction >= 0.4]
 17
 1
 11
+
+TEXTBOX
+460
+441
+642
+569
+Driver Status Legend\n-GREEN	= HOME\n-BLACK	= TRAVELING\n-ORANGE	= CHARGING\n-BLUE	= STAGING\n-RED	= WAITING\n-GREY	= STRANDED
+13
+0.0
+1
 
 @#$#@#$#@
 ## ## WHAT IS IT?

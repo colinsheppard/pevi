@@ -1,3 +1,5 @@
+;; hi
+
 extensions [matrix]
 
 globals

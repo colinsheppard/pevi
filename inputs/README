@@ -1,0 +1,5 @@
+This is where input files related to PEVI model runs are sourced during model executions.
+
+For now, all files in this directory are ignored by git to avoid storing large quantities of files in the serc/pevi repository.
+
+So make sure to use another method to back up / archive inputs that are important.

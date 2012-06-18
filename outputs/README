@@ -1,0 +1,5 @@
+This is where output files related to PEVI model runs are written during model executions.
+
+For now, all files in this directory are ignored by git to avoid storing large quantities of files in the serc/pevi repository.
+
+So make sure to use another method to back up / archive outputs that are important.

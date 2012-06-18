@@ -109,9 +109,9 @@ to setup-od-matrix
   ; Reads in main driver input file: Origin, destination, # of trips, distance, time
   set od matrix:make-constant (n-nodes * n-nodes) 5 0 
   
-  ifelse (file-exists? "test_input.txt") [
+  ifelse (file-exists? "../inputs/OD_Matrix.txt") [
     file-close
-    file-open "test_input.txt"
+    file-open "../inputs/OD_Matrix.txt"
     foreach n-values n-nodes [?] [
       let $from ?
       foreach n-values n-nodes [?] [
@@ -123,7 +123,7 @@ to setup-od-matrix
     ]
     file-close
   ]
-  [ user-message "Input file not found in current directory!" ]
+  [ user-message "File not found: ../inputs/OD_Matrix.txt" ]
 
 end 
 to setup-drivers
@@ -187,7 +187,7 @@ to setup-schedule
       ]
     ]
   ]
-  [ user-message "Input file not found in current directory!" ]
+  [ user-message (word "Input file '" driver-input-file "' not found!") ]
   
   ;Now each driver has a schedule. Let's place them where they need to be.
   
@@ -212,22 +212,22 @@ to setup-nodes
       ; Select the TAZ input file based on the alternative chooser on the interface. If the file does not exist, stop.
     if alternative = 0 [  
       file-close ; is this really necessary?
-      file-open "alternative_0.txt" ]
+      file-open "../inputs/alternative_0.txt" ]
     if alternative = 1 [  
       file-close ; is this really necessary?
-      file-open "alternative_1.txt" ]
+      file-open "../inputs/alternative_1.txt" ]
     if alternative = 2 [  
       file-close ; is this really necessary?
-      file-open "alternative_2.txt" ]
+      file-open "../inputs/alternative_2.txt" ]
     if alternative = 3 [  
       file-close ; is this really necessary?
-      file-open "alternative_3.txt" ]
+      file-open "../inputs/alternative_3.txt" ]
     if alternative = 4 [  
       file-close ; is this really necessary?
-      file-open "alternative_4.txt" ]
+      file-open "../inputs/alternative_4.txt" ]
     if alternative = 5 [  
       file-close ; is this really necessary?
-      file-open "alternative_5.txt" ]
+      file-open "../inputs/alternative_5.txt" ]
          
       foreach sort nodes[ ;this block reads taz-id, location, and charger info into each node
         ask ? [
@@ -842,7 +842,7 @@ INPUTBOX
 1076
 94
 driver-input-file
-p1r1.txt
+../inputs/p1r1.txt
 1
 0
 String

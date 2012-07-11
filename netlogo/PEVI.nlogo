@@ -1040,7 +1040,7 @@ INPUTBOX
 158
 284
 fuel-economy-mean
-0.34
+0.034
 1
 0
 Number

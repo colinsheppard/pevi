@@ -109,21 +109,24 @@ to setup-od-matrix
   ; Reads in main driver input file: Origin, destination, # of trips, distance, time
   set od matrix:make-constant (n-nodes * n-nodes) 5 0 
   
-  ifelse (file-exists? "../inputs/OD_Matrix.txt") [
+  ifelse (file-exists? "../inputs/OD_Matrix_5.txt") [
     file-close
-    file-open "../inputs/OD_Matrix.txt"
+    file-open "../inputs/OD_Matrix_5.txt"
+    let dummy-read file-read-line
     foreach n-values n-nodes [?] [
       let $from ?
       foreach n-values n-nodes [?] [
         let $row ($from * n-nodes + ?)
+        ;print (word file-read file-read (round file-read) file-read (file-read / 60))
         matrix:set-row od $row (list file-read file-read (round file-read) file-read (file-read / 60))
+        ;print (word file-read)
         ; Reads in: origin, destination, number of trips (modified by am trips and PEV penetration and rounded to nearest integer), drive distance, drive time
         ; Drive time is in the file as minutes, so to get into hours, we divide by 60 here.
       ]
     ]
     file-close
   ]
-  [ user-message "File not found: ../inputs/OD_Matrix.txt" ]
+  [ user-message "File not found: ../inputs/OD_Matrix_5.txt" ]
 
 end 
 to setup-drivers
@@ -156,10 +159,10 @@ to setup-schedule
   ifelse (file-exists? driver-input-file) [
     file-close
     file-open driver-input-file
+    let dummy-read file-read-line
     let index1 0
     let index2 0
     let dummy-logic false
-    
     while [file-at-end? = false] [
       set index1 index1 + 1
       if index1 = 1 [let dummy file-read]
@@ -173,7 +176,6 @@ to setup-schedule
           set destination-taz file-read
           matrix:set-row schedule index2 (list current-taz destination-taz file-read)
           find-minimum-charge
-          let dummy-read (file-read)
           set index2 index2 + 1
           ifelse (file-at-end? = false) [
            let next-driver file-read
@@ -183,7 +185,6 @@ to setup-schedule
           ]
           [set dummy-logic false]
         ]
-        
       ]
     ]
   ]
@@ -224,7 +225,7 @@ to setup-nodes
       file-open "../inputs/alternative_3.txt" ]
     if alternative = 4 [  
       file-close ; is this really necessary?
-      file-open "../inputs/alternative_4.txt" ]
+      file-open "../inputs/alternative_4_5.txt" ]
     if alternative = 5 [  
       file-close ; is this really necessary?
       file-open "../inputs/alternative_5.txt" ]
@@ -528,8 +529,8 @@ to depart
        ; Time to depart. Step one: calculate their total trip time, and how far they will drive.
        
        ; ah 3-25: now reading total-trip-dist and total-trip-time from od matrix, not from time&distance matrix.
-       set total-trip-dist matrix:get od (([current-taz] of self - 1) * 25 + [destination-taz] of self - 1) 3
-       set total-trip-time matrix:get od (([current-taz] of self - 1) * 25 + [destination-taz] of self - 1) 4 
+       set total-trip-dist matrix:get od (([current-taz] of self - 1) * n-nodes + [destination-taz] of self - 1) 3
+       set total-trip-time matrix:get od (([current-taz] of self - 1) * n-nodes + [destination-taz] of self - 1) 4 
        
       
       ; Now we know how long and far they are driving. Step 2: When do they arrive?
@@ -612,7 +613,7 @@ to find-minimum-charge
   ; kWh, and then divide by the battery capacity to get the required state-of-charge. Since the total-trip-dist and total-trip-times need to be set in "to depart" 
   ; so that cars will leave at the start of the day, I do not set those values here.
   
-    let next-trip-range matrix:get od (([current-taz] of self - 1) * 25 + [destination-taz] of self - 1) 3
+    let next-trip-range matrix:get od (([current-taz] of self - 1) * n-nodes + [destination-taz] of self - 1) 3
     set minimum-acceptable-charge (fuel-economy-mean * next-trip-range) / batt-cap-mean
     if phev? = false [if minimum-acceptable-charge > 1 [set phev? true]]
     
@@ -740,7 +741,7 @@ INPUTBOX
 293
 83
 n-nodes
-25
+5
 1
 0
 Number
@@ -842,7 +843,7 @@ INPUTBOX
 1076
 94
 driver-input-file
-../inputs/p1r1.txt
+../inputs/p1r1_5.txt
 1
 0
 String
@@ -877,7 +878,7 @@ CHOOSER
 alternative
 alternative
 0 1 2 3 4 5
-1
+4
 
 MONITOR
 1036

@@ -1,11 +1,11 @@
 library(colinmisc)
-load.libraries(c('sas7bdat','plyr','ggplot2','gtools','snow'))
+load.libraries(c('sas7bdat','plyr','ggplot2','gtools','snow','colorspace'))
 
 path.to.geatm <- '~/Dropbox/serc/pev-colin/data/GEATM-2020/'
 path.to.outputs <- '~/Dropbox/serc/pev-colin/data/scheduler-optim/'
 path.to.ctpp <- '~/Dropbox/serc/pev-colin/data/CTPP/'
 path.to.nhts <- '~/Dropbox/serc/pev-colin/data/NHTS/'
-path.to.hevi <- '~/Dropbox/serc/pev-colin/hevi/'
+path.to.pevi <- '~/Dropbox/serc/pev-colin/pevi/'
 
 #load(paste(path.to.nhts,"TripChaining/chntrp09.Rdata",sep=''))
 #load(paste(path.to.nhts,"HHV2PUB.Rdata",sep=''))
@@ -13,7 +13,7 @@ path.to.hevi <- '~/Dropbox/serc/pev-colin/hevi/'
 
 load(paste(path.to.geatm,"od-aggregated.Rdata",sep=''))
 load(file=paste(path.to.nhts,'data-preprocessed-for-scheduling.Rdata',sep=''))
-source(paste(path.to.hevi,"R/optim-functions.R",sep=''))
+source(paste(path.to.pevi,"R/optim-functions.R",sep=''))
 
 de.params <- list()
 de.params[['np']] <- 20           # number of particles
@@ -26,7 +26,8 @@ de.params[['max.iter']] <- 300    # max iterations
 stop.params <- list()
 stop.params[['diff.from.best.threshold']]          <- .005    # stopping threshold, when all ptx are 
                                                               # within this fraction of the best return T
-decision.vars <- data.frame(lbound=c(0.01,rep(1e-6,6)),ubound=c(10,rep(1,6)))
+decision.vars <- data.frame(lbound=c(0.1,rep(1,6)),ubound=c(5,rep(1,6)))
+decision.vars$name <-  c('scale.dist.thresh',0:(n-2))
 
 pev.penetration <- 0.01
 location <- 'colin-serc'
@@ -62,10 +63,12 @@ for(pev.penetration in c(0.01,0.02,0.04,0.03,0.05,0.1,0.15,0.2,0.25)){
     res <- evaluate.fitness(all.ptx[,1:n,gen.num])
     all.ptx[,c('fitness'),gen.num] <- res
   }
+  save.image(paste(path.to.outputs,"0saved-state-pen",pev.penetration*100,".Rdata",sep=''))
 
   # enter the loop
   while(!stop.criteria(all.ptx[,'fitness',gen.num],gen.num)){
     print(paste("gen:",gen.num))
+    source(paste(path.to.pevi,"R/optim-functions.R",sep='')) # allows hot-swapping code
 
     # initialize the candidate particles from the list of working particles
     cand <- all.ptx[,,gen.num]
@@ -106,6 +109,8 @@ for(pev.penetration in c(0.01,0.02,0.04,0.03,0.05,0.1,0.15,0.2,0.25)){
     all.ptx[improved.ptx,,gen.num+1] <- cand[improved.ptx,]
 
     print(all.ptx[,'fitness',gen.num])
+    notice.file <- paste(path.to.outputs,location,'-pen',pev.penetration*100,'-gen',gen.num,'-fit',roundC(mean(all.ptx[,'fitness',gen.num]),4),'-',format(Sys.time(),"%Y-%m-%d_%H%M%S"),'.csv',sep='')
+    write.csv(all.ptx[,,gen.num],file=notice.file)
 
     gen.num <- gen.num + 1
 
@@ -113,7 +118,7 @@ for(pev.penetration in c(0.01,0.02,0.04,0.03,0.05,0.1,0.15,0.2,0.25)){
     save.image(paste(path.to.outputs,"0saved-state-pen",pev.penetration*100,".Rdata",sep=''))
 
     # give myself notice 
-    system(paste("touch ",path.to.outputs,location,'-pen',pev.penetration*100,'-gen',gen.num-1,'-fit',roundC(mean(all.ptx[,'fitness',gen.num]),4),'-',format(Sys.time(),"%Y-%m-%d_%H%M%S"),sep=''))
+    #system(paste("touch ",path.to.outputs,location,'-pen',pev.penetration*100,'-gen',gen.num-1,'-fit',roundC(mean(all.ptx[,'fitness',gen.num]),4),'-',format(Sys.time(),"%Y-%m-%d_%H%M%S"),sep=''))
     
     # create a 5 second pause to allow for interruption
     for(i in 1:20){

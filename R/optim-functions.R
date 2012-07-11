@@ -13,7 +13,7 @@ evaluate.fitness <- function(ptx){
   break.pairs[[i+1]] <- c(breaks[i+1],numrows)
 
   results<-clusterEvalQ(cl,rm(list=ls()))
-  clusterExport(cl,c('create.schedule.batch','pev.penetration','rur.tours','rur.by.type','rur.tours.per','epdfs','od.24.simp','dist'))
+  clusterExport(cl,c('create.schedule.batch','pev.penetration','rur.tours','rur.by.type','rur.tours.per','epdfs','od.24.simp','dist','roundC','path.to.outputs'))
   clusterEvalQ(cl,library('plyr'))
   rm('results')
   results<-clusterApply(cl,break.pairs,fun='create.schedule.batch',ptx=ptx)
@@ -25,12 +25,13 @@ evaluate.fitness <- function(ptx){
 stop.criteria <- function(fit,gen.num){
   if(all(fit==Inf))return(F)
   # true if all deviations of fitnesses from the min are less than threshold OR if we've hit max iterations
-  return(all((fit-min(fit))/abs(min(fit))<stop.params$diff.from.best.threshold) | all(fit<0.0025) | gen.num>=de.params$max.iter)
+  return(all((fit-min(fit))/abs(min(fit))<stop.params$diff.from.best.threshold) | all(fit<0.025) | gen.num>=de.params$max.iter)
 }
 
 create.schedule.batch <- function(break.pair,ptx){
   ll<-break.pair[1]
   ul<-break.pair[2]
+  break.pair.code <- paste("node ",paste(break.pair,collapse=","),":",sep='')
   batch.results <- array(NA,length(ll:ul))
   i <- 1
 
@@ -87,8 +88,11 @@ create.schedule.batch <- function(break.pair,ptx){
     recycle.drivers.thresh <- 0.0
     max.length.remaining <- max(rur.tours$tours.left.in.journey)
 
+    inconsistent.schedule <- F
+
     for(od.i in 1:nrow(od.counts)){
     #for(od.i in 1:50){
+      if(od.i%%2000 == 0)cat(paste("pev ",pev.penetration,", progress: ",roundC(od.i/nrow(od.counts)*100,1),"%",sep=''),file=paste(path.to.outputs,"/logfile.txt",sep=''),append=T,fill=T,labels=break.pair.code)
       to.i <- od.counts$to[od.i]
       from.i <- od.counts$from[od.i]
       home.taz <- from.i
@@ -110,20 +114,26 @@ create.schedule.batch <- function(break.pair,ptx){
       }
       for(type in c('hw','ho','ow')){
         if(od.counts[od.i,type]<=0)next
-        # grab the indices of the tours that are close in time and distance, and in the case of home-based travel, starting from home
-        if(type=='ow'){
-          cands <- which( abs(rur.by.type[[type]]$TOT_MILS-dists$miles)<dist.thresh$miles[findInterval(rur.by.type[[type]]$TOT_MILS,dist.thresh$under)+1] & 
-                          abs(rur.by.type[[type]]$begin-hour+0.5)<depart.thresh.modified )
-        }else{
-          cands <- which( rur.by.type[[type]]$home.start &
-                          abs(rur.by.type[[type]]$TOT_MILS-dists$miles)<dist.thresh$miles[findInterval(rur.by.type[[type]]$TOT_MILS,dist.thresh$under)+1] & 
-                          abs(rur.by.type[[type]]$begin-hour+0.5)<depart.thresh.modified )
+        cands <- which(F)
+        depart.thresh.modified.used <- depart.thresh.modified
+        dist.thresh.used <- dist.thresh
+        while(length(cands)==0){
+          # grab the indices of the tours that are close in time and distance, and in the case of home-based travel, starting from home
+          if(type=='ow'){
+            cands <- which( abs(rur.by.type[[type]]$TOT_MILS-dists$miles)<dist.thresh.used$miles[findInterval(rur.by.type[[type]]$TOT_MILS,dist.thresh.used$under)+1] & 
+                            abs(rur.by.type[[type]]$begin-hour+0.5)<depart.thresh.modified.used )
+          }else{
+            cands <- which( rur.by.type[[type]]$home.start &
+                            abs(rur.by.type[[type]]$TOT_MILS-dists$miles)<dist.thresh.used$miles[findInterval(rur.by.type[[type]]$TOT_MILS,dist.thresh.used$under)+1] & 
+                            abs(rur.by.type[[type]]$begin-hour+0.5)<depart.thresh.modified.used )
+          }
+          if(length(cands)==0){
+            #depart.thresh.modified.used <- depart.thresh.modified.used + 0.5 
+            dist.thresh.used$miles <- dist.thresh.used$miles * 1.1
+            #cat(paste("no candidates found, relaxing thresholds to",depart.thresh.modified.used,dist.thresh.used$miles[1]),file=paste(path.to.outputs,"/logfile.txt",sep=''),append=T,fill=T,labels=break.pair.code)
+          }
         }
-        if(length(cands)==0){
-          print(paste('warning: no candidate tours found for ',dists$miles,' miles at ',hour,' hour for type ',type,' and od.i ',od.i,sep='')) 
-          stop()
-          next
-        }else if(length(cands)==1){
+        if(length(cands)==1){
           shuffled.cands <- cands
         }else{
           shuffled.cands <- sample(cands,prob=prob.weights.all[rur.by.type[[type]]$tours.left.in.journey[cands]+1])
@@ -210,7 +220,10 @@ create.schedule.batch <- function(break.pair,ptx){
             num.trips <- num.trips + cand.schedule.i - 1
             for(row.i in 1:(cand.schedule.i-1)){
               od.row <- which(od.counts$from==cand.schedule$from[row.i] & od.counts$to == cand.schedule$to[row.i] & od.counts$hour == as.integer(cand.schedule$depart[row.i]))
-              if(row.i==1 & od.row != od.i)stop('stop!')
+              if(row.i==1 & od.row != od.i){
+                cat("Stopping becuase row.i is 1 and od.row != od.i",file=paste(path.to.outputs,"/logfile.txt",sep=''),append=T,fill=T,labels=break.pair.code)
+                stop('stop!')
+              }
               od.counts[od.row,cand.schedule$geatm.type[row.i]] <- od.counts[od.row,cand.schedule$geatm.type[row.i]] - 1 
             }
             available.drivers[[cand.schedule$to[cand.schedule.i-1]]][['count']] <- available.drivers[[cand.schedule$to[cand.schedule.i-1]]][['count']] + 1
@@ -223,7 +236,8 @@ create.schedule.batch <- function(break.pair,ptx){
           }
         }
         if(od.counts[od.i,type]>0){
-          print(paste('no consistent journeys: scheduling one-legged journeys instead for ',dists$miles,' miles at ',hour,' hour for type ',type,' and od.i ',od.i,sep='')) 
+          #print(paste('no consistent journeys: scheduling one-legged journeys instead for ',dists$miles,' miles at ',hour,' hour for type ',type,' and od.i ',od.i,sep='')) 
+          #cat(paste('no consistent journeys: scheduling one-legged journeys instead for ',dists$miles,' miles at ',hour,' hour for type ',type,' and od.i ',od.i,sep=''),file=paste(path.to.outputs,"/logfile.txt",sep=''),append=T,fill=T,labels=break.pair.code) 
           for(cand in shuffled.cands){
             rur.tours.i <- rur.by.type[[type]]$index[cand]
             journey <- rur.tours[rur.tours.i:(rur.tours.i+rur.tours$tours.left.in.journey[rur.tours.i]), c('begin','end','TOT_DWEL4','journey.id','TOT_MILS','TOURTYPE','geatm.type')] 
@@ -242,18 +256,25 @@ create.schedule.batch <- function(break.pair,ptx){
             if(od.counts[od.i,type] <= 0)break
           }
           if(od.counts[od.i,type]>0){
-            print(paste('not enough tours to satisfy demand for ',dists$miles,' miles at ',hour,' hour for type ',type,' and od.i ',od.i,sep='')) 
-            stop()
+            #print(paste('not enough tours to satisfy demand for ',dists$miles,' miles at ',hour,' hour for type ',type,' and od.i ',od.i,sep='')) 
+            #cat(paste('not enough tours to satisfy demand for ',dists$miles,' miles at ',hour,' hour for type ',type,' and od.i ',od.i,sep=''),file=paste(path.to.outputs,"/logfile.txt",sep=''),append=T,fill=T,labels=break.pair.code) 
+            inconsistent.schedule <- T
+            break
           }
         }
       }
+      if(inconsistent.schedule)break
     }
-    schedule$type <- as.factor(schedule$type)
-    levels(schedule$type) <- levels(rur.tours$TOURTYPE)
-    #return(schedule)
+    if(inconsistent.schedule){
+      batch.results[i] <- Inf
+    }else{
+      schedule$type <- as.factor(schedule$type)
+      levels(schedule$type) <- levels(rur.tours$TOURTYPE)
+      #return(schedule)
 
-    # 2.37 is the target number of trips per driver
-    batch.results[i] <- abs(2.37 - nrow(schedule)/length(unique(schedule$driver)))
+      # 2.37 is the target number of trips per driver
+      batch.results[i] <- abs(2.37 - nrow(schedule)/length(unique(schedule$driver)))
+    }
 
     #synth.tours.per <- ddply(schedule,.(driver),function(df){data.frame(ntours=nrow(df),end.time=df$arrive[nrow(df)])})
     #if(!exists('rur.tours.per')){ rur.tours.per <- ddply(rur.tours,.(journey.id),nrow) }
@@ -264,5 +285,131 @@ create.schedule.batch <- function(break.pair,ptx){
     #batch.results[i] <- sum((cumsum(h.nhts$counts[1:limiting.index])/sum(h.nhts$counts)-cumsum(h.synth$counts[1:limiting.index])/sum(h.synth$counts))^2)
     i <- i+1 
   }
+  cat(paste('results: ',paste(batch.results,collpase=","),sep=''),file=paste(path.to.outputs,"/logfile.txt",sep=''),append=T,fill=T,labels=break.pair.code) 
   return(batch.results)
+}
+
+### plot.ptx(ptx,dimensions=1:2)
+# this will create an animation of the particles over time projected onto the 2 specified dimensions
+plot.ptx <- function(ptx,num.gens=1,dimensions=1:2,decision.vars=decision.vars,quantize.range=1){
+  #fit.range <- round(10*range(ptx[,'fitness',],na.rm=T))
+  fits <- as.numeric(ptx[,'fitness',])
+  fits <- fits[fits<Inf]
+  fit.range <- round(quantize.range * range(fits,na.rm=T))
+  cols <- diverge_hcl(diff(fit.range)+1)
+  library(animation)
+  oopt = ani.options(interval = 0.5, nmax = num.gens, ani.dev = png, withprompt=F,
+    ani.type = "png",
+    title = paste("DE Evolution Results"),
+    description  = paste("Projection onto dimensions:",paste(apply(decision.vars[dimensions,c('mod.name','param.name')],1,paste,collapse="."),collapse=", "))
+  )
+  #xdim <- seq(50,100,by=0.1)
+  #ydim <- seq(50,100,by=0.1)
+  #ack <- array(NA,c(length(xdim),length(ydim)))
+  #for(i in 1:length(xdim)){
+    #for(j in 1:length(ydim)){
+      #ack[i,j] <- ackley(c(xdim[i]-75,ydim[j]-75))
+    #}
+  #}
+  ani.start()
+  for(gen in 1:num.gens){
+    #contour(xdim,ydim,ack,col="grey",
+      #xlim=as.numeric(decision.vars[dimensions[1],c('lbound','ubound')]),
+      #ylim=as.numeric(decision.vars[dimensions[2],c('lbound','ubound')]),
+      #xlab=paste(decision.vars[1,c('mod.name','param.name')],collapse="."),
+      #ylab=paste(decision.vars[2,c('mod.name','param.name')],collapse="."),
+      #main=paste("Gen:",gen))
+    col.ind <- round(quantize.range * ptx[,'fitness',gen])
+    col.ind <- col.ind - round(min(fits,na.rm=T)) + 1
+    col.ind[col.ind==Inf] <- length(cols)
+    
+    plot(ptx[,dimensions[1],gen],ptx[,dimensions[2],gen],
+      col=cols[col.ind],
+      bg=cols[col.ind],pch=23,
+      xlim=as.numeric(decision.vars[dimensions[1],c('lbound','ubound')]),
+      ylim=as.numeric(decision.vars[dimensions[2],c('lbound','ubound')]),
+      xlab=paste(decision.vars[1,c('mod.name','param.name')],collapse="."),
+      ylab=paste(decision.vars[2,c('mod.name','param.name')],collapse="."),
+      main=paste("Gen:",gen))
+    #points(75,75,pch="X",col="red")
+  }
+  ani.stop()
+}
+plot.ptx.alldim <- function(ptx,num.gens=1,decision.vars=decision.vars,quantize.range=1,width=1500,height=1500,no.ani=F,pt.cex=1){
+  #fit.range <- round(10*range(ptx[,'fitness',],na.rm=T))
+  fits <- as.numeric(ptx[,'fitness',])
+  fits <- fits[fits<Inf]
+  fit.range <- round(quantize.range * range(fits,na.rm=T))
+  if(log(diff(fit.range),base=10)>2){ # implies more than 100 levels of color, let's increase the spacing
+    quantize.range <- 10^(-(floor(log(diff(fit.range),base=10))-1))
+    fit.range <- round(quantize.range * range(fits,na.rm=T))
+  }
+  cols <- diverge_hcl(diff(fit.range)+2)
+  cols[length(cols)] <- "green"
+  library(animation)
+  oopt = ani.options(interval = 0.5, nmax = num.gens, ani.dev = png, withprompt=F,
+    ani.type = "png",
+    title = paste("DE Evolution Results"),
+    description  = "",
+    ani.width=width, ani.height=height
+  )
+  n <- nrow(decision.vars)
+  layout.matrix <- matrix(1:n^2,n,byrow=T)
+  saved.inf <- array(NA,c(dim(ptx)[1]*dim(ptx)[3],dim(ptx)[2]-1))
+  
+  if(!no.ani){
+    ani.start()
+    gen.start <- 1
+  }else{
+    gen.start <- num.gens
+  }
+  for(gen in gen.start:num.gens){
+    col.ind <- round(quantize.range * ptx[,'fitness',gen])
+    col.ind <- col.ind - fit.range[1] + 1
+    n.inf <- sum(col.ind==Inf)
+    if(n.inf>0){
+      n.inf.saved <- sum(!is.na(saved.inf[,1]))
+      saved.inf[(n.inf.saved+1):(n.inf.saved+n.inf),] <- ptx[col.ind==Inf,1:(dim(ptx)[2]-1),gen]
+    }
+    col.ind[col.ind==Inf] <- length(cols)
+  
+    nf<-layout(layout.matrix)
+    for(dim.i in 1:n){
+      if(dim.i > 1){
+        for(skip in 1:(dim.i-1)){
+          if(dim.i==n & skip==1){
+            plot.new()
+            text(0.5,0.5,gen,font=2,cex=2)      
+          }else if(dim.i==n & skip==2){
+            fit.to.plot <- ptx[,'fitness',gen]
+            fit.to.plot[fit.to.plot==Inf] <- NA
+            hist(ptx[,'fitness',gen],main="Fitness (Inf removed)")
+          }else{
+            plot.new()
+          }
+        }
+      }
+      dim.name <- paste(decision.vars[dim.i,'name'],collapse=".")
+      brks <- seq(decision.vars[dim.i,'lbound'],decision.vars[dim.i,'ubound'],length.out=25)
+      par(mar=c(3.1,4.1,3.1,3.1))
+      #print(ptx[,dim.i,gen])
+      hist(ptx[,dim.i,gen],xlab="",main=dim.name,breaks=brks)
+      mtext(dim.name,side=4,font=2,cex=0.8)
+      if(dim.i==n)next
+      for(dim.i2 in (dim.i+1):n){
+        par(mar=c(2.1,2.1,1.1,1.1))
+        plot(ptx[,dim.i2,gen],ptx[,dim.i,gen],
+          col=cols[col.ind],
+          bg=cols[col.ind],pch=23,font.lab=2,cex.lab=1.3,
+          cex=pt.cex,
+          xlim=as.numeric(decision.vars[dim.i2,c('lbound','ubound')]),
+          ylim=as.numeric(decision.vars[dim.i,c('lbound','ubound')]),
+          main="")
+        points(na.omit(saved.inf[,dim.i2]),na.omit(saved.inf[,dim.i]),col="lightgreen",pch='.',cex=3)
+      }
+    }
+  }
+  if(!no.ani){
+    ani.stop()
+  }
 }

@@ -6,7 +6,7 @@ path.to.old.outputs <- '~/Dropbox/serc/pev-colin/data/scheduler-optim-try1/'
 path.to.geatm <- '~/Dropbox/serc/pev-colin/data/GEATM-2020/'
 path.to.ctpp <- '~/Dropbox/serc/pev-colin/data/CTPP/'
 path.to.nhts <- '~/Dropbox/serc/pev-colin/data/NHTS/'
-path.to.hevi <- '~/Dropbox/serc/pev-colin/hevi/'
+path.to.pevi <- '~/Dropbox/serc/pev-colin/pevi/'
 path.to.plots <- '~/Dropbox/serc/pev-colin/plots/'
 
 load(paste(path.to.geatm,"od-aggregated.Rdata",sep=''))
@@ -217,7 +217,7 @@ if(!file.exists(paste(path.to.outputs,'schedules-20120425.Rdata',sep=''))){
       print(paste('Penetration ',pev.penetration,sep=''))
 
       load(paste(path.to.outputs,"0saved-state-pen",pev.penetration*100,".Rdata",sep=''))
-      source(paste(path.to.hevi,'R/create-schedule.R',sep=''))
+      source(paste(path.to.pevi,'R/create-schedule.R',sep=''))
       prob.weights[prob.weights$pen == pev.penetration, 2:7] <- apply(all.ptx[,1:6,gen.num-1],2,mean)
       
       schedule[[pev.pen.char]] <- create.schedule(pev.penetration,prob.weights[prob.weights$pen == pev.penetration,2:7])
@@ -359,7 +359,7 @@ for(pev.penetration in pev.pens){
 
     schedule.reps[[pev.pen.char]][[as.character(replicate)]] <- create.schedule(pev.penetration,prob.weights[prob.weights$pen == pev.penetration,2:7])
 
-    write.table(schedule[[pev.pen.char]],file=paste(path.to.hevi,"inputs/driver-schedule-pen",pev.penetration*100,"-rep",replicate,"-20120425.txt",sep=''),sep='\t',row.names=F,quote=F)
+    write.table(schedule[[pev.pen.char]],file=paste(path.to.pevi,"inputs/driver-schedule-pen",pev.penetration*100,"-rep",replicate,"-20120425.txt",sep=''),sep='\t',row.names=F,quote=F)
   }
 }
 save(schedule.reps,file=paste(path.to.outputs,'schedule-replicates-20120425.Rdata',sep=''))

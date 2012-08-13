@@ -35,26 +35,73 @@ breed [nodes node]
 ;; -- TravelTime (schedules EVENT Arrive)
 ;; -- Arrive 
 ;;    -- if end of journey, remove from list
-;;    -- for remaining vehicles, enter DECISION NeedToCharge
+;;    -- for remaining vehicles, enter STATE NotCharging
 
-;EventScheduler; read in itinerary
 
-;STATE; all drivers enter NotCharging state
-;EVENT; -- schedule Depart
+
 
 ;DECISION; NeedToCharge:
-;;         -- yield boolean YES if:
-;;            -- itinerary incomplete  -AND-
-;;            -- [ChargeRange insufficient] -OR- [random yes] (charge anyway)
-;;
-;;         -- if YES, enter DECISION SeekCharger 
-;;         -- if NO, enter STATE NotCharging
+;;         ***assumes itinerary is never complete**
+;;         -- Is ChargeRange sufficient?
+;;            Executes EstimateRange submodel, Section 5.5
+;;            -- YES (include random yes) = goto STATE Traveling
+;;            -- NO = goto DECISION SeekCharger
 
-         
+;DECISION; SeekCharger:
+;;         -- see submodel, Section 5.6
+;;         -- NotFound? 
+;;            -- goto STATE NotCharging, request WaitTime
+;;         -- Found?
+;;            -- goto STATE Charging, request ChargeTime
+
+
+;EventScheduler; Itinerary:
+;;               -- see submodel, Section 5.1
+;;               -- schedule Depart
+
+;EventScheduler; WaitTime:
+;;               -- see submodel, Section 5.2
+;;               -- schedule [a time in the future to either] Depart -OR- RetrySeek
+;;                                                            (needs to be dummy variable)
+
+;STATE; NotCharging:
+;; This will be the state that all drivers enter when parked -- waiting for a charging station, or to depart..
+;;      -- if came from STATE Traveling -OR- Charging:
+;;         -- enter EventScheduler Itinerary:
+;;           -- add itinerary step
+;;           -- wait, then Depart -> send to DECISION NeedToCharge
+;;      -- if came from DECISION SeekCharger:
+;;         -- enter EventScheduler WaitTime:
+;;           -- either Depart or RetrySeek (in WaitTime)
+;;           -- Depart -> send to DECISION NeedToCharge
+;;           -- RetrySeek -> send to DECISION SeekCharger
+;;      -- if INITIALIZING, send to EventScheduler Itinerary
+
+
+;EventScheduler; ChargeTime:
+;;               -- see submodel, Section 5.4
+;;               -- schedule EndCharge 
+
+;STATE; Charging:
+;;      -- goto EventScheduler ChargeTime
+;;      -- execute Charging algorithm
+;;         -- will they always charge to a "full" battery, or disengage prematurely?
+;;      -- upon EndCharge, enter STATE NotCharging
+
+
+;EventScheduler; TravelTime:
+;;               -- see submodel, Section 5.3
+;;               -- schedule event Arrive
 
 ;STATE; Traveling:
 ;;      -- execute EventScheduler TravelTime 
-;;      -- upon Arrive, execute DECISION NeedToCharge
+;;      -- upon Arrive, enter STATE NotCharging
+
+
+
+;;in GO:
+;;   -- initialize itinerary
+;;   -- send to NotCharging
 @#$#@#$#@
 GRAPHICS-WINDOW
 375

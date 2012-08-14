@@ -6,7 +6,7 @@ globals
 [ start-hour      ; starting time, an integer (or fractional) hour
   stop-hour       ; time to end simulation, an integer hour
   time            ; current time in fractional hours
-  display-time    ; current time, a character string hh:mm
+  ;display-time    ; current time, a character string hh:mm
   
   od              ; origin-destination matrix assumes the taz's are 
                   ; numbered from 1 to n-nodes and the row number is calculated at (Fromtaz-1)*n-nodes+Totaz
@@ -23,12 +23,169 @@ globals
   od-dist
   old-time
 
-  temperature     ; ambient temperature
+  ;temperature     ; ambient temperature
 ]
 
 breed [drivers driver]
 breed [chargers charger]
 breed [nodes node]
+
+drivers-own [
+  
+;; VEHICLE specific
+  battery-capacity ; in kWh - FORCE GAUSSIAN DISTRIBUTION
+  state-of-charge ; represents the battery state of charge at each timestep
+      ; if soc is calculated from travel-dist and fuel-economy, is it a state variable still?
+  fuel-economy ; energy required to travel 1 mile (kWh/mile)
+  status ; discrete value from list:NotCharging,Traveling,Charging
+  current-taz ; keeps track of the current location of each vehicle
+  kWh-received ; a count of how much energy each driver has charged
+      
+;; TRIP specific
+  partner ;a variable used in to interact a driver and a charger
+  total-trip-time ; the total time needed to drive from A to B
+  travel-time ; used to store traveling time since departure
+  total-trip-dist ; the total distance for a given trip
+  travel-dist ; used to store distance driven since departure
+  departure-time ;When the vehicle is set to leave the taz
+  arrival-time ; when a car is supposed to arrive
+  
+;; SCHEDULE specific
+  schedule ; a matrix of: (1)from/current TAZ, (2)to/destination taz, (3)departure time. One row for each trip. (row 1, col 1) is the home TAZ
+  current-schedule-row ; keeps track of which row in the schedule each driver is on
+  destination-taz ;from the schedule, this is where we're going
+
+
+  wait-time
+  phev?  ;boolean variable 
+  
+]
+
+
+chargers-own[
+  taz-location ; TAZ # for each charger
+  available ; boolean to represent either available(TRUE) or occupied(FALSE)
+  charger-level ; 1, 2, or 3 (low to high charge)
+  charger-rate ; The rate of recharge for each charger.
+  charger-in-use ; A counter increased every time the charger is in use. Used to calculate duty factor. (Not attached to the name -ah)
+  duty-factor ; The fraction of time a charger is in use vs. time idle  
+  ;; Unless we calculate a duty factor unique to each charger level, this will bias the results (level 3 will always get more use, as it charges faster / 
+  ;; allowing it to charge more vehicles)
+  charger-service ; a counter for the number of drivers each charger services
+  ;; necessary?
+  kWh-charged ; a count of how much energy a charger has given
+  ;; Interesting -- temporal charge rate.  How does this overlap with the supply of energy throughout the day?  *****
+ ]
+
+nodes-own[
+  taz-id ; TAZ id #
+  time-and-distance ;matrix containing time and distance info for every other node
+  taz-chargers-1 ; the number of level 1 chargers in the taz
+  taz-chargers-2 ; the number of level 2 chargers in the taz
+  taz-chargers-3 ; the number of level 3 chargers in the taz
+]
+
+to setup
+  __clear-all-and-reset-ticks
+  
+  ; Set the time parameters
+  set start-hour 0        ; starting time, an hour
+  set stop-hour  24       ; time to end simulation, in whole or fractional hours
+  
+  ; Initialize the time variables
+  set time start-hour
+  ;update-display-time
+  
+  reset-ticks
+  
+  create-turtles 1 [ setxy 0 0 set color black] ;This invisible turtle makes sure we start at node 1 not node 0
+  setup-od-array
+  setup-nodes
+  ;setup-drivers
+  ;setup-chargers
+end 
+
+
+to setup-od-array
+  ; Reads in main driver input file: Origin, destination, # of trips, distance, time
+  set od-from array:from-list n-values (n-nodes * n-nodes) [0] ; creates global od-from
+  set od-to array:from-list n-values (n-nodes * n-nodes) [0]           ; global od-to
+  set od-demand array:from-list n-values (n-nodes * n-nodes) [0]       ; global od-demand
+  set od-dist array:from-list n-values (n-nodes * n-nodes) [0]         ; global od-dist
+  set od-time array:from-list n-values (n-nodes * n-nodes) [0]         ; global od-time
+  
+  ifelse (file-exists? "../inputs/OD_Matrix_5.txt") [
+    file-close
+    file-open "../inputs/OD_Matrix_5.txt"
+    foreach n-values (n-nodes * n-nodes) [?] [
+     array:set od-from ? file-read array:set od-to ? file-read array:set od-demand ? (round file-read) array:set od-dist ? file-read array:set od-time ? (file-read / 60)
+     
+    ; print (WORD "[ " array:item od-from ? ", " array:item od-to ? ", " array:item od-demand ? ", " array:item od-dist ? ", " array:item od-time ? " ]") 
+    ]
+    file-close
+  ]
+  [ user-message "File not found: ../OD_Matrix_5.txt" ]
+
+end 
+
+
+to setup-nodes
+  create-nodes n-nodes  ; BUTTON for # of nodes?
+      ask nodes [
+    set shape "star"
+    set color yellow
+    set size 0.5
+      ]
+      ; Select the TAZ input file based on the alternative chooser on the interface. If the file does not exist, stop.
+      ; BUTTON??
+
+  ; There was a button to select the "alternative": 0 through 5
+  ; Remove button, edit input file in gui
+
+
+  ifelse (file-exists? alternative-input-file) [ ; ../inputs/alternative_4_5.txt
+    file-close
+    file-open alternative-input-file
+    foreach sort nodes[ ;this block reads taz-id, location, and charger info into each node
+      ask ? [
+      set taz-id file-read
+      setxy file-read file-read
+      set taz-chargers-lvl-1 file-read ; Sets the number of level 1 chargers in each node
+      set taz-chargers-lvl-2 file-read ; Sets the number of level 2 chargers in each node
+      set taz-chargers-lvl-3 file-read ; Sets the number of level 3 chargers in each node
+      ]    
+    ]
+    [ user-message (word "Input file '" alternative-input-file "' not found!")] 
+   
+end ;setup-nodes
+
+
+to setup-drivers
+  ; creating drivers based on GEATM data, in setup-schedule procedure. 
+  setup-schedule
+  ask drivers [
+    set shape "car"
+    set color green
+    set size 2
+   ; set driver-satisfaction 1  ;initialize driver satisfaction
+    ; let battery capacity deviate a little bit but no less than 20 kWh
+    ifelse phev? = false [  ; is phev? a button to toggle?
+      ; set randomness of battery capacity
+      set battery-capacity min ( list max (list (batt-cap-mean - batt-cap-range) random-normal batt-cap-mean batt-cap-stdv) (batt-cap-mean + batt-cap-range)) 
+      ; set randomness of fuel economy
+      set fuel-economy max ( list min (list (fuel-economy-mean - fuel-economy-range) random-normal fuel-economy-mean fuel-economy-stdv) (fuel-economy-mean + fuel-economy-range) )
+    ]
+    [ set battery-capacity phev-batt-cap
+      set fuel-economy phev-fuel-economy
+    ]
+    set state-of-charge 1
+    set status "Home"
+    set partner nobody
+    find-minimum-charge
+  ]
+end ;setup-drivers
+
+
 
 ;; define all subroutines
 ;; need:
@@ -73,9 +230,10 @@ breed [nodes node]
 ;;      -- if came from DECISION SeekCharger:
 ;;         -- enter EventScheduler WaitTime:
 ;;           -- either Depart or RetrySeek (in WaitTime)
-;;           -- Depart -> send to DECISION NeedToCharge
+;;           -- Depart ;;;;-> send to DECISION NeedToCharge
 ;;           -- RetrySeek -> send to DECISION SeekCharger
 ;;      -- if INITIALIZING, send to EventScheduler Itinerary
+;;         -- send to Depart
 
 
 ;EventScheduler; ChargeTime:

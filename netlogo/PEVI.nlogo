@@ -3,8 +3,10 @@ extensions [matrix array]
 
 ;; define all globals
 globals
+
 [ start-hour      ; starting time, an integer (or fractional) hour
   stop-hour       ; time to end simulation, an integer hour
+  ;time-step-size  ; time step in minutes -- set by interface slider
   time            ; current time in fractional hours
   ;display-time    ; current time, a character string hh:mm
   
@@ -21,7 +23,7 @@ globals
   od-to
   od-demand
   od-dist
-  old-time
+  od-time
 
   ;temperature     ; ambient temperature
 ]
@@ -40,6 +42,7 @@ drivers-own [
   status ; discrete value from list:NotCharging,Traveling,Charging
   current-taz ; keeps track of the current location of each vehicle
   kWh-received ; a count of how much energy each driver has charged
+  phev?  ;boolean variable       
       
 ;; TRIP specific
   partner ;a variable used in to interact a driver and a charger
@@ -49,6 +52,8 @@ drivers-own [
   travel-dist ; used to store distance driven since departure
   departure-time ;When the vehicle is set to leave the taz
   arrival-time ; when a car is supposed to arrive
+  minimum-acceptable-charge ; The charge required to reach the next destination
+  RangeAcceptable? ; boolean
   
 ;; SCHEDULE specific
   schedule ; a matrix of: (1)from/current TAZ, (2)to/destination taz, (3)departure time. One row for each trip. (row 1, col 1) is the home TAZ
@@ -57,7 +62,7 @@ drivers-own [
 
 
   wait-time
-  phev?  ;boolean variable 
+
   
 ]
 
@@ -101,8 +106,8 @@ to setup
   create-turtles 1 [ setxy 0 0 set color black] ;This invisible turtle makes sure we start at node 1 not node 0
   setup-od-array
   setup-nodes
-  ;setup-drivers
-  ;setup-chargers
+  setup-drivers
+  setup-chargers
 end 
 
 
@@ -120,7 +125,7 @@ to setup-od-array
     foreach n-values (n-nodes * n-nodes) [?] [
      array:set od-from ? file-read array:set od-to ? file-read array:set od-demand ? (round file-read) array:set od-dist ? file-read array:set od-time ? (file-read / 60)
      
-    ; print (WORD "[ " array:item od-from ? ", " array:item od-to ? ", " array:item od-demand ? ", " array:item od-dist ? ", " array:item od-time ? " ]") 
+
     ]
     file-close
   ]
@@ -150,19 +155,20 @@ to setup-nodes
       ask ? [
       set taz-id file-read
       setxy file-read file-read
-      set taz-chargers-lvl-1 file-read ; Sets the number of level 1 chargers in each node
-      set taz-chargers-lvl-2 file-read ; Sets the number of level 2 chargers in each node
-      set taz-chargers-lvl-3 file-read ; Sets the number of level 3 chargers in each node
+      set taz-chargers-1 file-read ; Sets the number of level 1 chargers in each node
+      set taz-chargers-2 file-read ; Sets the number of level 2 chargers in each node
+      set taz-chargers-3 file-read ; Sets the number of level 3 chargers in each node
       ]    
     ]
-    [ user-message (word "Input file '" alternative-input-file "' not found!")] 
+  ]
+  [ user-message (word "Input file '" alternative-input-file "' not found!")] 
    
 end ;setup-nodes
 
 
 to setup-drivers
-  ; creating drivers based on GEATM data, in setup-schedule procedure. 
-  setup-schedule
+  ; creating drivers based on GEATM data, in setup-itinerary procedure. 
+  setup-itinerary
   ask drivers [
     set shape "car"
     set color green
@@ -173,7 +179,7 @@ to setup-drivers
       ; set randomness of battery capacity
       set battery-capacity min ( list max (list (batt-cap-mean - batt-cap-range) random-normal batt-cap-mean batt-cap-stdv) (batt-cap-mean + batt-cap-range)) 
       ; set randomness of fuel economy
-      set fuel-economy max ( list min (list (fuel-economy-mean - fuel-economy-range) random-normal fuel-economy-mean fuel-economy-stdv) (fuel-economy-mean + fuel-economy-range) )
+      set fuel-economy max ( list min (list (e-FuelConsump - fuel-economy-range) random-normal e-FuelConsump fuel-economy-stdv) (e-FuelConsump + fuel-economy-range) )
     ]
     [ set battery-capacity phev-batt-cap
       set fuel-economy phev-fuel-economy
@@ -181,10 +187,110 @@ to setup-drivers
     set state-of-charge 1
     set status "Home"
     set partner nobody
-    find-minimum-charge
+    EstimateRange
   ]
 end ;setup-drivers
 
+
+to setup-itinerary
+  ifelse (file-exists? driver-input-file) [ ; ../inputs/p1r1_5.txt
+    file-close
+    file-open driver-input-file
+    let this-driver 0
+    let sched-row 0
+    let this-sched false
+    
+    while [file-at-end? = false] [
+      set this-driver this-driver + 1
+      if this-driver = 1 [let dummy file-read]
+      create-drivers 1 [
+        set phev? false
+        set this-sched true
+        set schedule matrix:make-constant 15 3 99  ;****what do these #s mean?
+        set sched-row 0  
+        while [this-sched] [  ; while setting up the schedule for only this driver (this-sched=true)
+          matrix:set-row schedule sched-row (list file-read file-read file-read)
+          ; set-this-row-in-matrix "schedule" "at this row" [current-taz dest-taz depature-time]
+          EstimateRange  ;**************
+          ;let dummy-read (file-read)  ;***where is this reading from?***  necessary?
+          set sched-row sched-row + 1
+          ifelse (file-at-end? = false) [  ; if not yet at the end-of-file,
+           let next-driver file-read       ; set next-driver=col1
+            if next-driver != this-driver [
+              set this-sched false
+              ]
+            ]
+          [set this-sched false]
+        ] ; end while this-sched
+      ] ; end create-drivers
+    ] ; end while file-at-end
+  ] ; end ifelse
+  [ user-message (word "Input file '" driver-input-file "' not found!") ]
+  file-close
+  
+  ask drivers [
+    set current-taz matrix:get schedule 0 0 
+    set destination-taz matrix:get schedule 0 1 
+    set departure-time matrix:get schedule 0 2
+    setxy [xcor] of node current-taz [ycor] of node current-taz   
+  ]
+
+end ;setup-itinerary
+
+to setup-chargers
+  
+  ; The charger level, location, and quantity of chargers was read in during setup-nodes.
+  ; Now chargers of each level are created at the appropriate node.
+  ; Charger-rate is currently a separate state variable from charger level. We may want to combine the two later, if
+  ; we do not use "charger level" for anything else.
+
+  foreach sort nodes [                       ; At each node, chargers equal to "taz-chargers"are created.
+      create-chargers [taz-chargers-1] of ? [  ; The location of each charger created is then set as the current TAZ location
+      set shape "Circle 2"
+      set color red
+      set size 1
+      set charger-level 1
+      set charger-rate 2.4 ; Charger rate is the charger power in kW. Data from (Markel 2010), see project document
+      set taz-location [taz-id] of ?
+      set xcor [xcor] of ?
+      set ycor [ycor] of ?]
+      
+      create-chargers [taz-chargers-2] of ? [  ; The location of each charger created is then set as the current TAZ location
+      set shape "Circle 2"
+      set color red
+      set size 1
+      set charger-level 2
+      set charger-rate 19.2 ; Charger rate is the charger power in kW. Data from (Markel 2010), see project document
+      set taz-location [taz-id] of ?
+      set xcor [xcor] of ?
+      set ycor [ycor] of ?]
+      
+      create-chargers [taz-chargers-3] of ? [  ; The location of each charger created is then set as the current TAZ location
+      set shape "Circle 2"
+      set color red
+      set size 1
+      set charger-level 3
+      set charger-rate 30 ; Charger rate is the charger power in kW. Data from (Markel 2010), see project document
+      set taz-location [taz-id] of ?
+      set xcor [xcor] of ?
+      set ycor [ycor] of ?]
+  ]  
+  ask chargers [
+    set available TRUE
+    ]
+  
+end ;setup-chargers
+
+to go
+  
+  ; Advance the time and update time variables
+  tick
+  set time time + (time-step-size / 60)  ; Convert time step to hours and add to current time
+  if time > stop-hour [ 
+    stop ]           ; stop the simulation
+
+  
+end
 
 
 ;; define all subroutines
@@ -194,7 +300,24 @@ end ;setup-drivers
 ;;    -- if end of journey, remove from list
 ;;    -- for remaining vehicles, enter STATE NotCharging
 
+to EstimateRange
 
+;; This submodel estimates the range of the EV. If the RemainingRange is less than next-trip-range, returns a boolean RangeAcceptable? = false
+
+  
+    let next-trip-range matrix:get od (([current-taz] of self - 1) * 25 + [destination-taz] of self - 1) 3
+    let RemainingRange ((1 - state-of-charge) * (battery-capacity)) / (e-FuelConsump * safety-factor)
+    ;; yields remaining range available in miles
+    if RemainingRange > next-trip-range [set RangeAcceptable? true]
+    if RemainingRange <= next-trip-range [set RangeAcceptable? false]
+    ;set minimum-acceptable-charge (e-FuelConsump * next-trip-range) / batt-cap-mean
+   ;???? if phev? = false [if minimum-acceptable-charge > 1 [set phev? true]]
+ 
+  ;** adapted from find-minimum-charge
+  ; To determine minimum-acceptable-charge, we set a local variable equal to the distance of the next trip, multiply that by fuel-economy to get the required
+  ; kWh, and then divide by the battery capacity to get the required state-of-charge. Since the total-trip-dist and total-trip-times need to be set in "to depart" 
+  ; so that cars will leave at the start of the day, I do not set those values here. 
+end
 
 
 ;DECISION; NeedToCharge:
@@ -287,6 +410,183 @@ GRAPHICS-WINDOW
 1
 ticks
 30.0
+
+INPUTBOX
+149
+41
+304
+101
+n-nodes
+5
+1
+0
+Number
+
+INPUTBOX
+836
+30
+1071
+90
+alternative-input-file
+../inputs/alternative_4_5.txt
+1
+0
+String
+
+INPUTBOX
+26
+45
+129
+105
+batt-cap-mean
+24
+1
+0
+Number
+
+INPUTBOX
+25
+111
+123
+171
+batt-cap-stdv
+1
+1
+0
+Number
+
+INPUTBOX
+24
+177
+115
+237
+batt-cap-range
+5
+1
+0
+Number
+
+INPUTBOX
+24
+305
+134
+365
+fuel-economy-stdv
+0.05
+1
+0
+Number
+
+INPUTBOX
+24
+369
+141
+429
+fuel-economy-range
+0.1
+1
+0
+Number
+
+INPUTBOX
+24
+433
+115
+493
+phev-batt-cap
+16
+1
+0
+Number
+
+INPUTBOX
+24
+496
+138
+556
+phev-fuel-economy
+0.5
+1
+0
+Number
+
+INPUTBOX
+837
+97
+1072
+157
+driver-input-file
+../inputs/p1r1_5.txt
+1
+0
+String
+
+INPUTBOX
+152
+115
+307
+175
+safety-factor
+0.1
+1
+0
+Number
+
+INPUTBOX
+22
+242
+118
+302
+e-FuelConsump
+0.34
+1
+0
+Number
+
+BUTTON
+163
+267
+229
+300
+NIL
+setup
+NIL
+1
+T
+OBSERVER
+NIL
+NIL
+NIL
+NIL
+1
+
+BUTTON
+165
+317
+228
+350
+NIL
+go
+T
+1
+T
+OBSERVER
+NIL
+NIL
+NIL
+NIL
+1
+
+INPUTBOX
+840
+174
+995
+234
+time-step-size
+1
+1
+0
+Number
 
 @#$#@#$#@
 ## ## WHAT IS IT?

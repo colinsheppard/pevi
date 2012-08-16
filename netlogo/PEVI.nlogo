@@ -24,6 +24,11 @@ globals
   od-demand
   od-dist
   od-time
+  
+;  itin-driver
+  itin-from
+  itin-to
+  itin-depart
 
   ;temperature     ; ambient temperature
 ]
@@ -193,35 +198,44 @@ end ;setup-drivers
 
 
 to setup-itinerary
+;  set itin-driver array:from-list 15 [99]   ; creates global itin-driver
+
   ifelse (file-exists? driver-input-file) [ ; ../inputs/p1r1_5.txt
     file-close
     file-open driver-input-file
     let this-driver 0
-    let sched-row 0
-    let this-sched false
-    
+    let itin-row 0
+    let this-itin false
+        
     while [file-at-end? = false] [
       set this-driver this-driver + 1
       if this-driver = 1 [let dummy file-read]
       create-drivers 1 [
         set phev? false
-        set this-sched true
-        set schedule matrix:make-constant 15 3 99  ;****what do these #s mean?
-        set sched-row 0  
-        while [this-sched] [  ; while setting up the schedule for only this driver (this-sched=true)
-          matrix:set-row schedule sched-row (list file-read file-read file-read)
-          ; set-this-row-in-matrix "schedule" "at this row" [current-taz dest-taz depature-time]
+        set this-itin true
+;        set schedule matrix:make-constant 15 3 99  ;****what do these #s mean?
+        set itin-from array:from-list n-values 15 [99]     ; creates global itin-from
+        set itin-to array:from-list n-values 15 [99]       ; creates global itin-to
+        set itin-depart array:from-list n-values 15 [99]   ; creates global itin-depart
+        set itin-row 0  
+        while [this-itin] [  ; while setting up the schedule for only this driver (this-itin=true)
+;          matrix:set-row schedule itin-row (list file-read file-read file-read)
+          array:set itin-from itin-row file-read
+          array:set itin-to itin-row file-read
+          array:set itin-depart itin-row file-read
+        ;  array:set array index value
+;          ; set-this-row-in-matrix "schedule" "at this row" [current-taz dest-taz depature-time]
           EstimateRange  ;**************
-          ;let dummy-read (file-read)  ;***where is this reading from?***  necessary?
-          set sched-row sched-row + 1
+;          ;let dummy-read (file-read)  ;***where is this reading from?***  necessary?
+          set itin-row itin-row + 1
           ifelse (file-at-end? = false) [  ; if not yet at the end-of-file,
            let next-driver file-read       ; set next-driver=col1
             if next-driver != this-driver [
-              set this-sched false
+              set this-itin false
               ]
             ]
-          [set this-sched false]
-        ] ; end while this-sched
+          [set this-itin false]
+        ] ; end while this-itin
       ] ; end create-drivers
     ] ; end while file-at-end
   ] ; end ifelse
@@ -229,9 +243,12 @@ to setup-itinerary
   file-close
   
   ask drivers [
-    set current-taz matrix:get schedule 0 0 
-    set destination-taz matrix:get schedule 0 1 
-    set departure-time matrix:get schedule 0 2
+    set current-taz array:item itin-from 0
+    set destination-taz array:item itin-to 0
+    set departure-time array:item itin-depart 0
+;    set current-taz matrix:get schedule 0 0 
+;    set destination-taz matrix:get schedule 0 1 
+;    set departure-time matrix:get schedule 0 2
     setxy [xcor] of node current-taz [ycor] of node current-taz   
   ]
 

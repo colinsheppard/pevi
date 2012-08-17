@@ -9,28 +9,16 @@ globals
   ;time-step-size  ; time step in minutes -- set by interface slider
   time            ; current time in fractional hours
   ;display-time    ; current time, a character string hh:mm
-  
-  od              ; origin-destination matrix assumes the taz's are 
-                  ; numbered from 1 to n-nodes and the row number is calculated at (Fromtaz-1)*n-nodes+Totaz
-                  ; The columns correspond to the following definitions:
-                  ; 1 - Origin TAZ
-                  ; 2 - Destination TAZ
-                  ; 3 - Number of 24hr trips from 1 to 2 minus am trips, scaled for pev penetration
-                  ; 4 - Distance in miles
-                  ; 5 - Distance in travel time (minutes)
-  
+    
   od-from
   od-to
   od-demand
   od-dist
   od-time
   
-;  itin-driver
   itin-from
   itin-to
   itin-depart
-
-  ;temperature     ; ambient temperature
 ]
 
 breed [drivers driver]
@@ -64,13 +52,8 @@ drivers-own [
   schedule ; a matrix of: (1)from/current TAZ, (2)to/destination taz, (3)departure time. One row for each trip. (row 1, col 1) is the home TAZ
   current-schedule-row ; keeps track of which row in the schedule each driver is on
   destination-taz ;from the schedule, this is where we're going
-
-
   wait-time
-
-  
 ]
-
 
 chargers-own[
   taz-location ; TAZ # for each charger
@@ -129,29 +112,21 @@ to setup-od-array
     file-open "../inputs/OD_Matrix_5.txt"
     foreach n-values (n-nodes * n-nodes) [?] [
      array:set od-from ? file-read array:set od-to ? file-read array:set od-demand ? (round file-read) array:set od-dist ? file-read array:set od-time ? (file-read / 60)
-     
-
     ]
     file-close
   ]
   [ user-message "File not found: ../OD_Matrix_5.txt" ]
-
 end 
-
 
 to setup-nodes
   create-nodes n-nodes  ; BUTTON for # of nodes?
-      ask nodes [
+  ask nodes [
     set shape "star"
     set color yellow
     set size 0.5
-      ]
+  ]
       ; Select the TAZ input file based on the alternative chooser on the interface. If the file does not exist, stop.
       ; BUTTON??
-
-  ; There was a button to select the "alternative": 0 through 5
-  ; Remove button, edit input file in gui
-
 
   ifelse (file-exists? alternative-input-file) [ ; ../inputs/alternative_4_5.txt
     file-close
@@ -170,7 +145,6 @@ to setup-nodes
    
 end ;setup-nodes
 
-
 to setup-drivers
   ; creating drivers based on GEATM data, in setup-itinerary procedure. 
   setup-itinerary
@@ -180,7 +154,7 @@ to setup-drivers
     set size 2
    ; set driver-satisfaction 1  ;initialize driver satisfaction
     ; let battery capacity deviate a little bit but no less than 20 kWh
-    ifelse phev? = false [  ; is phev? a button to toggle?
+    ifelse phev? = false [  ; where is this getting set?
       ; set randomness of battery capacity
       set battery-capacity min ( list max (list (batt-cap-mean - batt-cap-range) random-normal batt-cap-mean batt-cap-stdv) (batt-cap-mean + batt-cap-range)) 
       ; set randomness of fuel economy
@@ -190,16 +164,13 @@ to setup-drivers
       set fuel-economy phev-fuel-economy
     ]
     set state-of-charge 1
-    set status "Home"
+    set status "NotCharging"
     set partner nobody
     EstimateRange
   ]
 end ;setup-drivers
 
-
 to setup-itinerary
-;  set itin-driver array:from-list 15 [99]   ; creates global itin-driver
-
   ifelse (file-exists? driver-input-file) [ ; ../inputs/p1r1_5.txt
     file-close
     file-open driver-input-file
@@ -213,20 +184,16 @@ to setup-itinerary
       create-drivers 1 [
         set phev? false
         set this-itin true
-;        set schedule matrix:make-constant 15 3 99  ;****what do these #s mean?
         set itin-from array:from-list n-values 15 [99]     ; creates global itin-from
         set itin-to array:from-list n-values 15 [99]       ; creates global itin-to
         set itin-depart array:from-list n-values 15 [99]   ; creates global itin-depart
         set itin-row 0  
         while [this-itin] [  ; while setting up the schedule for only this driver (this-itin=true)
-;          matrix:set-row schedule itin-row (list file-read file-read file-read)
           array:set itin-from itin-row file-read
           array:set itin-to itin-row file-read
           array:set itin-depart itin-row file-read
         ;  array:set array index value
-;          ; set-this-row-in-matrix "schedule" "at this row" [current-taz dest-taz depature-time]
-          EstimateRange  ;**************
-;          ;let dummy-read (file-read)  ;***where is this reading from?***  necessary?
+          ;EstimateRange  ;**************  *Now in Depart
           set itin-row itin-row + 1
           ifelse (file-at-end? = false) [  ; if not yet at the end-of-file,
            let next-driver file-read       ; set next-driver=col1
@@ -246,12 +213,8 @@ to setup-itinerary
     set current-taz array:item itin-from 0
     set destination-taz array:item itin-to 0
     set departure-time array:item itin-depart 0
-;    set current-taz matrix:get schedule 0 0 
-;    set destination-taz matrix:get schedule 0 1 
-;    set departure-time matrix:get schedule 0 2
     setxy [xcor] of node current-taz [ycor] of node current-taz   
   ]
-
 end ;setup-itinerary
 
 to setup-chargers
@@ -305,8 +268,12 @@ to go
   set time time + (time-step-size / 60)  ; Convert time step to hours and add to current time
   if time > stop-hour [ 
     stop ]           ; stop the simulation
-
   
+  EndCharge
+  Arrive
+  RetrySeek
+  Depart 
+  update-soc 
 end
 
 
@@ -322,7 +289,8 @@ to EstimateRange
 ;; This submodel estimates the range of the EV. If the RemainingRange is less than next-trip-range, returns a boolean RangeAcceptable? = false
 
   
-    let next-trip-range matrix:get od (([current-taz] of self - 1) * 25 + [destination-taz] of self - 1) 3
+    ;let next-trip-range matrix:get od (([current-taz] of self - 1) * 25 + [destination-taz] of self - 1) 3
+    let next-trip-range array:item od-dist (([current-taz] of self - 1) * 25 + [destination-taz] of self - 1)
     let RemainingRange ((1 - state-of-charge) * (battery-capacity)) / (e-FuelConsump * safety-factor)
     ;; yields remaining range available in miles
     if RemainingRange > next-trip-range [set RangeAcceptable? true]
@@ -336,6 +304,38 @@ to EstimateRange
   ; so that cars will leave at the start of the day, I do not set those values here. 
 end
 
+
+to Depart
+  ask drivers [
+    if (status = "NotCharging") and (time >= departure-time) [
+      ;; step 1 - does the driver NeedToCharge?
+      EstimateRange
+      ifelse RangeAcceptable (is true)[   ;; If the range is acceptable, continue to state Traveling
+        ;; step 2 - when does the driver arrive?
+        set total-trip-dist array:item od-dist (([current-taz] of self - 1) * 25 + [destination-taz] of self - 1)
+        set total-trip-time array:item od-time (([current-taz] of self - 1) * 25 + [destination-taz] of self - 1)
+        set arrival-time (time + total-trip-time)
+        set status "Traveling"
+        set color white
+      ]
+      [   ;; if the range is NOT acceptable, execute SeekCharger
+        
+      ]
+    ]
+end
+
+to update-soc
+  ask drivers [
+    if status = "Traveling" [
+      set travel-time (time - departure-time)
+      let speed (total-trip-dist / total-trip-time)
+      set travel-dist (speed * travel-time)
+      if state-of-charge > 0 [
+        set state-of-charge (state-of-charge - (time-step-size / 60 * speed * fuel-economy) / battery-capacity)
+        ] 
+    ; State of charge - update factor, update factor = time (hours) * speed (miles/hr) * efficiency (kWh/mi) / capacity (kWh)
+    ]
+end
 
 ;DECISION; NeedToCharge:
 ;;         ***assumes itinerary is never complete**

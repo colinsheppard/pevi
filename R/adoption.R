@@ -1,5 +1,5 @@
 library(colinmisc)
-load.libraries(c('plyr','ggplot2','gtools','gdata'))
+load.libraries(c('plyr','ggplot2','gtools','gdata','googleVis'))
 
 path.to.humveh <- '~/Dropbox/serc/pev-colin/data/Vehicle-Registration/'
 
@@ -36,7 +36,7 @@ ggplot(subset(veh,FUEL.TYPE%in%c("GAS/ELEC      ","ELECTRIC      ")),aes(x=year,
 tot.by.year <- ddply(veh,.(year),function(df){ data.frame(count=sum(df$COUNT,na.rm=T)) })
 frac.by.year <- ddply(veh,.(FUEL.TYPE,year),function(df){ data.frame(frac=sum(df$COUNT,na.rm=T)/subset(tot.by.year,year==df$year[1],count)$count,count=sum(df$COUNT,na.rm=T)) })
 tot.by.zip.year <- ddply(veh,.(zip.city,year),function(df){ data.frame(count=sum(df$COUNT,na.rm=T)) })
-frac.by.zip.year <- ddply(veh,.(FUEL.TYPE,zip.city,year),function(df){ data.frame(frac=sum(df$COUNT,na.rm=T)/subset(tot.by.zip.year,zip.city==df$zip.city[1] & year==df$year[1],count)$count) })
+frac.by.zip.year <- ddply(veh,.(FUEL.TYPE,zip.city,year),function(df){ data.frame(zip=df$ZIP.CODE[1],frac=sum(df$COUNT,na.rm=T)/subset(tot.by.zip.year,zip.city==df$zip.city[1] & year==df$year[1],count)$count) })
 
 # Just gas and electric
 ggplot(subset(frac.by.zip.year,FUEL.TYPE%in%c("GAS/ELEC","ELECTRIC")),aes(x=year,y=frac*100))+geom_bar(stat="identity",aes(fill=FUEL.TYPE))+facet_wrap(~zip.city)+scale_y_continuous(name="% of Vehicles Registered in ZIP")
@@ -73,6 +73,8 @@ ggplot(subset(frac.by.year.model.ev, MODEL %in% ev.models),aes(x=year,y=frac*100
 ggplot(subset(frac.by.year.model.ev, MODEL %in% ev.models),aes(x=year,y=count))+geom_bar(stat="identity",aes(fill=MODEL))+scale_y_continuous(name="Number of Vehicles Registered in Humboldt")
 
 save.image(file=paste(path.to.humveh,'session.Rdata'))
+frac.ev.hybrid.by.zip.year <- subset(frac.by.zip.year,FUEL.TYPE%in%c("GAS/ELEC","ELECTRIC"))
+save(frac.ev.hybrid.by.zip.year,file=paste(path.to.humveh,'frac-ev-hybrid-by-zip-year.Rdata'))
 
 # assume PEV total adoption mimics hybrid adoption, what is the yearly penetration levels and total number of PEVs
 fit <- lm('count ~ year',data.frame(year=tot.by.year$year,count=tot.by.year$count/1e3))

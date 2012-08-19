@@ -130,4 +130,24 @@ for(pev.penetration in c(0.01,0.02,0.04,0.03,0.05,0.1,0.15,0.2,0.25)){
   }
 }
 
+# analyze the results
+dist.thresh <- data.frame(under=c(3,seq(5,40,by=5),seq(50,100,by=25),seq(150,300,by=50)),
+                          miles=c(3,rep(5,8),10,rep(25,2),rep(50,4))) # miles
+for(pev.penetration in c(0.01,0.02,0.04,0.03,0.05,0.1,0.15,0.2,0.25)){
+  load(paste(path.to.outputs,"0saved-state-pen",pev.penetration*100,".Rdata",sep=''))
+  
+  if(pev.penetration == 0.01){
+    ptx.pen <- data.frame(all.ptx[,,gen.num],pen=pev.penetration)
+    dist.thresh.all <- data.frame(under=dist.thresh$under,miles=dist.thresh$miles*mean(all.ptx[,'scale.dist.thresh',gen.num]),pen=pev.penetration)
+  }else{
+    ptx.pen <- rbind(ptx.pen,data.frame(all.ptx[,,gen.num],pen=pev.penetration))
+    dist.thresh.all <- rbind(dist.thresh.all,data.frame(under=dist.thresh$under,miles=dist.thresh$miles*mean(all.ptx[,'scale.dist.thresh',gen.num]),pen=pev.penetration))
+  }
+}
+#ptx.pen$pen <- factor(ptx.pen$pen)
+library(ggplot2)
+
+ggplot(ptx.pen,aes(x=pen,y=scale.dist.thresh))+geom_box()+stat_summary(fun.y=mean,geom='point',colour='red')
+ggplot(dist.thresh.all,aes(x=under,y=miles))+geom_point()+geom_line()+facet_wrap(~pen)
+
 

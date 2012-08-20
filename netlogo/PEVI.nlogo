@@ -28,13 +28,13 @@ breed [nodes node]
 drivers-own [
   
 ;; VEHICLE specific
-  battery-capacity ; in kWh - FORCE GAUSSIAN DISTRIBUTION
+  battery-capacity ; in kwh - FORCE GAUSSIAN DISTRIBUTION
   state-of-charge ; represents the battery state of charge at each timestep
       ; if soc is calculated from travel-dist and fuel-economy, is it a state variable still?
-  fuel-economy ; energy required to travel 1 mile (kWh/mile)
+  fuel-economy ; energy required to travel 1 mile (kwh/mile)
   status ; discrete value from list:not-charging,traveling,charging
   current-taz ; keeps track of the current location of each vehicle
-  kWh-received ; a count of how much energy each driver has charged
+  kwh-received ; a count of how much energy each driver has charged
   phev?  ;boolean variable       
       
 ;; TRIP specific
@@ -66,7 +66,7 @@ chargers-own[
   ;; allowing it to charge more vehicles)
   charger-service ; a counter for the number of drivers each charger services
   ;; necessary?
-  kWh-charged ; a count of how much energy a charger has given
+  kwh-charged ; a count of how much energy a charger has given
   ;; Interesting -- temporal charge rate.  How does this overlap with the supply of energy throughout the day?  *****
  ]
 
@@ -153,7 +153,7 @@ to setup-drivers
     set color green
     set size 2
    ; set driver-satisfaction 1  ;initialize driver satisfaction
-    ; let battery capacity deviate a little bit but no less than 20 kWh
+    ; let battery capacity deviate a little bit but no less than 20 kwh
     ifelse phev? = false [  ; where is this getting set?
       ; set randomness of battery capacity
       set battery-capacity min ( list max (list (batt-cap-mean - batt-cap-range) random-normal batt-cap-mean batt-cap-stdv) (batt-cap-mean + batt-cap-range)) 
@@ -300,7 +300,7 @@ to estimate-range
  
   ;** adapted from find-minimum-charge
   ; To determine minimum-acceptable-charge, we set a local variable equal to the distance of the next trip, multiply that by fuel-economy to get the required
-  ; kWh, and then divide by the battery capacity to get the required state-of-charge. Since the total-trip-dist and total-trip-times need to be set in "to depart" 
+  ; kwh, and then divide by the battery capacity to get the required state-of-charge. Since the total-trip-dist and total-trip-times need to be set in "to depart" 
   ; so that cars will leave at the start of the day, I do not set those values here. 
 end
 
@@ -333,7 +333,7 @@ to update-soc
       if state-of-charge > 0 [
         set state-of-charge (state-of-charge - (time-step-size / 60 * speed * fuel-economy) / battery-capacity)
         ] 
-    ; State of charge - update factor, update factor = time (hours) * speed (miles/hr) * efficiency (kWh/mi) / capacity (kWh)
+    ; State of charge - update factor, update factor = time (hours) * speed (miles/hr) * efficiency (kwh/mi) / capacity (kwh)
     ]
 end
 

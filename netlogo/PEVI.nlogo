@@ -32,7 +32,7 @@ drivers-own [
   state-of-charge ; represents the battery state of charge at each timestep
       ; if soc is calculated from travel-dist and fuel-economy, is it a state variable still?
   fuel-economy ; energy required to travel 1 mile (kWh/mile)
-  status ; discrete value from list:NotCharging,Traveling,Charging
+  status ; discrete value from list:not-charging,traveling,charging
   current-taz ; keeps track of the current location of each vehicle
   kWh-received ; a count of how much energy each driver has charged
   phev?  ;boolean variable       
@@ -46,7 +46,7 @@ drivers-own [
   departure-time ;When the vehicle is set to leave the taz
   arrival-time ; when a car is supposed to arrive
   minimum-acceptable-charge ; The charge required to reach the next destination
-  RangeAcceptable? ; boolean
+  range-acceptable? ; boolean
   
 ;; SCHEDULE specific
   schedule ; a matrix of: (1)from/current TAZ, (2)to/destination taz, (3)departure time. One row for each trip. (row 1, col 1) is the home TAZ
@@ -158,15 +158,15 @@ to setup-drivers
       ; set randomness of battery capacity
       set battery-capacity min ( list max (list (batt-cap-mean - batt-cap-range) random-normal batt-cap-mean batt-cap-stdv) (batt-cap-mean + batt-cap-range)) 
       ; set randomness of fuel economy
-      set fuel-economy max ( list min (list (e-FuelConsump - fuel-economy-range) random-normal e-FuelConsump fuel-economy-stdv) (e-FuelConsump + fuel-economy-range) )
+      set fuel-economy max ( list min (list (elec-fuel-consump - fuel-economy-range) random-normal elec-fuel-consump fuel-economy-stdv) (elec-fuel-consump + fuel-economy-range) )
     ]
     [ set battery-capacity phev-batt-cap
       set fuel-economy phev-fuel-economy
     ]
     set state-of-charge 1
-    set status "NotCharging"
+    set status "not-charging"
     set partner nobody
-    EstimateRange
+    estimate-range
   ]
 end ;setup-drivers
 
@@ -193,7 +193,7 @@ to setup-itinerary
           array:set itin-to itin-row file-read
           array:set itin-depart itin-row file-read
         ;  array:set array index value
-          ;EstimateRange  ;**************  *Now in Depart
+          ;estimate-range  ;**************  *Now in Depart
           set itin-row itin-row + 1
           ifelse (file-at-end? = false) [  ; if not yet at the end-of-file,
            let next-driver file-read       ; set next-driver=col1
@@ -269,33 +269,33 @@ to go
   if time > stop-hour [ 
     stop ]           ; stop the simulation
   
-  EndCharge
-  Arrive
-  RetrySeek
-  Depart 
+  end-charge
+  arrive
+  retry-seek
+  depart 
   update-soc 
 end
 
 
 ;; define all subroutines
 ;; need:
-;; -- TravelTime (schedules EVENT Arrive)
-;; -- Arrive 
+;; -- TravelTime (schedules EVENT arrive)
+;; -- arrive 
 ;;    -- if end of journey, remove from list
-;;    -- for remaining vehicles, enter STATE NotCharging
+;;    -- for remaining vehicles, enter STATE not-charging
 
-to EstimateRange
+to estimate-range
 
-;; This submodel estimates the range of the EV. If the RemainingRange is less than next-trip-range, returns a boolean RangeAcceptable? = false
+;; This submodel estimates the range of the EV. If the RemainingRange is less than next-trip-range, returns a boolean range-acceptable? = false
 
   
     ;let next-trip-range matrix:get od (([current-taz] of self - 1) * 25 + [destination-taz] of self - 1) 3
     let next-trip-range array:item od-dist (([current-taz] of self - 1) * 25 + [destination-taz] of self - 1)
-    let RemainingRange ((1 - state-of-charge) * (battery-capacity)) / (e-FuelConsump * safety-factor)
+    let RemainingRange ((1 - state-of-charge) * (battery-capacity)) / (elec-fuel-consump * safety-factor)
     ;; yields remaining range available in miles
-    if RemainingRange > next-trip-range [set RangeAcceptable? true]
-    if RemainingRange <= next-trip-range [set RangeAcceptable? false]
-    ;set minimum-acceptable-charge (e-FuelConsump * next-trip-range) / batt-cap-mean
+    if RemainingRange > next-trip-range [set range-acceptable? true]
+    if RemainingRange <= next-trip-range [set range-acceptable? false]
+    ;set minimum-acceptable-charge (elec-fuel-consump * next-trip-range) / batt-cap-mean
    ;???? if phev? = false [if minimum-acceptable-charge > 1 [set phev? true]]
  
   ;** adapted from find-minimum-charge
@@ -305,20 +305,20 @@ to EstimateRange
 end
 
 
-to Depart
+to depart
   ask drivers [
-    if (status = "NotCharging") and (time >= departure-time) [
-      ;; step 1 - does the driver NeedToCharge?
-      EstimateRange
-      ifelse RangeAcceptable (is true)[   ;; If the range is acceptable, continue to state Traveling
+    if (status = "not-charging") and (time >= departure-time) [
+      ;; step 1 - does the driver need-to-charge?
+      estimate-range
+      ifelse range-acceptable (is true)[   ;; If the range is acceptable, continue to state traveling
         ;; step 2 - when does the driver arrive?
         set total-trip-dist array:item od-dist (([current-taz] of self - 1) * 25 + [destination-taz] of self - 1)
         set total-trip-time array:item od-time (([current-taz] of self - 1) * 25 + [destination-taz] of self - 1)
         set arrival-time (time + total-trip-time)
-        set status "Traveling"
+        set status "traveling"
         set color white
       ]
-      [   ;; if the range is NOT acceptable, execute SeekCharger
+      [   ;; if the range is NOT acceptable, execute seek-charger
         
       ]
     ]
@@ -326,7 +326,7 @@ end
 
 to update-soc
   ask drivers [
-    if status = "Traveling" [
+    if status = "traveling" [
       set travel-time (time - departure-time)
       let speed (total-trip-dist / total-trip-time)
       set travel-dist (speed * travel-time)
@@ -337,69 +337,69 @@ to update-soc
     ]
 end
 
-;DECISION; NeedToCharge:
+;DECISION; need-to-charge:
 ;;         ***assumes itinerary is never complete**
 ;;         -- Is ChargeRange sufficient?
-;;            Executes EstimateRange submodel, Section 5.5
-;;            -- YES (include random yes) = goto STATE Traveling
-;;            -- NO = goto DECISION SeekCharger
+;;            Executes estimate-range submodel, Section 5.5
+;;            -- YES (include random yes) = goto STATE traveling
+;;            -- NO = goto DECISION seek-charger
 
-;DECISION; SeekCharger:
+;DECISION; seek-charger:
 ;;         -- see submodel, Section 5.6
 ;;         -- NotFound? 
-;;            -- goto STATE NotCharging, request WaitTime
+;;            -- goto STATE not-charging, request wait-time
 ;;         -- Found?
-;;            -- goto STATE Charging, request ChargeTime
+;;            -- goto STATE charging, request ChargeTime
 
 
-;EventScheduler; Itinerary:
+;EventScheduler; itinerary:
 ;;               -- see submodel, Section 5.1
-;;               -- schedule Depart
+;;               -- schedule depart
 
-;EventScheduler; WaitTime:
+;EventScheduler; wait-time:
 ;;               -- see submodel, Section 5.2
-;;               -- schedule [a time in the future to either] Depart -OR- RetrySeek
+;;               -- schedule [a time in the future to either] depart -OR- retry-seek
 ;;                                                            (needs to be dummy variable)
 
-;STATE; NotCharging:
+;STATE; not-charging:
 ;; This will be the state that all drivers enter when parked -- waiting for a charging station, or to depart..
-;;      -- if came from STATE Traveling -OR- Charging:
-;;         -- enter EventScheduler Itinerary:
+;;      -- if came from STATE traveling -OR- charging:
+;;         -- enter EventScheduler itinerary:
 ;;           -- add itinerary step
-;;           -- wait, then Depart -> send to DECISION NeedToCharge
-;;      -- if came from DECISION SeekCharger:
-;;         -- enter EventScheduler WaitTime:
-;;           -- either Depart or RetrySeek (in WaitTime)
-;;           -- Depart ;;;;-> send to DECISION NeedToCharge
-;;           -- RetrySeek -> send to DECISION SeekCharger
-;;      -- if INITIALIZING, send to EventScheduler Itinerary
-;;         -- send to Depart
+;;           -- wait, then depart -> send to DECISION need-to-charge
+;;      -- if came from DECISION seek-charger:
+;;         -- enter EventScheduler wait-time:
+;;           -- either depart or retry-seek (in wait-time)
+;;           -- depart ;;;;-> send to DECISION need-to-charge
+;;           -- retry-seek -> send to DECISION seek-charger
+;;      -- if INITIALIZING, send to EventScheduler itinerary
+;;         -- send to depart
 
 
 ;EventScheduler; ChargeTime:
 ;;               -- see submodel, Section 5.4
-;;               -- schedule EndCharge 
+;;               -- schedule end-charge 
 
-;STATE; Charging:
+;STATE; charging:
 ;;      -- goto EventScheduler ChargeTime
-;;      -- execute Charging algorithm
+;;      -- execute charging algorithm
 ;;         -- will they always charge to a "full" battery, or disengage prematurely?
-;;      -- upon EndCharge, enter STATE NotCharging
+;;      -- upon end-charge, enter STATE not-charging
 
 
 ;EventScheduler; TravelTime:
 ;;               -- see submodel, Section 5.3
-;;               -- schedule event Arrive
+;;               -- schedule event arrive
 
-;STATE; Traveling:
+;STATE; traveling:
 ;;      -- execute EventScheduler TravelTime 
-;;      -- upon Arrive, enter STATE NotCharging
+;;      -- upon arrive, enter STATE not-charging
 
 
 
 ;;in GO:
 ;;   -- initialize itinerary
-;;   -- send to NotCharging
+;;   -- send to not-charging
 @#$#@#$#@
 GRAPHICS-WINDOW
 375

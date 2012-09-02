@@ -3,6 +3,7 @@ load.libraries(c('maptools','plotrix','stats','gpclib','plyr','png','RgoogleMaps
 gpclibPermit()
 
 path.to.geatm <- '~/Dropbox/serc/pev-colin/data/GEATM-2020/'
+path.to.google <- '~/Dropbox/serc/pev-colin/data/google-earth/'
 path.to.humveh <- '~/Dropbox/serc/pev-colin/data/Vehicle-Registration/'
 
 taz <- readShapePoly(paste(path.to.geatm,'Shape_Files/taz-LATLON.shp',sep=''))
@@ -88,11 +89,20 @@ if(!file.exists(paste(path.to.geatm,"zip-fraction-in-taz-matrix.Rdata",sep='')))
 }
 
 # now load up the data providing the fraction of EV's and Hybrids in Humboldt by zipcode and year from 2003-2011
-load(paste(path.to.humveh,'frac-ev-hybrid-by-zip-year.Rdata'))
-# simplify -- toss out distinction on fuel type
-frac.by.zip.year <- ddply(frac.ev.hybrid.by.zip.year,.(zip,year),function(df){ data.frame(frac=sum(df$frac)) })
-# now use these data to estimate 2011 penetration via a linear fit, include r-squared in the results for inspection
-frac.est <- ddply(frac.by.zip.year,.(zip),function(df){ data.frame(frac=predict(lm('frac ~ year',df),newdata=data.frame(year=2011)),r.squared=summary(lm('frac ~ year',df))$r.squared)})
+load(paste(path.to.humveh,'veh.Rdata',sep=''))  # veh
+load(file=paste(path.to.humveh,'tot-frac-by-year.Rdata',sep='')) # tot.by.year, frac.by.year
+aggregate.fracs <- ddply(veh,.(FUEL.TYPE,year),function(df){ data.frame(frac=sum(df$COUNT,na.rm=T)/subset(tot.by.year,year==df$year[1])$count) })
+frac.weight.by.zip.year <- ddply(frac.by.zip.year,.(FUEL.TYPE,zip.city,year),function(df){ data.frame(frac.weight=df$frac/subset(aggregate.fracs,year==df$year[1] & FUEL.TYPE==df$FUEL.TYPE[1])$frac) })
+
+# plot those weights
+ggplot(subset(frac.weight.by.zip.year,FUEL.TYPE%in%c("GAS/ELEC","ELECTRIC")),aes(x=year,y=frac.weight))+geom_bar(stat="identity",position="dodge",aes(fill=FUEL.TYPE))+facet_wrap(~zip.city)+scale_y_continuous(name="Ratio of Zip-Level Penetration to Aggregate Penetration")
+
+# do it again but aggregate EV/Hybrids first 
+frac.weight.by.zip.year.simple <- ddply(subset(frac.by.zip.year,FUEL.TYPE%in%c("GAS/ELEC","ELECTRIC")),.(zip.city,year),function(df){ data.frame(zip=df$zip[1],frac.weight=sum(df$frac)/sum(subset(aggregate.fracs,year==df$year[1] & FUEL.TYPE %in% df$FUEL.TYPE)$frac)) })
+ggplot(frac.weight.by.zip.year.simple,aes(x=year,y=frac.weight))+geom_bar(stat="identity")+facet_wrap(~zip.city)+scale_y_continuous(name="Ratio of Zip-Level Penetration to Aggregate Penetration")
+
+# Finally, take the average ratio in each zip code over the 7 year time frame
+frac.est <- ddply(frac.weight.by.zip.year.simple,.(zip),function(df){ data.frame(frac.weight=mean(df$frac.weight)) })
 
 # now dump results from PO Box only zip codes 95502 95518 95534 into their surrounding zips that actually have geographic extension
 frac.est$frac[frac.est$zip==95521] <- sum(frac.est$frac[frac.est$zip%in%c(95521,95518)])
@@ -100,12 +110,80 @@ frac.est$frac[frac.est$zip==95503] <- sum(frac.est$frac[frac.est$zip%in%c(95503,
 frac.est$frac[frac.est$zip==95501] <- sum(frac.est$frac[frac.est$zip%in%c(95501,95502)])
 frac.est <- frac.est[!frac.est$zip %in% c(95502,95518,95534),]
 
-# for zip codes that weren't in the polk data (mostly border zips outside of humboldt with tiny fractions inside TAZs), we add rows to frac.est make them NA
-frac.est <- rbind(frac.est,data.frame(zip=names(zips.in.taz)[! names(zips.in.taz) %in% frac.est$zip],frac=NA,r.squared=NA))
+# for zip codes that weren't in the polk data (mostly border zips outside of humboldt with tiny fractions inside TAZs), we add rows to frac.est make them have a weight of 1
+frac.est <- rbind(frac.est,data.frame(zip=names(zips.in.taz)[! names(zips.in.taz) %in% frac.est$zip],frac.weight=1))
 
 # now apply these estimates to the matrix
+w <- frac.est$frac.weight[match(names(zips.in.taz),frac.est$zip)]
+weight.matrix <- t(apply(zips.in.taz,1,function(x){ x * w }))
+taz.weights.on.penetration <- apply(weight.matrix,1,sum)
 
 
+# Load the aggregation polygons
+agg.polys <- readShapePoly(paste(path.to.google,'ProposedAggregation.shp',sep=''))
+taz.centroids <-SpatialPointsDataFrame(coordinates(taz),data=data.frame(longitude= coordinates(taz)[,1],longitude= coordinates(taz)[,2]))
+agg.mapping <- data.frame(name=over(taz.coords,agg.polys)$Name)
+agg.mapping$agg.id <- as.numeric(agg.mapping$name)
+agg.taz.shp <- unionSpatialPolygons(taz,agg.mapping$agg.id)
+aggregate.data <- function(df)
+{ 
+ return( colSums(df[,c('AREA','ACRES','SHAPE_AREA')]) ) 
+}
+taz@data$agg.id <- agg.mapping$agg.id
+agg.taz.data <- ddply(taz@data,.(agg.id),aggregate.data)
+agg.taz.shp <- SpatialPolygonsDataFrame(agg.taz.shp,agg.taz.data)
+
+# add new zone numbers corresponding to old zone numbers to the dataframe
+od.24.old$from.taz.new <- taz$agg.id[match(od.24.old$from.taz,taz$NEWTAZ)]
+od.24.old$to.taz.new <- taz$agg.id[match(od.24.old$to.taz,taz$NEWTAZ)]
+od.am.old$from.taz.new <- taz$agg.id[match(od.am.old$from.taz,taz$NEWTAZ)]
+od.am.old$to.taz.new <- taz$agg.id[match(od.am.old$to.taz,taz$NEWTAZ)]
+od.pm.old$from.taz.new <- taz$agg.id[match(od.pm.old$from.taz,taz$NEWTAZ)]
+od.pm.old$to.taz.new <- taz$agg.id[match(od.pm.old$to.taz,taz$NEWTAZ)]
+
+# for now, omit the rows with NA, which correspond to the TAZ id's in the OD data which don't have a
+# corresponding entry in the TAZ shape file (ID's 11-20)
+# I think this also omits ID's 1-10
+od.24.new <- ddply(na.omit(od.24.old),.(from.taz.new,to.taz.new),function(df){ c(sum(df$hbw),sum(df$hbshop),
+	sum(df$hbelem),sum(df$hbuniv),sum(df$hbro),sum(df$nhb),sum(df$ix),sum(df$xi),sum(df$ee),sum(df$demand)) })
+names(od.24.new) <- c('from','to','hbw','hbshop','hbelem','hbuniv','hbro',
+	'nhb','ix','xi','ee','demand')
+od.am.new <- ddply(na.omit(od.am.old),.(from.taz.new,to.taz.new),function(df){ c(sum(df$hbw),sum(df$hbshop),
+	sum(df$hbelem),sum(df$hbuniv),sum(df$hbro),sum(df$nhb),sum(df$ix),sum(df$xi),sum(df$ee),sum(df$demand)) })
+names(od.am.new) <- c('from','to','hbw','hbshop','hbelem','hbuniv','hbro',
+	'nhb','ix','xi','ee','demand')
+od.pm.new <- ddply(na.omit(od.pm.old),.(from.taz.new,to.taz.new),function(df){ c(sum(df$hbw),sum(df$hbshop),
+	sum(df$hbelem),sum(df$hbuniv),sum(df$hbro),sum(df$nhb),sum(df$ix),sum(df$xi),sum(df$ee),sum(df$demand)) })
+names(od.pm.new) <- c('from','to','hbw','hbshop','hbelem','hbuniv','hbro',
+	'nhb','ix','xi','ee','demand')
+
+# check that the sum of the rows equals the value in the sum column
+# they are currently not quite equal and I suspect this is from omiting zones 1-10
+od.24.new$row.sum <- rowSums(od.24.new[,3:11])
+
+# store total traffic leaving each new zone
+od.24.sum <- ddply(od.24.new,.(from),function(df){ sum(df$demand) })
+names(od.24.sum) <- c('taz','demand')
+
+# add total demand to the existing shape data
+agg.taz.shp@data$total.demand <- od.24.sum$demand[agg.taz.shp$agg.id]
+agg.taz.shp@data$trips.per.acre <- agg.taz.shp@data$total.demand/agg.taz.shp@data$ACRES
+
+trellis.par.set(sp.theme())
+spplot(agg.taz.shp,'total.demand')
+
+
+
+# Make a plot of total demand disaggregated
+od.24.old <- read.table(paste(path.to.geatm,'OD_Tables/OD by type 24 hr (2020).txt',sep=''),
+ header=FALSE, sep=",",colClasses='numeric')
+names(od.24.old) <- c('from.taz','to.taz','hbw','hbshop','hbelem','hbuniv','hbro',
+	'nhb','ix','xi','ee','demand')
+od.24.sum <- ddply(od.24.old,.(from),function(df){ sum(df$demand) })
+names(od.24.sum) <- c('taz','demand')
+taz@data$total.demand <- od.24.sum$demand[match(taz@data$NEWTAZ,od.24.sum$taz)]
+trellis.par.set(sp.theme())
+spplot(taz,'total.demand')
 
 
 #tracts  <- readShapePoly(paste(path.to.geatm,'../CA-CENSUS-TRACTS/tl_2010_06_tract10.shp',sep=''))
@@ -113,11 +191,10 @@ frac.est <- rbind(frac.est,data.frame(zip=names(zips.in.taz)[! names(zips.in.taz
 #plot(tracts[hum.tracts,])
 
 # tried to read in as lat-long but file has non-conformant data
-#taz <- readShapePoly('GEATM-Data/Shape_Files/taz.shp',proj4string=CRS("+proj=longlat"))
-#summary(taz)
-#attributes(taz)
+taz <- readShapePoly('GEATM-Data/Shape_Files/taz.shp',proj4string=CRS("+proj=longlat"))
+summary(taz)
 
-#plot(taz)
+plot(taz)
 
 taz.coords <- coordinates(taz)
 

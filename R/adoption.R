@@ -3,42 +3,51 @@ load.libraries(c('plyr','ggplot2','gtools','gdata','googleVis'))
 
 path.to.humveh <- '~/Dropbox/serc/pev-colin/data/Vehicle-Registration/'
 
-years <- c(2003,2005,2007,2009,2010,2011)
+years <- c(2003,2005,2007,2009,2010,2011,2012)
 
-first.year <- T
+if(!file.exists(paste(path.to.humveh,'veh.Rdata',sep=''))){
+  first.year <- T
 
-for(yr in years){
-  if(first.year){
-    veh <- read.csv(paste(path.to.humveh,'vehicles-',yr,'.csv',sep=''))
-    veh$year <- yr
-    first.year <- F
-  }else{
-    veh <- rbind(veh,data.frame(read.csv(paste(path.to.humveh,'vehicles-',yr,'.csv',sep='')),year=yr))
+  for(yr in years){
+    if(first.year){
+      veh <- read.csv(paste(path.to.humveh,'vehicles-',yr,'.csv',sep=''))
+      veh$year <- yr
+      first.year <- F
+    }else{
+      veh <- rbind(veh,data.frame(read.csv(paste(path.to.humveh,'vehicles-',yr,'.csv',sep='')),year=yr))
+    }
   }
-}
 
-# Trim the levels then convert to strings
-for(col.name in c('FUEL.TYPE','MAKE','MODEL','VEHICLE.CATEGORY')){
-  levels(veh[[col.name]]) <- trim(levels(veh[[col.name]]))
-  veh[[col.name]] <- as.character(veh[[col.name]])
-}
+  # Trim the levels then convert to strings
+  for(col.name in c('FUEL.TYPE','MAKE','MODEL','VEHICLE.CATEGORY')){
+    levels(veh[[col.name]]) <- trim(levels(veh[[col.name]]))
+    veh[[col.name]] <- as.character(veh[[col.name]])
+  }
 
-zips <- read.csv(paste(path.to.humveh,'zipcode.csv',sep=''))
-veh$city <- zips$city[match(veh$ZIP.CODE,zips$zip)]
-veh$zip.city <- paste(veh$city,veh$ZIP.CODE,sep=' - ')
+  zips <- read.csv(paste(path.to.humveh,'zipcode.csv',sep=''))
+  veh$city <- zips$city[match(veh$ZIP.CODE,zips$zip)]
+  veh$zip.city <- paste(veh$city,veh$ZIP.CODE,sep=' - ')
+
+  save(veh,file=paste(path.to.humveh,'veh.Rdata',sep=''))
+}else{
+  load(paste(path.to.humveh,'veh.Rdata',sep=''))
+}
+  
 
 # Hybrid and EV registrations by year and zip
 
-ggplot(subset(veh,FUEL.TYPE%in%c("GAS/ELEC      ","ELECTRIC      ")),aes(x=year,y=COUNT))+stat_summary(fun.y=sum,geom="bar",aes(fill=FUEL.TYPE))+facet_wrap(~zip.city)
+ggplot(subset(veh,FUEL.TYPE%in%c("GAS/ELEC","ELECTRIC")),aes(x=year,y=COUNT))+stat_summary(fun.y=sum,geom="bar",aes(fill=FUEL.TYPE))+facet_wrap(~zip.city)
 
 # Same but now show regisrations as a fraction of total zip registrations
 
 tot.by.year <- ddply(veh,.(year),function(df){ data.frame(count=sum(df$COUNT,na.rm=T)) })
 frac.by.year <- ddply(veh,.(FUEL.TYPE,year),function(df){ data.frame(frac=sum(df$COUNT,na.rm=T)/subset(tot.by.year,year==df$year[1],count)$count,count=sum(df$COUNT,na.rm=T)) })
 tot.by.zip.year <- ddply(veh,.(zip.city,year),function(df){ data.frame(count=sum(df$COUNT,na.rm=T)) })
-frac.by.zip.year <- ddply(veh,.(FUEL.TYPE,zip.city,year),function(df){ data.frame(zip=df$ZIP.CODE[1],frac=sum(df$COUNT,na.rm=T)/subset(tot.by.zip.year,zip.city==df$zip.city[1] & year==df$year[1],count)$count) })
+frac.by.zip.year <- ddply(veh,.(FUEL.TYPE,zip.city,year),function(df){ data.frame(zip=df$ZIP.CODE[1],count=sum(df$COUNT,na.rm=T),frac=sum(df$COUNT,na.rm=T)/subset(tot.by.zip.year,zip.city==df$zip.city[1] & year==df$year[1],count)$count) })
 
-# Just gas and electric
+save(tot.by.zip.year,frac.by.zip.year,tot.by.year,frac.by.year,file=paste(path.to.humveh,'tot-frac-by-year.Rdata',sep=''))
+
+# Just hybrid and electric
 ggplot(subset(frac.by.zip.year,FUEL.TYPE%in%c("GAS/ELEC","ELECTRIC")),aes(x=year,y=frac*100))+geom_bar(stat="identity",aes(fill=FUEL.TYPE))+facet_wrap(~zip.city)+scale_y_continuous(name="% of Vehicles Registered in ZIP")
 
 ggplot(subset(frac.by.year,FUEL.TYPE%in%c("GAS/ELEC","ELECTRIC")),aes(x=year,y=frac*100))+geom_bar(stat="identity",aes(fill=FUEL.TYPE))+scale_y_continuous(name="% of Vehicles Registered in Humboldt County")
@@ -78,7 +87,7 @@ save(frac.ev.hybrid.by.zip.year,file=paste(path.to.humveh,'frac-ev-hybrid-by-zip
 
 # assume PEV total adoption mimics hybrid adoption, what is the yearly penetration levels and total number of PEVs
 fit <- lm('count ~ year',data.frame(year=tot.by.year$year,count=tot.by.year$count/1e3))
-proj.years <- 2012:2025
+proj.years <- 2013:2025
 proj.count <- predict(fit,newdata=data.frame(year=proj.years))
 max.count <- max(c(tot.by.year$count/1e3,proj.count))
 plot(tot.by.year$year,tot.by.year$count/1e3,ylim=c(0,max.count),xlim=range(c(tot.by.year$year,proj.years)),ylab="Thousands of Registered Vehicles",xlab="Year",main="Linear Projection of Vehicle Registrations in Humbodlt County")
@@ -99,18 +108,16 @@ pevs.by.year <- hybrids.by.year
 pevs.by.year$year <- pevs.by.year$year + year.offset
 pevs.by.year$count <- pevs.by.year$count * (tot.and.proj$count[match(pevs.by.year$year,tot.and.proj$year)]/tot.and.proj$count[match(pevs.by.year$year-year.offset,tot.and.proj$year)])
 
-par(mar=c(5,4,4,5)+.1)
-plot(pevs.by.year$year,pevs.by.year$count,xlim=c(2010,2020),ylim=c(0,1.05*max(pevs.by.year$count)),xlab="Year",ylab="Number of PEVs",main="Projection of PEV Adoption in Humbodlt County")
-title(main=paste("(assuming PEV adoption follows same trend as hybrid-electric adoption)"),line=0.5,font.main=1)
+par(mar=c(5,4,6,5)+.1)
+plot(pevs.by.year$year,pevs.by.year$count,xlim=c(2010,2021),ylim=c(0,1.05*max(pevs.by.year$count)),xlab="Year",ylab="Number of PEVs",main="Projection of PEV Adoption in Humbodlt County")
+title(main=paste("(assuming linear growth in total reg. vehicles and PEV adoption"),line=1.7,font.main=1)
+title(main=paste("follows same trend as hybrid-electric adoption)"),line=0.5,font.main=1)
 axis(4,at=axTicks(2),labels=roundC(axTicks(2)/tot.and.proj$count[tot.and.proj$year==2020]*100,2))
 mtext("% of 2020 Vehicle Stock",side=4,line=3)
 grid()
 abline(lm('count~year',pevs.by.year),col='red')
 
-
-
 # Now do an independent calc based on observed vehicle replacements
-
 k.val <- read.csv(paste(path.to.humveh,'k-values.csv',sep=''))
 k.val<-melt(k.val,id.vars='age')
 names(k.val) <- c('age','set','k')
@@ -168,6 +175,15 @@ p2p.ratio <- data.frame(set=c('mean','median','k.03.05','k.05.07','k.07.09','k.0
 
 
 
+# make a motion chart
+
+library(reshape2)
+library(googleVis)
+
+v.sub <- veh[,c('zip.city','year','YEAR.MODEL','VEHICLE.CATEGORY','FUEL.TYPE','MAKE','MODEL','COUNT')]
+M <- gvisMotionChart(v.sub, idvar="zip.city", timevar="year",
+                      options=list(width=900, height=700), chartid="Humboldt_Vehicle_Registration")
+plot(M)
 
 
 

@@ -32,8 +32,8 @@ drivers-own [
 ;; VEHICLE specific
   battery-capacity ; in kwh - FORCE GAUSSIAN DISTRIBUTION
   state-of-charge ; represents the battery state of charge at each timestep
-      ; if soc is calculated from travel-dist and fuel-economy, is it a state variable still?
-  fuel-economy ; energy required to travel 1 mile (kwh/mile)
+      ; if soc is calculated from travel-dist and electric-fuel-consumption, is it a state variable still?
+  electric-fuel-consumption ; energy required to travel 1 mile (kwh/mile)
   status ; discrete value from list:not-charging,traveling,charging
   current-taz ; keeps track of the current location of each vehicle
   kwh-received ; a count of how much energy each driver has charged
@@ -83,13 +83,7 @@ nodes-own[
 to setup
   __clear-all-and-reset-ticks
   
-  ; Set the time parameters
-  ;set start-hour 0        ; starting time, an hour
-  ;set stop-hour  24       ; time to end simulation, in whole or fractional hours
-  
-  ; Initialize the time variables
-  ;set time start-hour
-  ;update-display-time
+  set schedule dynamic-scheduler:create
   
   reset-ticks
   
@@ -150,25 +144,32 @@ end ;setup-nodes
 to setup-drivers
   ; creating drivers based on GEATM data, in setup-itinerary procedure. 
   setup-itinerary
+  ; initialize driver state variables
   ask drivers [
+    set phev? false ; TODO needs to be determined during itinerary setup
+    set current-schedule-row 0
     set shape "car"
     set color green
     set size 2
-   ; set driver-satisfaction 1  ;initialize driver satisfaction
-    ; let battery capacity deviate a little bit but no less than 20 kwh
-    ifelse phev? = false [  ; where is this getting set?
-      ; set randomness of battery capacity
-      set battery-capacity min ( list max (list (batt-cap-mean - batt-cap-range) random-normal batt-cap-mean batt-cap-stdv) (batt-cap-mean + batt-cap-range)) 
-      ; set randomness of fuel economy
-      set fuel-economy max ( list min (list (elec-fuel-consump - fuel-economy-range) random-normal elec-fuel-consump fuel-economy-stdv) (elec-fuel-consump + fuel-economy-range) )
-    ]
-    [ set battery-capacity phev-batt-cap
-      set fuel-economy phev-fuel-economy
+    if[phev?]
+      set battery-capacity 25 ; TODO replace with values from a vehicle type distribution input file
+      set electric-fuel-consumption 0.35   ; kWh/mile
+    ][ 
+      set battery-capacity phev-batt-cap
+      set electric-fuel-consumption phev-electric-fuel-consumption
     ]
     set state-of-charge 1
     set status "not-charging"
     set partner nobody
     check-charge
+
+    set current-taz array:item itin-from current-scheduele-row
+    set destination-taz array:item itin-to current-schedule-row
+    set departure-time array:item itin-depart current-schedule-row
+    setxy [xcor] of node current-taz [ycor] of node current-taz   
+  ]
+  ask drivers [
+    dynamic-scheduler:add schedule self task depart departure-time
   ]
 end ;setup-drivers
 
@@ -184,7 +185,6 @@ to setup-itinerary
       set this-driver this-driver + 1
       if this-driver = 1 [let dummy file-read]
       create-drivers 1 [
-        set phev? false
         set itin-from array:from-list n-values 1 [-99]     ; creates global itin-from
         set itin-to array:from-list n-values 1 [-99]       ; creates global itin-to
         set itin-depart array:from-list n-values 1 [-99]   ; creates global itin-depart
@@ -211,20 +211,6 @@ to setup-itinerary
   [ user-message (word "Input file '" driver-input-file "' not found!") ]
   file-close
   
-  set current-schedule-row 0
-  ask drivers [
-    set current-taz array:item itin-from current-scheduele-row
-    set destination-taz array:item itin-to current-schedule-row
-    set departure-time array:item itin-depart current-schedule-row
-    setxy [xcor] of node current-taz [ycor] of node current-taz   
-  ]
-  
-  set schedule dynamic-scheduler:create
-  ask drivers [
-    dynamic-scheduler:add schedule self task depart departure-time
-    ;; adds the first departure for each driver to the program's schedule:
-    ;; (add to the) (schedule) (each driver) (to) (go to routine 'depart') (at this departure time)
-  ]
 end ;setup-itinerary
 
 to setup-chargers
@@ -272,21 +258,7 @@ to setup-chargers
 end ;setup-chargers
 
 to go
-  
-
-  
-  ; Advance the time and update time variables
-  ;tick
-  ;set time time + (time-step-size / 60)  ; Convert time step to hours and add to current time
-  ;if time > stop-hour [ 
-  ;  stop ]           ; stop the simulation
-  
-  dynamic-scheduler:go schedule ;-until schedule XX
-  ;end-charge
-  ;arrive
-  ;retry-seek
-  ;depart 
-  ;update-soc 
+  dynamic-scheduler:go schedule 
 end
 
 
@@ -312,7 +284,7 @@ to check-charge
    ;???? if phev? = false [if minimum-acceptable-charge > 1 [set phev? true]]
  
   ;** adapted from find-minimum-charge
-  ; To determine minimum-acceptable-charge, we set a local variable equal to the distance of the next trip, multiply that by fuel-economy to get the required
+  ; To determine minimum-acceptable-charge, we set a local variable equal to the distance of the next trip, multiply that by electric-fuel-consumption to get the required
   ; kwh, and then divide by the battery capacity to get the required state-of-charge. Since the total-trip-dist and total-trip-times need to be set in "to depart" 
   ; so that cars will leave at the start of the day, I do not set those values here. 
 end
@@ -370,7 +342,7 @@ to update-soc
       let speed (total-trip-dist / total-trip-time)
       ;;set travel-dist (speed * travel-time)
       if state-of-charge > 0 [
-        set state-of-charge (state-of-charge - (ticks * speed * fuel-economy) / battery-capacity)
+        set state-of-charge (state-of-charge - (ticks * speed * electric-fuel-consumption) / battery-capacity)
         ] 
     ; State of charge - update factor, update factor = time (hours) * speed (miles/hr) * efficiency (kwh/mi) / capacity (kwh)
     ]

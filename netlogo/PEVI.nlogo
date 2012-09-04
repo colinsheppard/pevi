@@ -51,7 +51,7 @@ drivers-own [
   need-to-charge? ; boolean
   
 ;; SCHEDULE specific
-  schedule ; a matrix of: (1)from/current TAZ, (2)to/destination taz, (3)departure time. One row for each trip. (row 1, col 1) is the home TAZ
+  itinerary ; a matrix of: (1)from/current TAZ, (2)to/destination taz, (3)departure time. One row for each trip. (row 1, col 1) is the home TAZ
   current-schedule-row ; keeps track of which row in the schedule each driver is on
   destination-taz ;from the schedule, this is where we're going
   wait-time
@@ -178,32 +178,32 @@ to setup-itinerary
     file-open driver-input-file
     let this-driver 0
     let itin-row 0
-    let this-itin false
+    let this-itin true
         
     while [file-at-end? = false] [
       set this-driver this-driver + 1
       if this-driver = 1 [let dummy file-read]
       create-drivers 1 [
         set phev? false
+        set itin-from array:from-list n-values 1 [-99]     ; creates global itin-from
+        set itin-to array:from-list n-values 1 [-99]       ; creates global itin-to
+        set itin-depart array:from-list n-values 1 [-99]   ; creates global itin-depart
+        array:set itin-from   0 file-read
+        array:set itin-to     0 file-read
+        array:set itin-depart 0	file-read
         set this-itin true
-        set itin-from array:from-list n-values 15 [99]     ; creates global itin-from
-        set itin-to array:from-list n-values 15 [99]       ; creates global itin-to
-        set itin-depart array:from-list n-values 15 [99]   ; creates global itin-depart
-        set itin-row 0  
         while [this-itin] [  ; while setting up the schedule for only this driver (this-itin=true)
-          array:set itin-from itin-row file-read
-          array:set itin-to itin-row file-read
-          array:set itin-depart itin-row file-read
-        ;  array:set array index value
-          ;check-charge  ;**************  *Now in Depart
-          set itin-row itin-row + 1
+          array:add itin-from	file-read
+          array:add itin-to	file-read
+          array:add itin-depart file-read
           ifelse (file-at-end? = false) [  ; if not yet at the end-of-file,
-           let next-driver file-read       ; set next-driver=col1
-            if next-driver != this-driver [
+	    let next-driver file-read       ; set next-driver=col1
+	    if next-driver != this-driver [
               set this-itin false
-              ]
             ]
-          [set this-itin false]
+          ][
+	    set this-itin false
+	  ]
         ] ; end while this-itin
       ] ; end create-drivers
     ] ; end while file-at-end

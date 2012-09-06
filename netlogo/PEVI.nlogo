@@ -2,9 +2,7 @@ extensions [matrix array dynamic-scheduler]
 
 
 ;; define all globals
-globals
-
-[ ;start-hour      ; starting time, an integer (or fractional) hour
+globals [ ;start-hour      ; starting time, an integer (or fractional) hour
   ;stop-hour       ; time to end simulation, an integer hour
   ;;time-step-size  ; time step in minutes -- set by interface slider
   ;time            ; current time in fractional hours
@@ -285,28 +283,22 @@ end
 
 
 to depart
-  print "departing"
- ; ask drivers [
- ;  if (status = "not-charging") and (ticks >= departure-time) [
-;      ;; step 1 - does the driver check-charge?
-;      check-charge
-;      ifelse need-to-charge? = true [   ;; if the driver needs to charge, send to seek-charger
-;
-;      ]
-;      [   ;; if the driver does not need to charge, set to "traveling"
-;          ;; step 2 - when does the driver arrive?
-;        set total-trip-dist array:item od-dist (([destination-taz] of self - 1) * 5 + [current-taz] of self - 1)
-;        set total-trip-time array:item od-time (([destination-taz] of self - 1) * 5 + [current-taz] of self - 1)
-;        set arrival-time (ticks + total-trip-time)
-;        set status "traveling"
-;        dynamic-scheduler:add schedule self task arrive arrival-time
-;        ;set color white
-;      ]
-;    ]
+  print word (who " departing " ticks)
+  check-charge
+  ifelse need-to-charge? = true [   ;; if the driver needs to charge, send to seek-charger
+      
+  ][   ;; if the driver does not need to charge, set to "traveling"
+       ;; step 2 - when does the driver arrive?
+    set total-trip-dist array:item od-dist (([destination-taz] of self - 1) * 5 + [current-taz] of self - 1)
+    set total-trip-time array:item od-time (([destination-taz] of self - 1) * 5 + [current-taz] of self - 1)
+    set arrival-time (ticks + total-trip-time)
+    set status "traveling"
+    dynamic-scheduler:add schedule self task arrive arrival-time
+  ]
 end
   
 to arrive
-;  ask drivers [
+  print word (who " arriving " ticks)
 ;    if status = "traveling" [
 ;     update-soc
 ;     set current-schedule-row current-schedule-row + 1

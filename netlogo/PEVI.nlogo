@@ -104,7 +104,11 @@ to setup-od-array
     file-close
     file-open "../inputs/OD_Matrix_5.txt"
     foreach n-values (n-nodes * n-nodes) [?] [
-     array:set od-from ? file-read array:set od-to ? file-read array:set od-demand ? (round file-read) array:set od-dist ? file-read array:set od-time ? (file-read / 60)
+     array:set od-from ? file-read 
+     array:set od-to ? file-read 
+     array:set od-demand ? (round file-read) 
+     array:set od-dist ? file-read
+     array:set od-time ? (file-read / 60)
     ]
     file-close
   ]
@@ -149,10 +153,10 @@ to setup-drivers
     set color green
     set size 2
     ifelse phev? [
-      set battery-capacity 25 ; TODO replace with values from a vehicle type distribution input file
+      set battery-capacity 10 ; TODO replace with values from a vehicle type distribution input file
       set electric-fuel-consumption 0.35   ; kWh/mile
     ][ 
-      set battery-capacity 10
+      set battery-capacity 25
       set electric-fuel-consumption 0.35
     ]
     set state-of-charge 1
@@ -162,8 +166,6 @@ to setup-drivers
     itinerary-event-scheduler
   ]
 end ;setup-drivers
-
-
 
 to setup-itinerary
   ifelse (file-exists? driver-input-file) [ ; ../inputs/p1r1_5.txt  
@@ -285,7 +287,7 @@ to itinerary-event-scheduler
 end
 
 to depart
-  print (word (who - 5) " departing " ticks)
+  print (word (who - 5) " departing " ticks " soc:" state-of-charge)
   check-charge
   ifelse need-to-charge? = true [   ;; if the driver needs to charge, send to seek-charger
       
@@ -300,8 +302,8 @@ to depart
 end
   
 to arrive
-  print (word (who - 5) " arriving " ticks)
-;     update-soc
+  update-soc
+  print (word (who - 5) " arriving at " ticks ", trip-distance: " total-trip-dist " soc:" state-of-charge " elec-fc:" electric-fuel-consumption " cap" battery-capacity)
   if (current-schedule-row + 1 < array:length itin-from) [
     set current-schedule-row current-schedule-row + 1
     itinerary-event-scheduler
@@ -309,20 +311,7 @@ to arrive
 end
 
 to update-soc
-;  ask drivers [
-;    if status = "traveling" [
-;      set travel-time (ticks - departure-time)
-;      let speed (total-trip-dist / total-trip-time)
-;      ;;set travel-dist (speed * travel-time)
-;      if state-of-charge > 0 [
-;        set state-of-charge (state-of-charge - (ticks * speed * electric-fuel-consumption) / battery-capacity)
-;        ] 
-;    ; State of charge - update factor, update factor = time (hours) * speed (miles/hr) * efficiency (kwh/mi) / capacity (kwh)
-;    ]
-;    if status = "charging" [
-;    
-;    
-;    ]
+  set state-of-charge (state-of-charge - total-trip-dist * electric-fuel-consumption / battery-capacity)
 end
 
 ;DECISION; check-charge:

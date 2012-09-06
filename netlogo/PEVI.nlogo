@@ -156,19 +156,14 @@ to setup-drivers
       set electric-fuel-consumption 0.35
     ]
     set state-of-charge 1
-    set status "not-charging"
     set partner nobody
     check-charge
 
-    set current-taz array:item itin-from current-schedule-row
-    set destination-taz array:item itin-to current-schedule-row
-    set departure-time array:item itin-depart current-schedule-row
-    setxy [xcor] of node current-taz [ycor] of node current-taz   
-  ]
-  ask drivers [
-    dynamic-scheduler:add schedule self task depart departure-time
+    itinerary-event-scheduler
   ]
 end ;setup-drivers
+
+
 
 to setup-itinerary
   ifelse (file-exists? driver-input-file) [ ; ../inputs/p1r1_5.txt  
@@ -281,9 +276,16 @@ to check-charge
   ; so that cars will leave at the start of the day, I do not set those values here. 
 end
 
+to itinerary-event-scheduler
+  set status "not-charging"
+  set current-taz array:item itin-from current-schedule-row
+  set destination-taz array:item itin-to current-schedule-row
+  set departure-time array:item itin-depart current-schedule-row
+  dynamic-scheduler:add schedule self task depart departure-time
+end
 
 to depart
-  print word (who " departing " ticks)
+  print (word (who - 5) " departing " ticks)
   check-charge
   ifelse need-to-charge? = true [   ;; if the driver needs to charge, send to seek-charger
       
@@ -298,28 +300,12 @@ to depart
 end
   
 to arrive
-  print word (who " arriving " ticks)
-;    if status = "traveling" [
+  print (word (who - 5) " arriving " ticks)
 ;     update-soc
-;     set current-schedule-row current-schedule-row + 1
-;     carefully [  ;; *** needed here?  might be necessary for check-charge to work
-;      set current-taz destination-taz
-;      set destination-taz array:item itin-to current-schedule-row
-;      set departure-time array:item itin-depart current-schedule-row
-;      setxy [xcor] of node current-taz [ycor] of node current-taz   
-;     ]
-;     ;; determine if the driver charge will at its current location:
-;     check-charge
-;     ifelse need-to-charge? = true [ ;; send to seek-charger
-;     ]
-;     
-;     [ ;; send to depart -- add next departure time to master schedule
-;       set status "not-charging"
-;       dynamic-scheduler:add schedule self task depart departure-time
-;     ]
-;    ]
-;  ]
-  
+  if (current-schedule-row + 1 < array:length itin-from) [
+    set current-schedule-row current-schedule-row + 1
+    itinerary-event-scheduler
+  ]
 end
 
 to update-soc

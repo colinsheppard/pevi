@@ -95,6 +95,7 @@ end
 
 
 to setup-od-array
+  print "setup-od-array"
   ; Reads in main driver input file: Origin, destination, # of trips, distance, time
   set od-from array:from-list n-values (n-nodes * n-nodes) [0] ; creates global od-from
   set od-to array:from-list n-values (n-nodes * n-nodes) [0]           ; global od-to
@@ -114,6 +115,7 @@ to setup-od-array
 end 
 
 to setup-nodes
+  print "setup-nodes"
   create-nodes n-nodes  ; BUTTON for # of nodes?
   ask nodes [
     set shape "star"
@@ -141,6 +143,7 @@ to setup-nodes
 end ;setup-nodes
 
 to setup-drivers
+  print "setup-drivers"
   ; creating drivers based on GEATM data, in setup-itinerary procedure. 
   setup-itinerary
   ; initialize driver state variables
@@ -173,19 +176,27 @@ to setup-drivers
 end ;setup-drivers
 
 to setup-itinerary
+  print "setup-itinerary"
   ifelse (file-exists? driver-input-file) [ ; ../inputs/p1r1_5.txt  
     file-close
     file-open driver-input-file
+    ;print "hi1"
     let itin-row 0
     let this-itin true
+    ;print file-at-end?
+    let dummy-read-line file-read-line  ; <--- added this 09/07, to allow the readfile to skip the first line (comments)
     let next-driver file-read
+   ;print (word "next-driver = " next-driver)
     let this-driver 0
+    ;print "hi"
     while [file-at-end? = false] [
       set this-driver next-driver
+      print (word "this-driver = " this-driver)
       create-drivers 1 [
         set itin-from array:from-list n-values 1 [-99]     ; creates global itin-from
         set itin-to array:from-list n-values 1 [-99]       ; creates global itin-to
         set itin-depart array:from-list n-values 1 [-99]   ; creates global itin-depart
+        ;print "hi in create-drivers"
         array:set itin-from   0 file-read
         array:set itin-to     0 file-read
         array:set itin-depart 0	file-read
@@ -204,11 +215,11 @@ to setup-itinerary
   ] ; end ifelse
   [ user-message (word "Input file '" driver-input-file "' not found!") ]
   file-close
-  
+  ;print "hi"
 end ;setup-itinerary
 
 to setup-chargers
-  
+  print "setup-chargers"
   ; The charger level, location, and quantity of chargers was read in during setup-nodes.
   ; Now chargers of each level are created at the appropriate node.
   ; Charger-rate is currently a separate state variable from charger level. We may want to combine the two later, if
@@ -516,28 +527,6 @@ fuel-economy-range
 Number
 
 INPUTBOX
-24
-433
-115
-493
-phev-batt-cap
-16
-1
-0
-Number
-
-INPUTBOX
-24
-496
-138
-556
-phev-fuel-economy
-0.5
-1
-0
-Number
-
-INPUTBOX
 837
 97
 1072
@@ -555,17 +544,6 @@ INPUTBOX
 175
 safety-factor
 0.1
-1
-0
-Number
-
-INPUTBOX
-22
-242
-118
-302
-e-FuelConsump
-0.34
 1
 0
 Number
@@ -603,17 +581,6 @@ NIL
 NIL
 NIL
 1
-
-INPUTBOX
-840
-174
-995
-234
-time-step-size
-1
-1
-0
-Number
 
 @#$#@#$#@
 ## ## WHAT IS IT?

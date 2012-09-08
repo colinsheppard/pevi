@@ -40,6 +40,7 @@ drivers-own [
   total-trip-time ; the total time needed to drive from A to B
   travel-time ; used to store traveling time since departure
   total-trip-dist ; the total distance for a given trip
+  next-trip-range
   travel-dist ; used to store distance driven since departure
   departure-time ;When the vehicle is set to leave the taz
   arrival-time ; when a car is supposed to arrive
@@ -112,6 +113,7 @@ to setup-od-array
     file-close
   ]
   [ user-message "File not found: ../OD_Matrix_5.txt" ]
+  print (word "od-dist = " od-dist)
 end 
 
 to setup-nodes
@@ -149,6 +151,7 @@ to setup-drivers
   ; initialize driver state variables
   ask drivers [
     set phev? false ; TODO needs to be determined during itinerary setup
+                    ; what is "TODO" -- new procedure to define? -ac 9/8
     set current-schedule-row 0
     set shape "car"
     set color green
@@ -157,18 +160,18 @@ to setup-drivers
       set battery-capacity 25 ; TODO replace with values from a vehicle type distribution input file
       set electric-fuel-consumption 0.35   ; kWh/mile
     ][ 
-      set battery-capacity 10
+      set battery-capacity 2.45 ; changed to reflect a ~70 mile range for full charge, for testing purposes. ac 9/8
       set electric-fuel-consumption 0.35
     ]
     set state-of-charge 1
     set status "not-charging"
     set partner nobody
-    check-charge
 
     set current-taz array:item itin-from current-schedule-row
     set destination-taz array:item itin-to current-schedule-row
     set departure-time array:item itin-depart current-schedule-row
     setxy [xcor] of node current-taz [ycor] of node current-taz   
+    check-charge  ; need to check the charge after defining destinations. ac 9/8
   ]
   ask drivers [
     dynamic-scheduler:add schedule self task depart departure-time
@@ -180,7 +183,6 @@ to setup-itinerary
   ifelse (file-exists? driver-input-file) [ ; ../inputs/p1r1_5.txt  
     file-close
     file-open driver-input-file
-    ;print "hi1"
     let itin-row 0
     let this-itin true
     ;print file-at-end?
@@ -188,15 +190,13 @@ to setup-itinerary
     let next-driver file-read
    ;print (word "next-driver = " next-driver)
     let this-driver 0
-    ;print "hi"
     while [file-at-end? = false] [
       set this-driver next-driver
-      print (word "this-driver = " this-driver)
+      ;print (word "this-driver = " this-driver)
       create-drivers 1 [
         set itin-from array:from-list n-values 1 [-99]     ; creates global itin-from
         set itin-to array:from-list n-values 1 [-99]       ; creates global itin-to
         set itin-depart array:from-list n-values 1 [-99]   ; creates global itin-depart
-        ;print "hi in create-drivers"
         array:set itin-from   0 file-read
         array:set itin-to     0 file-read
         array:set itin-depart 0	file-read
@@ -215,7 +215,6 @@ to setup-itinerary
   ] ; end ifelse
   [ user-message (word "Input file '" driver-input-file "' not found!") ]
   file-close
-  ;print "hi"
 end ;setup-itinerary
 
 to setup-chargers
@@ -280,13 +279,22 @@ to check-charge
 
   
     ;let next-trip-range matrix:get od (([destination-taz] of self - 1) * 5 + [current-taz] of self - 1) 3
- ;   let next-trip-range array:item od-dist (([destination-taz] of self - 1) * 5 + [current-taz] of self - 1)
- ;   let remaining-range ((1 - state-of-charge) * (battery-capacity)) / (electric-fuel-consumption * safety-factor)
+    ;print (word "od-dist (cc) = " od-dist)
+    ;print (word "destination of self = " [destination-taz] of self)
+    ;print (word "current of self = " [current-taz] of self)
+    set next-trip-range array:item od-dist (([destination-taz] of self - 1) * 5 + [current-taz] of self - 1)
+    let remaining-range ((state-of-charge) * (battery-capacity)) / (electric-fuel-consumption * safety-factor)
     ;; yields remaining range available in miles
- ;   if remaining-range > next-trip-range [set need-to-charge? false]
- ;   if remaining-range <= next-trip-range [set need-to-charge? true]
+    ; remaining range is high when soc is high, low when soc is low. ac 9/8
+    if remaining-range > next-trip-range [set need-to-charge? false]
+    if remaining-range <= next-trip-range [set need-to-charge? true
+         ;print (word "next trip range = " next-trip-range)
+         ]
     ;set minimum-acceptable-charge (elec-fuel-consump * next-trip-range) / batt-cap-mean
    ;???? if phev? = false [if minimum-acceptable-charge > 1 [set phev? true]]
+ ;   print (word "next trip range = " next-trip-range)
+   ; print (word "remaining range = " remaining-range)
+    ;print (word "need to charge? " need-to-charge?)
  
   ;** adapted from find-minimum-charge
   ; To determine minimum-acceptable-charge, we set a local variable equal to the distance of the next trip, multiply that by electric-fuel-consumption to get the required
@@ -297,65 +305,76 @@ end
 
 to depart
   print "departing"
- ; ask drivers [
- ;  if (status = "not-charging") and (ticks >= departure-time) [
+  ask drivers [
+    if (status = "not-charging") and (ticks >= departure-time) [
 ;      ;; step 1 - does the driver check-charge?
-;      check-charge
-;      ifelse need-to-charge? = true [   ;; if the driver needs to charge, send to seek-charger
-;
-;      ]
-;      [   ;; if the driver does not need to charge, set to "traveling"
-;          ;; step 2 - when does the driver arrive?
-;        set total-trip-dist array:item od-dist (([destination-taz] of self - 1) * 5 + [current-taz] of self - 1)
-;        set total-trip-time array:item od-time (([destination-taz] of self - 1) * 5 + [current-taz] of self - 1)
-;        set arrival-time (ticks + total-trip-time)
-;        set status "traveling"
-;        dynamic-scheduler:add schedule self task arrive arrival-time
-;        ;set color white
-;      ]
-;    ]
+      check-charge
+      ifelse need-to-charge? = true [   ;; if the driver needs to charge, send to seek-charger
+        ; will need to be able to charge en route; many destinations are greater than the max range. ac 9/8
+      ]
+      [   ;; if the driver does not need to charge, set to "traveling"
+          ;; step 2 - when does the driver arrive?
+        ;set total-trip-dist array:item od-dist (([destination-taz] of self - 1) * 5 + [current-taz] of self - 1)
+        set total-trip-dist next-trip-range  ; temporary -- next-trip-range is the same, and is calculated in check-charge. ac 9/8
+                                             ; is this value necessary? 
+        set total-trip-time array:item od-time (([destination-taz] of self - 1) * 5 + [current-taz] of self - 1)
+        set arrival-time (ticks + total-trip-time)
+        set status "traveling"
+        dynamic-scheduler:add schedule self task arrive arrival-time
+        ;set color white
+      ]
+    ]
+  ]
 end
   
-to arrive
-;  ask drivers [
-;    if status = "traveling" [
-;     update-soc
-;     set current-schedule-row current-schedule-row + 1
-;     carefully [  ;; *** needed here?  might be necessary for check-charge to work
-;      set current-taz destination-taz
-;      set destination-taz array:item itin-to current-schedule-row
-;      set departure-time array:item itin-depart current-schedule-row
-;      setxy [xcor] of node current-taz [ycor] of node current-taz   
-;     ]
-;     ;; determine if the driver charge will at its current location:
-;     check-charge
-;     ifelse need-to-charge? = true [ ;; send to seek-charger
-;     ]
-;     
-;     [ ;; send to depart -- add next departure time to master schedule
-;       set status "not-charging"
-;       dynamic-scheduler:add schedule self task depart departure-time
-;     ]
-;    ]
-;  ]
+to arrive  ; **start here next time -- was working here on getting "arrive" to work. ac 9/8
+  ask drivers [
+    if status = "traveling" [
+     update-soc
+     set current-schedule-row current-schedule-row + 1
+     carefully [  ;; *** needed here?  might be necessary for check-charge to work
+       set current-taz destination-taz
+       set destination-taz array:item itin-to current-schedule-row
+       set departure-time array:item itin-depart current-schedule-row
+       setxy [xcor] of node current-taz [ycor] of node current-taz   
+       
+     ;; determine if the driver will charge at its current location:
+       check-charge
+       ifelse need-to-charge? = true [ ;; send to seek-charger
+       ] 
+       [ ;; send to depart -- add next departure time to master schedule
+         set status "not-charging"
+         dynamic-scheduler:add schedule self task depart departure-time
+         print (word "new departure time for driver " driver " = " departure-time)
+       ]
+     ]
+     [
+       set status "Home" ;Driver is home again. Yay!
+       set departure-time 99
+       set color green
+     ]
+    ]
+  ]
   
 end
 
 to update-soc
-;  ask drivers [
-;    if status = "traveling" [
-;      set travel-time (ticks - departure-time)
-;      let speed (total-trip-dist / total-trip-time)
-;      ;;set travel-dist (speed * travel-time)
-;      if state-of-charge > 0 [
-;        set state-of-charge (state-of-charge - (ticks * speed * electric-fuel-consumption) / battery-capacity)
-;        ] 
-;    ; State of charge - update factor, update factor = time (hours) * speed (miles/hr) * efficiency (kwh/mi) / capacity (kwh)
-;    ]
-;    if status = "charging" [
-;    
-;    
-;    ]
+  ask drivers [
+    if status = "traveling" [
+      set travel-time (ticks - departure-time)  ; note for future: departure-time will correspond to the time on the master schedule
+                                                ; at which a driver leaves a taz either after "arriving" or "charging" from changing
+                                                ; the intended schedule. ac 9/8
+      let speed (total-trip-dist / total-trip-time)
+      ;;set travel-dist (speed * travel-time)
+      if state-of-charge > 0 [
+        set state-of-charge (state-of-charge - (ticks * speed * electric-fuel-consumption) / battery-capacity)
+        ] 
+    ; State of charge - update factor, update factor = time (hours) * speed (miles/hr) * efficiency (kwh/mi) / capacity (kwh)
+    ]
+    if status = "charging" [
+    
+    
+    ]
 end
 
 ;DECISION; check-charge:

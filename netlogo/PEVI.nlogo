@@ -1,4 +1,4 @@
-extensions [matrix array dynamic-scheduler]
+extensions [array dynamic-scheduler]
 
 
 ;; define all globals
@@ -15,6 +15,8 @@ globals [ ;start-hour      ; starting time, an integer (or fractional) hour
   od-time
   
   schedule  ;; this global variable holds the dynamic schedule for the PEVI program, appended by the drivers from their itineraries
+  
+  test-driver  ;; needed for testing
 ]
 
 breed [drivers driver]
@@ -77,6 +79,7 @@ nodes-own[
 ]
 
 to setup
+  print "setting up"
   __clear-all-and-reset-ticks
   
   set schedule dynamic-scheduler:create
@@ -261,7 +264,6 @@ end
 to check-charge
 
 ;; This submodel estimates the range of the EV. If the remaining-range is less than next-trip-range, returns a boolean need-to-charge? = false
-
   
     ;let next-trip-range matrix:get od (([destination-taz] of self - 1) * 5 + [current-taz] of self - 1) 3
  ;   let next-trip-range array:item od-dist (([destination-taz] of self - 1) * 5 + [current-taz] of self - 1)
@@ -312,6 +314,10 @@ end
 
 to update-soc
   set state-of-charge (state-of-charge - total-trip-dist * electric-fuel-consumption / battery-capacity)
+end
+
+to-report driver-soc [the-driver]
+    report [state-of-charge] of the-driver
 end
 
 ;DECISION; check-charge:

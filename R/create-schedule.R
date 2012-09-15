@@ -83,7 +83,7 @@ create.schedule <- function(pev.penetration,prob.weights,scale.dist.thresh=1){
                         abs(rur.by.type[[type]]$begin-hour+0.5)<depart.thresh.modified )
       }
       if(length(cands)==0){
-        print(paste('warning: no candidate tours found for ',dists$miles,' miles at ',hour,' hour for type ',type,' and od.i ',od.i,sep='')) 
+        print(paste('error: no candidate tours found for ',dists$miles,' miles at ',hour,' hour for type ',type,' and od.i ',od.i,sep='')) 
         stop()
         next
       }else if(length(cands)==1){

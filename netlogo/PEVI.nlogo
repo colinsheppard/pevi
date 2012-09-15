@@ -1,4 +1,4 @@
-extensions [array dynamic-scheduler]
+extensions [dynamic-scheduler]
 
 
 ;; define all globals
@@ -13,6 +13,8 @@ globals [ ;start-hour      ; starting time, an integer (or fractional) hour
   od-demand
   od-dist
   od-time
+  
+  n-nodes
   
   schedule  ;; this global variable holds the dynamic schedule for the PEVI program, appended by the drivers from their itineraries
   
@@ -88,40 +90,43 @@ to setup
   reset-ticks
   
   create-turtles 1 [ setxy 0 0 set color black] ;This invisible turtle makes sure we start at node 1 not node 0
+  set n-nodes 5 ; TODO, infer this from the od input file
   
-  setup-od-array
+  setup-od-data
   setup-nodes
   setup-drivers
   setup-chargers
 end 
 
 
-to setup-od-array
-  print "setup-od-array"
+to setup-od-data
+  print "setup-od-data"
   ; Reads in main driver input file: Origin, destination, # of trips, distance, time
-  set od-from array:from-list n-values (n-nodes * n-nodes) [0] ; creates global od-from
-  set od-to array:from-list n-values (n-nodes * n-nodes) [0]           ; global od-to
-  set od-demand array:from-list n-values (n-nodes * n-nodes) [0]       ; global od-demand
-  set od-dist array:from-list n-values (n-nodes * n-nodes) [0]         ; global od-dist
-  set od-time array:from-list n-values (n-nodes * n-nodes) [0]         ; global od-time
+  set od-from   n-values (n-nodes * n-nodes) [0] 
+  set od-to     n-values (n-nodes * n-nodes) [0] 
+  set od-demand n-values (n-nodes * n-nodes) [0] 
+  set od-dist   n-values (n-nodes * n-nodes) [0] 
+  set od-time   n-values (n-nodes * n-nodes) [0] 
   
   ifelse (file-exists? "../inputs/OD_Matrix_5.txt") [
     file-close
     file-open "../inputs/OD_Matrix_5.txt"
     foreach n-values (n-nodes * n-nodes) [?] [
-     array:set od-from ? file-read array:set od-to ? file-read array:set od-demand ? (round file-read) array:set od-dist ? file-read array:set od-time ? (file-read)
-     ; HEVI code claims that the "Drive time is in the file as minutes" -- the example file OD_Matrix_5.txt would then suggest that drivers can
-     ; sustain a speed of 600mi/hr, if they travel 10 mi/min.  Changed to reflect drive time in the file as units hrs, even though this currently
-     ; reflects an average speed ~ 8mi/hr. ac 9/9
+     set od-from replace-item ? od-from file-read 
+     set od-from replace-item ? od-to   file-read 
+     set od-from replace-item ? od-demand  (round file-read) 
+     set od-from replace-item ? od-dist file-read 
+     set od-from replace-item ? od-time file-read
     ]
     file-close
+  ][ 
+    user-message "File not found: ../OD_Matrix_5.txt" 
   ]
-  [ user-message "File not found: ../OD_Matrix_5.txt" ]
 end 
 
 to setup-nodes
   print "setup-nodes"
-  create-nodes n-nodes  ; BUTTON for # of nodes?
+  create-nodes n-nodes
   ask nodes [
     set shape "star"
     set color yellow
@@ -186,19 +191,16 @@ to setup-itinerary
     while [file-at-end? = false] [
       set this-driver next-driver
       create-drivers 1 [
-        set itin-from array:from-list n-values 1 [-99]     ; creates global itin-from
-        set itin-to array:from-list n-values 1 [-99]       ; creates global itin-to
-        set itin-depart array:from-list n-values 1 [-99]   ; creates global itin-depart
-        array:set itin-from   0 file-read
-        array:set itin-to     0 file-read
-        array:set itin-depart 0	file-read
+        set itin-from n-values 1 [file-read]     ; creates global itin-from
+        set itin-to n-values 1 [file-read]       ; creates global itin-to
+        set itin-depart n-values 1 [file-read]   ; creates global itin-depart
         if file-at-end? = false [
           set next-driver file-read
           set this-itin true
           while [next-driver = this-driver] [  
-            array:add itin-from	file-read
-            array:add itin-to	file-read
-            array:add itin-depart file-read
+            set itin-from	lput file-read itin-from
+            set itin-to	lput file-read itin-to
+            set itin-depart lput file-read itin-depart
             ifelse file-at-end? [ set next-driver -1][ set next-driver file-read ]
           ] ; end while this-itin
         ]
@@ -291,9 +293,9 @@ end
 
 to itinerary-event-scheduler
   set status "not-charging"
-  set current-taz array:item itin-from current-schedule-row
-  set destination-taz array:item itin-to current-schedule-row
-  set departure-time array:item itin-depart current-schedule-row
+  set current-taz item current-schedule-row itin-from 
+  set destination-taz item current-schedule-row itin-to
+  set departure-time item current-schedule-row itin-depart
   if (departure-time < ticks)[ set departure-time ticks ]  ; TODO this should actually involve changing the itinerary
   dynamic-scheduler:add schedule self task depart departure-time
 end
@@ -305,18 +307,22 @@ to depart
       
   ][   ;; if the driver does not need to charge, set to "traveling"
        ;; step 2 - when does the driver arrive?
-    set total-trip-dist array:item od-dist (([destination-taz] of self - 1) * 5 + [current-taz] of self - 1)
-    set total-trip-time array:item od-time (([destination-taz] of self - 1) * 5 + [current-taz] of self - 1)
+    set total-trip-dist item od-index od-dist
+    set total-trip-time item od-index od-time
     set arrival-time (ticks + total-trip-time)
     set status "traveling"
     dynamic-scheduler:add schedule self task arrive arrival-time
   ]
 end
+
+to-report od-index
+  report (([destination-taz] of self - 1) * n-nodes + [current-taz] of self - 1)
+end
   
 to arrive
   update-soc
   print (word (who - 5) " arriving at " ticks ", trip-distance: " total-trip-dist " soc:" state-of-charge " elec-fc:" electric-fuel-consumption " cap" battery-capacity)
-  if (current-schedule-row + 1 < array:length itin-from) [
+  if (current-schedule-row + 1 < length itin-from) [
     set current-schedule-row current-schedule-row + 1
     itinerary-event-scheduler
   ]
@@ -420,17 +426,6 @@ GRAPHICS-WINDOW
 1
 ticks
 30.0
-
-INPUTBOX
-149
-41
-304
-101
-n-nodes
-5
-1
-0
-Number
 
 INPUTBOX
 836

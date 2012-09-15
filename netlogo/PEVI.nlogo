@@ -40,6 +40,7 @@ drivers-own [
   total-trip-time ; the total time needed to drive from A to B
   travel-time ; used to store traveling time since departure
   total-trip-dist ; the total distance for a given trip
+  next-trip-range
   travel-dist ; used to store distance driven since departure
   departure-time ;When the vehicle is set to leave the taz
   arrival-time ; when a car is supposed to arrive
@@ -96,6 +97,7 @@ end
 
 
 to setup-od-array
+  print "setup-od-array"
   ; Reads in main driver input file: Origin, destination, # of trips, distance, time
   set od-from array:from-list n-values (n-nodes * n-nodes) [0] ; creates global od-from
   set od-to array:from-list n-values (n-nodes * n-nodes) [0]           ; global od-to
@@ -107,11 +109,10 @@ to setup-od-array
     file-close
     file-open "../inputs/OD_Matrix_5.txt"
     foreach n-values (n-nodes * n-nodes) [?] [
-     array:set od-from ? file-read 
-     array:set od-to ? file-read 
-     array:set od-demand ? (round file-read) 
-     array:set od-dist ? file-read
-     array:set od-time ? (file-read / 60)
+     array:set od-from ? file-read array:set od-to ? file-read array:set od-demand ? (round file-read) array:set od-dist ? file-read array:set od-time ? (file-read)
+     ; HEVI code claims that the "Drive time is in the file as minutes" -- the example file OD_Matrix_5.txt would then suggest that drivers can
+     ; sustain a speed of 600mi/hr, if they travel 10 mi/min.  Changed to reflect drive time in the file as units hrs, even though this currently
+     ; reflects an average speed ~ 8mi/hr. ac 9/9
     ]
     file-close
   ]
@@ -119,6 +120,7 @@ to setup-od-array
 end 
 
 to setup-nodes
+  print "setup-nodes"
   create-nodes n-nodes  ; BUTTON for # of nodes?
   ask nodes [
     set shape "star"
@@ -146,6 +148,7 @@ to setup-nodes
 end ;setup-nodes
 
 to setup-drivers
+  print "setup-drivers"
   ; creating drivers based on GEATM data, in setup-itinerary procedure. 
   setup-itinerary
   ; initialize driver state variables
@@ -163,6 +166,7 @@ to setup-drivers
       set electric-fuel-consumption 0.35
     ]
     set state-of-charge 1
+    set status "not-charging"
     set partner nobody
     check-charge
 
@@ -171,6 +175,7 @@ to setup-drivers
 end ;setup-drivers
 
 to setup-itinerary
+  print "setup-itinerary"
   ifelse (file-exists? driver-input-file) [ ; ../inputs/p1r1_5.txt  
     file-close
     file-open driver-input-file
@@ -202,11 +207,10 @@ to setup-itinerary
   ] ; end ifelse
   [ user-message (word "Input file '" driver-input-file "' not found!") ]
   file-close
-  
 end ;setup-itinerary
 
 to setup-chargers
-  
+  print "setup-chargers"
   ; The charger level, location, and quantity of chargers was read in during setup-nodes.
   ; Now chargers of each level are created at the appropriate node.
   ; Charger-rate is currently a separate state variable from charger level. We may want to combine the two later, if
@@ -265,14 +269,19 @@ to check-charge
 
 ;; This submodel estimates the range of the EV. If the remaining-range is less than next-trip-range, returns a boolean need-to-charge? = false
   
-    ;let next-trip-range matrix:get od (([destination-taz] of self - 1) * 5 + [current-taz] of self - 1) 3
- ;   let next-trip-range array:item od-dist (([destination-taz] of self - 1) * 5 + [current-taz] of self - 1)
- ;   let remaining-range ((1 - state-of-charge) * (battery-capacity)) / (electric-fuel-consumption * safety-factor)
+    set next-trip-range array:item od-dist (([destination-taz] of self - 1) * 5 + [current-taz] of self - 1)
+    let remaining-range ((state-of-charge) * (battery-capacity)) / (electric-fuel-consumption * safety-factor)
     ;; yields remaining range available in miles
- ;   if remaining-range > next-trip-range [set need-to-charge? false]
- ;   if remaining-range <= next-trip-range [set need-to-charge? true]
+    ; remaining range is high when soc is high, low when soc is low. ac 9/8
+    if remaining-range > next-trip-range [set need-to-charge? false]
+    if remaining-range <= next-trip-range [set need-to-charge? true
+         ;print (word "next trip range = " next-trip-range)
+         ]
     ;set minimum-acceptable-charge (elec-fuel-consump * next-trip-range) / batt-cap-mean
    ;???? if phev? = false [if minimum-acceptable-charge > 1 [set phev? true]]
+ ;   print (word "next trip range = " next-trip-range)
+   ; print (word "remaining range = " remaining-range)
+    ;print (word "need to charge? " need-to-charge?)
  
   ;** adapted from find-minimum-charge
   ; To determine minimum-acceptable-charge, we set a local variable equal to the distance of the next trip, multiply that by electric-fuel-consumption to get the required
@@ -489,28 +498,6 @@ fuel-economy-range
 Number
 
 INPUTBOX
-24
-433
-115
-493
-phev-batt-cap
-16
-1
-0
-Number
-
-INPUTBOX
-24
-496
-138
-556
-phev-fuel-economy
-0.5
-1
-0
-Number
-
-INPUTBOX
 837
 97
 1072
@@ -528,17 +515,6 @@ INPUTBOX
 175
 safety-factor
 0.1
-1
-0
-Number
-
-INPUTBOX
-22
-242
-118
-302
-e-FuelConsump
-0.34
 1
 0
 Number
@@ -576,17 +552,6 @@ NIL
 NIL
 NIL
 1
-
-INPUTBOX
-840
-174
-995
-234
-time-step-size
-1
-1
-0
-Number
 
 @#$#@#$#@
 ## ## WHAT IS IT?

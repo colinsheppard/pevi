@@ -1,10 +1,13 @@
 library(colinmisc)
-load.libraries(c('maptools','plotrix','stats','gpclib','plyr','png','RgoogleMaps','lattice'))
+load.libraries(c('maptools','plotrix','stats','gpclib','plyr','png','RgoogleMaps','lattice','stringr','ggplot2','rgdal','XML','plotKML'))
 gpclibPermit()
 
-path.to.geatm <- '~/Dropbox/serc/pev-colin/data/GEATM-2020/'
+path.to.geatm  <- '~/Dropbox/serc/pev-colin/data/GEATM-2020/'
 path.to.google <- '~/Dropbox/serc/pev-colin/data/google-earth/'
 path.to.humveh <- '~/Dropbox/serc/pev-colin/data/Vehicle-Registration/'
+path.to.plots  <- '~/Dropbox/serc/pev-colin/plots/'
+path.to.pevi   <- '~/Dropbox/serc/pev-colin/pevi/'
+path.to.parcel <- '~/Dropbox/serc/pev-colin/data/HUM-PARCELS/'
 
 taz <- readShapePoly(paste(path.to.geatm,'Shape_Files/taz-LATLON.shp',sep=''))
 zips    <- readShapePoly(paste(path.to.geatm,'../CA-ZIPS/tl_2010_06_zcta510.shp',sep=''))
@@ -118,11 +121,25 @@ w <- frac.est$frac.weight[match(names(zips.in.taz),frac.est$zip)]
 weight.matrix <- t(apply(zips.in.taz,1,function(x){ x * w }))
 taz.weights.on.penetration <- apply(weight.matrix,1,sum)
 
+# load the OD data
+od.24.old <- read.table(paste(path.to.geatm,'OD_Tables/OD by type 24 hr (2020).txt',sep=''),header=FALSE, sep=",",colClasses='numeric')
+names(od.24.old) <- c('from','to','hbw','hbshop','hbelem','hbuniv','hbro','nhb','ix','xi','ee','demand')
+od.am.old <- read.table(paste(path.to.geatm,'OD_Tables/OD by type AM (2020).txt',sep=''),header=FALSE, sep=",",colClasses='numeric')
+names(od.am.old) <- c('from','to','hbw','hbshop','hbelem','hbuniv','hbro','nhb','ix','xi','ee','demand')
+od.pm.old <- read.table(paste(path.to.geatm,'OD_Tables/OD by type PM (2020).txt',sep=''),header=FALSE, sep=",",colClasses='numeric')
+names(od.pm.old) <- c('from','to','hbw','hbshop','hbelem','hbuniv','hbro','nhb','ix','xi','ee','demand')
+
+# Make a plot of total demand disaggregated
+od.24.sum <- ddply(od.24.old,.(from),function(df){ sum(df$demand) })
+names(od.24.sum) <- c('taz','demand')
+taz@data$total.demand <- od.24.sum$demand[match(taz@data$NEWTAZ,od.24.sum$taz)]
+trellis.par.set(sp.theme())
+spplot(taz,'total.demand')
 
 # Load the aggregation polygons
 agg.polys <- readShapePoly(paste(path.to.google,'ProposedAggregation.shp',sep=''))
 taz.centroids <-SpatialPointsDataFrame(coordinates(taz),data=data.frame(longitude= coordinates(taz)[,1],longitude= coordinates(taz)[,2]))
-agg.mapping <- data.frame(name=over(taz.coords,agg.polys)$Name)
+agg.mapping <- data.frame(name=over(taz.centroids,agg.polys)$Name)
 agg.mapping$agg.id <- as.numeric(agg.mapping$name)
 agg.taz.shp <- unionSpatialPolygons(taz,agg.mapping$agg.id)
 aggregate.data <- function(df)
@@ -134,168 +151,137 @@ agg.taz.data <- ddply(taz@data,.(agg.id),aggregate.data)
 agg.taz.shp <- SpatialPolygonsDataFrame(agg.taz.shp,agg.taz.data)
 
 # add new zone numbers corresponding to old zone numbers to the dataframe
-od.24.old$from.taz.new <- taz$agg.id[match(od.24.old$from.taz,taz$NEWTAZ)]
-od.24.old$to.taz.new <- taz$agg.id[match(od.24.old$to.taz,taz$NEWTAZ)]
-od.am.old$from.taz.new <- taz$agg.id[match(od.am.old$from.taz,taz$NEWTAZ)]
-od.am.old$to.taz.new <- taz$agg.id[match(od.am.old$to.taz,taz$NEWTAZ)]
-od.pm.old$from.taz.new <- taz$agg.id[match(od.pm.old$from.taz,taz$NEWTAZ)]
-od.pm.old$to.taz.new <- taz$agg.id[match(od.pm.old$to.taz,taz$NEWTAZ)]
+od.24.old$from.new <- taz$agg.id[match(od.24.old$from,taz$NEWTAZ)]
+od.24.old$to.new <- taz$agg.id[match(od.24.old$to,taz$NEWTAZ)]
+od.am.old$from.new <- taz$agg.id[match(od.am.old$from,taz$NEWTAZ)]
+od.am.old$to.new <- taz$agg.id[match(od.am.old$to,taz$NEWTAZ)]
+od.pm.old$from.new <- taz$agg.id[match(od.pm.old$from,taz$NEWTAZ)]
+od.pm.old$to.new <- taz$agg.id[match(od.pm.old$to,taz$NEWTAZ)]
 
 # for now, omit the rows with NA, which correspond to the TAZ id's in the OD data which don't have a
 # corresponding entry in the TAZ shape file (ID's 11-20)
 # I think this also omits ID's 1-10
-od.24.new <- ddply(na.omit(od.24.old),.(from.taz.new,to.taz.new),function(df){ c(sum(df$hbw),sum(df$hbshop),
-	sum(df$hbelem),sum(df$hbuniv),sum(df$hbro),sum(df$nhb),sum(df$ix),sum(df$xi),sum(df$ee),sum(df$demand)) })
-names(od.24.new) <- c('from','to','hbw','hbshop','hbelem','hbuniv','hbro',
-	'nhb','ix','xi','ee','demand')
-od.am.new <- ddply(na.omit(od.am.old),.(from.taz.new,to.taz.new),function(df){ c(sum(df$hbw),sum(df$hbshop),
-	sum(df$hbelem),sum(df$hbuniv),sum(df$hbro),sum(df$nhb),sum(df$ix),sum(df$xi),sum(df$ee),sum(df$demand)) })
-names(od.am.new) <- c('from','to','hbw','hbshop','hbelem','hbuniv','hbro',
-	'nhb','ix','xi','ee','demand')
-od.pm.new <- ddply(na.omit(od.pm.old),.(from.taz.new,to.taz.new),function(df){ c(sum(df$hbw),sum(df$hbshop),
-	sum(df$hbelem),sum(df$hbuniv),sum(df$hbro),sum(df$nhb),sum(df$ix),sum(df$xi),sum(df$ee),sum(df$demand)) })
-names(od.pm.new) <- c('from','to','hbw','hbshop','hbelem','hbuniv','hbro',
-	'nhb','ix','xi','ee','demand')
+od.24.new <- ddply(na.omit(od.24.old),.(from.new,to.new),function(df){ 
+  c(sum(df$hbw),sum(df$hbshop),sum(df$hbelem),sum(df$hbuniv),sum(df$hbro),sum(df$nhb),sum(df$ix),sum(df$xi),sum(df$ee),sum(df$demand)) })
+names(od.24.new) <- c('from','to','hbw','hbshop','hbelem','hbuniv','hbro','nhb','ix','xi','ee','demand')
+od.am.new <- ddply(na.omit(od.am.old),.(from.new,to.new),function(df){
+  c(sum(df$hbw),sum(df$hbshop),sum(df$hbelem),sum(df$hbuniv),sum(df$hbro),sum(df$nhb),sum(df$ix),sum(df$xi),sum(df$ee),sum(df$demand)) })
+names(od.am.new) <- c('from','to','hbw','hbshop','hbelem','hbuniv','hbro','nhb','ix','xi','ee','demand')
+od.pm.new <- ddply(na.omit(od.pm.old),.(from.new,to.new),function(df){ 
+  c(sum(df$hbw),sum(df$hbshop),sum(df$hbelem),sum(df$hbuniv),sum(df$hbro),sum(df$nhb),sum(df$ix),sum(df$xi),sum(df$ee),sum(df$demand)) })
+names(od.pm.new) <- c('from','to','hbw','hbshop','hbelem','hbuniv','hbro','nhb','ix','xi','ee','demand')
+
+write.csv(od.24.new,file=paste(path.to.geatm,'od_24_new.csv',sep=''))
+write.csv(od.am.new,file=paste(path.to.geatm,'od_am_new.csv',sep=''))
+write.csv(od.pm.new,file=paste(path.to.geatm,'od_pm_new.csv',sep=''))
 
 # check that the sum of the rows equals the value in the sum column
 # they are currently not quite equal and I suspect this is from omiting zones 1-10
 od.24.new$row.sum <- rowSums(od.24.new[,3:11])
 
 # store total traffic leaving each new zone
-od.24.sum <- ddply(od.24.new,.(from),function(df){ sum(df$demand) })
-names(od.24.sum) <- c('taz','demand')
+od.24.sum.from <- ddply(od.24.new,.(from),function(df){ sum(df$demand) })
+names(od.24.sum.from) <- c('taz','demand')
+od.24.sum.to <- ddply(od.24.new,.(to),function(df){ sum(df$demand) })
+names(od.24.sum.to) <- c('taz','demand')
 
 # add total demand to the existing shape data
-agg.taz.shp@data$total.demand <- od.24.sum$demand[agg.taz.shp$agg.id]
+agg.taz.shp@data$total.demand.from <- od.24.sum.from$demand[agg.taz.shp$id]
+agg.taz.shp@data$total.demand.to <- od.24.sum.to$demand[agg.taz.shp$id]
 agg.taz.shp@data$trips.per.acre <- agg.taz.shp@data$total.demand/agg.taz.shp@data$ACRES
 
 trellis.par.set(sp.theme())
-spplot(agg.taz.shp,'total.demand')
+spplot(agg.taz.shp,c('total.demand.from','total.demand.to'))
+
+# look at where people from each TAZ are going to 
+if(names(agg.taz.shp@data)[1]!="id")names(agg.taz.shp@data) <- c('id',names(agg.taz.shp@data)[2:ncol(agg.taz.shp@data)]) # make first column of shape data 'id' instead of 'agg.id'
+agg.names <- as.character(ddply(agg.mapping,.(agg.id),function(df){ df[1,]})$name)
+agg.taz.shp@data$name <- agg.names[agg.taz.shp@data$id]
+agg.points <- fortify(agg.taz.shp,region="id")
+agg.df <- join(agg.points,agg.taz.shp@data,by="id")
+
+ggplot(agg.df,aes(long,lat,group=name))+
+  geom_polygon(aes(fill=total.demand)) +
+  geom_path(color="white") +
+  coord_equal()
 
 
+make.dir(paste(path.to.plots,'demand',sep=''))
+for(agg.taz.id in agg.taz.shp$id){
+  taz.name <- str_replace_all(as.character(agg.mapping$name[agg.mapping$agg.id == agg.taz.id][1]),'-','.')
+  if(!is.na(as.numeric(substr(taz.name,1,1)))) taz.name <- paste('HWY',taz.name,sep='')
+  new.col.name.to <- paste(taz.name,'.to',sep='')
+  new.col.name.from <- paste(taz.name,'.of.total',sep='')
+  
+  agg.taz.shp@data[,new.col.name.to] <- subset(od.24.new,from==agg.taz.id)$demand[agg.taz.shp$id]/sum(subset(od.24.new,from==agg.taz.id)$demand)*100
+  agg.taz.shp@data[,new.col.name.from] <- subset(od.24.new,to==agg.taz.id)$demand[agg.taz.shp$id]/sum(od.24.new$demand)*100
+  pdf(file=paste(path.to.plots,'demand/',taz.name,'.pdf',sep=''),16,12)
+  trellis.par.set(sp.theme())
+  print(spplot(agg.taz.shp,c(new.col.name.to,new.col.name.from)))
+  dev.off()
+}
+spplot(agg.taz.shp,names(agg.taz.shp@data)[grep('of.total',names(agg.taz.shp@data))], names.attr= agg.taz.shp$name,colorkey=list(space="bottom"))
 
-# Make a plot of total demand disaggregated
-od.24.old <- read.table(paste(path.to.geatm,'OD_Tables/OD by type 24 hr (2020).txt',sep=''),
- header=FALSE, sep=",",colClasses='numeric')
-names(od.24.old) <- c('from.taz','to.taz','hbw','hbshop','hbelem','hbuniv','hbro',
-	'nhb','ix','xi','ee','demand')
-od.24.sum <- ddply(od.24.old,.(from),function(df){ sum(df$demand) })
-names(od.24.sum) <- c('taz','demand')
-taz@data$total.demand <- od.24.sum$demand[match(taz@data$NEWTAZ,od.24.sum$taz)]
-trellis.par.set(sp.theme())
-spplot(taz,'total.demand')
+# write the data to a shapefile, note we need to write the names of the fields separately b/c they get truncated due to ESRI format limitations
+writePolyShape(agg.taz.shp,paste(path.to.pevi,'inputs/development/aggregated-taz',sep=''))
+agg.taz.shp.fieldnames <- names(agg.taz.shp@data)
+save(agg.taz.shp.fieldnames,file=paste(path.to.pevi,'inputs/development/aggregated-taz-fieldnames.Rdata',sep=''))
 
+# write the data to KML file with colors related to traffic demand
+map.color <- function (x,c.map){
+  c.map[round((length(c.map)-1)*(x-min(x))/diff(range(x))+1,0)]
+}
+shp.to.kml <- function(shp,kml.filename,kmlname="KML Name", kmldescription="<i>Description</i>",borders='white',lwds=1.5,colors='red',id.col='id',name.col='id',description.cols=NA){
+  n <- length(shp@polygons)
+  if(length(colors)==1)colors <- rep(colors,n)
+  if(length(borders)==1)borders <- rep(borders,n)
+  if(length(lwds)==1)lwds <- rep(lwds,n)
+  kml.data <- sapply(slot(shp, "polygons"), function(x) { 
+    row.num = which(as.numeric(slot(x, "ID"))==shp@data[[id.col]])
+    descrip = ifelse(is.na(description.cols),'',paste(paste(description.cols,': ',shp@data[row.num,description.cols],sep=''),collapse='<br/><br/>')) 
+    kmlPolygon(x,
+      name=shp@data[[name.col]][row.num], 
+      col=colors[row.num], lwd=lwds[row.num], border=borders[row.num], 
+      description=descrip
+    )})
 
-#tracts  <- readShapePoly(paste(path.to.geatm,'../CA-CENSUS-TRACTS/tl_2010_06_tract10.shp',sep=''))
-#hum.tracts <- which(tracts@data$COUNTYFP10=='023')
-#plot(tracts[hum.tracts,])
+  kmlFile <- file(kml.filename, "w")
+  cat(kmlPolygon(kmlname=kmlname, kmldescription=kmldescription)$header, 
+      file=kmlFile, sep="\n")
+  cat(unlist(kml.data["style",]), file=kmlFile, sep="\n")
+  cat(unlist(kml.data["content",]), file=kmlFile, sep="\n")
+  cat(kmlPolygon()$footer, file=kmlFile, sep="\n")
+  close(kmlFile)
 
-# tried to read in as lat-long but file has non-conformant data
-taz <- readShapePoly('GEATM-Data/Shape_Files/taz.shp',proj4string=CRS("+proj=longlat"))
-summary(taz)
-
-plot(taz)
-
-taz.coords <- coordinates(taz)
-
-newtaznum <- 50
-
-taz.clusterd <- kmeans(taz.coords,newtaznum)
-
-agg.taz <- unionSpatialPolygons(taz,taz.clusterd$cluster)
-centroid.coordinates <- coordinates(agg.taz)
-
-dev.new()
-plot(agg.taz)
-points(coordinates(agg.taz))
-textxy(centroid.coordinates[,1],centroid.coordinates[,2],1:25,cx=1)
-#zoomplot( locator(2) )
-
-taz@data$cluster <- taz.clusterd$cluster
-
-aggregate.data <- function(df)
-{ 
- return( colSums(df[,c('AREA','ACRES','SHAPE_AREA')]) ) 
+  system(paste('open ',kml.filename,sep=''))
 }
 
-agg.taz.data <- ddply(taz@data,.(cluster),aggregate.data)
+c.map <- paste(map.color(agg.taz.shp@data$total.demand.from,blue2red(50)),'7F',sep='')
+shp.to.kml(agg.taz.shp,paste(path.to.pevi,'inputs/development/aggregated-taz.kml',sep=''),'Aggregated TAZs','Color denotes total daily demand','red',1.5,c.map,name.col='name',description.cols=names(agg.taz.shp@data))
 
-writePolyShape(SpatialPolygonsDataFrame(agg.taz,data=agg.taz.data),paste('taz-aggregated.shp',sep=''))
+c.map <- paste(map.color(taz@data$total.demand,blue2red(50)),'7F',sep='')
+ shp.to.kml(taz,paste(path.to.pevi,'inputs/development/disaggregated-taz.kml',sep=''),'Disaggregated TAZs','Color denotes total daily demand','white',1.5,c.map,name.col='NEWTAZ',description.cols=c('total.demand','NEWTAZ','ACRES'),id.col='ID')
 
-#read.table or read.csv?
-#ODtable.24hr.old <- read.csv('GEATM-Data/OD_Tables/OD Table SUM2.csv', header=TRUE, row.names=1)
 
-#doesn't work ODtable.24hr.old <- matrix(scan('GEATM-Data/OD_Tables/OD Table SUM2.csv', n=774*774, sep="'"),nrow=774,ncol=774, byrow = TRUE)
-#ODtable.AM.old <- read.csv('GEATM-Data/OD_Tables/OD AM SUM.txt', header=TRUE)
-#ODtable.PM.old <- read.csv('GEATM-Data/OD_Tables/OD PM SUM.txt', header=TRUE)
+# Join Humboldt parcel data with land use data
+land.use <- read.dbf(paste(path.to.parcel,'Hum-Land-Use.dbf',sep=''))$dbf
+subset(land.use,APN==50303106)
+apn <- readShapePoly(paste(path.to.parcel,'Hum-Parcels-LongLat.shp',sep=''))
+apn@data <- join(apn@data,land.use[,c('APN','USECODE','NEIGHCODE',"SITHSNBR","SITHSNBRSF","SITSTDIR","SITSTNAME", "SITSTTYPE","SITCITY","SITZIP","ZONING","GEN_PLAN")],by="APN")
+use.codes <- read.csv(paste(path.to.parcel,'usecodes.csv',sep=''),colClasses=c('character','character','character','numeric'))
+apn@data <- join(apn@data,use.codes,by="NEIGHCODE")
+apn@data$color <- ifelse( apn@data$type == 'residential','#E300007F',ifelse(apn@data$type=='commercial','#004FE37F',ifelse(apn@data$type=='industrial','#00C4107F','#0000007F')))
+apn@data$id <- sapply(slot(apn,'polygons'),function(x){ as.numeric(slot(x,'ID')) })
+apn@data$use<-as.character(apn@data$use)
+apn@data$type<-as.character(apn@data$type)
+apn@data$EXLU4<-as.character(apn@data$EXLU4)
+apn@data$ZONING<-as.character(apn@data$ZONING)
 
-ODtable.24hr.old <- as.matrix(read.csv('GEATM-Data/OD_Tables/OD Table SUM2.csv',header=FALSE))
-aggmat <- function(old,ntc,num)
-{
-	tmp <- mat.or.vec(775,num)
-	new <- mat.or.vec(num,num)
-	
-	for (zn in 1:num) # for each new zone
-	{	# store old zones in oldind
-		oldind <- which(ntc %in% zn) + 21 
-		# plus 20 for the zones skipped in the original data set and plus 1 for the taz number column
-		tmp[,zn] <- rowSums(old[,oldind], dims=1) # sum the rows corresponding to old zones)
-	}
-	for (zn in 1:num) # for each new zone
-	{	# store old zones in oldind
-		oldind <- which(ntc %in% zn) + 21
-		new[zn,] <- colSums(tmp[which(ntc %in% zn)+21,])
-	}
-	new
-}
+apn.cent <- coordinates(apn)
+apn.sub <- apn[apn.cent[,1]>-124.14117 & apn.cent[,1] < -124.086455 & apn.cent[,2] < 40.874601 & apn.cent[,2] > 40.799047,]
 
-ODtable.24hr.new <- aggmat(ODtable.24hr.old,taz$cluster,newtaznum)
+shp.to.kml(apn.sub,paste(path.to.parcel,'apn-subset.kml',sep=''),'Humboldt Parcels','Color denotes use category','white',0.5,apn.sub@data$color,name.col='APN',description.cols=c('EXLU4','ZONING','use','type','weight'))
 
-# read in all columns of OD by type data
-#OD.cols <- c(rep('numeric',12)) # I think numeric is the default and this is not needed
-# read.table or read.csv or scan
-#OD.24hr.old <- read.table('GEATM-Data/OD_Tables/OD by type 24 hr.txt', header=FALSE, sep=",",
-					colClasses=OD.cols)
-OD.24hr.old <- read.csv('GEATM-Data/OD_Tables/OD by type 24 hr.txt', header=FALSE)
-OD.AM.old <- read.csv('GEATM-Data/OD_Tables/OD by type AM.txt', header=FALSE)
-OD.PM.old <- read.csv('GEATM-Data/OD_Tables/OD by type PM.txt', header=FALSE)
-
-names(OD.24hr.old) <- c('fromtaz','totaz','HBW','HBSHOP','HBELEM','HBUNIV','HBRO','NHB','IX','XI','EE','Sum24hr')
-
-# started to change this but didn't complete
-condense <- function(old,ntc,num) # still needs verified
-{
-	new <- array(0,dim=c(num,12))
-	rowindex <- 1
-	for (zn in 1:num) # for each new zone
-	{
-		oldind <- which(ntc %in% zn) # store old zones in oldind 
-			for (zi in 1:length(oldind)) # for each old zone
-			{	
-				new[rowindex,1] <- c(1:num) # assign from zone to first column
-				# for fromtaz data, sum 3rd column of old and put in 2nd col of new
-				new[zn,2] <-  new [zn,2] + sum(old[3][old[1]==oldind[zi]])
-				# for totaz data, sum 3rd column of old and put in 3nd col of new 
-				new[zn,3] <-  new [zn,3] + sum(old[3][old[2]==oldind[zi]])
-			}
-	}
-	new
-}
-
- # condense the old taz data to the total sum to (column 2) and from (column 3) new tazs
-OD.24hr.new <- collapse(OD.24hr.old,taz$cluster,newtaznum)
-
-dev.new()
-#plot(agg.taz,col=color.scale(OD.24hr.new[,3],color.spec="rgb"))
-# we could also try to use spplot here
-# trellis.par.set(sp.theme())
-# spplot(agg.taz,colorkey=list(space="bottom"), scales=list(draw=TRUE))
-
-Eureka <- GetMap(center=c(40.8022222,-124.1625), zoom =14, destfile = "Eureka_z14.png")
-EkaImg <- readPNG('Eureka_z14.png')
-dev.new()
-plot(1:2, type='n', main="Eureka zoom = 14", xlab="x", ylab="y")
-lim <- par()
-rasterImage(EkaImg, lim$usr[1], lim$usr[3], lim$usr[2], lim$usr[4])
+shp.to.kml(apn,paste(path.to.parcel,'apn.kml',sep=''),'Humboldt Parcels','Color denotes use category','white',0.5,apn@data$color,name.col='APN',description.cols=c('EXLU4','ZONING','use','type','weight'))
 
 

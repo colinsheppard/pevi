@@ -1,5 +1,8 @@
 library(colinmisc)
-load.libraries(c('sas7bdat','plyr','ggplot2','gtools'))
+load.libraries(c('sas7bdat','plyr','ggplot2','gtools','doMC'))
+
+num.processors <- 10
+registerDoMC(num.processors)
 
 path.to.outputs <- '~/Dropbox/serc/pev-colin/data/scheduler-optim/'
 path.to.old.outputs <- '~/Dropbox/serc/pev-colin/data/scheduler-optim-try1/'
@@ -19,9 +22,9 @@ load(file=paste(path.to.nhts,'data-preprocessed-for-scheduling.Rdata',sep=''))
 # play with deriving a schedule based on trip numbers and pev penetration
 
 if(!file.exists(paste(path.to.geatm,"od-aggregated.Rdata",sep=''))){
-  od.24.new <- read.table(paste(path.to.geatm,"od_24_new.txt",sep=""),sep="",header=T)
-  od.am.new <- read.table(paste(path.to.geatm,"od_am_new.txt",sep=""),sep="",header=T)
-  od.pm.new <- read.table(paste(path.to.geatm,"od_pm_new.txt",sep=""),sep="",header=T)
+  od.24.new <- read.csv(paste(path.to.geatm,"od_24_new.csv",sep=""))
+  od.am.new <- read.csv(paste(path.to.geatm,"od_am_new.csv",sep=""))
+  od.pm.new <- read.csv(paste(path.to.geatm,"od_pm_new.csv",sep=""))
   dist <- read.table(paste(path.to.geatm,"taz-dist-time.txt",sep=""),sep="\t",header=T)
   names(dist) <- c('from','to','demand','miles','time')
   dist$time <- dist$time/60
@@ -102,7 +105,7 @@ facet_wrap(~TOURTYPE)
 # based on comparing the various subsets, use US rural as the basis for the HEVI model, exclude non POV travel and long distance travel (>300 miles)
 if(!file.exists(paste(path.to.nhts,'data-preprocessed-for-scheduling.Rdata',sep=''))){
   rur.tours <- subset(tours,URBRUR==2 & PMT_POV>0 & TOT_MILS<300)
-  rur.tours$tours.left.in.journey <- ddply(rur.tours,.(journey.id),function(df){ data.frame(tours.left.in.journey=(nrow(df)-1):0) })$tours.left.in.journey
+  rur.tours$tours.left.in.journey <- ddply(rur.tours,.(journey.id),function(df){ data.frame(tours.left.in.journey=(nrow(df)-1):0) },.parallel=T)$tours.left.in.journey
   # get rid of some bad data: NA for TOT_DWEL4, begin, end
   rur.tours <- rur.tours[!rur.tours$journey.id %in% rur.tours$journey.id[is.na(rur.tours$TOT_DWEL4)&rur.tours$tours.left.in.journey>0],]
   rur.tours$TOT_DWEL4[is.na(rur.tours$TOT_DWEL4)] <- 0
@@ -113,32 +116,29 @@ if(!file.exists(paste(path.to.nhts,'data-preprocessed-for-scheduling.Rdata',sep=
   #length(unique(paste(tours$HOUSEID,tours$PERSONID,tours$TOUR)))
 
   # What is the distribution of driving distance 
-  ggplot(rur.tours,aes(x=TOT_MILS))+
-  scale_x_continuous(name="Total Tour Distance (miles)")+
-  opts(title = "2009 NHTS - Rural US POV") +
-  geom_histogram()+
-  facet_wrap(~TOURTYPE)
+  #ggplot(rur.tours,aes(x=TOT_MILS))+
+  #scale_x_continuous(name="Total Tour Distance (miles)")+
+  #opts(title = "2009 NHTS - Rural US POV") +
+  #geom_histogram()+
+  #facet_wrap(~TOURTYPE)
 
   # What does the departure distribution look like
-  ggplot(rur.tours,aes(x=begin))+
-  scale_x_continuous(name="Departure Time (hour)")+
-  opts(title = "2009 NHTS - Rural US POV") +
-  geom_histogram(binwidth=1)+
-  facet_wrap(~TOURTYPE)
+  #ggplot(rur.tours,aes(x=begin))+
+  #scale_x_continuous(name="Departure Time (hour)")+
+  #opts(title = "2009 NHTS - Rural US POV") +
+  #geom_histogram(binwidth=1)+
+  #facet_wrap(~TOURTYPE)
 
   # prepare OD data by condensing trip types into HW, HO, OW categories
-  od.24.simp <- od.24.new[,c('from.taz.new','to.taz.new')]
-  names(od.24.simp) <- c('from','to')
+  od.24.simp <- od.24.new[,c('from','to')]
   od.24.simp$hw <- od.24.new[,'hbw']
   od.24.simp$ho <- apply(od.24.new[,c('hbshop','hbelem','hbuniv','hbro')],1,sum)
   od.24.simp$ow <- apply(od.24.new[,c('nhb','ix','xi','ee')],1,sum)
-  od.am.simp <- od.am.new[,c('from.taz.new','to.taz.new')]
-  names(od.am.simp) <- c('from','to')
+  od.am.simp <- od.am.new[,c('from','to')]
   od.am.simp$hw <- od.am.new[,'hbw']
   od.am.simp$ho <- apply(od.am.new[,c('hbshop','hbelem','hbuniv','hbro')],1,sum)
   od.am.simp$ow <- apply(od.am.new[,c('nhb','ix','xi','ee')],1,sum)
-  od.pm.simp <- od.pm.new[,c('from.taz.new','to.taz.new')]
-  names(od.pm.simp) <- c('from','to')
+  od.pm.simp <- od.pm.new[,c('from','to')]
   od.pm.simp$hw <- od.pm.new[,'hbw']
   od.pm.simp$ho <- apply(od.pm.new[,c('hbshop','hbelem','hbuniv','hbro')],1,sum)
   od.pm.simp$ow <- apply(od.pm.new[,c('nhb','ix','xi','ee')],1,sum)
@@ -192,7 +192,7 @@ if(!file.exists(paste(path.to.nhts,'data-preprocessed-for-scheduling.Rdata',sep=
   # verify that it all sums to 1
   #weighted.mean(colSums(epdfs)[2:4],c(nrow(rur.by.type[['hw']]),nrow(rur.by.type[['ho']]),nrow(rur.by.type[['ow']])))
 
-  rur.tours.per <- ddply(rur.tours,.(journey.id),nrow) # takes a long time but is important to verifying that the schedule reflects the NHTS data
+  rur.tours.per <- ddply(rur.tours,.(journey.id),nrow,.parallel=T) # takes a long time but is important to verifying that the schedule reflects the NHTS data
 
   # the following were found using an optimization that attempted to match the NHTS distribution of tours per driver to the synthetic schedulel 
   #prob.weights <- list()
@@ -204,7 +204,8 @@ if(!file.exists(paste(path.to.nhts,'data-preprocessed-for-scheduling.Rdata',sep=
   load(file=paste(path.to.nhts,'data-preprocessed-for-scheduling.Rdata',sep=''))
 }
 
-pev.pens <- c(0.01,0.02,0.03,0.04,0.05,0.1,0.15,0.2,0.25)
+source(paste(path.to.pevi,'R/create-schedule.R',sep=''))
+pev.pens <- c(0.005,0.01,0.02,0.04,0.08)
 replicate <- 1
 prob.weights <- data.frame(pen=pev.pens,'0'=NA,'1'=NA,'2'=NA,'3'=NA,'4'=NA,'5'=NA)
 schedule <- list()
@@ -217,7 +218,6 @@ if(!file.exists(paste(path.to.outputs,'schedules-20120425.Rdata',sep=''))){
       print(paste('Penetration ',pev.penetration,sep=''))
 
       load(paste(path.to.outputs,"0saved-state-pen",pev.penetration*100,".Rdata",sep=''))
-      source(paste(path.to.pevi,'R/create-schedule.R',sep=''))
       prob.weights[prob.weights$pen == pev.penetration, 2:7] <- apply(all.ptx[,1:6,gen.num-1],2,mean)
       
       schedule[[pev.pen.char]] <- create.schedule(pev.penetration,prob.weights[prob.weights$pen == pev.penetration,2:7])

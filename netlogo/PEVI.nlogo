@@ -1,10 +1,8 @@
-extensions [matrix array dynamic-scheduler]
+extensions [dynamic-scheduler]
 
 
 ;; define all globals
-globals
-
-[ ;start-hour      ; starting time, an integer (or fractional) hour
+globals [ ;start-hour      ; starting time, an integer (or fractional) hour
   ;stop-hour       ; time to end simulation, an integer hour
   ;;time-step-size  ; time step in minutes -- set by interface slider
   ;time            ; current time in fractional hours
@@ -16,7 +14,11 @@ globals
   od-dist
   od-time
   
+  n-nodes
+  
   schedule  ;; this global variable holds the dynamic schedule for the PEVI program, appended by the drivers from their itineraries
+  
+  test-driver  ;; needed for testing
 ]
 
 breed [drivers driver]
@@ -80,6 +82,7 @@ nodes-own[
 ]
 
 to setup
+  print "setting up"
   __clear-all-and-reset-ticks
   
   set schedule dynamic-scheduler:create
@@ -87,41 +90,43 @@ to setup
   reset-ticks
   
   create-turtles 1 [ setxy 0 0 set color black] ;This invisible turtle makes sure we start at node 1 not node 0
+  set n-nodes 5 ; TODO, infer this from the od input file
   
-  setup-od-array
+  setup-od-data
   setup-nodes
   setup-drivers
   setup-chargers
 end 
 
 
-to setup-od-array
-  print "setup-od-array"
+to setup-od-data
+  print "setup-od-data"
   ; Reads in main driver input file: Origin, destination, # of trips, distance, time
-  set od-from array:from-list n-values (n-nodes * n-nodes) [0] ; creates global od-from
-  set od-to array:from-list n-values (n-nodes * n-nodes) [0]           ; global od-to
-  set od-demand array:from-list n-values (n-nodes * n-nodes) [0]       ; global od-demand
-  set od-dist array:from-list n-values (n-nodes * n-nodes) [0]         ; global od-dist
-  set od-time array:from-list n-values (n-nodes * n-nodes) [0]         ; global od-time
+  set od-from   n-values (n-nodes * n-nodes) [0] 
+  set od-to     n-values (n-nodes * n-nodes) [0] 
+  set od-demand n-values (n-nodes * n-nodes) [0] 
+  set od-dist   n-values (n-nodes * n-nodes) [0] 
+  set od-time   n-values (n-nodes * n-nodes) [0] 
   
   ifelse (file-exists? "../inputs/OD_Matrix_5.txt") [
     file-close
     file-open "../inputs/OD_Matrix_5.txt"
     foreach n-values (n-nodes * n-nodes) [?] [
-     array:set od-from ? file-read array:set od-to ? file-read array:set od-demand ? (round file-read) array:set od-dist ? file-read array:set od-time ? (file-read)
-     ; HEVI code claims that the "Drive time is in the file as minutes" -- the example file OD_Matrix_5.txt would then suggest that drivers can
-     ; sustain a speed of 600mi/hr, if they travel 10 mi/min.  Changed to reflect drive time in the file as units hrs, even though this currently
-     ; reflects an average speed ~ 8mi/hr. ac 9/9
+     set od-from replace-item ? od-from file-read 
+     set od-from replace-item ? od-to   file-read 
+     set od-from replace-item ? od-demand  (round file-read) 
+     set od-from replace-item ? od-dist file-read 
+     set od-from replace-item ? od-time file-read
     ]
     file-close
+  ][ 
+    user-message "File not found: ../OD_Matrix_5.txt" 
   ]
-  [ user-message "File not found: ../OD_Matrix_5.txt" ]
-  ;print (word "od-dist = " od-dist)
 end 
 
 to setup-nodes
   print "setup-nodes"
-  create-nodes n-nodes  ; BUTTON for # of nodes?
+  create-nodes n-nodes
   ask nodes [
     set shape "star"
     set color yellow
@@ -143,7 +148,7 @@ to setup-nodes
       ]    
     ]
   ]
-  [ user-message (word "Input file " alternative-input-file " not found!")] 
+  [ user-message (word "Input file '" alternative-input-file "' not found!")] 
    
 end ;setup-nodes
 
@@ -154,32 +159,24 @@ to setup-drivers
   ; initialize driver state variables
   ask drivers [
     set phev? false ; TODO needs to be determined during itinerary setup
-                    ; what is "TODO" -- new procedure to define? -ac 9/8
     set current-schedule-row 0
     set shape "car"
     set color green
     set size 2
     ifelse phev? [
-      set battery-capacity 25 ; TODO replace with values from a vehicle type distribution input file
+      set battery-capacity 10 ; TODO replace with values from a vehicle type distribution input file
       set electric-fuel-consumption 0.35   ; kWh/mile
     ][ 
-      set battery-capacity 25 ; 
+      set battery-capacity 25
       set electric-fuel-consumption 0.35
     ]
     set state-of-charge 1
     set status "not-charging"
     set partner nobody
+    check-charge
 
-    set current-taz array:item itin-from current-schedule-row
-    set destination-taz array:item itin-to current-schedule-row
-    set departure-time array:item itin-depart current-schedule-row
-    setxy [xcor] of node current-taz [ycor] of node current-taz   
-    check-charge  ; need to check the charge after defining destinations. ac 9/8
+    itinerary-event-scheduler
   ]
-  ask drivers [
-    dynamic-scheduler:add schedule self task depart departure-time
-  ]
-  
 end ;setup-drivers
 
 to setup-itinerary
@@ -189,25 +186,21 @@ to setup-itinerary
     file-open driver-input-file
     let itin-row 0
     let this-itin true
-    let dummy-read-line file-read-line  ; <--- added this 09/07, to allow the readfile to skip the first line (comments)
     let next-driver file-read
     let this-driver 0
     while [file-at-end? = false] [
       set this-driver next-driver
       create-drivers 1 [
-        set itin-from array:from-list n-values 1 [-99]     ; creates global itin-from
-        set itin-to array:from-list n-values 1 [-99]       ; creates global itin-to
-        set itin-depart array:from-list n-values 1 [-99]   ; creates global itin-depart
-        array:set itin-from   0 file-read
-        array:set itin-to     0 file-read
-        array:set itin-depart 0	file-read
+        set itin-from n-values 1 [file-read]     ; creates global itin-from
+        set itin-to n-values 1 [file-read]       ; creates global itin-to
+        set itin-depart n-values 1 [file-read]   ; creates global itin-depart
         if file-at-end? = false [
           set next-driver file-read
           set this-itin true
           while [next-driver = this-driver] [  
-            array:add itin-from	file-read
-            array:add itin-to	file-read
-            array:add itin-depart file-read
+            set itin-from	lput file-read itin-from
+            set itin-to	lput file-read itin-to
+            set itin-depart lput file-read itin-depart
             ifelse file-at-end? [ set next-driver -1][ set next-driver file-read ]
           ] ; end while this-itin
         ]
@@ -275,18 +268,17 @@ end
 ;;    -- for remaining vehicles, enter STATE not-charging
 
 to check-charge
-
+  set need-to-charge? false
 ;; This submodel estimates the range of the EV. If the remaining-range is less than next-trip-range, returns a boolean need-to-charge? = false
-
   
-    set next-trip-range array:item od-dist (([destination-taz] of self - 1) * 5 + [current-taz] of self - 1)
-    let remaining-range ((state-of-charge) * (battery-capacity)) / (electric-fuel-consumption * safety-factor)
+;    set next-trip-range array:item od-dist (([destination-taz] of self - 1) * 5 + [current-taz] of self - 1)
+;    let remaining-range ((state-of-charge) * (battery-capacity)) / (electric-fuel-consumption * safety-factor)
     ;; yields remaining range available in miles
     ; remaining range is high when soc is high, low when soc is low. ac 9/8
-    if remaining-range > next-trip-range [set need-to-charge? false]
-    if remaining-range <= next-trip-range [set need-to-charge? true
+;    if remaining-range > next-trip-range [set need-to-charge? false]
+;    if remaining-range <= next-trip-range [set need-to-charge? true
          ;print (word "next trip range = " next-trip-range)
-         ]
+;         ]
     ;set minimum-acceptable-charge (elec-fuel-consump * next-trip-range) / batt-cap-mean
    ;???? if phev? = false [if minimum-acceptable-charge > 1 [set phev? true]]
  ;   print (word "next trip range = " next-trip-range)
@@ -299,97 +291,49 @@ to check-charge
   ; so that cars will leave at the start of the day, I do not set those values here. 
 end
 
+to itinerary-event-scheduler
+  set status "not-charging"
+  set current-taz item current-schedule-row itin-from 
+  set destination-taz item current-schedule-row itin-to
+  set departure-time item current-schedule-row itin-depart
+  if (departure-time < ticks)[ set departure-time ticks ]  ; TODO this should actually involve changing the itinerary
+  dynamic-scheduler:add schedule self task depart departure-time
+end
 
 to depart
-  print "departing"
-  ask drivers [
-    if (status = "not-charging") and (ticks >= departure-time) [
-;      ;; step 1 - does the driver check-charge?
-      check-charge
-      ifelse need-to-charge? = true [   ;; if the driver needs to charge, send to seek-charger
-        ; will need to be able to charge en route; many destinations are greater than the max range. ac 9/8
-      ]
-      [   ;; if the driver does not need to charge, set to "traveling"
-          ;; step 2 - when does the driver arrive?
-        ;set total-trip-dist array:item od-dist (([destination-taz] of self - 1) * 5 + [current-taz] of self - 1)
-        set total-trip-dist next-trip-range  ; temporary -- next-trip-range is the same, and is calculated in check-charge. ac 9/8
-                                             ; is this value necessary? 
-        set total-trip-time array:item od-time (([destination-taz] of self - 1) * 5 + [current-taz] of self - 1) ; units = hrs? ac 9/9
-        let speed total-trip-dist / total-trip-time
-        ;print (word "in depart, going from " [current-taz] of self " to " [destination-taz] of self)
-        ;print (word "in depart, dist, time = " total-trip-dist ", " total-trip-time)
-        ;print (word "in depart, speed = " speed)
-        set arrival-time (ticks + total-trip-time)
-        ;print (word "in depart, arrival-time (trip time), departure time = " arrival-time ", " ticks)
-        set status "traveling"
-        dynamic-scheduler:add schedule self task arrive arrival-time
-        ;set color white
-      ]
-    ]
+  print (word (who - 5) " departing " ticks " soc:" state-of-charge)
+  check-charge
+  ifelse need-to-charge? = true [   ;; if the driver needs to charge, send to seek-charger
+      
+  ][   ;; if the driver does not need to charge, set to "traveling"
+       ;; step 2 - when does the driver arrive?
+    set total-trip-dist item od-index od-dist
+    set total-trip-time item od-index od-time
+    set arrival-time (ticks + total-trip-time)
+    set status "traveling"
+    dynamic-scheduler:add schedule self task arrive arrival-time
   ]
 end
+
+to-report od-index
+  report (([destination-taz] of self - 1) * n-nodes + [current-taz] of self - 1)
+end
   
-to arrive  ; **start here next time -- was working here on getting "arrive" to work. ac 9/8
-  ask drivers [
-    if status = "traveling" [
-      ;print (word "sending to update-soc from arrive at time " ticks)
-      update-soc
-     set current-schedule-row current-schedule-row + 1
-     carefully [  ;; *** needed here?  might be necessary for check-charge to work
-       set current-taz destination-taz
-       set destination-taz array:item itin-to current-schedule-row
-       set departure-time array:item itin-depart current-schedule-row
-       setxy [xcor] of node current-taz [ycor] of node current-taz   
-       
-     ;; determine if the driver will charge at its current location:
-       check-charge
-       ifelse need-to-charge? = true [ 
-         ;; send to seek-charger
-       ] 
-       [ ;; send to depart -- add next departure time to master schedule
-         set status "not-charging"
-         dynamic-scheduler:add schedule self task depart departure-time
-         ;print (word "new departure time for driver " self " = " departure-time)
-       ]
-     ]
-     [  ; if the first block in 'carefully' does not work -- if the next row in the schedule does not exist (is this a problem now?) 
-        ; -- this block is executed as a fail-safe.
-       set status "not-charging" ;Driver is home again. Yay!
-       set departure-time 99
-       set color green
-     ]
-    ]
+to arrive
+  update-soc
+  print (word (who - 5) " arriving at " ticks ", trip-distance: " total-trip-dist " soc:" state-of-charge " elec-fc:" electric-fuel-consumption " cap" battery-capacity)
+  if (current-schedule-row + 1 < length itin-from) [
+    set current-schedule-row current-schedule-row + 1
+    itinerary-event-scheduler
   ]
-  
 end
 
 to update-soc
-  ;print (word "entered update-soc")
-  ask drivers [
-    if status = "traveling" [
-  ;print (word "soc before check = " state-of-charge)
-      ;set travel-time (ticks - departure-time)  ; note for future: departure-time will correspond to the time on the master schedule
-                                                ; at which a driver leaves a taz either after "arriving" or "charging" from changing
-                                                ; the intended schedule. ac 9/8
-      
-      let speed (total-trip-dist / total-trip-time)
-      ;;set travel-dist (speed * travel-time)
-      if state-of-charge > 0 [
-        set state-of-charge (state-of-charge - (total-trip-dist * electric-fuel-consumption) / battery-capacity)
-        ] 
-    ; State of charge = current soc - (miles traveled [mi] * efficiency (kwh/mi) / capacity (kwh))
-  ;print (word "travel-time = " travel-time)
-  ;print (word "ticks, departure = " ticks ", " departure-time)
-  ;print (word "spead, trip dist, trip time = " speed ", " total-trip-dist ", " total-trip-time)
- 
-  ;print (word "soc is now = " state-of-charge)
+  set state-of-charge (state-of-charge - total-trip-dist * electric-fuel-consumption / battery-capacity)
+end
 
-    ]
-    if status = "charging" [
-    
-    
-    ]
-  ]
+to-report driver-soc [the-driver]
+    report [state-of-charge] of the-driver
 end
 
 ;DECISION; check-charge:
@@ -482,17 +426,6 @@ GRAPHICS-WINDOW
 1
 ticks
 30.0
-
-INPUTBOX
-149
-41
-304
-101
-n-nodes
-5
-1
-0
-Number
 
 INPUTBOX
 836

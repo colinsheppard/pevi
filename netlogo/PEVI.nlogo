@@ -1,13 +1,6 @@
 extensions [dynamic-scheduler]
 
-
-;; define all globals
-globals [ ;start-hour      ; starting time, an integer (or fractional) hour
-  ;stop-hour       ; time to end simulation, an integer hour
-  ;;time-step-size  ; time step in minutes -- set by interface slider
-  ;time            ; current time in fractional hours
-  ;;display-time    ; current time, a character string hh:mm
-    
+globals [    
   od-from
   od-to
   od-demand
@@ -18,7 +11,8 @@ globals [ ;start-hour      ; starting time, an integer (or fractional) hour
   
   schedule  ;; this global variable holds the dynamic schedule for the PEVI program, appended by the drivers from their itineraries
   
-  test-driver  ;; needed for testing
+  ;; globals needed for testing
+  test-driver
 ]
 
 breed [drivers driver]
@@ -26,19 +20,34 @@ breed [chargers charger]
 breed [nodes node]
 
 drivers-own [
+;; VEHICLE
+  vehicle-type              ; e.g. 'leaf' or 'volt'
+  is-phev?                  
+  battery-capacity          ; kwh
+  electric-fuel-consumption ; kwh / mile
+  hybrid-fuel-consumption   ; gallon / mile, for phev charge sustaining mode
   
-;; VEHICLE specific
-  battery-capacity ; in kwh - FORCE GAUSSIAN DISTRIBUTION
-  state-of-charge ; represents the battery state of charge at each timestep
-      ; if soc is calculated from travel-dist and electric-fuel-consumption, is it a state variable still?
-  electric-fuel-consumption ; energy required to travel 1 mile (kwh/mile)
-  status ; discrete value from list:not-charging,traveling,charging
-  current-taz ; keeps track of the current location of each vehicle
-  kwh-received ; a count of how much energy each driver has charged
-  phev?  ;boolean variable       
-      
-;; TRIP specific
-  partner ;a variable used in to interact a driver and a charger
+;; DEMOGRAPHY  
+  home-taz
+  probability-of-unneeded-charge
+
+;; OPERATION
+  state                     ; discrete string value: not-charging, traveling, charging
+  current-taz               ; nobody if traveling
+  destination-taz
+  state-of-charge
+  current-charger           ; nobody if not charging
+  
+  itin-from 
+  itin-to
+  itin-depart
+  itin-trip-type
+  itin-change-flag
+  itin-delay-amount
+  current-itin-row          ; index of current location in the itinerary (referring to next trip or current trip if traveling)
+
+;; CONVENIENCE VARIABLES
+;; these are used to implement the model, but are in the model description
   total-trip-time ; the total time needed to drive from A to B
   travel-time ; used to store traveling time since departure
   total-trip-dist ; the total distance for a given trip
@@ -48,47 +57,39 @@ drivers-own [
   arrival-time ; when a car is supposed to arrive
   minimum-acceptable-charge ; The charge required to reach the next destination
   need-to-charge? ; boolean
+
+;; TRACKING
+  num-denials
   
-;; SCHEDULE specific
-  itin-from 
-  itin-to
-  itin-depart
-  current-schedule-row ; keeps track of which row in the schedule each driver is on
-  destination-taz ;from the schedule, this is where we're going
-  wait-time
+;; CANDIDATE ADDITIONS TO MODEL DESCRIPTION
+  kwh-received ; a count of how much energy each driver has charged
+
 ]
 
 chargers-own[
-  taz-location ; TAZ # for each charger
-  available ; boolean to represent either available(TRUE) or occupied(FALSE)
-  charger-level ; 1, 2, or 3 (low to high charge)
-  charger-rate ; The rate of recharge for each charger.
-  charger-in-use ; A counter increased every time the charger is in use. Used to calculate duty factor. (Not attached to the name -ah)
-  duty-factor ; The fraction of time a charger is in use vs. time idle  
-  ;; Unless we calculate a duty factor unique to each charger level, this will bias the results (level 3 will always get more use, as it charges faster / 
-  ;; allowing it to charge more vehicles)
-  charger-service ; a counter for the number of drivers each charger services
-  ;; necessary?
-  kwh-charged ; a count of how much energy a charger has given
-  ;; Interesting -- temporal charge rate.  How does this overlap with the supply of energy throughout the day?  *****
+  location         ; TAZ # for each charger
+  current-driver   ; driver currenlty being serviced, nobody indicates charger is available
+  charger-type     ; 1, 2, or 3
+  charge-rate      ; kWh / hr
+  num-sessions     ; count of charging sessions
+  energy-delivered ; kWh
  ]
 
 nodes-own[
-  taz-id ; TAZ id #
-  time-and-distance ;matrix containing time and distance info for every other node
-  taz-chargers-1 ; the number of level 1 chargers in the taz
-  taz-chargers-2 ; the number of level 2 chargers in the taz
-  taz-chargers-3 ; the number of level 3 chargers in the taz
+  id              ; TAZ id
+  chargers-in-taz ; list of all non-home chargers
+  home-charger    ; special charger available to all drivers when in their home taz
+  drivers-in-taz  ; list of drivers currently in TAZ
+  
+  n-levels        ; list containing the number of chargers for levels 1,2,3 at index 0,1,2
 ]
 
 to setup
   print "setting up"
   __clear-all-and-reset-ticks
-  
+ 
   set schedule dynamic-scheduler:create
-  
-  reset-ticks
-  
+   
   create-turtles 1 [ setxy 0 0 set color black] ;This invisible turtle makes sure we start at node 1 not node 0
   set n-nodes 5 ; TODO, infer this from the od input file
   
@@ -131,20 +132,18 @@ to setup-nodes
     set shape "star"
     set color yellow
     set size 0.5
+    set n-levels n-values 3 [-99]
   ]
-      ; Select the TAZ input file based on the alternative chooser on the interface. If the file does not exist, stop.
-      ; BUTTON??
-
   ifelse (file-exists? alternative-input-file) [ ; ../inputs/alternative_4_5.txt
     file-close
     file-open alternative-input-file
     foreach sort nodes[ ;this block reads taz-id, location, and charger info into each node
       ask ? [
-      set taz-id file-read
-      setxy file-read file-read
-      set taz-chargers-1 file-read ; Sets the number of level 1 chargers in each node
-      set taz-chargers-2 file-read ; Sets the number of level 2 chargers in each node
-      set taz-chargers-3 file-read ; Sets the number of level 3 chargers in each node
+        set id file-read
+        setxy file-read file-read
+        foreach [0 1 2] [
+          set n-levels replace-item ? n-levels file-read
+        ]
       ]    
     ]
   ]
@@ -158,12 +157,12 @@ to setup-drivers
   setup-itinerary
   ; initialize driver state variables
   ask drivers [
-    set phev? false ; TODO needs to be determined during itinerary setup
-    set current-schedule-row 0
+    set is-phev? false ; TODO needs to be determined during itinerary setup
+    set current-itin-row 0
     set shape "car"
     set color green
     set size 2
-    ifelse phev? [
+    ifelse is-phev? [
       set battery-capacity 10 ; TODO replace with values from a vehicle type distribution input file
       set electric-fuel-consumption 0.35   ; kWh/mile
     ][ 
@@ -171,8 +170,8 @@ to setup-drivers
       set electric-fuel-consumption 0.35
     ]
     set state-of-charge 1
-    set status "not-charging"
-    set partner nobody
+    set state "not-charging"
+    set current-charger nobody
     check-charge
 
     itinerary-event-scheduler
@@ -219,40 +218,31 @@ to setup-chargers
   ; we do not use "charger level" for anything else.
 
   foreach sort nodes [                       ; At each node, chargers equal to "taz-chargers"are created.
-    create-chargers [taz-chargers-1] of ? [  ; The location of each charger created is then set as the current TAZ location
-      set shape "Circle 2"
-      set color red
-      set size 1
-      set charger-level 1
-      set charger-rate 2.4 ; Charger rate is the charger power in kW. Data from (Markel 2010), see project document
-      set taz-location [taz-id] of ?
-      set xcor [xcor] of ?
-      set ycor [ycor] of ?]
+    create-chargers [item 0 n-levels] of ? [  ; The location of each charger created is then set as the current TAZ location
+      set charger-type 1
+      set charge-rate 2.4 ; Charger rate is the charger power in kW. Data from (Markel 2010), see project document
+      set location ?
+    ]
+    create-chargers [item 0 n-levels] of ? [  ; The location of each charger created is then set as the current TAZ location
+      set charger-type 2
+      set charge-rate 19.2 ; Charger rate is the charger power in kW. Data from (Markel 2010), see project document
+      set location ?
+    ]
     
-    create-chargers [taz-chargers-2] of ? [  ; The location of each charger created is then set as the current TAZ location
-      set shape "Circle 2"
-      set color red
-      set size 1
-      set charger-level 2
-      set charger-rate 19.2 ; Charger rate is the charger power in kW. Data from (Markel 2010), see project document
-      set taz-location [taz-id] of ?
-      set xcor [xcor] of ?
-      set ycor [ycor] of ?]
-    
-    create-chargers [taz-chargers-3] of ? [  ; The location of each charger created is then set as the current TAZ location
-      set shape "Circle 2"
-      set color red
-      set size 1
-      set charger-level 3
-      set charger-rate 30 ; Charger rate is the charger power in kW. Data from (Markel 2010), see project document
-      set taz-location [taz-id] of ?
-      set xcor [xcor] of ?
-      set ycor [ycor] of ?]
+    create-chargers [item 0 n-levels] of ? [  ; The location of each charger created is then set as the current TAZ location
+      set charger-type 3
+      set charge-rate 30 ; Charger rate is the charger power in kW. Data from (Markel 2010), see project document
+      set location ?
+    ]
   ]  
   ask chargers [
-    set available TRUE
-    ]
-  
+    set shape "Circle 2"
+    set color red
+    set size 1
+    set current-driver nobody
+    set xcor [xcor] of location
+    set ycor [ycor] of location
+  ]
 end ;setup-chargers
 
 to go
@@ -292,10 +282,10 @@ to check-charge
 end
 
 to itinerary-event-scheduler
-  set status "not-charging"
-  set current-taz item current-schedule-row itin-from 
-  set destination-taz item current-schedule-row itin-to
-  set departure-time item current-schedule-row itin-depart
+  set state "not-charging"
+  set current-taz item current-itin-row itin-from 
+  set destination-taz item current-itin-row itin-to
+  set departure-time item current-itin-row itin-depart
   if (departure-time < ticks)[ set departure-time ticks ]  ; TODO this should actually involve changing the itinerary
   dynamic-scheduler:add schedule self task depart departure-time
 end
@@ -310,7 +300,7 @@ to depart
     set total-trip-dist item od-index od-dist
     set total-trip-time item od-index od-time
     set arrival-time (ticks + total-trip-time)
-    set status "traveling"
+    set state "traveling"
     dynamic-scheduler:add schedule self task arrive arrival-time
   ]
 end
@@ -322,8 +312,8 @@ end
 to arrive
   update-soc
   print (word (who - 5) " arriving at " ticks ", trip-distance: " total-trip-dist " soc:" state-of-charge " elec-fc:" electric-fuel-consumption " cap" battery-capacity)
-  if (current-schedule-row + 1 < length itin-from) [
-    set current-schedule-row current-schedule-row + 1
+  if (current-itin-row + 1 < length itin-from) [
+    set current-itin-row current-itin-row + 1
     itinerary-event-scheduler
   ]
 end

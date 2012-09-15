@@ -266,17 +266,17 @@ end
 ;;    -- for remaining vehicles, enter STATE not-charging
 
 to check-charge
-
+  set need-to-charge? false
 ;; This submodel estimates the range of the EV. If the remaining-range is less than next-trip-range, returns a boolean need-to-charge? = false
   
-    set next-trip-range array:item od-dist (([destination-taz] of self - 1) * 5 + [current-taz] of self - 1)
-    let remaining-range ((state-of-charge) * (battery-capacity)) / (electric-fuel-consumption * safety-factor)
+;    set next-trip-range array:item od-dist (([destination-taz] of self - 1) * 5 + [current-taz] of self - 1)
+;    let remaining-range ((state-of-charge) * (battery-capacity)) / (electric-fuel-consumption * safety-factor)
     ;; yields remaining range available in miles
     ; remaining range is high when soc is high, low when soc is low. ac 9/8
-    if remaining-range > next-trip-range [set need-to-charge? false]
-    if remaining-range <= next-trip-range [set need-to-charge? true
+;    if remaining-range > next-trip-range [set need-to-charge? false]
+;    if remaining-range <= next-trip-range [set need-to-charge? true
          ;print (word "next trip range = " next-trip-range)
-         ]
+;         ]
     ;set minimum-acceptable-charge (elec-fuel-consump * next-trip-range) / batt-cap-mean
    ;???? if phev? = false [if minimum-acceptable-charge > 1 [set phev? true]]
  ;   print (word "next trip range = " next-trip-range)
@@ -294,6 +294,7 @@ to itinerary-event-scheduler
   set current-taz array:item itin-from current-schedule-row
   set destination-taz array:item itin-to current-schedule-row
   set departure-time array:item itin-depart current-schedule-row
+  if (departure-time < ticks)[ set departure-time ticks ]  ; TODO this should actually involve changing the itinerary
   dynamic-scheduler:add schedule self task depart departure-time
 end
 

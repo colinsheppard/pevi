@@ -233,7 +233,7 @@ to setup-chargers
   ; Charger-rate is currently a separate state variable from charger level. We may want to combine the two later, if
   ; we do not use "charger level" for anything else.
 
-  foreach sort nodes [                       ; At each node, chargers equal to "taz-chargers"are created.
+  foreach sort nodes [                       ; At each node,  chargers equal to "taz-chargers"are created.
     create-chargers [item 0 n-levels] of ? [  ; The location of each charger created is then set as the current TAZ location
       set charger-type 1
       set charge-rate 2.4 ; Charger rate is the charger power in kW. Data from (Markel 2010), see project document
@@ -264,25 +264,31 @@ to setup-chargers
 end ;setup-chargers
 
 to go
-  dynamic-scheduler:go schedule 
+  dynamic-scheduler:go-until schedule 25
 end
 
+;;;;;;;;;;;;;;;;;;;;
+;; NEED TO CHARGE
+;;;;;;;;;;;;;;;;;;;;
 to-report need-to-charge [calling-event]
-  set remaining-range (state-of-charge * battery-capacity / (electric-fuel-consumption * charge-safety-factor))
+  set remaining-range (state-of-charge * battery-capacity / electric-fuel-consumption )
 
-  ifelse ( (calling-event = "arrive" and remaining-range < journey-distance) or 
-           (calling-event = "depart" and remaining-range < trip-distance) )[ ; TODO add random draw here for people who charge but don't need to
+  ifelse ( (calling-event = "arrive" and remaining-range < journey-distance * charge-safety-factor) or 
+           (calling-event = "depart" and remaining-range < trip-distance * charge-safety-factor) )[ ; TODO add random draw here for people who charge but don't need to
     report true
   ][
     report false
   ]
 end
 
+;;;;;;;;;;;;;;;;;;;;
+;; SEEK CHARGER
+;;;;;;;;;;;;;;;;;;;;
 to seek-charger
-  print (word (who - 5) " seek-charger ")
+  print (word precision ticks 3 " " self " seek-charger ")
   foreach [chargers-in-taz] of current-taz [
     if [current-driver] of ? = nobody [
-      print (word "found " ?)
+      print (word precision ticks 3 " " self " found " ?)
       ask ? [
         set current-driver myself 
       ]
@@ -291,15 +297,18 @@ to seek-charger
       stop
     ] 
   ]
+  if current-charger = nobody [  print (word precision ticks 3 " " self " no charger found ") ]
 end
 
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;; CHARGE TIME EVENT SCHEDULER
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 to charge-time-event-scheduler
-  print (word (who - 5) " charge-time-event-scheduler ")
   set state "charging"
   set charger-in-origin-or-destination true  ; TODO this needs to be updated once en-route/neighbor chargins is impelemented
   set time-until-depart departure-time - ticks
-  set trip-charge-time-need max sentence 0 ((trip-distance / electric-fuel-consumption - state-of-charge * battery-capacity) * charge-safety-factor / [charge-rate] of current-charger)
-  set journey-charge-time-need max sentence 0 ((journey-distance / electric-fuel-consumption - state-of-charge * battery-capacity) * charge-safety-factor / [charge-rate] of current-charger)
+  set trip-charge-time-need max sentence 0 ((trip-distance * charge-safety-factor * electric-fuel-consumption - state-of-charge * battery-capacity) / [charge-rate] of current-charger)
+  set journey-charge-time-need max sentence 0 ((journey-distance * charge-safety-factor * electric-fuel-consumption - state-of-charge * battery-capacity) / [charge-rate] of current-charger)
   set full-charge-time-need (1 - state-of-charge) * battery-capacity / [charge-rate] of current-charger
   ifelse full-charge-time-need < trip-charge-time-need [
     set time-until-end-charge full-charge-time-need
@@ -319,44 +328,71 @@ to charge-time-event-scheduler
     ]
   ]
   dynamic-scheduler:add schedule self task end-charge ticks + time-until-end-charge
+  print (word precision ticks 3 " " self " charging for " precision time-until-end-charge 3)
 end
 
+;;;;;;;;;;;;;;;;;;;;
+;; END CHARGE
+;;;;;;;;;;;;;;;;;;;;
 to end-charge
-  set state-of-charge (state-of-charge - trip-distance * electric-fuel-consumption / battery-capacity)
+  set state-of-charge (state-of-charge + time-until-end-charge * [charge-rate] of current-charger / battery-capacity)
+  print (word precision ticks 3 " " self " ending charge soc:" precision state-of-charge 3)
+  ask current-charger [ set current-driver nobody ]
+  set current-charger nobody
+  itinerary-event-scheduler
 end
 
+;;;;;;;;;;;;;;;;;;;;
+;; NEED TO CHARGE
+;;;;;;;;;;;;;;;;;;;;
 to itinerary-event-scheduler
   set state "not-charging"
   if (departure-time < ticks)[ set departure-time ticks ]  ; TODO this should actually involve changing the itinerary
   dynamic-scheduler:add schedule self task depart departure-time
 end
 
+;;;;;;;;;;;;;;;;;;;;
+;; NEED TO CHARGE
+;;;;;;;;;;;;;;;;;;;;
 to depart
-  print (word (who - 5) " departing " ticks " soc:" state-of-charge)
+  print (word precision ticks 3 " " self " departing, soc:" state-of-charge)
   ifelse need-to-charge "depart" [
-    seek-charger
+    ifelse state-of-charge = 1 [ 
+      print (word precision ticks 3 " " self " cannot make trip with full battery") ;; TODO this shouldn't happen when PHEV are implemented
+    ][
+      seek-charger
+    ]
   ][
     travel-time-event-scheduler
   ]
 end
 
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;; TRAVEL TIME EVENT SCHEDULER
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 to travel-time-event-scheduler
   set state "traveling"
   set trip-time item my-od-index od-time
   set arrival-time (ticks + trip-time)
   dynamic-scheduler:add schedule self task arrive arrival-time
 end
-  
+
+;;;;;;;;;;;;;;;;;;;;
+;; ARRIVE
+;;;;;;;;;;;;;;;;;;;;
 to arrive
   set state-of-charge (state-of-charge - trip-distance * electric-fuel-consumption / battery-capacity)
   set journey-distance journey-distance - trip-distance
-  print (word (who - 5) " arriving at " ticks ", trip-distance: " trip-distance " soc:" state-of-charge " elec-fc:" electric-fuel-consumption " cap" battery-capacity)
+  print (word precision ticks 3 " " self " arriving, trip-distance: " trip-distance " soc:" state-of-charge " elec-fc:" electric-fuel-consumption " cap" battery-capacity)
   update-itinerary
   if not itin-complete? [
     itinerary-event-scheduler
   ]
 end
 
+;;;;;;;;;;;;;;;;;;;;
+;; UPDATE ITINERARY
+;;;;;;;;;;;;;;;;;;;;
 to update-itinerary
   ifelse (current-itin-row + 1 < length itin-from) [
     set current-itin-row current-itin-row + 1

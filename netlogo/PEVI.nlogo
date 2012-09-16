@@ -60,6 +60,13 @@ drivers-own [
   departure-time ;When the vehicle is set to leave the taz
   arrival-time ; when a car is supposed to arrive
   minimum-acceptable-charge ; The charge required to reach the next destination
+  itin-complete?
+  charger-in-origin-or-destination
+  time-until-depart
+  trip-charge-time-need
+  journey-charge-time-need
+  full-charge-time-need
+  time-until-end-charge
 
 ;; TRACKING
   num-denials
@@ -137,6 +144,7 @@ to setup-nodes
     set color yellow
     set size 0.5
     set n-levels n-values 3 [-99]
+    set chargers-in-taz n-values 0 [0]
   ]
   ifelse (file-exists? alternative-input-file) [ ; ../inputs/alternative_4_5.txt
     file-close
@@ -162,7 +170,8 @@ to setup-drivers
   ; initialize driver state variables
   ask drivers [
     set is-phev? false ; TODO needs to be determined during itinerary setup
-    set current-itin-row 0
+    set current-itin-row -1
+    update-itinerary
     set shape "car"
     set color green
     set size 2
@@ -180,6 +189,7 @@ to setup-drivers
     foreach n-values length itin-from [?] [
       set journey-distance (journey-distance + distance-from-to (item ? itin-from) (item ? itin-to) )
     ]
+    set itin-complete? false
     itinerary-event-scheduler
   ]
 end ;setup-drivers
@@ -234,7 +244,6 @@ to setup-chargers
       set charge-rate 19.2 ; Charger rate is the charger power in kW. Data from (Markel 2010), see project document
       set location ?
     ]
-    
     create-chargers [item 0 n-levels] of ? [  ; The location of each charger created is then set as the current TAZ location
       set charger-type 3
       set charge-rate 30 ; Charger rate is the charger power in kW. Data from (Markel 2010), see project document
@@ -248,6 +257,9 @@ to setup-chargers
     set current-driver nobody
     set xcor [xcor] of location
     set ycor [ycor] of location
+    ask location[
+      set chargers-in-taz lput myself chargers-in-taz
+    ]
   ]
 end ;setup-chargers
 
@@ -256,8 +268,7 @@ to go
 end
 
 to-report need-to-charge [calling-event]
-  set trip-distance item my-od-index od-dist
-  set remaining-range ((1 - state-of-charge) * (battery-capacity)) / (electric-fuel-consumption * charge-safety-factor)
+  set remaining-range (state-of-charge * battery-capacity / (electric-fuel-consumption * charge-safety-factor))
 
   ifelse ( (calling-event = "arrive" and remaining-range < journey-distance) or 
            (calling-event = "depart" and remaining-range < trip-distance) )[ ; TODO add random draw here for people who charge but don't need to
@@ -268,14 +279,54 @@ to-report need-to-charge [calling-event]
 end
 
 to seek-charger
-  
+  print (word (who - 5) " seek-charger ")
+  foreach [chargers-in-taz] of current-taz [
+    if [current-driver] of ? = nobody [
+      print (word "found " ?)
+      ask ? [
+        set current-driver myself 
+      ]
+      set current-charger ?
+      charge-time-event-scheduler
+      stop
+    ] 
+  ]
+end
+
+to charge-time-event-scheduler
+  print (word (who - 5) " charge-time-event-scheduler ")
+  set state "charging"
+  set charger-in-origin-or-destination true  ; TODO this needs to be updated once en-route/neighbor chargins is impelemented
+  set time-until-depart departure-time - ticks
+  set trip-charge-time-need max sentence 0 ((trip-distance / electric-fuel-consumption - state-of-charge * battery-capacity) * charge-safety-factor / [charge-rate] of current-charger)
+  set journey-charge-time-need max sentence 0 ((journey-distance / electric-fuel-consumption - state-of-charge * battery-capacity) * charge-safety-factor / [charge-rate] of current-charger)
+  set full-charge-time-need (1 - state-of-charge) * battery-capacity / [charge-rate] of current-charger
+  ifelse full-charge-time-need < trip-charge-time-need [
+    set time-until-end-charge full-charge-time-need
+  ][
+    ifelse time-until-depart < trip-charge-time-need[
+      set time-until-end-charge trip-charge-time-need
+    ][
+      ifelse charger-in-origin-or-destination[
+        set time-until-end-charge min sentence time-until-depart full-charge-time-need 
+      ][
+        ifelse [charger-type] of current-charger = 3[
+          set time-until-end-charge min sentence time-until-depart journey-charge-time-need
+        ][
+          set time-until-end-charge min sentence time-until-depart trip-charge-time-need
+        ]
+      ]
+    ]
+  ]
+  dynamic-scheduler:add schedule self task end-charge ticks + time-until-end-charge
+end
+
+to end-charge
+  set state-of-charge (state-of-charge - trip-distance * electric-fuel-consumption / battery-capacity)
 end
 
 to itinerary-event-scheduler
   set state "not-charging"
-  set current-taz item current-itin-row itin-from 
-  set destination-taz item current-itin-row itin-to
-  set departure-time item current-itin-row itin-depart
   if (departure-time < ticks)[ set departure-time ticks ]  ; TODO this should actually involve changing the itinerary
   dynamic-scheduler:add schedule self task depart departure-time
 end
@@ -285,10 +336,36 @@ to depart
   ifelse need-to-charge "depart" [
     seek-charger
   ][
-    set trip-time     item my-od-index od-time
-    set arrival-time (ticks + trip-time)
-    set state "traveling"
-    dynamic-scheduler:add schedule self task arrive arrival-time
+    travel-time-event-scheduler
+  ]
+end
+
+to travel-time-event-scheduler
+  set state "traveling"
+  set trip-time item my-od-index od-time
+  set arrival-time (ticks + trip-time)
+  dynamic-scheduler:add schedule self task arrive arrival-time
+end
+  
+to arrive
+  set state-of-charge (state-of-charge - trip-distance * electric-fuel-consumption / battery-capacity)
+  set journey-distance journey-distance - trip-distance
+  print (word (who - 5) " arriving at " ticks ", trip-distance: " trip-distance " soc:" state-of-charge " elec-fc:" electric-fuel-consumption " cap" battery-capacity)
+  update-itinerary
+  if not itin-complete? [
+    itinerary-event-scheduler
+  ]
+end
+
+to update-itinerary
+  ifelse (current-itin-row + 1 < length itin-from) [
+    set current-itin-row current-itin-row + 1
+    set current-taz node item current-itin-row itin-from
+    set destination-taz node item current-itin-row itin-to
+    set departure-time item current-itin-row itin-depart
+    set trip-distance item my-od-index od-dist
+  ][
+    set itin-complete? true
   ]
 end
 
@@ -300,20 +377,7 @@ to-report od-index [destination source]
 end
 
 to-report my-od-index
-  report (([destination-taz] of self - 1) * n-nodes + [current-taz] of self - 1)
-end
-  
-to arrive
-  update-soc
-  print (word (who - 5) " arriving at " ticks ", trip-distance: " trip-distance " soc:" state-of-charge " elec-fc:" electric-fuel-consumption " cap" battery-capacity)
-  if (current-itin-row + 1 < length itin-from) [
-    set current-itin-row current-itin-row + 1
-    itinerary-event-scheduler
-  ]
-end
-
-to update-soc
-  set state-of-charge (state-of-charge - trip-distance * electric-fuel-consumption / battery-capacity)
+  report (([id] of destination-taz - 1) * n-nodes + [id] of current-taz - 1)
 end
 
 to-report driver-soc [the-driver]

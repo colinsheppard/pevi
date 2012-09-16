@@ -11,6 +11,9 @@ globals [
   
   schedule  ;; this global variable holds the dynamic schedule for the PEVI program, appended by the drivers from their itineraries
   
+;; PARAMETERS
+  charge-safety-factor
+  
   ;; globals needed for testing
   test-driver
 ]
@@ -48,15 +51,15 @@ drivers-own [
 
 ;; CONVENIENCE VARIABLES
 ;; these are used to implement the model, but are in the model description
-  total-trip-time ; the total time needed to drive from A to B
-  travel-time ; used to store traveling time since departure
-  total-trip-dist ; the total distance for a given trip
-  next-trip-range
+  trip-time 
+  travel-time 
+  trip-distance
+  journey-distance
+  remaining-range
   travel-dist ; used to store distance driven since departure
   departure-time ;When the vehicle is set to leave the taz
   arrival-time ; when a car is supposed to arrive
   minimum-acceptable-charge ; The charge required to reach the next destination
-  need-to-charge? ; boolean
 
 ;; TRACKING
   num-denials
@@ -92,6 +95,7 @@ to setup
    
   create-turtles 1 [ setxy 0 0 set color black] ;This invisible turtle makes sure we start at node 1 not node 0
   set n-nodes 5 ; TODO, infer this from the od input file
+  set charge-safety-factor 1.1
   
   setup-od-data
   setup-nodes
@@ -113,11 +117,11 @@ to setup-od-data
     file-close
     file-open "../inputs/OD_Matrix_5.txt"
     foreach n-values (n-nodes * n-nodes) [?] [
-     set od-from replace-item ? od-from file-read 
-     set od-from replace-item ? od-to   file-read 
-     set od-from replace-item ? od-demand  (round file-read) 
-     set od-from replace-item ? od-dist file-read 
-     set od-from replace-item ? od-time file-read
+     set od-from   replace-item ? od-from file-read 
+     set od-to     replace-item ? od-to   file-read 
+     set od-demand replace-item ? od-demand  (round file-read) 
+     set od-dist   replace-item ? od-dist file-read 
+     set od-time   replace-item ? od-time file-read
     ]
     file-close
   ][ 
@@ -172,8 +176,10 @@ to setup-drivers
     set state-of-charge 1
     set state "not-charging"
     set current-charger nobody
-    check-charge
-
+    set journey-distance 0
+    foreach n-values length itin-from [?] [
+      set journey-distance (journey-distance + distance-from-to (item ? itin-from) (item ? itin-to) )
+    ]
     itinerary-event-scheduler
   ]
 end ;setup-drivers
@@ -249,36 +255,20 @@ to go
   dynamic-scheduler:go schedule 
 end
 
+to-report need-to-charge [calling-event]
+  set trip-distance item my-od-index od-dist
+  set remaining-range ((1 - state-of-charge) * (battery-capacity)) / (electric-fuel-consumption * charge-safety-factor)
 
-;; define all subroutines
-;; need:
-;; -- TravelTime (schedules EVENT arrive)
-;; -- arrive 
-;;    -- if end of journey, remove from list
-;;    -- for remaining vehicles, enter STATE not-charging
+  ifelse ( (calling-event = "arrive" and remaining-range < journey-distance) or 
+           (calling-event = "depart" and remaining-range < trip-distance) )[ ; TODO add random draw here for people who charge but don't need to
+    report true
+  ][
+    report false
+  ]
+end
 
-to check-charge
-  set need-to-charge? false
-;; This submodel estimates the range of the EV. If the remaining-range is less than next-trip-range, returns a boolean need-to-charge? = false
+to seek-charger
   
-;    set next-trip-range array:item od-dist (([destination-taz] of self - 1) * 5 + [current-taz] of self - 1)
-;    let remaining-range ((state-of-charge) * (battery-capacity)) / (electric-fuel-consumption * safety-factor)
-    ;; yields remaining range available in miles
-    ; remaining range is high when soc is high, low when soc is low. ac 9/8
-;    if remaining-range > next-trip-range [set need-to-charge? false]
-;    if remaining-range <= next-trip-range [set need-to-charge? true
-         ;print (word "next trip range = " next-trip-range)
-;         ]
-    ;set minimum-acceptable-charge (elec-fuel-consump * next-trip-range) / batt-cap-mean
-   ;???? if phev? = false [if minimum-acceptable-charge > 1 [set phev? true]]
- ;   print (word "next trip range = " next-trip-range)
-   ; print (word "remaining range = " remaining-range)
-    ;print (word "need to charge? " need-to-charge?)
- 
-  ;** adapted from find-minimum-charge
-  ; To determine minimum-acceptable-charge, we set a local variable equal to the distance of the next trip, multiply that by electric-fuel-consumption to get the required
-  ; kwh, and then divide by the battery capacity to get the required state-of-charge. Since the total-trip-dist and total-trip-times need to be set in "to depart" 
-  ; so that cars will leave at the start of the day, I do not set those values here. 
 end
 
 to itinerary-event-scheduler
@@ -292,26 +282,30 @@ end
 
 to depart
   print (word (who - 5) " departing " ticks " soc:" state-of-charge)
-  check-charge
-  ifelse need-to-charge? = true [   ;; if the driver needs to charge, send to seek-charger
-      
-  ][   ;; if the driver does not need to charge, set to "traveling"
-       ;; step 2 - when does the driver arrive?
-    set total-trip-dist item od-index od-dist
-    set total-trip-time item od-index od-time
-    set arrival-time (ticks + total-trip-time)
+  ifelse need-to-charge "depart" [
+    seek-charger
+  ][
+    set trip-time     item my-od-index od-time
+    set arrival-time (ticks + trip-time)
     set state "traveling"
     dynamic-scheduler:add schedule self task arrive arrival-time
   ]
 end
 
-to-report od-index
+to-report distance-from-to [from-taz to-taz]
+  report item ((from-taz - 1) * n-nodes + to-taz - 1 ) od-dist
+end
+to-report od-index [destination source]
+  report ((destination - 1) * n-nodes + source - 1)
+end
+
+to-report my-od-index
   report (([destination-taz] of self - 1) * n-nodes + [current-taz] of self - 1)
 end
   
 to arrive
   update-soc
-  print (word (who - 5) " arriving at " ticks ", trip-distance: " total-trip-dist " soc:" state-of-charge " elec-fc:" electric-fuel-consumption " cap" battery-capacity)
+  print (word (who - 5) " arriving at " ticks ", trip-distance: " trip-distance " soc:" state-of-charge " elec-fc:" electric-fuel-consumption " cap" battery-capacity)
   if (current-itin-row + 1 < length itin-from) [
     set current-itin-row current-itin-row + 1
     itinerary-event-scheduler
@@ -319,11 +313,11 @@ to arrive
 end
 
 to update-soc
-  set state-of-charge (state-of-charge - total-trip-dist * electric-fuel-consumption / battery-capacity)
+  set state-of-charge (state-of-charge - trip-distance * electric-fuel-consumption / battery-capacity)
 end
 
 to-report driver-soc [the-driver]
-    report [state-of-charge] of the-driver
+  report [state-of-charge] of the-driver
 end
 
 ;DECISION; check-charge:

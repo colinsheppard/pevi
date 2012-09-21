@@ -14,6 +14,7 @@ globals [
   
 ;; PARAMETERS
   charge-safety-factor
+  wait-time-mean
   
   ;; globals needed for testing
   test-driver
@@ -95,6 +96,9 @@ nodes-own[
   n-levels        ; list containing the number of chargers for levels 1,2,3 at index 0,1,2
 ]
 
+;;;;;;;;;;;;;;;;;;;;
+;; SETUP
+;;;;;;;;;;;;;;;;;;;;
 to setup
   print "setting up"
   __clear-all-and-reset-ticks
@@ -104,165 +108,13 @@ to setup
   create-turtles 1 [ setxy 0 0 set color black] ;This invisible turtle makes sure we start at node 1 not node 0
   set n-nodes 5 ; TODO, infer this from the od input file
   set charge-safety-factor 1.1
+  set wait-time-mean 0.5
   
   setup-od-data
   setup-nodes
   setup-drivers
   setup-chargers
 end 
-
-
-to setup-od-data
-  print "setup-od-data"
-  ; Reads in main driver input file: Origin, destination, # of trips, distance, time
-  set od-from   n-values (n-nodes * n-nodes) [0] 
-  set od-to     n-values (n-nodes * n-nodes) [0] 
-  set od-demand n-values (n-nodes * n-nodes) [0] 
-  set od-dist   n-values (n-nodes * n-nodes) [0] 
-  set od-time   n-values (n-nodes * n-nodes) [0] 
-  
-  ifelse (file-exists? "../inputs/OD_Matrix_5.txt") [
-    file-close
-    file-open "../inputs/OD_Matrix_5.txt"
-    foreach n-values (n-nodes * n-nodes) [?] [
-     set od-from   replace-item ? od-from file-read 
-     set od-to     replace-item ? od-to   file-read 
-     set od-demand replace-item ? od-demand  (round file-read) 
-     set od-dist   replace-item ? od-dist file-read 
-     set od-time   replace-item ? od-time file-read
-    ]
-    file-close
-  ][ 
-    user-message "File not found: ../OD_Matrix_5.txt" 
-  ]
-end 
-
-to setup-nodes
-  print "setup-nodes"
-  create-nodes n-nodes
-  ask nodes [
-    set shape "star"
-    set color yellow
-    set size 0.5
-    set n-levels n-values 3 [-99]
-    set chargers-in-taz n-values 0 [0]
-  ]
-  ifelse (file-exists? alternative-input-file) [ ; ../inputs/alternative_4_5.txt
-    file-close
-    file-open alternative-input-file
-    foreach sort nodes[ ;this block reads taz-id, location, and charger info into each node
-      ask ? [
-        set id file-read
-        setxy file-read file-read
-        foreach [0 1 2] [
-          set n-levels replace-item ? n-levels file-read
-        ]
-      ]    
-    ]
-  ]
-  [ user-message (word "Input file '" alternative-input-file "' not found!")] 
-   
-end ;setup-nodes
-
-to setup-drivers
-  print "setup-drivers"
-  ; creating drivers based on GEATM data, in setup-itinerary procedure. 
-  setup-itinerary
-  ; initialize driver state variables
-  ask drivers [
-    set is-phev? false ; TODO needs to be determined during itinerary setup
-    set current-itin-row -1
-    update-itinerary
-    set shape "car"
-    set color green
-    set size 2
-    ifelse is-phev? [
-      set battery-capacity 10 ; TODO replace with values from a vehicle type distribution input file
-      set electric-fuel-consumption 0.35   ; kWh/mile
-    ][ 
-      set battery-capacity 25
-      set electric-fuel-consumption 0.35
-    ]
-    set state-of-charge 1
-    set state "not-charging"
-    set current-charger nobody
-    set journey-distance 0
-    foreach n-values length itin-from [?] [
-      set journey-distance (journey-distance + distance-from-to (item ? itin-from) (item ? itin-to) )
-    ]
-    set itin-complete? false
-    itinerary-event-scheduler
-  ]
-end ;setup-drivers
-
-to setup-itinerary
-  print "setup-itinerary"
-  ifelse (file-exists? driver-input-file) [ ; ../inputs/p1r1_5.txt  
-    file-close
-    file-open driver-input-file
-    let itin-row 0
-    let this-itin true
-    let next-driver file-read
-    let this-driver 0
-    while [file-at-end? = false] [
-      set this-driver next-driver
-      create-drivers 1 [
-        set itin-from n-values 1 [file-read]     ; creates global itin-from
-        set itin-to n-values 1 [file-read]       ; creates global itin-to
-        set itin-depart n-values 1 [file-read]   ; creates global itin-depart
-        if file-at-end? = false [
-          set next-driver file-read
-          set this-itin true
-          while [next-driver = this-driver] [  
-            set itin-from	lput file-read itin-from
-            set itin-to	lput file-read itin-to
-            set itin-depart lput file-read itin-depart
-            ifelse file-at-end? [ set next-driver -1][ set next-driver file-read ]
-          ] ; end while this-itin
-        ]
-      ] ; end create-drivers
-    ] ; end while file-at-end
-  ] ; end ifelse
-  [ user-message (word "Input file '" driver-input-file "' not found!") ]
-  file-close
-end ;setup-itinerary
-
-to setup-chargers
-  print "setup-chargers"
-  ; The charger level, location, and quantity of chargers was read in during setup-nodes.
-  ; Now chargers of each level are created at the appropriate node.
-  ; Charger-rate is currently a separate state variable from charger level. We may want to combine the two later, if
-  ; we do not use "charger level" for anything else.
-
-  foreach sort nodes [                       ; At each node,  chargers equal to "taz-chargers"are created.
-    create-chargers [item 0 n-levels] of ? [  ; The location of each charger created is then set as the current TAZ location
-      set charger-type 1
-      set charge-rate 2.4 ; Charger rate is the charger power in kW. Data from (Markel 2010), see project document
-      set location ?
-    ]
-    create-chargers [item 0 n-levels] of ? [  ; The location of each charger created is then set as the current TAZ location
-      set charger-type 2
-      set charge-rate 19.2 ; Charger rate is the charger power in kW. Data from (Markel 2010), see project document
-      set location ?
-    ]
-    create-chargers [item 0 n-levels] of ? [  ; The location of each charger created is then set as the current TAZ location
-      set charger-type 3
-      set charge-rate 30 ; Charger rate is the charger power in kW. Data from (Markel 2010), see project document
-      set location ?
-    ]
-  ]  
-  ask chargers [
-    set shape "Circle 2"
-    set color red
-    set size 1
-    set current-driver nobody
-    set xcor [xcor] of location
-    set ycor [ycor] of location
-    ask location[
-      set chargers-in-taz lput myself chargers-in-taz
-    ]
-  ]
-end ;setup-chargers
 
 to go
   dynamic-scheduler:go-until schedule 25
@@ -283,10 +135,21 @@ to-report need-to-charge [calling-event]
 end
 
 ;;;;;;;;;;;;;;;;;;;;
+;; RETRY SEEK
+;;;;;;;;;;;;;;;;;;;;
+to retry-seek
+  print (word precision ticks 3 " " self " retry-seek ")
+  set time-until-depart departure-time - ticks
+  seek-charger
+end
+
+;;;;;;;;;;;;;;;;;;;;
 ;; SEEK CHARGER
 ;;;;;;;;;;;;;;;;;;;;
 to seek-charger
   print (word precision ticks 3 " " self " seek-charger ")
+  set time-until-depart departure-time - ticks
+    
   foreach [chargers-in-taz] of current-taz [
     if [current-driver] of ? = nobody [
       print (word precision ticks 3 " " self " found " ?)
@@ -298,7 +161,27 @@ to seek-charger
       stop
     ] 
   ]
-  if current-charger = nobody [  print (word precision ticks 3 " " self " no charger found ") ]
+  if current-charger = nobody [  
+    print (word precision ticks 3 " " self " no charger found ") 
+    wait-time-event-scheduler  
+  ]
+end
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;; WAIT TIME EVENT SCHEDULER
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+to wait-time-event-scheduler
+  print (word precision ticks 3 " " self " wait-time-event-scheduler remaining-range:" remaining-range 
+    " trip-distance:" trip-distance " time-until-depart:" time-until-depart)
+  set state "not charging"
+  ifelse remaining-range / charge-safety-factor < trip-distance [
+    dynamic-scheduler:add schedule self task retry-seek ticks + wait-time-mean ;; TODO make wait-time-mean random draw
+  ][
+    ifelse remaining-range / charge-safety-factor >= journey-distance or time-until-depart <= 1 [
+      dynamic-scheduler:add schedule self task depart time-until-depart
+    ][
+      dynamic-scheduler:add schedule self task retry-seek ticks + wait-time-mean ;; TODO make wait-time-mean random draw
+    ]
+  ]
 end
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
@@ -306,8 +189,7 @@ end
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 to charge-time-event-scheduler
   set state "charging"
-  set charger-in-origin-or-destination true  ; TODO this needs to be updated once en-route/neighbor chargins is impelemented
-  set time-until-depart departure-time - ticks
+  set charger-in-origin-or-destination true  ; TODO this needs to be updated once en-route/neighbor charging is impelemented
   set trip-charge-time-need max sentence 0 ((trip-distance * charge-safety-factor * electric-fuel-consumption - state-of-charge * battery-capacity) / [charge-rate] of current-charger)
   set journey-charge-time-need max sentence 0 ((journey-distance * charge-safety-factor * electric-fuel-consumption - state-of-charge * battery-capacity) / [charge-rate] of current-charger)
   set full-charge-time-need (1 - state-of-charge) * battery-capacity / [charge-rate] of current-charger
@@ -316,6 +198,7 @@ to charge-time-event-scheduler
   ][
     ifelse time-until-depart < trip-charge-time-need[
       set time-until-end-charge trip-charge-time-need
+      change-depart-time time-until-end-charge
     ][
       ifelse charger-in-origin-or-destination[
         set time-until-end-charge min sentence time-until-depart full-charge-time-need 
@@ -328,8 +211,31 @@ to charge-time-event-scheduler
       ]
     ]
   ]
-  dynamic-scheduler:add schedule self task end-charge ticks + time-until-end-charge
-  print (word precision ticks 3 " " self " charging for " precision time-until-end-charge 3)
+  ifelse [charger-type] of current-charger < 3 and time-until-end-charge < trip-charge-time-need [
+    dynamic-scheduler:add schedule self task retry-seek ticks + min (sentence wait-time-mean (time-until-depart - 0.5));; TODO make wait-time-mean random draw with max of time-until-depart - 0.5
+    print (word precision ticks 3 " " self " charging for min of " wait-time-mean " and " precision (time-until-depart - 0.5) 3)
+  ][
+    ifelse [charger-type] of current-charger < 2 and time-until-end-charge < journey-charge-time-need [
+      dynamic-scheduler:add schedule self task end-charge ticks + min (sentence wait-time-mean (time-until-depart - 0.5))
+      print (word precision ticks 3 " " self " charging for min of " wait-time-mean " and " precision (time-until-depart - 0.5) 3)
+    ][
+      dynamic-scheduler:add schedule self task end-charge ticks + time-until-end-charge
+      print (word precision ticks 3 " " self " charging for " precision time-until-end-charge 3)
+    ]
+  ]
+
+end
+
+to change-depart-time [new-depart-time]
+  set itin-depart replace-item current-itin-row itin-depart new-depart-time
+  if current-itin-row < (length itin-depart - 1)[
+    foreach n-values (length itin-depart - current-itin-row - 1) [current-itin-row + ? + 1] [ change-depart-time-row ?  ]
+  ]
+end
+to change-depart-time-row [row-num]
+  if item row-num itin-depart < item (row-num - 1) itin-depart[
+    set itin-depart replace-item row-num itin-depart (0.5 + item (row-num - 1) itin-depart) ;; TODO make sub-model about how itin is adjusted when multiple trips are impacted
+  ]
 end
 
 ;;;;;;;;;;;;;;;;;;;;
@@ -387,7 +293,15 @@ to arrive
   print (word precision ticks 3 " " self " arriving, trip-distance: " trip-distance " soc:" state-of-charge " elec-fc:" electric-fuel-consumption " cap" battery-capacity)
   update-itinerary
   if not itin-complete? [
-    itinerary-event-scheduler
+    ifelse need-to-charge "arrive" [
+      ifelse state-of-charge = 1 [ 
+        print (word precision ticks 3 " " self " cannot make trip with full battery") ;; TODO this shouldn't happen when PHEV are implemented
+      ][
+        seek-charger
+      ]
+    ][
+      travel-time-event-scheduler
+    ]
   ]
 end
 

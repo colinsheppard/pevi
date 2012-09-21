@@ -249,9 +249,9 @@ to end-charge
   itinerary-event-scheduler
 end
 
-;;;;;;;;;;;;;;;;;;;;
-;; NEED TO CHARGE
-;;;;;;;;;;;;;;;;;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;; ITINERARY EVENT SCHEDULER
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 to itinerary-event-scheduler
   set state "not-charging"
   if (departure-time < ticks)[ set departure-time ticks ]  ; TODO this should actually involve changing the itinerary
@@ -259,7 +259,7 @@ to itinerary-event-scheduler
 end
 
 ;;;;;;;;;;;;;;;;;;;;
-;; NEED TO CHARGE
+;; DEPART
 ;;;;;;;;;;;;;;;;;;;;
 to depart
   print (word precision ticks 3 " " self " departing, soc:" state-of-charge)

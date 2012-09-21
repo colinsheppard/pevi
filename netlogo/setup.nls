@@ -1,0 +1,166 @@
+;;;;;;;;;;;;;;;;;;;;
+;; SETUP OD DATA
+;;;;;;;;;;;;;;;;;;;;
+to setup-od-data
+  print "setup-od-data"
+  ; Reads in main driver input file: Origin, destination, # of trips, distance, time
+  set od-from   n-values (n-nodes * n-nodes) [0] 
+  set od-to     n-values (n-nodes * n-nodes) [0] 
+  set od-demand n-values (n-nodes * n-nodes) [0] 
+  set od-dist   n-values (n-nodes * n-nodes) [0] 
+  set od-time   n-values (n-nodes * n-nodes) [0] 
+  
+  ifelse (file-exists? "../inputs/OD_Matrix_5.txt") [
+    file-close
+    file-open "../inputs/OD_Matrix_5.txt"
+    foreach n-values (n-nodes * n-nodes) [?] [
+     set od-from   replace-item ? od-from file-read 
+     set od-to     replace-item ? od-to   file-read 
+     set od-demand replace-item ? od-demand  (round file-read) 
+     set od-dist   replace-item ? od-dist file-read 
+     set od-time   replace-item ? od-time file-read
+    ]
+    file-close
+  ][ 
+    user-message "File not found: ../OD_Matrix_5.txt" 
+  ]
+end 
+
+;;;;;;;;;;;;;;;;;;;;
+;; SETUP NODES
+;;;;;;;;;;;;;;;;;;;;
+to setup-nodes
+  print "setup-nodes"
+  create-nodes n-nodes
+  ask nodes [
+    set shape "star"
+    set color yellow
+    set size 0.5
+    set n-levels n-values 3 [-99]
+    set chargers-in-taz n-values 0 [0]
+  ]
+  ifelse (file-exists? alternative-input-file) [ ; ../inputs/alternative_4_5.txt
+    file-close
+    file-open alternative-input-file
+    foreach sort nodes[ ;this block reads taz-id, location, and charger info into each node
+      ask ? [
+        set id file-read
+        setxy file-read file-read
+        foreach [0 1 2] [
+          set n-levels replace-item ? n-levels file-read
+        ]
+      ]    
+    ]
+  ]
+  [ user-message (word "Input file '" alternative-input-file "' not found!")] 
+   
+end ;setup-nodes
+
+;;;;;;;;;;;;;;;;;;;;
+;; SETUP DRIVERS
+;;;;;;;;;;;;;;;;;;;;
+to setup-drivers
+  print "setup-drivers"
+  ; creating drivers based on GEATM data, in setup-itinerary procedure. 
+  setup-itinerary
+  ; initialize driver state variables
+  ask drivers [
+    set is-phev? false ; TODO needs to be determined during itinerary setup
+    set current-itin-row -1
+    update-itinerary
+    set shape "car"
+    set color green
+    set size 2
+    ifelse is-phev? [
+      set battery-capacity 10 ; TODO replace with values from a vehicle type distribution input file
+      set electric-fuel-consumption 0.35   ; kWh/mile
+    ][ 
+      set battery-capacity 25
+      set electric-fuel-consumption 0.35
+    ]
+    set state-of-charge 1
+    set state "not-charging"
+    set current-charger nobody
+    set journey-distance 0
+    foreach n-values length itin-from [?] [
+      set journey-distance (journey-distance + distance-from-to (item ? itin-from) (item ? itin-to) )
+    ]
+    set itin-complete? false
+    itinerary-event-scheduler
+  ]
+end ;setup-drivers
+
+;;;;;;;;;;;;;;;;;;;;
+;; SETUP INTINERARY
+;;;;;;;;;;;;;;;;;;;;
+to setup-itinerary
+  print "setup-itinerary"
+  ifelse (file-exists? driver-input-file) [ ; ../inputs/p1r1_5.txt  
+    file-close
+    file-open driver-input-file
+    let itin-row 0
+    let this-itin true
+    let next-driver file-read
+    let this-driver 0
+    while [file-at-end? = false] [
+      set this-driver next-driver
+      create-drivers 1 [
+        set itin-from n-values 1 [file-read]     ; creates global itin-from
+        set itin-to n-values 1 [file-read]       ; creates global itin-to
+        set itin-depart n-values 1 [file-read]   ; creates global itin-depart
+        if file-at-end? = false [
+          set next-driver file-read
+          set this-itin true
+          while [next-driver = this-driver] [  
+            set itin-from  lput file-read itin-from
+            set itin-to  lput file-read itin-to
+            set itin-depart lput file-read itin-depart
+            ifelse file-at-end? [ set next-driver -1][ set next-driver file-read ]
+          ] ; end while this-itin
+        ]
+      ] ; end create-drivers
+    ] ; end while file-at-end
+  ] ; end ifelse
+  [ user-message (word "Input file '" driver-input-file "' not found!") ]
+  file-close
+end ;setup-itinerary
+
+;;;;;;;;;;;;;;;;;;;;
+;; SETUP CHARGERS
+;;;;;;;;;;;;;;;;;;;;
+to setup-chargers
+  print "setup-chargers"
+  ; The charger level, location, and quantity of chargers was read in during setup-nodes.
+  ; Now chargers of each level are created at the appropriate node.
+  ; Charger-rate is currently a separate state variable from charger level. We may want to combine the two later, if
+  ; we do not use "charger level" for anything else.
+
+  foreach sort nodes [                       ; At each node,  chargers equal to "taz-chargers"are created.
+    create-chargers [item 0 n-levels] of ? [  ; The location of each charger created is then set as the current TAZ location
+      set charger-type 1
+      set charge-rate 2.4 ; Charger rate is the charger power in kW. Data from (Markel 2010), see project document
+      set location ?
+    ]
+    create-chargers [item 0 n-levels] of ? [  ; The location of each charger created is then set as the current TAZ location
+      set charger-type 2
+      set charge-rate 19.2 ; Charger rate is the charger power in kW. Data from (Markel 2010), see project document
+      set location ?
+    ]
+    create-chargers [item 0 n-levels] of ? [  ; The location of each charger created is then set as the current TAZ location
+      set charger-type 3
+      set charge-rate 30 ; Charger rate is the charger power in kW. Data from (Markel 2010), see project document
+      set location ?
+    ]
+  ]  
+  ask chargers [
+    set shape "Circle 2"
+    set color red
+    set size 1
+    set current-driver nobody
+    set xcor [xcor] of location
+    set ycor [ycor] of location
+    ask location[
+      set chargers-in-taz lput myself chargers-in-taz
+    ]
+  ]
+end ;setup-chargers

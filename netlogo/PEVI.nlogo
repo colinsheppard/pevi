@@ -1,4 +1,5 @@
 extensions [dynamic-scheduler]
+__includes["setup.nls"]
 
 globals [    
   od-from

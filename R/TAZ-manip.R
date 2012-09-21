@@ -133,17 +133,18 @@ names(od.pm.old) <- c('from','to','hbw','hbshop','hbelem','hbuniv','hbro','nhb',
 od.24.sum <- ddply(od.24.old,.(from),function(df){ sum(df$demand) })
 names(od.24.sum) <- c('taz','demand')
 taz@data$total.demand <- od.24.sum$demand[match(taz@data$NEWTAZ,od.24.sum$taz)]
+taz@data$total.demand.per.acre <- taz@data$total.demand / taz@data$ACRES
 trellis.par.set(sp.theme())
 spplot(taz,'total.demand')
+spplot(taz,'total.demand.per.acre')
 
 # Load the aggregation polygons
 agg.polys <- readShapePoly(paste(path.to.google,'ProposedAggregation.shp',sep=''))
-taz.centroids <-SpatialPointsDataFrame(coordinates(taz),data=data.frame(longitude= coordinates(taz)[,1],longitude= coordinates(taz)[,2]))
+taz.centroids <-SpatialPointsDataFrame(coordinates(taz),data=data.frame(longitude= coordinates(taz)[,1],latitude= coordinates(taz)[,2]))
 agg.mapping <- data.frame(name=over(taz.centroids,agg.polys)$Name)
 agg.mapping$agg.id <- as.numeric(agg.mapping$name)
 agg.taz.shp <- unionSpatialPolygons(taz,agg.mapping$agg.id)
-aggregate.data <- function(df)
-{ 
+aggregate.data <- function(df){ 
  return( colSums(df[,c('AREA','ACRES','SHAPE_AREA')]) ) 
 }
 taz@data$agg.id <- agg.mapping$agg.id
@@ -185,42 +186,42 @@ names(od.24.sum.from) <- c('taz','demand')
 od.24.sum.to <- ddply(od.24.new,.(to),function(df){ sum(df$demand) })
 names(od.24.sum.to) <- c('taz','demand')
 
+if(names(agg.taz.shp@data)[1]!="id")names(agg.taz.shp@data) <- c('id',names(agg.taz.shp@data)[2:ncol(agg.taz.shp@data)]) # make first column of shape data 'id' instead of 'agg.id'
+
 # add total demand to the existing shape data
 agg.taz.shp@data$total.demand.from <- od.24.sum.from$demand[agg.taz.shp$id]
 agg.taz.shp@data$total.demand.to <- od.24.sum.to$demand[agg.taz.shp$id]
-agg.taz.shp@data$trips.per.acre <- agg.taz.shp@data$total.demand/agg.taz.shp@data$ACRES
 
 trellis.par.set(sp.theme())
 spplot(agg.taz.shp,c('total.demand.from','total.demand.to'))
 
 # look at where people from each TAZ are going to 
-if(names(agg.taz.shp@data)[1]!="id")names(agg.taz.shp@data) <- c('id',names(agg.taz.shp@data)[2:ncol(agg.taz.shp@data)]) # make first column of shape data 'id' instead of 'agg.id'
 agg.names <- as.character(ddply(agg.mapping,.(agg.id),function(df){ df[1,]})$name)
 agg.taz.shp@data$name <- agg.names[agg.taz.shp@data$id]
-agg.points <- fortify(agg.taz.shp,region="id")
-agg.df <- join(agg.points,agg.taz.shp@data,by="id")
 
-ggplot(agg.df,aes(long,lat,group=name))+
-  geom_polygon(aes(fill=total.demand)) +
-  geom_path(color="white") +
-  coord_equal()
+#agg.points <- fortify(agg.taz.shp,region="id")
+#agg.df <- join(agg.points,agg.taz.shp@data,by="id")
 
+#ggplot(agg.df,aes(long,lat,group=name))+
+  #geom_polygon(aes(fill=total.demand)) +
+  #geom_path(color="white") +
+  #coord_equal()
 
-make.dir(paste(path.to.plots,'demand',sep=''))
-for(agg.taz.id in agg.taz.shp$id){
-  taz.name <- str_replace_all(as.character(agg.mapping$name[agg.mapping$agg.id == agg.taz.id][1]),'-','.')
-  if(!is.na(as.numeric(substr(taz.name,1,1)))) taz.name <- paste('HWY',taz.name,sep='')
-  new.col.name.to <- paste(taz.name,'.to',sep='')
-  new.col.name.from <- paste(taz.name,'.of.total',sep='')
+#make.dir(paste(path.to.plots,'demand',sep=''))
+#for(agg.taz.id in agg.taz.shp$id){
+  #taz.name <- str_replace_all(as.character(agg.mapping$name[agg.mapping$agg.id == agg.taz.id][1]),'-','.')
+  #if(!is.na(as.numeric(substr(taz.name,1,1)))) taz.name <- paste('HWY',taz.name,sep='')
+  #new.col.name.to <- paste(taz.name,'.to',sep='')
+  #new.col.name.from <- paste(taz.name,'.of.total',sep='')
   
-  agg.taz.shp@data[,new.col.name.to] <- subset(od.24.new,from==agg.taz.id)$demand[agg.taz.shp$id]/sum(subset(od.24.new,from==agg.taz.id)$demand)*100
-  agg.taz.shp@data[,new.col.name.from] <- subset(od.24.new,to==agg.taz.id)$demand[agg.taz.shp$id]/sum(od.24.new$demand)*100
-  pdf(file=paste(path.to.plots,'demand/',taz.name,'.pdf',sep=''),16,12)
-  trellis.par.set(sp.theme())
-  print(spplot(agg.taz.shp,c(new.col.name.to,new.col.name.from)))
-  dev.off()
-}
-spplot(agg.taz.shp,names(agg.taz.shp@data)[grep('of.total',names(agg.taz.shp@data))], names.attr= agg.taz.shp$name,colorkey=list(space="bottom"))
+  #agg.taz.shp@data[,new.col.name.to] <- subset(od.24.new,from==agg.taz.id)$demand[agg.taz.shp$id]/sum(subset(od.24.new,from==agg.taz.id)$demand)*100
+  #agg.taz.shp@data[,new.col.name.from] <- subset(od.24.new,to==agg.taz.id)$demand[agg.taz.shp$id]/sum(od.24.new$demand)*100
+  #pdf(file=paste(path.to.plots,'demand/',taz.name,'.pdf',sep=''),16,12)
+  #trellis.par.set(sp.theme())
+  #print(spplot(agg.taz.shp,c(new.col.name.to,new.col.name.from)))
+  #dev.off()
+#}
+#spplot(agg.taz.shp,names(agg.taz.shp@data)[grep('of.total',names(agg.taz.shp@data))], names.attr= agg.taz.shp$name,colorkey=list(space="bottom"))
 
 # write the data to a shapefile, note we need to write the names of the fields separately b/c they get truncated due to ESRI format limitations
 writePolyShape(agg.taz.shp,paste(path.to.pevi,'inputs/development/aggregated-taz',sep=''))
@@ -262,6 +263,10 @@ shp.to.kml(agg.taz.shp,paste(path.to.pevi,'inputs/development/aggregated-taz.kml
 c.map <- paste(map.color(taz@data$total.demand,blue2red(50)),'7F',sep='')
  shp.to.kml(taz,paste(path.to.pevi,'inputs/development/disaggregated-taz.kml',sep=''),'Disaggregated TAZs','Color denotes total daily demand','white',1.5,c.map,name.col='NEWTAZ',description.cols=c('total.demand','NEWTAZ','ACRES'),id.col='ID')
 
+for.c.map <- log(taz@data$total.demand.per.acre[-which(taz@data$total.demand.per.acre==Inf)])
+for.c.map[for.c.map<=0] <- 0 
+c.map <- paste(map.color(for.c.map,blue2red(50)),'7F',sep='')
+ shp.to.kml(taz[-which(taz@data$total.demand.per.acre==Inf),],paste(path.to.pevi,'inputs/development/disaggregated-taz-per-acre.kml',sep=''),'Disaggregated TAZs','Color denotes total daily demand per acre','white',1.5,c.map,name.col='NEWTAZ',description.cols=c('total.demand.per.acre','total.demand','NEWTAZ','ACRES'),id.col='ID')
 
 # Join Humboldt parcel data with land use data
 land.use <- read.dbf(paste(path.to.parcel,'Hum-Land-Use.dbf',sep=''))$dbf

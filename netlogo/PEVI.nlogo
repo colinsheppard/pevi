@@ -117,7 +117,7 @@ to setup
 end 
 
 to go
-  dynamic-scheduler:go-until schedule 25
+  dynamic-scheduler:go-until schedule 7
 end
 
 ;;;;;;;;;;;;;;;;;;;;
@@ -226,6 +226,10 @@ to charge-time-event-scheduler
 
 end
 
+;;;;;;;;;;;;;;;;;;;;;;;;;
+;; CHANGE DEPARTURE TIME
+;;;;;;;;;;;;;;;;;;;;;;;;;
+
 to change-depart-time [new-depart-time]
   set itin-depart replace-item current-itin-row itin-depart new-depart-time
   if current-itin-row < (length itin-depart - 1)[
@@ -292,6 +296,10 @@ to arrive
   set journey-distance journey-distance - trip-distance
   print (word precision ticks 3 " " self " arriving, trip-distance: " trip-distance " soc:" state-of-charge " elec-fc:" electric-fuel-consumption " cap" battery-capacity)
   update-itinerary
+  
+  ;; is the arrival time before or after the next "itinerary" departure time?
+  ;if ticks > 
+  
   if not itin-complete? [
     ifelse need-to-charge "arrive" [
       ifelse state-of-charge = 1 [ 
@@ -303,6 +311,9 @@ to arrive
       travel-time-event-scheduler
     ]
   ]
+  ;[
+  ; itinerary-event-scheduler
+  ;]
 end
 
 ;;;;;;;;;;;;;;;;;;;;
@@ -310,12 +321,28 @@ end
 ;;;;;;;;;;;;;;;;;;;;
 to update-itinerary
   ifelse (current-itin-row + 1 < length itin-from) [
-    set current-itin-row current-itin-row + 1
-    set current-taz node item current-itin-row itin-from
-    set destination-taz node item current-itin-row itin-to
-    set departure-time item current-itin-row itin-depart
-    set trip-distance item my-od-index od-dist
-  ][
+    ifelse ((item (current-itin-row + 1) itin-depart) < ticks) [  ;;; work in progress. driver 7 should fall into the 
+      set current-itin-row current-itin-row + 1                   ;;; first category, but is not.  ac 9.26
+      set current-taz node item current-itin-row itin-from
+      set destination-taz node item current-itin-row itin-to
+      change-depart-time ticks  
+      print (word precision ticks 3 " " self " need to change depart time to:" precision itin-depart 3)
+      set trip-distance item my-od-index od-dist
+    ] 
+    [
+      set current-itin-row current-itin-row + 1
+      set current-taz node item current-itin-row itin-from
+      set destination-taz node item current-itin-row itin-to
+      set departure-time item current-itin-row itin-depart
+      set trip-distance item my-od-index od-dist
+    ]
+    ;set current-itin-row current-itin-row + 1
+    ;set current-taz node item current-itin-row itin-from
+    ;set destination-taz node item current-itin-row itin-to
+    ;set departure-time item current-itin-row itin-depart
+    ;set trip-distance item my-od-index od-dist
+  ]
+  [
     set itin-complete? true
   ]
 end
@@ -471,10 +498,10 @@ batt-cap-range
 Number
 
 INPUTBOX
-24
-305
-134
-365
+147
+86
+257
+146
 fuel-economy-stdv
 0.05
 1
@@ -482,10 +509,10 @@ fuel-economy-stdv
 Number
 
 INPUTBOX
-24
-369
-141
-429
+147
+150
+264
+210
 fuel-economy-range
 0.1
 1
@@ -503,22 +530,11 @@ driver-input-file
 0
 String
 
-INPUTBOX
-152
-115
-307
-175
-safety-factor
-0.1
-1
-0
-Number
-
 BUTTON
-163
-267
-229
-300
+145
+41
+211
+74
 NIL
 setup
 NIL
@@ -532,10 +548,10 @@ NIL
 1
 
 BUTTON
-165
-317
-228
-350
+224
+43
+287
+76
 NIL
 go
 T
@@ -547,6 +563,17 @@ NIL
 NIL
 NIL
 1
+
+INPUTBOX
+837
+167
+1072
+227
+od-input-file
+../inputs/OD_Matrix_5.txt
+1
+0
+String
 
 @#$#@#$#@
 ## ## WHAT IS IT?

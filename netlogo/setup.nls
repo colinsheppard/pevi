@@ -10,9 +10,9 @@ to setup-od-data
   set od-dist   n-values (n-nodes * n-nodes) [0] 
   set od-time   n-values (n-nodes * n-nodes) [0] 
   
-  ifelse (file-exists? "../inputs/OD_Matrix_5.txt") [
+  ifelse (file-exists? od-input-file) [ ; ../inputs/OD_Matrix_5.txt
     file-close
-    file-open "../inputs/OD_Matrix_5.txt"
+    file-open od-input-file
     foreach n-values (n-nodes * n-nodes) [?] [
      set od-from   replace-item ? od-from file-read 
      set od-to     replace-item ? od-to   file-read 
@@ -22,7 +22,7 @@ to setup-od-data
     ]
     file-close
   ][ 
-    user-message "File not found: ../OD_Matrix_5.txt" 
+    user-message (word "Input file '" od-input-file "' not found!") 
   ]
 end 
 

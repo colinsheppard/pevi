@@ -1,3 +1,4 @@
 *.DS_Store
 inputs/*
 outputs/*
+netlogo/temp/*

@@ -9,50 +9,31 @@ path.to.plots  <- '~/Dropbox/serc/pev-colin/plots/'
 path.to.pevi   <- '~/Dropbox/serc/pev-colin/pevi/'
 path.to.parcel <- '~/Dropbox/serc/pev-colin/data/HUM-PARCELS/'
 
+source(paste(path.to.pevi,'R/gis-functions.R',sep=''))
+
 taz <- readShapePoly(paste(path.to.geatm,'Shape_Files/taz-LATLON.shp',sep=''))
 zips    <- readShapePoly(paste(path.to.geatm,'../CA-ZIPS/tl_2010_06_zcta510.shp',sep=''))
 zips@data$INTPTLAT10 <- as.numeric(as.character(zips@data$INTPTLAT10))
 zips@data$INTPTLON10 <- as.numeric(as.character(zips@data$INTPTLON10))
 hum.zips<- which(zips@data$INTPTLAT10 < 42 & zips@data$INTPTLAT10 > 39.5 & zips@data$INTPTLON10 < -123 & zips@data$INTPTLON10 > -124.5 )
-plot(zips[hum.zips,])
-plot(taz,col='#0000ff22',add=T)
+
+tracts <- readShapePoly(paste(path.to.geatm,'../HUM-CENSUS-TRACTS/hum-census-tracts.shp',sep=''))
+tracts <- tracts[-which(tracts@data$NAME10=='9901'),]
+tracts@data$GEOID10 <- as.numeric(as.character(tracts@data$GEOID10))
+tracts@data$NAMELSAD10 <- as.character(tracts@data$NAMELSAD10)
+tract.pop <- read.csv(paste(path.to.geatm,'../HUM-CENSUS-TRACTS/2010-population-by-tract.csv',sep=''))
+tracts@data$population <- tract.pop$total.population[match(tracts@data$GEOID10,tract.pop$GEO.id)]
+tracts@data$ID <- unlist(lapply(tracts@polygons,function(x){slot(x,'ID')}))
+#c.map <- paste(map.color(tracts@data$population,blue2red(50)),'7F',sep='')
+#shp.to.kml(tracts,paste(path.to.google,'humboldt-census-tracts.kml',sep=''),'Population','','red',1.5,c.map,id.col='ID',name.col='name',description.cols=c('NAMELSAD10','population'))
+
+
 # finding two overlapping polygons
-taz.id <- which(taz@data$ID==519)
-zip.id <- which(zips@data$ZCTA5CE10==95549)
-plot(taz[taz.id,],col='#ee229922',add=T)
-plot(zips[zip.id,],col='#3399ff22',add=T)
+#taz.id <- which(taz@data$ID==519)
+#zip.id <- which(zips@data$ZCTA5CE10==95549)
+#plot(taz[taz.id,],col='#ee229922',add=T)
+#plot(zips[zip.id,],col='#3399ff22',add=T)
 
-
-# area.of.union
-# this gives you the area of the union of any number of SpatialPolygonsDataFrame objects including multiple rows within
-# make sure that both objects are in the same projection before attempting
-#
-# arguments must be an object of class "SpatialPolygonsDataFrame" or a list of such objects 
-# each data frame can have multiple rows and the union over all rows of all data frames is taken
-area.of.union <- function(spatial.polys.list){
-  if(inherits(spatial.polys.list,"SpatialPolygonsDataFrame")){
-    spatial.polys.list <- list(spatial.polys.list)
-  }
-  first.union <- T
-  for(spatial.polys.list.i in 1:length(spatial.polys.list)){
-    for(row.i in nrow(spatial.polys.list[[spatial.polys.list.i]]@data)){
-      polys <- slot(spatial.polys.list[[spatial.polys.list.i]][row.i,], "polygons")  
-      for(polys.i in 1:length(polys)){
-        polys.polys <- slot(polys[[polys.i]], "Polygons")
-        for(polys.polys.i in 1:length(polys.polys)){
-          pp.coords <- slot(polys.polys[[polys.polys.i]], "coords")
-          if(first.union){
-            result.gpc.poly <- as(pp.coords, "gpc.poly")
-            first.union <- F
-          }else{
-            result.gpc.poly <- gpclib:::union(result.gpc.poly,as(pp.coords, "gpc.poly"))
-          }
-        }
-      }
-    }
-  }
-  area.poly(result.gpc.poly)
-}
 
 if(!file.exists(paste(path.to.geatm,"zip-fraction-in-taz-matrix.Rdata",sep=''))){
   # get the data frame ready for storage of the results which will hold the fraction of each zip (the columns) by area that 
@@ -229,33 +210,7 @@ agg.taz.shp.fieldnames <- names(agg.taz.shp@data)
 save(agg.taz.shp.fieldnames,file=paste(path.to.pevi,'inputs/development/aggregated-taz-fieldnames.Rdata',sep=''))
 
 # write the data to KML file with colors related to traffic demand
-map.color <- function (x,c.map){
-  c.map[round((length(c.map)-1)*(x-min(x))/diff(range(x))+1,0)]
-}
-shp.to.kml <- function(shp,kml.filename,kmlname="KML Name", kmldescription="<i>Description</i>",borders='white',lwds=1.5,colors='red',id.col='id',name.col='id',description.cols=NA){
-  n <- length(shp@polygons)
-  if(length(colors)==1)colors <- rep(colors,n)
-  if(length(borders)==1)borders <- rep(borders,n)
-  if(length(lwds)==1)lwds <- rep(lwds,n)
-  kml.data <- sapply(slot(shp, "polygons"), function(x) { 
-    row.num = which(as.numeric(slot(x, "ID"))==shp@data[[id.col]])
-    descrip = ifelse(is.na(description.cols),'',paste(paste(description.cols,': ',shp@data[row.num,description.cols],sep=''),collapse='<br/><br/>')) 
-    kmlPolygon(x,
-      name=shp@data[[name.col]][row.num], 
-      col=colors[row.num], lwd=lwds[row.num], border=borders[row.num], 
-      description=descrip
-    )})
 
-  kmlFile <- file(kml.filename, "w")
-  cat(kmlPolygon(kmlname=kmlname, kmldescription=kmldescription)$header, 
-      file=kmlFile, sep="\n")
-  cat(unlist(kml.data["style",]), file=kmlFile, sep="\n")
-  cat(unlist(kml.data["content",]), file=kmlFile, sep="\n")
-  cat(kmlPolygon()$footer, file=kmlFile, sep="\n")
-  close(kmlFile)
-
-  system(paste('open ',kml.filename,sep=''))
-}
 
 c.map <- paste(map.color(agg.taz.shp@data$total.demand.from,blue2red(50)),'7F',sep='')
 shp.to.kml(agg.taz.shp,paste(path.to.pevi,'inputs/development/aggregated-taz.kml',sep=''),'Aggregated TAZs','Color denotes total daily demand','red',1.5,c.map,name.col='name',description.cols=names(agg.taz.shp@data))

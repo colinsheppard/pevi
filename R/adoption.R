@@ -27,6 +27,7 @@ if(!file.exists(paste(path.to.humveh,'veh.Rdata',sep=''))){
   zips <- read.csv(paste(path.to.humveh,'zipcode.csv',sep=''))
   veh$city <- zips$city[match(veh$ZIP.CODE,zips$zip)]
   veh$zip.city <- paste(veh$city,veh$ZIP.CODE,sep=' - ')
+  veh$make.model <- paste(veh$MAKE,veh$MODEL,sep=' ')
 
   save(veh,file=paste(path.to.humveh,'veh.Rdata',sep=''))
 }else{
@@ -55,15 +56,11 @@ ggplot(subset(frac.by.year,FUEL.TYPE%in%c("GAS/ELEC","ELECTRIC")),aes(x=year,y=f
 # All fuel types
 ggplot(frac.by.zip.year,aes(x=year,y=frac*100))+geom_bar(stat="identity",aes(fill=FUEL.TYPE))+facet_wrap(~zip.city)+scale_y_continuous(name="% of Vehicles Registered in ZIP")
 
-# Look at specific MODELS (too many for the bar chart to be useful)
-#frac.by.zip.year.model <- ddply(veh,.(MODEL,zip.city,year),function(df){ data.frame(FUEL.TYPE=df$FUEL.TYPE[1],frac=sum(df$COUNT,na.rm=T)/subset(tot.by.zip.year,zip.city==df$zip.city[1] & year==df$year[1],count)$count) })
-#hybrid.models<-unlist(unique(subset(veh,FUEL.TYPE=="GAS/ELEC",MODEL)))
-#ggplot(subset(frac.by.zip.year.model,FUEL.TYPE=="GAS/ELEC" & MODEL %in% hybrid.models),aes(x=year,y=frac*100))+geom_bar(stat="identity",aes(fill=MODEL))+facet_wrap(~zip.city)+scale_y_continuous(name="% of Vehicles Registered in ZIP")
-
 # Look at specific MAKES of hybrids 
-frac.by.zip.year.make <- ddply(subset(veh,FUEL.TYPE=="GAS/ELEC"),.(MAKE,zip.city,year),function(df){ data.frame(FUEL.TYPE=df$FUEL.TYPE[1],frac=sum(df$COUNT,na.rm=T)/subset(tot.by.zip.year,zip.city==df$zip.city[1] & year==df$year[1],count)$count,stringsAsFactors=F) })
+frac.by.zip.year.make <- ddply(subset(veh,FUEL.TYPE=="GAS/ELEC"),.(MAKE,zip.city,year),function(df){ data.frame(FUEL.TYPE=df$FUEL.TYPE[1],count=sum(df$COUNT,na.rm=T),frac=sum(df$COUNT,na.rm=T)/subset(tot.by.zip.year,zip.city==df$zip.city[1] & year==df$year[1],count)$count,stringsAsFactors=F) })
 hybrid.makes <- unlist(unique(subset(veh,FUEL.TYPE=="GAS/ELEC",MAKE)))
 ggplot(subset(frac.by.zip.year.make, MAKE %in% hybrid.makes),aes(x=year,y=frac*100))+geom_bar(stat="identity",aes(fill=MAKE))+facet_wrap(~zip.city)+scale_y_continuous(name="% of Vehicles Registered in ZIP")
+ggplot(subset(frac.by.zip.year.make, MAKE %in% hybrid.makes),aes(x=year,y=count))+geom_bar(stat="identity",aes(fill=MAKE))+facet_wrap(~zip.city)+scale_y_continuous(name="# Vehicles Registered in ZIP")
 
 frac.by.year.make <- ddply(subset(veh,FUEL.TYPE=="GAS/ELEC"),.(MAKE,year),function(df){ data.frame(FUEL.TYPE=df$FUEL.TYPE[1],frac=sum(df$COUNT,na.rm=T)/subset(tot.by.year,year==df$year[1],count)$count,stringsAsFactors=F) })
 ggplot(subset(frac.by.year.make, MAKE %in% hybrid.makes),aes(x=year,y=frac*100))+geom_bar(stat="identity",aes(fill=MAKE))+scale_y_continuous(name="% of Vehicles Registered in Humboldt")

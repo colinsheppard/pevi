@@ -79,6 +79,7 @@ to setup-drivers
       set electric-fuel-consumption 0.35
     ]
     set state-of-charge 1
+    set willing-to-roam-time-threshold 0.2  ;; driver is willing to roam for 20 minutes. ac 9.28
     set state "not-charging"
     set current-charger nobody
     set journey-distance 0

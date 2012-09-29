@@ -69,6 +69,8 @@ drivers-own [
   journey-charge-time-need
   full-charge-time-need
   time-until-end-charge
+  willing-to-roam-time-threshold  ;; added 9.28 ac
+  willing-to-roam?
 
 ;; TRACKING
   num-denials
@@ -117,7 +119,7 @@ to setup
 end 
 
 to go
-  dynamic-scheduler:go-until schedule 10
+  dynamic-scheduler:go-until schedule 30
 end
 
 ;;;;;;;;;;;;;;;;;;;;
@@ -129,9 +131,17 @@ to-report need-to-charge [calling-event]
   ifelse ( (calling-event = "arrive" and remaining-range < journey-distance * charge-safety-factor) or 
            (calling-event = "depart" and remaining-range < trip-distance * charge-safety-factor) )[ ; TODO add random draw here for people who charge but don't need to
     report true
+    print (word precision ticks 3 " " self " NEEDS TO CHARGE! ")
   ][
     report false
   ]
+;  ifelse ( (remaining-range < journey-distance * charge-safety-factor) or   
+;           (remaining-range < trip-distance * charge-safety-factor) )[ ; TODO add random draw here for people who charge but don't need to
+;    report true
+;  ][
+;    report false
+;  ]
+
 end
 
 ;;;;;;;;;;;;;;;;;;;;
@@ -147,24 +157,67 @@ end
 ;; SEEK CHARGER
 ;;;;;;;;;;;;;;;;;;;;
 to seek-charger
+  print (word "ENTER SEEK-CHARGER")
   print (word precision ticks 3 " " self " seek-charger ")
   set time-until-depart departure-time - ticks
-    
-  foreach [chargers-in-taz] of current-taz [
-    if [current-driver] of ? = nobody [
-      print (word precision ticks 3 " " self " found " ?)
-      ask ? [
-        set current-driver myself 
-      ]
-      set current-charger ?
-      charge-time-event-scheduler
-      stop
-    ] 
+  
+  
+  ;; submodel action 1:
+  ifelse time-until-depart < willing-to-roam-time-threshold [
+    set willing-to-roam? true
   ]
+  [
+    set willing-to-roam? false
+  ]
+    
+  ;; submodel action 2:
+  ifelse willing-to-roam? [
+      ;; driver will roam to find charger -- looks at ALL CHARGERS
+      ;; 1st -- look at chargers in current TAZ
+    foreach [chargers-in-taz] of current-taz [
+      if [current-driver] of ? = nobody [
+        print (word precision ticks 3 " " self " found " ?)
+        ask ? [
+          set current-driver myself 
+        ]
+        set current-charger ?
+        charge-time-event-scheduler
+        stop
+      ] 
+      ;; 2nd -- look at chargers en-route from current TAZ to destination TAZ
+      ;; how do we find the TAZs en-route?
+      ;; 1. what is the maximum distance the driver can travel?
+      ;; 2. current charge = ___
+      ;; 3. 
+      ;; 4. what are the TAZs the driver will travel through?
+      ;foreach [chargers-in-taz] of destination-taz [  NO -- driver cannot reach destination-taz!
+      
+      ;; 3rd -- look at all other chargers in neighboring TAZs within acceptable range
+    ]
+  ] 
+  
+  [   
+      ;; driver will NOT roam to find charger -- looks only in current TAZ
+    foreach [chargers-in-taz] of current-taz [
+      if [current-driver] of ? = nobody [
+        print (word precision ticks 3 " " self " found " ?)
+        ask ? [
+          set current-driver myself 
+        ]
+        set current-charger ?
+        charge-time-event-scheduler
+        stop
+      ] 
+    ]                        
+  ]
+    
+    
+
   if current-charger = nobody [  
     print (word precision ticks 3 " " self " no charger found ") 
     wait-time-event-scheduler  
   ]
+  print (word "EXIT SEEK-CHARGER")
 end
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; WAIT TIME EVENT SCHEDULER
@@ -189,7 +242,7 @@ end
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 to charge-time-event-scheduler
   set state "charging"
-  set charger-in-origin-or-destination true  ; TODO this needs to be updated once en-route/neighbor charging is impelemented
+  set charger-in-origin-or-destination true  ; TODO this needs to be updated once en-route/neighbor charging is implemented
   set trip-charge-time-need max sentence 0 ((trip-distance * charge-safety-factor * electric-fuel-consumption - state-of-charge * battery-capacity) / [charge-rate] of current-charger)
   set journey-charge-time-need max sentence 0 ((journey-distance * charge-safety-factor * electric-fuel-consumption - state-of-charge * battery-capacity) / [charge-rate] of current-charger)
   set full-charge-time-need (1 - state-of-charge) * battery-capacity / [charge-rate] of current-charger
@@ -212,6 +265,7 @@ to charge-time-event-scheduler
     ]
   ]
   ifelse [charger-type] of current-charger < 3 and time-until-end-charge < trip-charge-time-need [
+    print (word "time-until-end-charge: " time-until-end-charge ", trip-charge-time-need: " trip-charge-time-need ", time-until-depart: " time-until-depart)
     dynamic-scheduler:add schedule self task retry-seek ticks + min (sentence wait-time-mean (time-until-depart - 0.5));; TODO make wait-time-mean random draw with max of time-until-depart - 0.5
     print (word precision ticks 3 " " self " charging for min of " wait-time-mean " and " precision (time-until-depart - 0.5) 3)
   ][
@@ -231,13 +285,13 @@ end
 ;;;;;;;;;;;;;;;;;;;;;;;;;
 
 to change-depart-time [new-depart-time]
-  print (word "ENTER CHANGE-DEPART-TIME")
+  ;print (word "ENTER CHANGE-DEPART-TIME")
   set itin-depart replace-item current-itin-row itin-depart new-depart-time
   print (word precision ticks 3 " " self " new-depart-time: " new-depart-time " new itin-depart: " itin-depart)      
   if current-itin-row < (length itin-depart - 1)[
     foreach n-values (length itin-depart - current-itin-row - 1) [current-itin-row + ? + 1] [ change-depart-time-row ?  ]
   ]
-    print (word "EXIT CHANGE-DEPART-TIME")
+  ;print (word "EXIT CHANGE-DEPART-TIME")
 end
 
 to change-depart-time-row [row-num]
@@ -263,16 +317,15 @@ end
 to itinerary-event-scheduler
   set state "not-charging"
   if (departure-time < ticks)[ 
-    print (word "ENTER UPDATE-EVENT-ITINERARY (change depart)")
-    print (word precision ticks 3 " " self " need to change old departure time:" item (current-itin-row - 1) itin-depart " to new depart time (now):" ticks)
+    ;print (word "ENTER UPDATE-EVENT-SCHEDULER (schedule depart)")
+    ;print (word precision ticks 3 " " self " need to change old departure time:" item (current-itin-row - 1) itin-depart " to new depart time (now):" ticks)
     print (word precision ticks 3 " " self " old itinerary:" itin-depart)      
     change-depart-time ticks  
     set departure-time item current-itin-row itin-depart
-    print (word precision ticks 3 " " self " need to change depart time to: " precision departure-time 3)
+    ; print (word precision ticks 3 " " self " need to change depart time to: " precision departure-time 3)
     print (word precision ticks 3 " " self " new itinerary:" itin-depart)
-    print (word "EXIT UPDATE-EVENT-ITINERARY (change depart)")
-  ]  ; TODO this should actually involve changing the itinerary
-     ; DONE ac 9.27
+    ;print (word "EXIT UPDATE-EVENT-SCHEDULER (schedule depart)")
+  ]  
   
   dynamic-scheduler:add schedule self task depart departure-time
 end
@@ -282,15 +335,20 @@ end
 ;;;;;;;;;;;;;;;;;;;;
 to depart
   print (word precision ticks 3 " " self " departing, soc:" state-of-charge)
-  print (word precision ticks 3 " " self " itinerary (upon departure):" itin-depart)
-  ifelse need-to-charge "depart" [
+  ;print (word precision ticks 3 " " self " itinerary (upon departure):" itin-depart)
+  ifelse need-to-charge "depart" [  ;; do drivers need to seek charge upon departing?
+                                    ;; --> does the driver have enough charge to travel the next leg of the journey? (trip-distance of journey-distance)
+                                    ;; shouldn't this be executed alongside the check for ample charge to complete journey-distance?
+                                    ;; otherwise, the driver may need to alter the itinerary because he checks his charge upon departure
     ifelse state-of-charge = 1 [ 
       print (word precision ticks 3 " " self " cannot make trip with full battery") ;; TODO this shouldn't happen when PHEV are implemented
     ][
-      seek-charger
+      seek-charger   
     ]
-  ][
-    travel-time-event-scheduler
+  ]
+  [  
+    travel-time-event-scheduler  ;; schedules next arrival to occur
+    ;print (word precision ticks 3 " " self " next arrival time: " precision arrival-time 3)
   ]
 end
 
@@ -299,9 +357,12 @@ end
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 to travel-time-event-scheduler
   set state "traveling"
+  ;print (word "ENTER TRAVEL-TIME-EVENT-SCHEDULER (schedule arrive)")
   set trip-time item my-od-index od-time
   set arrival-time (ticks + trip-time)
   dynamic-scheduler:add schedule self task arrive arrival-time
+  print (word "next arrival time: " precision arrival-time 3)
+  ;print (word "EXIT TRAVEL-TIME-EVENT-SCHEDULER (schedule arrive)")
 end
 
 ;;;;;;;;;;;;;;;;;;;;
@@ -316,19 +377,23 @@ to arrive
     
   if not itin-complete? [
 
-    print (word precision ticks 3 " " self " next departure time: " precision departure-time 3)
-    print (word precision ticks 3 " " self " itinerary:" itin-depart)
-    itinerary-event-scheduler
+    itinerary-event-scheduler  ;; schedules next departure to occur
+    ;print (word precision ticks 3 " " self " next departure time: " precision departure-time 3)
+    ;print (word precision ticks 3 " " self " itinerary:" itin-depart)
     
-    ifelse need-to-charge "arrive" [
+    if need-to-charge "arrive" [   ;; removed "else"
       ifelse state-of-charge = 1 [ 
         print (word precision ticks 3 " " self " cannot make trip with full battery") ;; TODO this shouldn't happen when PHEV are implemented
       ][
-        seek-charger
+        seek-charger  ;; TODO need to re-schedule departure if schedule is delayed by seeking a charger. ac 9.28
       ]
-    ][
-      travel-time-event-scheduler
     ]
+    
+    
+    ;[  ;; don't need to schedule next ARRIVAL here -- schedule this in DEPART routine
+    ;  travel-time-event-scheduler
+    ;  print (word precision ticks 3 " " self " next arrival time: " precision arrival-time 3)
+    ;]
   ]
 
 end
@@ -364,69 +429,6 @@ to-report driver-soc [the-driver]
   report [state-of-charge] of the-driver
 end
 
-;DECISION; check-charge:
-;;         ***assumes itinerary is never complete**
-;;         -- Is ChargeRange sufficient?
-;;            Executes check-charge submodel, Section 5.5
-;;            -- YES (include random yes) = goto STATE traveling
-;;            -- NO = goto DECISION seek-charger
-
-;DECISION; seek-charger:
-;;         -- see submodel, Section 5.6
-;;         -- NotFound? 
-;;            -- goto STATE not-charging, request wait-time
-;;         -- Found?
-;;            -- goto STATE charging, request ChargeTime
-
-
-;EventScheduler; itinerary:
-;;               -- see submodel, Section 5.1
-;;               -- schedule depart
-
-;EventScheduler; wait-time:
-;;               -- see submodel, Section 5.2
-;;               -- schedule [a time in the future to either] depart -OR- retry-seek
-;;                                                            (needs to be dummy variable)
-
-;STATE; not-charging:
-;; This will be the state that all drivers enter when parked -- waiting for a charging station, or to depart..
-;;      -- if came from STATE traveling -OR- charging:
-;;         -- enter EventScheduler itinerary:
-;;           -- add itinerary step
-;;           -- wait, then depart -> send to DECISION check-charge
-;;      -- if came from DECISION seek-charger:
-;;         -- enter EventScheduler wait-time:
-;;           -- either depart or retry-seek (in wait-time)
-;;           -- depart ;;;;-> send to DECISION check-charge
-;;           -- retry-seek -> send to DECISION seek-charger
-;;      -- if INITIALIZING, send to EventScheduler itinerary
-;;         -- send to depart
-
-
-;EventScheduler; ChargeTime:
-;;               -- see submodel, Section 5.4
-;;               -- schedule end-charge 
-
-;STATE; charging:
-;;      -- goto EventScheduler ChargeTime
-;;      -- execute charging algorithm
-;;         -- will they always charge to a "full" battery, or disengage prematurely?
-;;      -- upon end-charge, enter STATE not-charging
-
-
-;EventScheduler; TravelTime:
-;;               -- see submodel, Section 5.3
-;;               -- schedule event arrive
-
-;STATE; traveling:
-;;      -- execute EventScheduler TravelTime 
-;;      -- upon arrive, enter STATE not-charging
-
-
-
-;;in GO:
-;;   -- initialize itinerary
-;;   -- send to not-charging
 @#$#@#$#@
 GRAPHICS-WINDOW
 375

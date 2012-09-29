@@ -117,7 +117,7 @@ to setup
 end 
 
 to go
-  dynamic-scheduler:go-until schedule 10
+  dynamic-scheduler:go-until schedule 8.9
 end
 
 ;;;;;;;;;;;;;;;;;;;;
@@ -262,7 +262,18 @@ end
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 to itinerary-event-scheduler
   set state "not-charging"
-  ;if (departure-time < ticks)[ set departure-time ticks ]  ; TODO this should actually involve changing the itinerary
+  if (departure-time < ticks)[ 
+    print (word "ENTER UPDATE-EVENT-ITINERARY (change depart)")
+    print (word precision ticks 3 " " self " need to change old departure time:" item (current-itin-row - 1) itin-depart " to new depart time (now):" ticks)
+    print (word precision ticks 3 " " self " old itinerary:" itin-depart)      
+    change-depart-time ticks  
+    set departure-time item current-itin-row itin-depart
+    print (word precision ticks 3 " " self " need to change depart time to: " precision departure-time 3)
+    print (word precision ticks 3 " " self " new itinerary:" itin-depart)
+    print (word "EXIT UPDATE-EVENT-ITINERARY (change depart)")
+  ]  ; TODO this should actually involve changing the itinerary
+     ; DONE ac 9.27
+  
   dynamic-scheduler:add schedule self task depart departure-time
 end
 
@@ -305,9 +316,9 @@ to arrive
     
   if not itin-complete? [
 
+    itinerary-event-scheduler
     print (word precision ticks 3 " " self " next departure time: " precision departure-time 3)
     print (word precision ticks 3 " " self " itinerary:" itin-depart)
-    itinerary-event-scheduler
     
     ifelse need-to-charge "arrive" [
       ifelse state-of-charge = 1 [ 
@@ -327,32 +338,11 @@ end
 ;;;;;;;;;;;;;;;;;;;;
 to update-itinerary
   ifelse (current-itin-row + 1 < length itin-from) [
-    ifelse ((item (current-itin-row + 1) itin-depart) < ticks) [  ;;; work in progress. driver 7 should fall into the 
-      print (word "ENTER UPDATE-ITINERARY (change depart)")
-      print (word precision ticks 3 " " self " need to change old departure time:" item (current-itin-row + 1) itin-depart " to new depart time (now):" ticks)
-      print (word precision ticks 3 " " self " old itinerary:" itin-depart)      
-      set current-itin-row (current-itin-row + 1)                   ;;; first category, but is not.  ac 9.26
-      set current-taz node item current-itin-row itin-from
-      set destination-taz node item current-itin-row itin-to
-      change-depart-time ticks  
-      set departure-time item current-itin-row itin-depart
-      print (word precision ticks 3 " " self " need to change depart time to: " precision departure-time 3)
-      print (word precision ticks 3 " " self " new itinerary:" itin-depart)
-      set trip-distance item my-od-index od-dist
-      print (word "EXIT UPDATE-ITINERARY (change depart)")
-    ] 
-    [
-      set current-itin-row current-itin-row + 1
-      set current-taz node item current-itin-row itin-from
-      set destination-taz node item current-itin-row itin-to
-      set departure-time item current-itin-row itin-depart
-      set trip-distance item my-od-index od-dist
-    ]
-    ;set current-itin-row current-itin-row + 1
-    ;set current-taz node item current-itin-row itin-from
-    ;set destination-taz node item current-itin-row itin-to
-    ;set departure-time item current-itin-row itin-depart
-    ;set trip-distance item my-od-index od-dist
+    set current-itin-row current-itin-row + 1
+    set current-taz node item current-itin-row itin-from
+    set destination-taz node item current-itin-row itin-to
+    set departure-time item current-itin-row itin-depart
+    set trip-distance item my-od-index od-dist
   ]
   [
     set itin-complete? true

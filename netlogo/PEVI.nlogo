@@ -247,19 +247,24 @@ to charge-time-event-scheduler
   set trip-charge-time-need max sentence 0 ((trip-distance * charge-safety-factor * electric-fuel-consumption - state-of-charge * battery-capacity) / [charge-rate] of current-charger)
   set journey-charge-time-need max sentence 0 ((journey-distance * charge-safety-factor * electric-fuel-consumption - state-of-charge * battery-capacity) / [charge-rate] of current-charger)
   set full-charge-time-need (1 - state-of-charge) * battery-capacity / [charge-rate] of current-charger
-  ifelse full-charge-time-need < trip-charge-time-need [
+  ifelse full-charge-time-need < trip-charge-time-need [  ;; if sufficent time to charge to full
     set time-until-end-charge full-charge-time-need
-  ][
-    ifelse time-until-depart < trip-charge-time-need[
+  ]
+  [                                                      ;; not sufficient time to charge to full
+    ifelse time-until-depart < trip-charge-time-need [   ;; if sufficient time to charge to reach next destination
       set time-until-end-charge trip-charge-time-need
       change-depart-time time-until-end-charge
-    ][
-      ifelse charger-in-origin-or-destination[
+    ]
+    [                                                    ;; not sufficient time to charge to reach next destination
+      ifelse charger-in-origin-or-destination [
         set time-until-end-charge min sentence time-until-depart full-charge-time-need 
-      ][
-        ifelse [charger-type] of current-charger = 3[
+        change-depart-time time-until-end-charge
+      ]
+      [
+        ifelse [charger-type] of current-charger = 3 [
           set time-until-end-charge min sentence time-until-depart journey-charge-time-need
-        ][
+        ]
+        [
           set time-until-end-charge min sentence time-until-depart trip-charge-time-need
         ]
       ]
@@ -317,18 +322,18 @@ end
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 to itinerary-event-scheduler
   set state "not-charging"
-  if (departure-time < ticks)[    ;; no longer necessary? depart-time is "corrected" in UPDATE-ITINERARY
+  ;if (departure-time < ticks)[    ;; no longer necessary? depart-time is "corrected" in UPDATE-ITINERARY
                                    ;; it's possible the departure time will need to be "corrected" again if the driver
                                    ;; has had to wait a long time for a charger.
   ;  print (word "ENTER ITINERARY-EVENT-SCHEDULER (schedule depart)")
   ;  print (word precision ticks 3 " " self " need to change old departure time:" item (current-itin-row - 1) itin-depart " to new depart time (now):" ticks)
   ;  print (word precision ticks 3 " " self " old itinerary:" itin-depart)      
-    change-depart-time ticks  
-    set departure-time item current-itin-row itin-depart
+  ;  change-depart-time ticks  
+  ;  set departure-time item current-itin-row itin-depart
   ;  ; print (word precision ticks 3 " " self " need to change depart time to: " precision departure-time 3)
-    print (word precision ticks 3 " " self " new itinerary:" itin-depart)
+  ;  print (word precision ticks 3 " " self " new itinerary:" itin-depart)
   ;  print (word "EXIT ITINERARY-EVENT-SCHEDULER (schedule depart)")
-  ]  
+  ;]  
   
   dynamic-scheduler:add schedule self task depart departure-time
 end

@@ -12,6 +12,12 @@ globals [
   
   schedule  ;; this global variable holds the dynamic schedule for the PEVI program, appended by the drivers from their itineraries
   
+;; FILE PATHS
+  parameter-file
+  charger-input-file
+  driver-input-file
+  od-input-file
+  
 ;; PARAMETERS
   charge-safety-factor
   wait-time-mean
@@ -108,9 +114,9 @@ to setup
   set schedule dynamic-scheduler:create
    
   create-turtles 1 [ setxy 0 0 set color black] ;This invisible turtle makes sure we start at node 1 not node 0
-  set n-nodes 5 ; TODO, infer this from the od input file
-  set charge-safety-factor 1.1
-  set wait-time-mean 0.5
+  
+  set parameter-file "params.txt"
+  read-parameter-file
   
   setup-od-data
   setup-nodes
@@ -464,17 +470,6 @@ ticks
 30.0
 
 INPUTBOX
-836
-30
-1071
-90
-alternative-input-file
-../inputs/alternative_4_5.txt
-1
-0
-String
-
-INPUTBOX
 26
 45
 129
@@ -529,17 +524,6 @@ fuel-economy-range
 0
 Number
 
-INPUTBOX
-785
-97
-1099
-157
-driver-input-file
-../../../pev-shared/data/inputs/p1r1_5.txt
-1
-0
-String
-
 BUTTON
 145
 41
@@ -573,17 +557,6 @@ NIL
 NIL
 NIL
 1
-
-INPUTBOX
-786
-167
-1101
-227
-od-input-file
-../../../pev-shared/data/inputs/OD_Matrix_5.txt
-1
-0
-String
 
 @#$#@#$#@
 ## ## WHAT IS IT?

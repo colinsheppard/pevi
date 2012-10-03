@@ -149,7 +149,7 @@ end
 ;;;;;;;;;;;;;;;;;;;;
 to retry-seek
   print (word precision ticks 3 " " self " retry-seek ")
-  set time-until-depart departure-time - ticks
+  set time-until-depart departure-time - ticks  ;; this must be the "correct" departure time -- adjusted if necessary
   seek-charger
 end
 
@@ -187,6 +187,7 @@ to seek-charger
       ;; 2nd -- look at chargers en-route from current TAZ to destination TAZ
       ;; how do we find the TAZs en-route?
       ;; 1. what is the maximum distance the driver can travel?
+      ;; = trip-distance, set in UPDATE-ITINERARY, executed in ARRIVE
       ;; 2. current charge = ___
       ;; 3. 
       ;; 4. what are the TAZs the driver will travel through?
@@ -195,7 +196,6 @@ to seek-charger
       ;; 3rd -- look at all other chargers in neighboring TAZs within acceptable range
     ]
   ] 
-  
   [   
       ;; driver will NOT roam to find charger -- looks only in current TAZ
     foreach [chargers-in-taz] of current-taz [
@@ -206,18 +206,18 @@ to seek-charger
         ]
         set current-charger ?
         charge-time-event-scheduler
+
+        print (word "EXIT SEEK-CHARGER")
         stop
       ] 
     ]                        
   ]
     
-    
-
   if current-charger = nobody [  
     print (word precision ticks 3 " " self " no charger found ") 
     wait-time-event-scheduler  
   ]
-  print (word "EXIT SEEK-CHARGER")
+
 end
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; WAIT TIME EVENT SCHEDULER
@@ -230,7 +230,8 @@ to wait-time-event-scheduler
     dynamic-scheduler:add schedule self task retry-seek ticks + wait-time-mean ;; TODO make wait-time-mean random draw
   ][
     ifelse remaining-range / charge-safety-factor >= journey-distance or time-until-depart <= 1 [
-      dynamic-scheduler:add schedule self task depart time-until-depart
+      print (word precision ticks 3 " " self " in wait-time-event-sched, deciding to depart at time " (ticks + time-until-depart))
+      dynamic-scheduler:add schedule self task depart (ticks + time-until-depart)
     ][
       dynamic-scheduler:add schedule self task retry-seek ticks + wait-time-mean ;; TODO make wait-time-mean random draw
     ]
@@ -316,15 +317,17 @@ end
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 to itinerary-event-scheduler
   set state "not-charging"
-  if (departure-time < ticks)[ 
-    ;print (word "ENTER UPDATE-EVENT-SCHEDULER (schedule depart)")
-    ;print (word precision ticks 3 " " self " need to change old departure time:" item (current-itin-row - 1) itin-depart " to new depart time (now):" ticks)
-    print (word precision ticks 3 " " self " old itinerary:" itin-depart)      
+  if (departure-time < ticks)[    ;; no longer necessary? depart-time is "corrected" in UPDATE-ITINERARY
+                                   ;; it's possible the departure time will need to be "corrected" again if the driver
+                                   ;; has had to wait a long time for a charger.
+  ;  print (word "ENTER ITINERARY-EVENT-SCHEDULER (schedule depart)")
+  ;  print (word precision ticks 3 " " self " need to change old departure time:" item (current-itin-row - 1) itin-depart " to new depart time (now):" ticks)
+  ;  print (word precision ticks 3 " " self " old itinerary:" itin-depart)      
     change-depart-time ticks  
     set departure-time item current-itin-row itin-depart
-    ; print (word precision ticks 3 " " self " need to change depart time to: " precision departure-time 3)
+  ;  ; print (word precision ticks 3 " " self " need to change depart time to: " precision departure-time 3)
     print (word precision ticks 3 " " self " new itinerary:" itin-depart)
-    ;print (word "EXIT UPDATE-EVENT-SCHEDULER (schedule depart)")
+  ;  print (word "EXIT ITINERARY-EVENT-SCHEDULER (schedule depart)")
   ]  
   
   dynamic-scheduler:add schedule self task depart departure-time
@@ -372,28 +375,21 @@ to arrive
   set state-of-charge (state-of-charge - trip-distance * electric-fuel-consumption / battery-capacity)
   set journey-distance journey-distance - trip-distance
   print (word precision ticks 3 " " self " arriving, trip-distance: " trip-distance " soc:" state-of-charge " elec-fc:" electric-fuel-consumption " cap" battery-capacity)
-  update-itinerary
-  
-    
+  update-itinerary 
+      
   if not itin-complete? [
-
-    itinerary-event-scheduler  ;; schedules next departure to occur
-    ;print (word precision ticks 3 " " self " next departure time: " precision departure-time 3)
-    ;print (word precision ticks 3 " " self " itinerary:" itin-depart)
-    
-    if need-to-charge "arrive" [   ;; removed "else"
+   
+    ifelse need-to-charge "arrive" [   ;; if CHARGE NEEDED, seek-charger
       ifelse state-of-charge = 1 [ 
         print (word precision ticks 3 " " self " cannot make trip with full battery") ;; TODO this shouldn't happen when PHEV are implemented
-      ][
+      ]
+      [
         seek-charger  ;; TODO need to re-schedule departure if schedule is delayed by seeking a charger. ac 9.28
       ]
     ]
-    
-    
-    ;[  ;; don't need to schedule next ARRIVAL here -- schedule this in DEPART routine
-    ;  travel-time-event-scheduler
-    ;  print (word precision ticks 3 " " self " next arrival time: " precision arrival-time 3)
-    ;]
+    [
+      itinerary-event-scheduler  ;; if NO CHARGE NEEDED, schedules next departure to occur     
+    ]
   ]
 
 end
@@ -406,6 +402,12 @@ to update-itinerary
     set current-itin-row current-itin-row + 1
     set current-taz node item current-itin-row itin-from
     set destination-taz node item current-itin-row itin-to
+    if ((item current-itin-row itin-depart) < ticks)[
+      print (word precision ticks 3 " " self " need to change old departure time:" item (current-itin-row - 1) itin-depart " to new depart time (now):" ticks)
+      print (word precision ticks 3 " " self " old itinerary:" itin-depart)      
+      change-depart-time ticks  
+      print (word precision ticks 3 " " self " new itinerary:" itin-depart)
+    ]
     set departure-time item current-itin-row itin-depart
     set trip-distance item my-od-index od-dist
   ]
@@ -428,7 +430,6 @@ end
 to-report driver-soc [the-driver]
   report [state-of-charge] of the-driver
 end
-
 @#$#@#$#@
 GRAPHICS-WINDOW
 375
@@ -524,12 +525,12 @@ fuel-economy-range
 Number
 
 INPUTBOX
-837
+785
 97
-1072
+1099
 157
 driver-input-file
-../inputs/p1r1_5.txt
+../../../pev-shared/data/inputs/p1r1_5.txt
 1
 0
 String
@@ -569,12 +570,12 @@ NIL
 1
 
 INPUTBOX
-837
+786
 167
-1072
+1101
 227
 od-input-file
-../inputs/OD_Matrix_5.txt
+../../../pev-shared/data/inputs/OD_Matrix_5.txt
 1
 0
 String

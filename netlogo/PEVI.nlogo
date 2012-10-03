@@ -155,7 +155,8 @@ end
 ;;;;;;;;;;;;;;;;;;;;
 to retry-seek
   print (word precision ticks 3 " " self " retry-seek ")
-  set time-until-depart departure-time - ticks  ;; this must be the "correct" departure time -- adjusted if necessary
+  ;;set time-until-depart departure-time - ticks  ;; this must be the "correct" departure time -- adjusted if necessary
+  ;; not necessary here -- immediately executes this command in seek-charger
   seek-charger
 end
 
@@ -245,7 +246,9 @@ to wait-time-event-scheduler
 end
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-;; CHARGE TIME EVENT SCHEDULER
+;; CHARGE TIME EVENT SCHEDULER   
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;; time-until-depart set in SEEK CHARGER = departure-time - ticks
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 to charge-time-event-scheduler
   set state "charging"
@@ -259,18 +262,18 @@ to charge-time-event-scheduler
   [                                                      ;; not sufficient time to charge to full
     ifelse time-until-depart < trip-charge-time-need [   ;; if sufficient time to charge to reach next destination
       set time-until-end-charge trip-charge-time-need
-      change-depart-time time-until-end-charge
+      change-depart-time (time-until-end-charge + ticks)
     ]
     [                                                    ;; not sufficient time to charge to reach next destination
-      ifelse charger-in-origin-or-destination [
+      ifelse charger-in-origin-or-destination [          ;; TRUE right now -- charger is in origin
         set time-until-end-charge min sentence time-until-depart full-charge-time-need 
-        change-depart-time time-until-end-charge
+        change-depart-time (time-until-end-charge + ticks)
       ]
-      [
-        ifelse [charger-type] of current-charger = 3 [
+      [                                                  ;; NOT in od -- en-route?
+        ifelse [charger-type] of current-charger = 3 [   ;; charge for full journey
           set time-until-end-charge min sentence time-until-depart journey-charge-time-need
         ]
-        [
+        [                                                ;; only charge what you need
           set time-until-end-charge min sentence time-until-depart trip-charge-time-need
         ]
       ]
@@ -320,7 +323,13 @@ to end-charge
   print (word precision ticks 3 " " self " ending charge soc:" precision state-of-charge 3)
   ask current-charger [ set current-driver nobody ]
   set current-charger nobody
+  if (departure-time < ticks)[  ;; added 10.2 ac
+    change-depart-time ticks
+    set departure-time item current-itin-row itin-depart
+  ]
+  print (word "CHANGED DEPART TIME AT END-CHARGE")
   itinerary-event-scheduler
+  print (word precision ticks 3 " " self " new itinerary (end-charge): " itin-depart)
 end
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;

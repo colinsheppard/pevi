@@ -125,7 +125,7 @@ to setup
 end 
 
 to go
-  dynamic-scheduler:go-until schedule 10
+  dynamic-scheduler:go-until schedule 24
 end
 
 ;;;;;;;;;;;;;;;;;;;;
@@ -155,8 +155,12 @@ end
 ;;;;;;;;;;;;;;;;;;;;
 to retry-seek
   print (word precision ticks 3 " " self " retry-seek ")
-  ;;set time-until-depart departure-time - ticks  ;; this must be the "correct" departure time -- adjusted if necessary
-  ;; not necessary here -- immediately executes this command in seek-charger
+
+  if (departure-time < ticks)[  
+    change-depart-time ticks
+  ] 
+  print (word "IN RETRY-SEEK")
+  print (word precision ticks 3 " " self " depature-time: " departure-time " itin: " itin-depart)
   seek-charger
 end
 
@@ -170,7 +174,7 @@ to seek-charger
   
   
   ;; submodel action 1:
-  ifelse time-until-depart < willing-to-roam-time-threshold [
+  ifelse time-until-depart > willing-to-roam-time-threshold [  
     set willing-to-roam? true
   ]
   [
@@ -229,6 +233,8 @@ end
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; WAIT TIME EVENT SCHEDULER
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;; wait-time-mean set in params.txt
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 to wait-time-event-scheduler
   print (word precision ticks 3 " " self " wait-time-event-scheduler remaining-range:" remaining-range 
     " trip-distance:" trip-distance " time-until-depart:" time-until-depart)
@@ -236,9 +242,10 @@ to wait-time-event-scheduler
   ifelse remaining-range / charge-safety-factor < trip-distance [
     dynamic-scheduler:add schedule self task retry-seek ticks + wait-time-mean ;; TODO make wait-time-mean random draw
   ][
-    ifelse remaining-range / charge-safety-factor >= journey-distance or time-until-depart <= 1 [
+    ifelse remaining-range / charge-safety-factor >= journey-distance or departure-time <= ticks [   ;time-until-depart <= 1 [
+      change-depart-time (time-until-depart + ticks)
       print (word precision ticks 3 " " self " in wait-time-event-sched, deciding to depart at time " (ticks + time-until-depart))
-      dynamic-scheduler:add schedule self task depart (ticks + time-until-depart)
+      dynamic-scheduler:add schedule self task depart departure-time
       print (word "in WAIT-TIME-EVENT-SCHED")
       print (word precision ticks 3 " " self " departure scheduled: " departure-time " itin: " itin-depart)
   
@@ -262,54 +269,71 @@ to charge-time-event-scheduler
   ifelse full-charge-time-need < trip-charge-time-need [  ;; if sufficent time to charge to full
     set time-until-end-charge full-charge-time-need
   ]
-  [                                                      ;; not sufficient time to charge to full
-    ifelse time-until-depart < trip-charge-time-need [   ;; if NOT sufficient time to charge to reach next destination
-      set time-until-end-charge trip-charge-time-need    ;; -->
-                                                         ;; WILL need to update departure time
-      print (word precision ticks 3 " " self " old itinerary (pre end-charge): " itin-depart)
-      change-depart-time (time-until-end-charge + ticks)
-      print (word precision ticks 3 " " self " new itinerary (pre end-charge): " itin-depart)
-      print (word precision ticks 3 " ticks: " ticks " + time-until-end-charge: " time-until-end-charge " = " (time-until-end-charge + ticks))
+  [                                                      
+    ifelse time-until-depart < trip-charge-time-need [   ;; NOT SUFFICIENT TIME FOR NEXT TRIP - delay sched to allow for charging
+      set time-until-end-charge trip-charge-time-need    
+      ;change-depart-time (time-until-end-charge + ticks)
     ]
-    [                                                    ;; sufficient time to charge to before next departure
-                                                         ;;
-                                                         ;; don't need to update departure time
-      ifelse charger-in-origin-or-destination [          ;; TRUE right now -- charger is in origin
+    [                                                    ;; SUFFICIENT TIME - 
+      ifelse charger-in-origin-or-destination [          ;; charge to full if enough time @ home/work
         set time-until-end-charge min sentence time-until-depart full-charge-time-need 
-        
-        ;print (word precision ticks 3 " " self " old itinerary (pre end-charge): " itin-depart)
-        ;change-depart-time (time-until-end-charge + ticks)
-        ;print (word precision ticks 3 " " self " new itinerary (pre end-charge): " itin-depart)
-        ;print (word precision ticks 3 " ticks: " ticks " + time-until-end-charge: " time-until-end-charge " = " (time-until-end-charge + ticks))      
-      ]
-      [                                                  ;; NOT in od -- en-route?
-        ifelse [charger-type] of current-charger = 3 [   ;; charge for full journey
+       ]
+      [                                                  
+        ifelse [charger-type] of current-charger = 3 [   
           set time-until-end-charge min sentence time-until-depart journey-charge-time-need
         ]
-        [                                                ;; only charge what you need
+        [                                                
           set time-until-end-charge min sentence time-until-depart trip-charge-time-need
         ]
       ]
     ]
   ]
-  
   print (word precision ticks 3 " " self " charger-type = " [charger-type] of current-charger)
-  ;; if change-depart here?
-  ifelse [charger-type] of current-charger < 3 and time-until-end-charge < trip-charge-time-need [
+
+  ifelse [charger-type] of current-charger < 3 and time-until-end-charge < trip-charge-time-need [  ;; charger = 1 or 2
+                                                                                                    ;; AND spare time
     print (word "time-until-end-charge: " time-until-end-charge ", trip-charge-time-need: " trip-charge-time-need ", time-until-depart: " time-until-depart)
-    dynamic-scheduler:add schedule self task retry-seek ticks + min (sentence wait-time-mean (time-until-depart - 0.5));; TODO make wait-time-mean random draw with max of time-until-depart - 0.5
-    print (word precision ticks 3 " " self " retry seek in min of " wait-time-mean " and " precision (time-until-depart - 0.5) 3)
+ 
+    ifelse time-until-depart >= 0.5 [
+      dynamic-scheduler:add schedule self task retry-seek ticks + min (sentence wait-time-mean (time-until-depart - 0.5));; TODO make wait-time-mean random draw with max of time-until-depart - 0.5      
+      print (word precision ticks 3 " " self " retry seek in min of " wait-time-mean " and " precision (time-until-depart - 0.5) 3)    ]
+    [
+      dynamic-scheduler:add schedule self task retry-seek ticks + wait-time-mean ;; TODO make wait-time-mean random draw with max of time-until-depart - 0.5
+    ]
   ]
   [
-    ifelse [charger-type] of current-charger < 2 and time-until-end-charge < journey-charge-time-need [
-      dynamic-scheduler:add schedule self task end-charge ticks + min (sentence wait-time-mean (time-until-depart - 0.5))
-      print (word precision ticks 3 " " self " charging for min of " wait-time-mean " and " precision (time-until-depart - 0.5) 3)
+    ifelse [charger-type] of current-charger < 2 and time-until-end-charge < journey-charge-time-need [  ;; charger = 1
+                                                                                                         ;; if only lvl 1 charger available,
+                                                                                                         ;; 
+
+      ifelse time-until-depart >= 0.5 [
+        set time-until-end-charge min (sentence wait-time-mean (time-until-depart - 0.5))     ;; or abs(time-until-depart - 0.5)                                                                                                   
+      ]
+      [
+        set time-until-end-charge wait-time-mean
+      ]
+      print (word precision ticks 3 " " self " charging for " precision time-until-end-charge 3)
+      if (time-until-end-charge + ticks) > departure-time [
+        change-depart-time (time-until-end-charge + ticks)
+      ]
+      print (word precision ticks 3 " " self " end charge will be at: " (ticks + time-until-end-charge))
+      print (word precision ticks 3 " " self " itin: " itin-depart)
+      dynamic-scheduler:add schedule self task end-charge ticks + time-until-end-charge
+
     ]
     [
-      dynamic-scheduler:add schedule self task end-charge ticks + time-until-end-charge
       print (word precision ticks 3 " " self " charging for " precision time-until-end-charge 3)
+      if (time-until-end-charge + ticks) > departure-time [
+        change-depart-time (time-until-end-charge + ticks)
+      ]
+      dynamic-scheduler:add schedule self task end-charge ticks + time-until-end-charge             ;; charger = 3
+
     ]
   ]
+
+  
+  print (word precision ticks 3 " " self " itin after determining charge time: " itin-depart)
+   
   
 end
 
@@ -318,13 +342,12 @@ end
 ;;;;;;;;;;;;;;;;;;;;;;;;;
 
 to change-depart-time [new-depart-time]
-  ;print (word "ENTER CHANGE-DEPART-TIME")
   set itin-depart replace-item current-itin-row itin-depart new-depart-time
   print (word precision ticks 3 " " self " new-depart-time: " new-depart-time " new itin-depart: " itin-depart)      
   if current-itin-row < (length itin-depart - 1)[
     foreach n-values (length itin-depart - current-itin-row - 1) [current-itin-row + ? + 1] [ change-depart-time-row ?  ]
   ]
-  ;print (word "EXIT CHANGE-DEPART-TIME")
+  set departure-time new-depart-time
 end
 
 to change-depart-time-row [row-num]
@@ -337,20 +360,12 @@ end
 ;; END CHARGE
 ;;;;;;;;;;;;;;;;;;;;
 
-  ;; AC doing work here on 10.2 --> need to look into the effect of changing departure time upon end-charge.
-                                   ;previous change-depart only changes the depart time BEFORE retry-seek executed.
-                                   ;need to also account for multiple retry-seeks, and then an update of change-depart, if necessary
-
 to end-charge
   set state-of-charge (state-of-charge + time-until-end-charge * [charge-rate] of current-charger / battery-capacity)
   print (word precision ticks 3 " " self " ending charge soc:" precision state-of-charge 3)
   ask current-charger [ set current-driver nobody ]
   set current-charger nobody
-  ;if (departure-time < ticks)[  ;; added 10.2 ac
-  ;  change-depart-time ticks
-  ;  set departure-time item current-itin-row itin-depart
-  ;]
-  ;print (word "CHANGED DEPART TIME AT END-CHARGE")
+
   itinerary-event-scheduler
   print (word precision ticks 3 " " self " new itinerary (end-charge): " itin-depart)
 end
@@ -360,22 +375,10 @@ end
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 to itinerary-event-scheduler
   set state "not-charging"
-  ;if (departure-time < ticks)[    ;; no longer necessary? depart-time is "corrected" in UPDATE-ITINERARY
-                                   ;; it's possible the departure time will need to be "corrected" again if the driver
-                                   ;; has had to wait a long time for a charger.
-  ;  print (word "ENTER ITINERARY-EVENT-SCHEDULER (schedule depart)")
-  ;  print (word precision ticks 3 " " self " need to change old departure time:" item (current-itin-row - 1) itin-depart " to new depart time (now):" ticks)
-  ;  print (word precision ticks 3 " " self " old itinerary:" itin-depart)      
-  ;  change-depart-time ticks  
-  ;  set departure-time item current-itin-row itin-depart
-  ;  ; print (word precision ticks 3 " " self " need to change depart time to: " precision departure-time 3)
-  ;  print (word precision ticks 3 " " self " new itinerary:" itin-depart)
-  ;  print (word "EXIT ITINERARY-EVENT-SCHEDULER (schedule depart)")
-  ;]  
   
   dynamic-scheduler:add schedule self task depart departure-time
-  print (word "in ITIN-EVENT-SCHED")
-  print (word precision ticks 3 " " self " departure scheduled: " departure-time " itin: " itin-depart)
+  ;print (word "in ITIN-EVENT-SCHED")
+  ;print (word precision ticks 3 " " self " departure scheduled: " departure-time " itin: " itin-depart)
 end
 
 ;;;;;;;;;;;;;;;;;;;;
@@ -384,10 +387,8 @@ end
 to depart
   print (word precision ticks 3 " " self " departing, soc:" state-of-charge)
   ;print (word precision ticks 3 " " self " itinerary (upon departure):" itin-depart)
-  ifelse need-to-charge "depart" [  ;; do drivers need to seek charge upon departing?
-                                    ;; --> does the driver have enough charge to travel the next leg of the journey? (trip-distance of journey-distance)
-                                    ;; shouldn't this be executed alongside the check for ample charge to complete journey-distance?
-                                    ;; otherwise, the driver may need to alter the itinerary because he checks his charge upon departure
+  ifelse need-to-charge "depart" [  
+    
     ifelse state-of-charge = 1 [ 
       print (word precision ticks 3 " " self " cannot make trip with full battery") ;; TODO this shouldn't happen when PHEV are implemented
     ][
@@ -395,7 +396,7 @@ to depart
     ]
   ]
   [  
-    travel-time-event-scheduler  ;; schedules next arrival to occur
+    travel-time-event-scheduler  
     ;print (word precision ticks 3 " " self " next arrival time: " precision arrival-time 3)
   ]
 end
@@ -424,16 +425,16 @@ to arrive
       
   if not itin-complete? [
    
-    ifelse need-to-charge "arrive" [   ;; if CHARGE NEEDED, seek-charger
+    ifelse need-to-charge "arrive" [   
       ifelse state-of-charge = 1 [ 
         print (word precision ticks 3 " " self " cannot make trip with full battery") ;; TODO this shouldn't happen when PHEV are implemented
       ]
       [
-        seek-charger  ;; TODO need to re-schedule departure if schedule is delayed by seeking a charger. ac 9.28
+        seek-charger  
       ]
     ]
     [
-      itinerary-event-scheduler  ;; if NO CHARGE NEEDED, schedules next departure to occur     
+      itinerary-event-scheduler  
     ]
   ]
 
@@ -447,13 +448,17 @@ to update-itinerary
     set current-itin-row current-itin-row + 1
     set current-taz node item current-itin-row itin-from
     set destination-taz node item current-itin-row itin-to
-    if ((item current-itin-row itin-depart) < ticks)[
+    ifelse ((item current-itin-row itin-depart) < ticks)[
       print (word precision ticks 3 " " self " need to change old departure time:" item (current-itin-row - 1) itin-depart " to new depart time (now):" ticks)
       print (word precision ticks 3 " " self " old itinerary:" itin-depart)      
       change-depart-time ticks  
       print (word precision ticks 3 " " self " new itinerary:" itin-depart)
     ]
-    set departure-time item current-itin-row itin-depart
+    [
+      set departure-time item current-itin-row itin-depart
+    ]
+    ;print (word "IN UPDATE-ITINERARY")
+    ;print (word precision ticks 3 " " self " depature-time: " departure-time " itin: " itin-depart)   
     set trip-distance item my-od-index od-dist
   ]
   [

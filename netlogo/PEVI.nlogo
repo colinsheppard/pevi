@@ -183,7 +183,7 @@ to seek-charger
  
   ;; submodel action 1:
   ifelse time-until-depart > willing-to-roam-time-threshold [  
-    set willing-to-roam? true
+    set willing-to-roam? false  ;; temporarily setting this to FALSE to test this submodel
     set charger-in-origin-or-destination false ;; NOT REALLY SURE HOW TO TREAT THIS
   ]
   [
@@ -226,17 +226,27 @@ to seek-charger
         set current-trip-charge-time-need max sentence 0 ((trip-distance * charge-safety-factor * electric-fuel-consumption - state-of-charge * battery-capacity) / [charge-rate] of current-charger)
         set current-journey-charge-time-need max sentence 0 ((journey-distance * charge-safety-factor * electric-fuel-consumption - state-of-charge * battery-capacity) / [charge-rate] of current-charger)
         set current-full-charge-time-need (1 - state-of-charge) * battery-capacity / [charge-rate] of current-charger
+        print (word "current tctn: " current-trip-charge-time-need)
+        print (word "soc: " state-of-charge " battcap: " battery-capacity " chargerate: " [charge-rate] of current-charger " trip-distance: " trip-distance " csf: " charge-safety-factor " efc: " electric-fuel-consumption)
+        ;; WORKING HERE!!! ^
+
 
         ask ? [
-          set current-charger-cost (([time-opportunity-cost] of myself) * (([extra-time-until-end-charge] of myself) + ([extra-time-for-travel] of myself)) + energy-price * charge-rate * (([current-trip-charge-time-need] of myself) + ([extra-charge-time-for-travel] of myself)))
-          ; set charger-cost (12.50 * (0 + 0) + energy-price * charge-rate * (trip-charge-time-need + 0))
+          ;set current-charger-cost (([time-opportunity-cost] of myself) * (([extra-time-until-end-charge] of myself) + ([extra-time-for-travel] of myself)) + energy-price * charge-rate * (([current-trip-charge-time-need] of myself) + ([extra-charge-time-for-travel] of myself)))
+          set current-charger-cost (12.50 * (0 + 0) + energy-price * charge-rate * (([current-trip-charge-time-need] of myself) + 0))
           ; charger-cost = energy-price * charge-rate * trip-charge-time-need
+          print (word "in ask ?, current tctn: " ([current-trip-charge-time-need] of myself))
         ]
+        print (word precision ticks 3 " " self " current-charger-cost: " [current-charger-cost] of current-charger)        
+        print (word "CHECK-PRICES: " check-prices)
         
         ifelse check-prices = 0 [
           ask ? [
             set current-driver myself 
           ]
+          print (word precision ticks 3 " " self " charger: " current-charger " price: " [current-charger-cost] of current-charger)
+          print (word precision ticks 3 " " self " trip ct: " trip-charge-time-need " journey ct: " journey-charge-time-need " full ct: " full-charge-time-need)
+
           set trip-charge-time-need current-trip-charge-time-need
           set journey-charge-time-need current-journey-charge-time-need
           set full-charge-time-need current-full-charge-time-need
@@ -266,6 +276,8 @@ to seek-charger
     wait-time-event-scheduler  
   ]
   [
+    print (word precision ticks 3 " " self " charger: " current-charger " price: " [current-charger-cost] of current-charger)
+    print (word precision ticks 3 " " self " trip ct: " trip-charge-time-need " journey ct: " journey-charge-time-need " full ct: " full-charge-time-need)
     charge-time-event-scheduler 
   ]
 

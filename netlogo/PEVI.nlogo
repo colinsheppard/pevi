@@ -21,6 +21,11 @@ globals [
 ;; PARAMETERS
   charge-safety-factor
   wait-time-mean
+  batt-cap-mean
+  batt-cap-stdv
+  batt-cap-range
+  fuel-economy-stdv
+  fuel-economy-range
   
   ;; globals needed for testing
   test-driver
@@ -72,11 +77,18 @@ drivers-own [
   charger-in-origin-or-destination
   time-until-depart
   trip-charge-time-need
+  current-trip-charge-time-need
   journey-charge-time-need
+  current-journey-charge-time-need
   full-charge-time-need
+  current-full-charge-time-need
   time-until-end-charge
   willing-to-roam-time-threshold  ;; added 9.28 ac
   willing-to-roam?
+  time-opportunity-cost
+  extra-time-until-end-charge
+  extra-time-for-travel
+  extra-charge-time-for-travel
 
 ;; TRACKING
   num-denials
@@ -93,6 +105,9 @@ chargers-own[
   charge-rate      ; kWh / hr
   num-sessions     ; count of charging sessions
   energy-delivered ; kWh
+  energy-price     ; $0.14/kWh
+  last-charger-cost
+  current-charger-cost
  ]
 
 nodes-own[
@@ -125,7 +140,7 @@ to setup
 end 
 
 to go
-  dynamic-scheduler:go-until schedule 24
+  dynamic-scheduler:go-until schedule 16
 end
 
 ;;;;;;;;;;;;;;;;;;;;
@@ -138,6 +153,7 @@ to-report need-to-charge [calling-event]
            (calling-event = "depart" and remaining-range < trip-distance * charge-safety-factor) )[ ; TODO add random draw here for people who charge but don't need to
     report true
     print (word precision ticks 3 " " self " NEEDS TO CHARGE! ")
+    set num-denials 0
   ][
     report false
   ]
@@ -155,17 +171,24 @@ end
 ;;;;;;;;;;;;;;;;;;;;
 ;; SEEK CHARGER
 ;;;;;;;;;;;;;;;;;;;;
+;; trip-charge-time-need set in CHARGE-TIME-EVENT-SCHEDULER 
+;;;;;;;;;;;;;;;;;;;;
 to seek-charger
   print (word precision ticks 3 " " self " seek-charger ")
   set time-until-depart departure-time - ticks
+  set extra-time-until-end-charge 0
+  set extra-time-for-travel 0
+  set extra-charge-time-for-travel 0
   
-  
+ 
   ;; submodel action 1:
   ifelse time-until-depart > willing-to-roam-time-threshold [  
     set willing-to-roam? true
+    set charger-in-origin-or-destination false ;; NOT REALLY SURE HOW TO TREAT THIS
   ]
   [
     set willing-to-roam? false
+    set charger-in-origin-or-destination true  ; TODO this needs to be updated once en-route/neighbor charging is implemented
   ]
     
   ;; submodel action 2:
@@ -195,22 +218,55 @@ to seek-charger
     ]
   ][  
     ;; driver will NOT roam to find charger -- looks only in current TAZ
+    let check-prices 0
     foreach [chargers-in-taz] of current-taz [
       if [current-driver] of ? = nobody [
         print (word precision ticks 3 " " self " found " ?)
-        ask ? [
-          set current-driver myself 
-        ]
         set current-charger ?
-        charge-time-event-scheduler
-        stop
-      ] 
-    ]                        
+        set current-trip-charge-time-need max sentence 0 ((trip-distance * charge-safety-factor * electric-fuel-consumption - state-of-charge * battery-capacity) / [charge-rate] of current-charger)
+        set current-journey-charge-time-need max sentence 0 ((journey-distance * charge-safety-factor * electric-fuel-consumption - state-of-charge * battery-capacity) / [charge-rate] of current-charger)
+        set current-full-charge-time-need (1 - state-of-charge) * battery-capacity / [charge-rate] of current-charger
+
+        ask ? [
+          set current-charger-cost (([time-opportunity-cost] of myself) * (([extra-time-until-end-charge] of myself) + ([extra-time-for-travel] of myself)) + energy-price * charge-rate * (([current-trip-charge-time-need] of myself) + ([extra-charge-time-for-travel] of myself)))
+          ; set charger-cost (12.50 * (0 + 0) + energy-price * charge-rate * (trip-charge-time-need + 0))
+          ; charger-cost = energy-price * charge-rate * trip-charge-time-need
+        ]
+        
+        ifelse check-prices = 0 [
+          ask ? [
+            set current-driver myself 
+          ]
+          set trip-charge-time-need current-trip-charge-time-need
+          set journey-charge-time-need current-journey-charge-time-need
+          set full-charge-time-need current-full-charge-time-need
+        ]
+        [   ;; check-prices > 0        
+          if ([last-charger-cost] of current-charger) > ([current-charger-cost] of current-charger) [
+            ask ? [
+              set current-driver myself 
+            ]
+            set trip-charge-time-need current-trip-charge-time-need
+            set journey-charge-time-need current-journey-charge-time-need
+            set full-charge-time-need current-full-charge-time-need          
+          ]
+        ]    
+        
+        ask ? [
+          set last-charger-cost current-charger-cost
+        ]
+        set check-prices (check-prices + 1)
+      ]
+    ] 
   ]
     
-  if current-charger = nobody [  
-    print (word precision ticks 3 " " self " no charger found ") 
+  ifelse current-charger = nobody [  
+    print (word precision ticks 3 " " self " NO CHARGER FOUND ") 
+    set num-denials (num-denials + 1)
     wait-time-event-scheduler  
+  ]
+  [
+    charge-time-event-scheduler 
   ]
 
 end
@@ -223,11 +279,14 @@ to wait-time-event-scheduler
   print (word precision ticks 3 " " self " wait-time-event-scheduler remaining-range:" remaining-range " trip-distance:" trip-distance " time-until-depart:" time-until-depart)
   set state "not charging"
   ifelse remaining-range / charge-safety-factor < trip-distance [
+    if departure-time <= ticks [
+      change-depart-time ticks + wait-time-mean
+    ]
     dynamic-scheduler:add schedule self task retry-seek ticks + wait-time-mean ;; TODO make wait-time-mean random draw
   ][
     ifelse remaining-range / charge-safety-factor >= journey-distance or departure-time <= ticks [   ;time-until-depart <= 1 [
-      change-depart-time (time-until-depart + ticks)
-      print (word precision ticks 3 " " self " in wait-time-event-sched, deciding to depart at time " (ticks + time-until-depart))
+      change-depart-time ticks 
+      print (word precision ticks 3 " " self " in wait-time-event-sched, deciding to depart at time " ticks)
       dynamic-scheduler:add schedule self task depart departure-time
     ][
       dynamic-scheduler:add schedule self task retry-seek ticks + wait-time-mean ;; TODO make wait-time-mean random draw
@@ -242,32 +301,28 @@ end
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 to charge-time-event-scheduler
   set state "charging"
-  set charger-in-origin-or-destination true  ; TODO this needs to be updated once en-route/neighbor charging is implemented
-  set trip-charge-time-need max sentence 0 ((trip-distance * charge-safety-factor * electric-fuel-consumption - state-of-charge * battery-capacity) / [charge-rate] of current-charger)
-  set journey-charge-time-need max sentence 0 ((journey-distance * charge-safety-factor * electric-fuel-consumption - state-of-charge * battery-capacity) / [charge-rate] of current-charger)
-  set full-charge-time-need (1 - state-of-charge) * battery-capacity / [charge-rate] of current-charger
   ifelse full-charge-time-need < trip-charge-time-need [  ;; if sufficent time to charge to full
     set time-until-end-charge full-charge-time-need
-  ][                                                      
+    ][                                                      
     ifelse time-until-depart < trip-charge-time-need [   
-      ;; NOT SUFFICIENT TIME FOR NEXT TRIP - delay sched to allow for charging
+          ;; NOT SUFFICIENT TIME FOR NEXT TRIP - delay sched to allow for charging
       set time-until-end-charge trip-charge-time-need    
-    ][                                                    
+      ][                                                    
       ;; SUFFICIENT TIME - 
       ifelse charger-in-origin-or-destination [
         ;; charge to full if enough time @ home/work
         set time-until-end-charge min sentence time-until-depart full-charge-time-need 
-      ][                                                  
+        ][                                                  
         ifelse [charger-type] of current-charger = 3 [  
           ;; charge until departure or journey charge time, whichever comes first 
           set time-until-end-charge min sentence time-until-depart journey-charge-time-need
-        ][
+          ][
           ;; charge until departure or trip charge time, whichever comes first
           set time-until-end-charge min sentence time-until-depart trip-charge-time-need
+          ]
         ]
       ]
     ]
-  ]
   let next-event-scheduled-at 0 
   ifelse (time-until-depart > 0.5) and ([charger-type] of current-charger < 3) and (time-until-end-charge < trip-charge-time-need) [  ;; charger = 1 or 2                                                                                                    
     set next-event-scheduled-at ticks + min (sentence wait-time-mean (time-until-depart - 0.5)) ;; TODO make wait-time-mean random draw with max of time-until-depart - 0.5  
@@ -416,13 +471,13 @@ to-report driver-soc [the-driver]
 end
 @#$#@#$#@
 GRAPHICS-WINDOW
-375
-19
-775
-425
+86
+10
+331
+207
 -1
 -1
-15.0
+6.654
 1
 10
 1
@@ -442,66 +497,11 @@ GRAPHICS-WINDOW
 ticks
 30.0
 
-INPUTBOX
-26
-45
-129
-105
-batt-cap-mean
-24
-1
-0
-Number
-
-INPUTBOX
-25
-111
-123
-171
-batt-cap-stdv
-1
-1
-0
-Number
-
-INPUTBOX
-24
-177
-115
-237
-batt-cap-range
-5
-1
-0
-Number
-
-INPUTBOX
-147
-86
-257
-146
-fuel-economy-stdv
-0.05
-1
-0
-Number
-
-INPUTBOX
-147
-150
-264
-210
-fuel-economy-range
-0.1
-1
-0
-Number
-
 BUTTON
-145
-41
-211
-74
+9
+10
+75
+43
 NIL
 setup
 NIL
@@ -515,10 +515,10 @@ NIL
 1
 
 BUTTON
-224
-43
-287
-76
+9
+47
+72
+80
 NIL
 go
 T

@@ -1,6 +1,11 @@
 "n-nodes"	5 
 "charge-safety-factor"	1.1
 "wait-time-mean"	0.5
+"batt-cap-mean"	24
+"batt-cap-stdv"	1
+"batt-cap-range"	5
+"fuel-economy-stdv"	0.05
+"fuel-economy-range"	0.1
 "charger-input-file"	"../inputs/alternative_4_5.txt"
 "driver-input-file"	"../../../pev-shared/data/inputs/p1r1_5.txt"
 "od-input-file"	"../../../pev-shared/data/inputs/OD_Matrix_5.txt"

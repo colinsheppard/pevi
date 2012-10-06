@@ -10,10 +10,15 @@ to read-parameter-file
       ifelse param-name = "n-nodes" [ set n-nodes file-read ][  ; TODO, infer this from the od input file
       ifelse param-name = "charge-safety-factor" [ set charge-safety-factor file-read ][
       ifelse param-name = "wait-time-mean" [ set wait-time-mean file-read ][
+      ifelse param-name = "batt-cap-mean" [ set batt-cap-mean file-read ][
+      ifelse param-name = "batt-cap-stdv" [ set batt-cap-stdv file-read ][
+      ifelse param-name = "batt-cap-range" [set batt-cap-range file-read ][
+      ifelse param-name = "fuel-economy-stdv" [ set fuel-economy-stdv file-read ][
+      ifelse param-name = "fuel-economy-range" [ set fuel-economy-range file-read ][
       ifelse param-name = "charger-input-file" [ set charger-input-file file-read ][
       ifelse param-name = "driver-input-file" [ set driver-input-file file-read ][
       ifelse param-name = "od-input-file" [ set od-input-file file-read ][
-      ]]]]]]
+      ]]]]]]]]]]]
     ]
     file-close
   ][ 
@@ -95,6 +100,7 @@ to setup-drivers
     set shape "car"
     set color green
     set size 2
+    set time-opportunity-cost 12.5  ; $/kWh
     ifelse is-phev? [
       set battery-capacity 10 ; TODO replace with values from a vehicle type distribution input file
       set electric-fuel-consumption 0.35   ; kWh/mile

@@ -4,9 +4,9 @@ __includes["setup.nls"]
 globals [    
   od-from
   od-to
-  od-demand
   od-dist
   od-time
+  od-enroute
   
   n-nodes
   
@@ -26,6 +26,7 @@ globals [
   batt-cap-range
   fuel-economy-stdv
   fuel-economy-range
+  charger-search-distance
   
   ;; globals needed for testing
   test-driver
@@ -116,6 +117,8 @@ nodes-own[
   home-charger    ; special charger available to all drivers when in their home taz
   drivers-in-taz  ; list of drivers currently in TAZ
   
+  neighbor-tazs   ; list of tazs within charger-search-distance of this taz
+  
   n-levels        ; list containing the number of chargers for levels 1,2,3 at index 0,1,2
 ]
 
@@ -135,6 +138,7 @@ to setup
   
   setup-od-data
   setup-nodes
+  convert-enroute-ids
   setup-drivers
   setup-chargers
 end 
@@ -291,14 +295,14 @@ to wait-time-event-scheduler
   print (word precision ticks 3 " " self " wait-time-event-scheduler remaining-range:" remaining-range " trip-distance:" trip-distance " time-until-depart:" time-until-depart)
   set state "not charging"
   ifelse remaining-range / charge-safety-factor < trip-distance [
-    if departure-time <= ticks [
-      change-depart-time ticks + wait-time-mean
-    ]
+;    if departure-time <= ticks [
+;      change-depart-time ticks + wait-time-mean
+;    ]
     dynamic-scheduler:add schedule self task retry-seek ticks + wait-time-mean ;; TODO make wait-time-mean random draw
   ][
-    ifelse remaining-range / charge-safety-factor >= journey-distance or departure-time <= ticks [   ;time-until-depart <= 1 [
-      change-depart-time ticks 
-      print (word precision ticks 3 " " self " in wait-time-event-sched, deciding to depart at time " ticks)
+    ifelse remaining-range / charge-safety-factor >= journey-distance or time-until-depart <= 1 [
+;      change-depart-time ticks 
+;      print (word precision ticks 3 " " self " in wait-time-event-sched, deciding to depart at time " ticks)
       dynamic-scheduler:add schedule self task depart departure-time
     ][
       dynamic-scheduler:add schedule self task retry-seek ticks + wait-time-mean ;; TODO make wait-time-mean random draw
@@ -542,6 +546,17 @@ NIL
 NIL
 NIL
 1
+
+MONITOR
+292
+14
+1077
+60
+od-enroute
+od-enroute
+17
+1
+11
 
 @#$#@#$#@
 ## ## WHAT IS IT?

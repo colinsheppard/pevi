@@ -9,6 +9,7 @@ to read-parameter-file
       let param-name file-read
       ifelse param-name = "n-nodes" [ set n-nodes file-read ][  ; TODO, infer this from the od input file
       ifelse param-name = "charge-safety-factor" [ set charge-safety-factor file-read ][
+      ifelse param-name = "charger-search-distance" [ set charger-search-distance file-read ][
       ifelse param-name = "wait-time-mean" [ set wait-time-mean file-read ][
       ifelse param-name = "batt-cap-mean" [ set batt-cap-mean file-read ][
       ifelse param-name = "batt-cap-stdv" [ set batt-cap-stdv file-read ][
@@ -18,7 +19,7 @@ to read-parameter-file
       ifelse param-name = "charger-input-file" [ set charger-input-file file-read ][
       ifelse param-name = "driver-input-file" [ set driver-input-file file-read ][
       ifelse param-name = "od-input-file" [ set od-input-file file-read ][
-      ]]]]]]]]]]]
+      ]]]]]]]]]]]]
     ]
     file-close
   ][ 
@@ -35,9 +36,9 @@ to setup-od-data
   ; Reads in main driver input file: Origin, destination, # of trips, distance, time
   set od-from   n-values (n-nodes * n-nodes) [0] 
   set od-to     n-values (n-nodes * n-nodes) [0] 
-  set od-demand n-values (n-nodes * n-nodes) [0] 
   set od-dist   n-values (n-nodes * n-nodes) [0] 
   set od-time   n-values (n-nodes * n-nodes) [0] 
+  set od-enroute n-values (n-nodes * n-nodes) [n-values (0) [0]] 
   
   ifelse (file-exists? od-input-file) [ ; ../inputs/OD_Matrix_5.txt
     file-close
@@ -45,15 +46,32 @@ to setup-od-data
     foreach n-values (n-nodes * n-nodes) [?] [
      set od-from   replace-item ? od-from file-read 
      set od-to     replace-item ? od-to   file-read 
-     set od-demand replace-item ? od-demand  (round file-read) 
      set od-dist   replace-item ? od-dist file-read 
      set od-time   replace-item ? od-time file-read
+     set od-enroute replace-item ? od-enroute split file-read ","
     ]
     file-close
   ][ 
     user-message (word "Input file '" od-input-file "' not found!") 
   ]
 end 
+
+;;;;;;;;;;;;;;;;;;;;
+;; SPLIT
+;; Helper function written by jimlyons37: http://groups.yahoo.com/group/netlogo-users/message/6490
+;; Adapted by Colin to allow empty string as argument and assumes elements are numbers, not strings
+;;;;;;;;;;;;;;;;;;;;
+to-report split [ #string #sep ] ; #sep must be non-empty string
+  let result [] ; return value
+  let w length #sep
+  if length #string = 0 [ report result ]
+  loop[ ; exit when done
+    let next-pos position #sep #string
+    if not is-number? next-pos [ report reverse (fput read-from-string #string result) ]
+    set result fput read-from-string (substring #string 0 next-pos) result
+    set #string substring #string (next-pos + w) (length #string)
+  ]
+end
 
 ;;;;;;;;;;;;;;;;;;;;
 ;; SETUP NODES
@@ -78,12 +96,31 @@ to setup-nodes
         foreach [0 1 2] [
           set n-levels replace-item ? n-levels file-read
         ]
+        set neighbor-tazs n-values 0 [0]
+        foreach n-values n-nodes [? + 1] [
+          if not (? = id) and (distance-from-to id ? <= charger-search-distance) [
+           set neighbor-tazs fput node ? neighbor-tazs
+          ]
+        ]
       ]    
     ]
   ]
-  [ user-message (word "Input file '" charger-input-file "' not found!")] 
+  [ user-message (word "Input file '" charger-input-file "' not found!")]
    
 end ;setup-nodes
+
+;;;;;;;;;;;;;;;;;;;;;;;
+;; CONVERT ENROUTE IDS
+;;;;;;;;;;;;;;;;;;;;;;;
+to convert-enroute-ids
+  foreach n-values length od-enroute [?] [
+    let old-enroute-list item ? od-enroute
+    foreach n-values length old-enroute-list [?] [
+      set old-enroute-list replace-item ? old-enroute-list (node item ? old-enroute-list)
+    ]
+    set od-enroute replace-item ? od-enroute old-enroute-list
+  ]
+end
 
 ;;;;;;;;;;;;;;;;;;;;
 ;; SETUP DRIVERS

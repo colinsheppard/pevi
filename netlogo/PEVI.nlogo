@@ -144,7 +144,7 @@ to setup
 end 
 
 to go
-  dynamic-scheduler:go-until schedule 16
+  dynamic-scheduler:go-until schedule 6.5
 end
 
 ;;;;;;;;;;;;;;;;;;;;
@@ -184,17 +184,13 @@ to seek-charger
   set extra-time-for-travel 0
   set extra-charge-time-for-travel 0
   
- 
   ;; submodel action 1:
   ifelse time-until-depart > willing-to-roam-time-threshold [  
-    set willing-to-roam? false  ;; temporarily setting this to FALSE to test this submodel
-    set charger-in-origin-or-destination false ;; NOT REALLY SURE HOW TO TREAT THIS
+    set willing-to-roam? true  ;; temporarily setting this to FALSE to test this submodel
+  ][
+    set willing-to-roam? true 
   ]
-  [
-    set willing-to-roam? false
-    set charger-in-origin-or-destination true  ; TODO this needs to be updated once en-route/neighbor charging is implemented
-  ]
-    
+  set charger-in-origin-or-destination true  ; TODO this needs to be updated once en-route/neighbor charging is implemented    
   ;; submodel action 2:
   ifelse willing-to-roam? [
     ;; driver will roam to find charger -- looks at ALL CHARGERS
@@ -208,30 +204,17 @@ to seek-charger
         set current-charger ?
         charge-time-event-scheduler
         stop
-      ] 
-      ;; 2nd -- look at chargers en-route from current TAZ to destination TAZ
-      ;; how do we find the TAZs en-route?
-      ;; 1. what is the maximum distance the driver can travel?
-      ;; = trip-distance, set in UPDATE-ITINERARY, executed in ARRIVE
-      ;; 2. current charge = ___
-      ;; 3. 
-      ;; 4. what are the TAZs the driver will travel through?
-      ;foreach [chargers-in-taz] of destination-taz [  NO -- driver cannot reach destination-taz!
-      
-      ;; 3rd -- look at all other chargers in neighboring TAZs within acceptable range
+      ]
     ]
   ][  
     ;; driver will NOT roam to find charger -- looks only in current TAZ
     let check-prices 0
     foreach [chargers-in-taz] of current-taz [
       if [current-driver] of ? = nobody [
-        print (word precision ticks 3 " " self " found " ?)
-        set current-charger ?
-        set current-trip-charge-time-need max sentence 0 ((trip-distance * charge-safety-factor * electric-fuel-consumption - state-of-charge * battery-capacity) / [charge-rate] of current-charger)
-        set current-journey-charge-time-need max sentence 0 ((journey-distance * charge-safety-factor * electric-fuel-consumption - state-of-charge * battery-capacity) / [charge-rate] of current-charger)
-        set current-full-charge-time-need (1 - state-of-charge) * battery-capacity / [charge-rate] of current-charger
-        print (word "current tctn: " current-trip-charge-time-need)
-        print (word "soc: " state-of-charge " battcap: " battery-capacity " chargerate: " [charge-rate] of current-charger " trip-distance: " trip-distance " csf: " charge-safety-factor " efc: " electric-fuel-consumption)
+;        print (word precision ticks 3 " " self " found " ?)
+   ;     set current-charger ?
+;      print (word "current tctn: " current-trip-charge-time-need)
+ ;       print (word "soc: " state-of-charge " battcap: " battery-capacity " chargerate: " [charge-rate] of current-charger " trip-distance: " trip-distance " csf: " charge-safety-factor " efc: " electric-fuel-consumption)
         ;; WORKING HERE!!! ^
 
 
@@ -274,17 +257,11 @@ to seek-charger
     ] 
   ]
     
-  ifelse current-charger = nobody [  
+  if current-charger = nobody [  
     print (word precision ticks 3 " " self " NO CHARGER FOUND ") 
     set num-denials (num-denials + 1)
     wait-time-event-scheduler  
   ]
-  [
-    print (word precision ticks 3 " " self " charger: " current-charger " price: " [current-charger-cost] of current-charger)
-    print (word precision ticks 3 " " self " trip ct: " trip-charge-time-need " journey ct: " journey-charge-time-need " full ct: " full-charge-time-need)
-    charge-time-event-scheduler 
-  ]
-
 end
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; WAIT TIME EVENT SCHEDULER
@@ -317,28 +294,16 @@ end
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 to charge-time-event-scheduler
   set state "charging"
-  ifelse full-charge-time-need < trip-charge-time-need [  ;; if sufficent time to charge to full
-    set time-until-end-charge full-charge-time-need
-    ][                                                      
-    ifelse time-until-depart < trip-charge-time-need [   
-          ;; NOT SUFFICIENT TIME FOR NEXT TRIP - delay sched to allow for charging
-      set time-until-end-charge trip-charge-time-need    
-      ][                                                    
-      ;; SUFFICIENT TIME - 
-      ifelse charger-in-origin-or-destination [
-        ;; charge to full if enough time @ home/work
-        set time-until-end-charge min sentence time-until-depart full-charge-time-need 
-        ][                                                  
-        ifelse [charger-type] of current-charger = 3 [  
-          ;; charge until departure or journey charge time, whichever comes first 
-          set time-until-end-charge min sentence time-until-depart journey-charge-time-need
-          ][
-          ;; charge until departure or trip charge time, whichever comes first
-          set time-until-end-charge min sentence time-until-depart trip-charge-time-need
-          ]
-        ]
-      ]
-    ]
+  set trip-charge-time-need max sentence 0 ((trip-distance * charge-safety-factor * electric-fuel-consumption - state-of-charge * battery-capacity) / [charge-rate] of current-charger)
+  set journey-charge-time-need max sentence 0 ((journey-distance * charge-safety-factor * electric-fuel-consumption - state-of-charge * battery-capacity) / [charge-rate] of current-charger)
+  set full-charge-time-need (1 - state-of-charge) * battery-capacity / [charge-rate] of current-charger
+
+  set time-until-end-charge (calc-time-until-end-charge full-charge-time-need 
+                                                    trip-charge-time-need 
+                                                    journey-charge-time-need 
+                                                    time-until-depart 
+                                                    charger-in-origin-or-destination 
+                                                    [charger-type] of current-charger)
   let next-event-scheduled-at 0 
   ifelse (time-until-depart > 0.5) and ([charger-type] of current-charger < 3) and (time-until-end-charge < trip-charge-time-need) [  ;; charger = 1 or 2                                                                                                    
     set next-event-scheduled-at ticks + min (sentence wait-time-mean (time-until-depart - 0.5)) ;; TODO make wait-time-mean random draw with max of time-until-depart - 0.5  
@@ -357,6 +322,31 @@ to charge-time-event-scheduler
   ]
   if next-event-scheduled-at > departure-time[
     change-depart-time next-event-scheduled-at
+  ]
+end
+
+to-report calc-time-until-end-charge [#full-charge-time-need #trip-charge-time-need #journey-charge-time-need #time-until-depart #charger-in-origin-or-destination #charger-type]
+  ifelse #full-charge-time-need < #trip-charge-time-need [  ;; if sufficent time to charge to full
+    report #full-charge-time-need
+  ][                                                      
+    ifelse #time-until-depart < #trip-charge-time-need [   
+      ;; NOT SUFFICIENT TIME FOR NEXT TRIP - will cause delay in schedule
+      report #trip-charge-time-need    
+    ][                                                    
+      ;; SUFFICIENT TIME - 
+      ifelse #charger-in-origin-or-destination [
+        ;; charge to full if enough time @ home/work
+        report min sentence #time-until-depart #full-charge-time-need 
+      ][                                                  
+        ifelse #charger-type = 3 [  
+          ;; charge until departure or journey charge time, whichever comes first 
+          report min (sentence #time-until-depart #journey-charge-time-need #full-charge-time-need)
+        ][
+          ;; charge until departure or trip charge time, whichever comes first
+          report min sentence #time-until-depart #trip-charge-time-need
+        ]
+      ]
+    ]
   ]
 end
 

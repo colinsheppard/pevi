@@ -25,7 +25,6 @@ to read-parameter-file
   ][ 
     user-message (word "Input file '" od-input-file "' not found!") 
   ]
-  
 end
 
 ;;;;;;;;;;;;;;;;;;;;

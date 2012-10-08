@@ -1,22 +1,34 @@
-extensions [matrix array dynamic-scheduler]
+extensions [dynamic-scheduler]
+__includes["setup.nls"]
 
-
-;; define all globals
-globals
-
-[ ;start-hour      ; starting time, an integer (or fractional) hour
-  ;stop-hour       ; time to end simulation, an integer hour
-  ;;time-step-size  ; time step in minutes -- set by interface slider
-  ;time            ; current time in fractional hours
-  ;;display-time    ; current time, a character string hh:mm
-    
+globals [    
   od-from
   od-to
   od-demand
   od-dist
   od-time
   
+  n-nodes
+  
   schedule  ;; this global variable holds the dynamic schedule for the PEVI program, appended by the drivers from their itineraries
+  
+;; FILE PATHS
+  parameter-file
+  charger-input-file
+  driver-input-file
+  od-input-file
+  
+;; PARAMETERS
+  charge-safety-factor
+  wait-time-mean
+  batt-cap-mean
+  batt-cap-stdv
+  batt-cap-range
+  fuel-economy-stdv
+  fuel-economy-range
+  
+  ;; globals needed for testing
+  test-driver
 ]
 
 breed [drivers driver]
@@ -24,446 +36,442 @@ breed [chargers charger]
 breed [nodes node]
 
 drivers-own [
+;; VEHICLE
+  vehicle-type              ; e.g. 'leaf' or 'volt'
+  is-phev?                  
+  battery-capacity          ; kwh
+  electric-fuel-consumption ; kwh / mile
+  hybrid-fuel-consumption   ; gallon / mile, for phev charge sustaining mode
   
-;; VEHICLE specific
-  battery-capacity ; in kwh - FORCE GAUSSIAN DISTRIBUTION
-  state-of-charge ; represents the battery state of charge at each timestep
-      ; if soc is calculated from travel-dist and electric-fuel-consumption, is it a state variable still?
-  electric-fuel-consumption ; energy required to travel 1 mile (kwh/mile)
-  status ; discrete value from list:not-charging,traveling,charging
-  current-taz ; keeps track of the current location of each vehicle
-  kwh-received ; a count of how much energy each driver has charged
-  phev?  ;boolean variable       
-      
-;; TRIP specific
-  partner ;a variable used in to interact a driver and a charger
-  total-trip-time ; the total time needed to drive from A to B
-  travel-time ; used to store traveling time since departure
-  total-trip-dist ; the total distance for a given trip
-  next-trip-range
+;; DEMOGRAPHY  
+  home-taz
+  probability-of-unneeded-charge
+
+;; OPERATION
+  state                     ; discrete string value: not-charging, traveling, charging
+  current-taz               ; nobody if traveling
+  destination-taz
+  state-of-charge
+  current-charger           ; nobody if not charging
+  
+  itin-from 
+  itin-to
+  itin-depart
+  itin-trip-type
+  itin-change-flag
+  itin-delay-amount
+  current-itin-row          ; index of current location in the itinerary (referring to next trip or current trip if traveling)
+
+;; CONVENIENCE VARIABLES
+;; these are used to implement the model, but are in the model description
+  trip-time 
+  travel-time 
+  trip-distance
+  journey-distance
+  remaining-range
   travel-dist ; used to store distance driven since departure
   departure-time ;When the vehicle is set to leave the taz
   arrival-time ; when a car is supposed to arrive
   minimum-acceptable-charge ; The charge required to reach the next destination
-  need-to-charge? ; boolean
+  itin-complete?
+  charger-in-origin-or-destination
+  time-until-depart
+  trip-charge-time-need
+  current-trip-charge-time-need
+  journey-charge-time-need
+  current-journey-charge-time-need
+  full-charge-time-need
+  current-full-charge-time-need
+  time-until-end-charge
+  willing-to-roam-time-threshold  ;; added 9.28 ac
+  willing-to-roam?
+  time-opportunity-cost
+  extra-time-until-end-charge
+  extra-time-for-travel
+  extra-charge-time-for-travel
+
+;; TRACKING
+  num-denials
   
-;; SCHEDULE specific
-  itin-from 
-  itin-to
-  itin-depart
-  current-schedule-row ; keeps track of which row in the schedule each driver is on
-  destination-taz ;from the schedule, this is where we're going
-  wait-time
+;; CANDIDATE ADDITIONS TO MODEL DESCRIPTION
+  kwh-received ; a count of how much energy each driver has charged
+
 ]
 
 chargers-own[
-  taz-location ; TAZ # for each charger
-  available ; boolean to represent either available(TRUE) or occupied(FALSE)
-  charger-level ; 1, 2, or 3 (low to high charge)
-  charger-rate ; The rate of recharge for each charger.
-  charger-in-use ; A counter increased every time the charger is in use. Used to calculate duty factor. (Not attached to the name -ah)
-  duty-factor ; The fraction of time a charger is in use vs. time idle  
-  ;; Unless we calculate a duty factor unique to each charger level, this will bias the results (level 3 will always get more use, as it charges faster / 
-  ;; allowing it to charge more vehicles)
-  charger-service ; a counter for the number of drivers each charger services
-  ;; necessary?
-  kwh-charged ; a count of how much energy a charger has given
-  ;; Interesting -- temporal charge rate.  How does this overlap with the supply of energy throughout the day?  *****
+  location         ; TAZ # for each charger
+  current-driver   ; driver currenlty being serviced, nobody indicates charger is available
+  charger-type     ; 1, 2, or 3
+  charge-rate      ; kWh / hr
+  num-sessions     ; count of charging sessions
+  energy-delivered ; kWh
+  energy-price     ; $0.14/kWh
+  charger-cost
+  current-charger-cost
  ]
 
 nodes-own[
-  taz-id ; TAZ id #
-  time-and-distance ;matrix containing time and distance info for every other node
-  taz-chargers-1 ; the number of level 1 chargers in the taz
-  taz-chargers-2 ; the number of level 2 chargers in the taz
-  taz-chargers-3 ; the number of level 3 chargers in the taz
+  id              ; TAZ id
+  chargers-in-taz ; list of all non-home chargers
+  home-charger    ; special charger available to all drivers when in their home taz
+  drivers-in-taz  ; list of drivers currently in TAZ
+  
+  n-levels        ; list containing the number of chargers for levels 1,2,3 at index 0,1,2
 ]
 
+;;;;;;;;;;;;;;;;;;;;
+;; SETUP
+;;;;;;;;;;;;;;;;;;;;
 to setup
+  print "setting up"
   __clear-all-and-reset-ticks
-  
+ 
   set schedule dynamic-scheduler:create
-  
-  reset-ticks
-  
+   
   create-turtles 1 [ setxy 0 0 set color black] ;This invisible turtle makes sure we start at node 1 not node 0
   
-  setup-od-array
+  set parameter-file "params.txt"
+  read-parameter-file
+  
+  setup-od-data
   setup-nodes
   setup-drivers
   setup-chargers
 end 
 
-
-to setup-od-array
-  print "setup-od-array"
-  ; Reads in main driver input file: Origin, destination, # of trips, distance, time
-  set od-from array:from-list n-values (n-nodes * n-nodes) [0] ; creates global od-from
-  set od-to array:from-list n-values (n-nodes * n-nodes) [0]           ; global od-to
-  set od-demand array:from-list n-values (n-nodes * n-nodes) [0]       ; global od-demand
-  set od-dist array:from-list n-values (n-nodes * n-nodes) [0]         ; global od-dist
-  set od-time array:from-list n-values (n-nodes * n-nodes) [0]         ; global od-time
-  
-  ifelse (file-exists? "../inputs/OD_Matrix_5.txt") [
-    file-close
-    file-open "../inputs/OD_Matrix_5.txt"
-    foreach n-values (n-nodes * n-nodes) [?] [
-     array:set od-from ? file-read array:set od-to ? file-read array:set od-demand ? (round file-read) array:set od-dist ? file-read array:set od-time ? (file-read)
-     ; HEVI code claims that the "Drive time is in the file as minutes" -- the example file OD_Matrix_5.txt would then suggest that drivers can
-     ; sustain a speed of 600mi/hr, if they travel 10 mi/min.  Changed to reflect drive time in the file as units hrs, even though this currently
-     ; reflects an average speed ~ 8mi/hr. ac 9/9
-    ]
-    file-close
-  ]
-  [ user-message "File not found: ../OD_Matrix_5.txt" ]
-  ;print (word "od-dist = " od-dist)
-end 
-
-to setup-nodes
-  print "setup-nodes"
-  create-nodes n-nodes  ; BUTTON for # of nodes?
-  ask nodes [
-    set shape "star"
-    set color yellow
-    set size 0.5
-  ]
-      ; Select the TAZ input file based on the alternative chooser on the interface. If the file does not exist, stop.
-      ; BUTTON??
-
-  ifelse (file-exists? alternative-input-file) [ ; ../inputs/alternative_4_5.txt
-    file-close
-    file-open alternative-input-file
-    foreach sort nodes[ ;this block reads taz-id, location, and charger info into each node
-      ask ? [
-      set taz-id file-read
-      setxy file-read file-read
-      set taz-chargers-1 file-read ; Sets the number of level 1 chargers in each node
-      set taz-chargers-2 file-read ; Sets the number of level 2 chargers in each node
-      set taz-chargers-3 file-read ; Sets the number of level 3 chargers in each node
-      ]    
-    ]
-  ]
-  [ user-message (word "Input file " alternative-input-file " not found!")] 
-   
-end ;setup-nodes
-
-to setup-drivers
-  print "setup-drivers"
-  ; creating drivers based on GEATM data, in setup-itinerary procedure. 
-  setup-itinerary
-  ; initialize driver state variables
-  ask drivers [
-    set phev? false ; TODO needs to be determined during itinerary setup
-                    ; what is "TODO" -- new procedure to define? -ac 9/8
-    set current-schedule-row 0
-    set shape "car"
-    set color green
-    set size 2
-    ifelse phev? [
-      set battery-capacity 25 ; TODO replace with values from a vehicle type distribution input file
-      set electric-fuel-consumption 0.35   ; kWh/mile
-    ][ 
-      set battery-capacity 25 ; 
-      set electric-fuel-consumption 0.35
-    ]
-    set state-of-charge 1
-    set status "not-charging"
-    set partner nobody
-
-    set current-taz array:item itin-from current-schedule-row
-    set destination-taz array:item itin-to current-schedule-row
-    set departure-time array:item itin-depart current-schedule-row
-    setxy [xcor] of node current-taz [ycor] of node current-taz   
-    check-charge  ; need to check the charge after defining destinations. ac 9/8
-  ]
-  ask drivers [
-    dynamic-scheduler:add schedule self task depart departure-time
-  ]
-  
-end ;setup-drivers
-
-to setup-itinerary
-  print "setup-itinerary"
-  ifelse (file-exists? driver-input-file) [ ; ../inputs/p1r1_5.txt  
-    file-close
-    file-open driver-input-file
-    let itin-row 0
-    let this-itin true
-    ;let dummy-read-line file-read-line  ; <--- added this 09/07, to allow the readfile to skip the first line (comments)
-    let next-driver file-read
-    let this-driver 0
-    while [file-at-end? = false] [
-      set this-driver next-driver
-      create-drivers 1 [
-        set itin-from array:from-list n-values 1 [-99]     ; creates global itin-from
-        set itin-to array:from-list n-values 1 [-99]       ; creates global itin-to
-        set itin-depart array:from-list n-values 1 [-99]   ; creates global itin-depart
-        array:set itin-from   0 file-read
-        array:set itin-to     0 file-read
-        array:set itin-depart 0	file-read
-        if file-at-end? = false [
-          set next-driver file-read
-          set this-itin true
-          while [next-driver = this-driver] [  
-            array:add itin-from	file-read
-            array:add itin-to	file-read
-            array:add itin-depart file-read
-            ifelse file-at-end? [ set next-driver -1][ set next-driver file-read ]
-          ] ; end while this-itin
-        ]
-      ] ; end create-drivers
-    ] ; end while file-at-end
-  ] ; end ifelse
-  [ user-message (word "Input file '" driver-input-file "' not found!") ]
-  file-close
-end ;setup-itinerary
-
-to setup-chargers
-  print "setup-chargers"
-  ; The charger level, location, and quantity of chargers was read in during setup-nodes.
-  ; Now chargers of each level are created at the appropriate node.
-  ; Charger-rate is currently a separate state variable from charger level. We may want to combine the two later, if
-  ; we do not use "charger level" for anything else.
-
-  foreach sort nodes [                       ; At each node, chargers equal to "taz-chargers"are created.
-    create-chargers [taz-chargers-1] of ? [  ; The location of each charger created is then set as the current TAZ location
-      set shape "Circle 2"
-      set color red
-      set size 1
-      set charger-level 1
-      set charger-rate 2.4 ; Charger rate is the charger power in kW. Data from (Markel 2010), see project document
-      set taz-location [taz-id] of ?
-      set xcor [xcor] of ?
-      set ycor [ycor] of ?]
-    
-    create-chargers [taz-chargers-2] of ? [  ; The location of each charger created is then set as the current TAZ location
-      set shape "Circle 2"
-      set color red
-      set size 1
-      set charger-level 2
-      set charger-rate 19.2 ; Charger rate is the charger power in kW. Data from (Markel 2010), see project document
-      set taz-location [taz-id] of ?
-      set xcor [xcor] of ?
-      set ycor [ycor] of ?]
-    
-    create-chargers [taz-chargers-3] of ? [  ; The location of each charger created is then set as the current TAZ location
-      set shape "Circle 2"
-      set color red
-      set size 1
-      set charger-level 3
-      set charger-rate 30 ; Charger rate is the charger power in kW. Data from (Markel 2010), see project document
-      set taz-location [taz-id] of ?
-      set xcor [xcor] of ?
-      set ycor [ycor] of ?]
-  ]  
-  ask chargers [
-    set available TRUE
-    ]
-  
-end ;setup-chargers
-
 to go
-  dynamic-scheduler:go schedule 
+  dynamic-scheduler:go-until schedule 16
 end
 
+;;;;;;;;;;;;;;;;;;;;
+;; NEED TO CHARGE
+;;;;;;;;;;;;;;;;;;;;
+to-report need-to-charge [calling-event]
+  set remaining-range (state-of-charge * battery-capacity / electric-fuel-consumption )
 
-;; define all subroutines
-;; need:
-;; -- TravelTime (schedules EVENT arrive)
-;; -- arrive 
-;;    -- if end of journey, remove from list
-;;    -- for remaining vehicles, enter STATE not-charging
+  ifelse ( (calling-event = "arrive" and remaining-range < journey-distance * charge-safety-factor) or 
+           (calling-event = "depart" and remaining-range < trip-distance * charge-safety-factor) )[ ; TODO add random draw here for people who charge but don't need to
+    report true
+    print (word precision ticks 3 " " self " NEEDS TO CHARGE! ")
+    set num-denials 0
+  ][
+    report false
+  ]
+end
 
-to check-charge
+;;;;;;;;;;;;;;;;;;;;
+;; RETRY SEEK
+;;;;;;;;;;;;;;;;;;;;
+to retry-seek
+  print (word precision ticks 3 " " self " retry-seek ")
 
-;; This submodel estimates the range of the EV. If the remaining-range is less than next-trip-range, returns a boolean need-to-charge? = false
+  seek-charger
+end
 
+;;;;;;;;;;;;;;;;;;;;
+;; SEEK CHARGER
+;;;;;;;;;;;;;;;;;;;;
+;; trip-charge-time-need set in CHARGE-TIME-EVENT-SCHEDULER 
+;;;;;;;;;;;;;;;;;;;;
+to seek-charger
+  print (word precision ticks 3 " " self " seek-charger ")
+  set time-until-depart departure-time - ticks
+  set extra-time-until-end-charge 0
+  set extra-time-for-travel 0
+  set extra-charge-time-for-travel 0
   
-    set next-trip-range array:item od-dist (([destination-taz] of self - 1) * 5 + [current-taz] of self - 1)
-    let remaining-range ((state-of-charge) * (battery-capacity)) / (electric-fuel-consumption * safety-factor)
-    ;; yields remaining range available in miles
-    ; remaining range is high when soc is high, low when soc is low. ac 9/8
-    if remaining-range > next-trip-range [set need-to-charge? false]
-    if remaining-range <= next-trip-range [set need-to-charge? true
-         ;print (word "next trip range = " next-trip-range)
-         ]
-    ;set minimum-acceptable-charge (elec-fuel-consump * next-trip-range) / batt-cap-mean
-   ;???? if phev? = false [if minimum-acceptable-charge > 1 [set phev? true]]
- ;   print (word "next trip range = " next-trip-range)
-   ; print (word "remaining range = " remaining-range)
-    ;print (word "need to charge? " need-to-charge?)
  
-  ;** adapted from find-minimum-charge
-  ; To determine minimum-acceptable-charge, we set a local variable equal to the distance of the next trip, multiply that by electric-fuel-consumption to get the required
-  ; kwh, and then divide by the battery capacity to get the required state-of-charge. Since the total-trip-dist and total-trip-times need to be set in "to depart" 
-  ; so that cars will leave at the start of the day, I do not set those values here. 
-end
-
-
-to depart
-  print "departing"
-  ask drivers [
-    if (status = "not-charging") and (ticks >= departure-time) [
-;      ;; step 1 - does the driver check-charge?
-      check-charge
-      ifelse need-to-charge? = true [   ;; if the driver needs to charge, send to seek-charger
-        ; will need to be able to charge en route; many destinations are greater than the max range. ac 9/8
-      ]
-      [   ;; if the driver does not need to charge, set to "traveling"
-          ;; step 2 - when does the driver arrive?
-        ;set total-trip-dist array:item od-dist (([destination-taz] of self - 1) * 5 + [current-taz] of self - 1)
-        set total-trip-dist next-trip-range  ; temporary -- next-trip-range is the same, and is calculated in check-charge. ac 9/8
-                                             ; is this value necessary? 
-        set total-trip-time array:item od-time (([destination-taz] of self - 1) * 5 + [current-taz] of self - 1) ; units = hrs? ac 9/9
-        let speed total-trip-dist / total-trip-time
-        ;print (word "in depart, going from " [current-taz] of self " to " [destination-taz] of self)
-        ;print (word "in depart, dist, time = " total-trip-dist ", " total-trip-time)
-        ;print (word "in depart, speed = " speed)
-        set arrival-time (ticks + total-trip-time)
-        ;print (word "in depart, arrival-time (trip time), departure time = " arrival-time ", " ticks)
-        set status "traveling"
-        dynamic-scheduler:add schedule self task arrive arrival-time
-        ;set color white
-      ]
-    ]
+  ;; submodel action 1:
+  ifelse time-until-depart > willing-to-roam-time-threshold [  
+    set willing-to-roam? true
+    set charger-in-origin-or-destination false ;; NOT REALLY SURE HOW TO TREAT THIS
   ]
-end
-  
-to arrive  ; **start here next time -- was working here on getting "arrive" to work. ac 9/8
-  ask drivers [
-    if status = "traveling" [
-      ;print (word "sending to update-soc from arrive at time " ticks)
-      update-soc
-     set current-schedule-row current-schedule-row + 1
-     carefully [  ;; *** needed here?  might be necessary for check-charge to work
-       set current-taz destination-taz
-       set destination-taz array:item itin-to current-schedule-row
-       set departure-time array:item itin-depart current-schedule-row
-       setxy [xcor] of node current-taz [ycor] of node current-taz   
-       
-     ;; determine if the driver will charge at its current location:
-       check-charge
-       ifelse need-to-charge? = true [ 
-         ;; send to seek-charger
-       ] 
-       [ ;; send to depart -- add next departure time to master schedule
-         set status "not-charging"
-         dynamic-scheduler:add schedule self task depart departure-time
-         ;print (word "new departure time for driver " self " = " departure-time)
-       ]
-     ]
-     [  ; if the first block in 'carefully' does not work -- if the next row in the schedule does not exist (is this a problem now?) 
-        ; -- this block is executed as a fail-safe.
-       set status "not-charging" ;Driver is home again. Yay!
-       set departure-time 99
-       set color green
-     ]
-    ]
+  [
+    set willing-to-roam? false
+    set charger-in-origin-or-destination true  ; TODO this needs to be updated once en-route/neighbor charging is implemented
   ]
-  
-end
-
-to update-soc
-  ;print (word "entered update-soc")
-  ask drivers [
-    if status = "traveling" [
-  ;print (word "soc before check = " state-of-charge)
-      ;set travel-time (ticks - departure-time)  ; note for future: departure-time will correspond to the time on the master schedule
-                                                ; at which a driver leaves a taz either after "arriving" or "charging" from changing
-                                                ; the intended schedule. ac 9/8
+    
+  ;; submodel action 2:
+  ifelse willing-to-roam? [
+    ;; driver will roam to find charger -- looks at ALL CHARGERS
+    ;; 1st -- look at chargers in current TAZ
+    foreach [chargers-in-taz] of current-taz [
+      if [current-driver] of ? = nobody [
+        print (word precision ticks 3 " " self " found " ?)
+        ask ? [
+          set current-driver myself 
+        ]
+        set current-charger ?
+        charge-time-event-scheduler
+        stop
+      ] 
+      ;; 2nd -- look at chargers en-route from current TAZ to destination TAZ
+      ;; how do we find the TAZs en-route?
+      ;; 1. what is the maximum distance the driver can travel?
+      ;; = trip-distance, set in UPDATE-ITINERARY, executed in ARRIVE
+      ;; 2. current charge = ___
+      ;; 3. 
+      ;; 4. what are the TAZs the driver will travel through?
+      ;foreach [chargers-in-taz] of destination-taz [  NO -- driver cannot reach destination-taz!
       
-      let speed (total-trip-dist / total-trip-time)
-      ;;set travel-dist (speed * travel-time)
-      if state-of-charge > 0 [
-        set state-of-charge (state-of-charge - (total-trip-dist * electric-fuel-consumption) / battery-capacity)
-        ] 
-    ; State of charge = current soc - (miles traveled [mi] * efficiency (kwh/mi) / capacity (kwh))
-  ;print (word "travel-time = " travel-time)
-  ;print (word "ticks, departure = " ticks ", " departure-time)
-  ;print (word "spead, trip dist, trip time = " speed ", " total-trip-dist ", " total-trip-time)
- 
-  ;print (word "soc is now = " state-of-charge)
-
+      ;; 3rd -- look at all other chargers in neighboring TAZs within acceptable range
     ]
-    if status = "charging" [
+  ][  
+    ;; driver will NOT roam to find charger -- looks only in current TAZ
+    let check-prices 0
+    foreach [chargers-in-taz] of current-taz [
+      if [current-driver] of ? = nobody [
+        print (word precision ticks 3 " " self " found " ?)
+        set current-charger ?
+        set current-trip-charge-time-need max sentence 0 ((trip-distance * charge-safety-factor * electric-fuel-consumption - state-of-charge * battery-capacity) / [charge-rate] of current-charger)
+        set current-journey-charge-time-need max sentence 0 ((journey-distance * charge-safety-factor * electric-fuel-consumption - state-of-charge * battery-capacity) / [charge-rate] of current-charger)
+        set current-full-charge-time-need (1 - state-of-charge) * battery-capacity / [charge-rate] of current-charger
+
+        set current-charger-cost (time-opportunity-cost * (extra-time-until-end-charge + extra-time-for-travel) + energy-price * charge-rate * (trip-charge-time-need + extra-charge-time-for-travel))
+        ; set charger-cost (12.50 * (0 + 0) + energy-price * charge-rate * (trip-charge-time-need + 0))
+        ; charger-cost = energy-price * charge-rate * trip-charge-time-need
+        
+        ifelse check-prices = 0 [
+          ask ? [
+            set current-driver myself 
+          ]
+          set trip-charge-time-need current-trip-charge-time-need
+          set journey-charge-time-need current-journey-charge-time-need
+          set full-charge-time-need current-full-charge-time-need
+        ]
+        [   ;; check-prices > 0
+          if last-charger-cost > current-charger-cost [
+            ask ? [
+              set current-driver myself 
+            ]
+            set trip-charge-time-need current-trip-charge-time-need
+            set journey-charge-time-need current-journey-charge-time-need
+            set full-charge-time-need current-full-charge-time-need          
+          ]
+        ]    
+      set last-charger-cost current-charger-cost
+      set check-prices (check-prices + 1)
+      ]
+    ] 
+  ]
     
-    
+  if current-charger = nobody [  
+    print (word precision ticks 3 " " self " NO CHARGER FOUND ") 
+    set num-denials (num-denials + 1)
+    wait-time-event-scheduler  
+  ]
+
+end
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;; WAIT TIME EVENT SCHEDULER
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;; wait-time-mean set in params.txt
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+to wait-time-event-scheduler
+  print (word precision ticks 3 " " self " wait-time-event-scheduler remaining-range:" remaining-range " trip-distance:" trip-distance " time-until-depart:" time-until-depart)
+  set state "not charging"
+  ifelse remaining-range / charge-safety-factor < trip-distance [
+    if departure-time <= ticks [
+      change-depart-time ticks + wait-time-mean
+    ]
+    dynamic-scheduler:add schedule self task retry-seek ticks + wait-time-mean ;; TODO make wait-time-mean random draw
+  ][
+    ifelse remaining-range / charge-safety-factor >= journey-distance or departure-time <= ticks [   ;time-until-depart <= 1 [
+      change-depart-time ticks 
+      print (word precision ticks 3 " " self " in wait-time-event-sched, deciding to depart at time " ticks)
+      dynamic-scheduler:add schedule self task depart departure-time
+    ][
+      dynamic-scheduler:add schedule self task retry-seek ticks + wait-time-mean ;; TODO make wait-time-mean random draw
     ]
   ]
 end
 
-;DECISION; check-charge:
-;;         ***assumes itinerary is never complete**
-;;         -- Is ChargeRange sufficient?
-;;            Executes check-charge submodel, Section 5.5
-;;            -- YES (include random yes) = goto STATE traveling
-;;            -- NO = goto DECISION seek-charger
-
-;DECISION; seek-charger:
-;;         -- see submodel, Section 5.6
-;;         -- NotFound? 
-;;            -- goto STATE not-charging, request wait-time
-;;         -- Found?
-;;            -- goto STATE charging, request ChargeTime
-
-
-;EventScheduler; itinerary:
-;;               -- see submodel, Section 5.1
-;;               -- schedule depart
-
-;EventScheduler; wait-time:
-;;               -- see submodel, Section 5.2
-;;               -- schedule [a time in the future to either] depart -OR- retry-seek
-;;                                                            (needs to be dummy variable)
-
-;STATE; not-charging:
-;; This will be the state that all drivers enter when parked -- waiting for a charging station, or to depart..
-;;      -- if came from STATE traveling -OR- charging:
-;;         -- enter EventScheduler itinerary:
-;;           -- add itinerary step
-;;           -- wait, then depart -> send to DECISION check-charge
-;;      -- if came from DECISION seek-charger:
-;;         -- enter EventScheduler wait-time:
-;;           -- either depart or retry-seek (in wait-time)
-;;           -- depart ;;;;-> send to DECISION check-charge
-;;           -- retry-seek -> send to DECISION seek-charger
-;;      -- if INITIALIZING, send to EventScheduler itinerary
-;;         -- send to depart
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;; CHARGE TIME EVENT SCHEDULER   
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;; time-until-depart set in SEEK CHARGER = departure-time - ticks
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+to charge-time-event-scheduler
+  set state "charging"
+  ifelse full-charge-time-need < trip-charge-time-need [  ;; if sufficent time to charge to full
+    set time-until-end-charge full-charge-time-need
+    ][                                                      
+    ifelse time-until-depart < trip-charge-time-need [   
+          ;; NOT SUFFICIENT TIME FOR NEXT TRIP - delay sched to allow for charging
+      set time-until-end-charge trip-charge-time-need    
+      ][                                                    
+      ;; SUFFICIENT TIME - 
+      ifelse charger-in-origin-or-destination [
+        ;; charge to full if enough time @ home/work
+        set time-until-end-charge min sentence time-until-depart full-charge-time-need 
+        ][                                                  
+        ifelse [charger-type] of current-charger = 3 [  
+          ;; charge until departure or journey charge time, whichever comes first 
+          set time-until-end-charge min sentence time-until-depart journey-charge-time-need
+          ][
+          ;; charge until departure or trip charge time, whichever comes first
+          set time-until-end-charge min sentence time-until-depart trip-charge-time-need
+          ]
+        ]
+      ]
+    ]
 
 
-;EventScheduler; ChargeTime:
-;;               -- see submodel, Section 5.4
-;;               -- schedule end-charge 
+  let next-event-scheduled-at 0 
+  ifelse (time-until-depart > 0.5) and ([charger-type] of current-charger < 3) and (time-until-end-charge < trip-charge-time-need) [  ;; charger = 1 or 2                                                                                                    
+    set next-event-scheduled-at ticks + min (sentence wait-time-mean (time-until-depart - 0.5)) ;; TODO make wait-time-mean random draw with max of time-until-depart - 0.5  
+    dynamic-scheduler:add schedule self task retry-seek next-event-scheduled-at
+    print (word precision ticks 3 " " self " scheduling retry-seek, time-until-end-charge: " time-until-end-charge ", trip-charge-time-need: " trip-charge-time-need)
+  ][
+    ifelse (time-until-depart > 0.5) and ([charger-type] of current-charger < 2) and (time-until-end-charge < journey-charge-time-need) [  ;; charger = 1
+      set next-event-scheduled-at ticks + min (sentence wait-time-mean (time-until-depart - 0.5)) ;; TODO make wait-time-mean random draw with max of time-until-depart - 0.5  
+      dynamic-scheduler:add schedule self task retry-seek next-event-scheduled-at
+      print (word precision ticks 3 " " self " scheduling retry-seek for " next-event-scheduled-at " time-until-end-charge: " time-until-end-charge ", journey-charge-time-need: " journey-charge-time-need)
+    ][
+      set next-event-scheduled-at ticks + time-until-end-charge
+      dynamic-scheduler:add schedule self task end-charge next-event-scheduled-at
+      print (word precision ticks 3 " " self " scheduling end-charge, time-until-end-charge: " time-until-end-charge)
+    ]
+  ]
+  if next-event-scheduled-at > departure-time[
+    change-depart-time next-event-scheduled-at
+  ]
+end
 
-;STATE; charging:
-;;      -- goto EventScheduler ChargeTime
-;;      -- execute charging algorithm
-;;         -- will they always charge to a "full" battery, or disengage prematurely?
-;;      -- upon end-charge, enter STATE not-charging
+;;;;;;;;;;;;;;;;;;;;;;;;;
+;; CHANGE DEPARTURE TIME
+;;;;;;;;;;;;;;;;;;;;;;;;;
 
+to change-depart-time [new-depart-time]
+  set itin-depart replace-item current-itin-row itin-depart new-depart-time
+  print (word precision ticks 3 " " self " new-depart-time: " new-depart-time " for row: " current-itin-row " new itin-depart: " itin-depart)      
+  if current-itin-row < (length itin-depart - 1)[
+    foreach n-values (length itin-depart - current-itin-row - 1) [current-itin-row + ? + 1] [ change-depart-time-row ?  ]
+  ]
+  set departure-time new-depart-time
+end
 
-;EventScheduler; TravelTime:
-;;               -- see submodel, Section 5.3
-;;               -- schedule event arrive
+to change-depart-time-row [row-num]
+  if item row-num itin-depart < item (row-num - 1) itin-depart[
+    set itin-depart replace-item row-num itin-depart (0.5 + item (row-num - 1) itin-depart) ;; TODO make sub-model about how itin is adjusted when multiple trips are impacted
+  ]
+end
 
-;STATE; traveling:
-;;      -- execute EventScheduler TravelTime 
-;;      -- upon arrive, enter STATE not-charging
+;;;;;;;;;;;;;;;;;;;;
+;; END CHARGE
+;;;;;;;;;;;;;;;;;;;;
 
+to end-charge
+  set state-of-charge (state-of-charge + time-until-end-charge * [charge-rate] of current-charger / battery-capacity)
+  print (word precision ticks 3 " " self " ending charge soc:" precision state-of-charge 3)
+  ask current-charger [ set current-driver nobody ]
+  set current-charger nobody
 
+  itinerary-event-scheduler
+end
 
-;;in GO:
-;;   -- initialize itinerary
-;;   -- send to not-charging
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;; ITINERARY EVENT SCHEDULER
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+to itinerary-event-scheduler
+  set state "not-charging"
+  
+  dynamic-scheduler:add schedule self task depart departure-time
+end
+
+;;;;;;;;;;;;;;;;;;;;
+;; DEPART
+;;;;;;;;;;;;;;;;;;;;
+to depart
+  print (word precision ticks 3 " " self " departing, soc:" state-of-charge)
+  ;print (word precision ticks 3 " " self " itinerary (upon departure):" itin-depart)
+  ifelse need-to-charge "depart" [  
+    ifelse state-of-charge = 1 [ 
+      print (word precision ticks 3 " " self " cannot make trip with full battery") ;; TODO this shouldn't happen when PHEV are implemented
+    ][
+      seek-charger   
+    ]
+  ][  
+    travel-time-event-scheduler
+  ]
+end
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;; TRAVEL TIME EVENT SCHEDULER
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+to travel-time-event-scheduler
+  set state "traveling"
+  set trip-time item my-od-index od-time
+  set arrival-time (ticks + trip-time)
+  dynamic-scheduler:add schedule self task arrive arrival-time
+  print (word precision ticks 3 " " self " next arrival time: " precision arrival-time 3)
+end
+
+;;;;;;;;;;;;;;;;;;;;
+;; ARRIVE
+;;;;;;;;;;;;;;;;;;;;
+to arrive
+  set state-of-charge (state-of-charge - trip-distance * electric-fuel-consumption / battery-capacity)
+  set journey-distance journey-distance - trip-distance
+  print (word precision ticks 3 " " self " arriving, trip-distance: " trip-distance " soc:" state-of-charge " elec-fc:" electric-fuel-consumption " cap" battery-capacity)
+  update-itinerary 
+      
+  if not itin-complete? [
+    ifelse need-to-charge "arrive" [   
+      ifelse state-of-charge = 1 [ 
+        print (word precision ticks 3 " " self " cannot make trip with full battery") ;; TODO this shouldn't happen when PHEV are implemented
+      ][
+        seek-charger  
+      ]
+    ][
+      itinerary-event-scheduler  
+    ]
+  ]
+
+end
+
+;;;;;;;;;;;;;;;;;;;;
+;; UPDATE ITINERARY
+;;;;;;;;;;;;;;;;;;;;
+to update-itinerary
+  ifelse (current-itin-row + 1 < length itin-from) [
+    set current-itin-row current-itin-row + 1
+    set current-taz node item current-itin-row itin-from
+    set destination-taz node item current-itin-row itin-to
+    ifelse ((item current-itin-row itin-depart) < ticks)[     
+      change-depart-time ticks
+    ][
+      set departure-time item current-itin-row itin-depart
+    ] 
+    set trip-distance item my-od-index od-dist
+  ][
+    set itin-complete? true
+  ]
+end
+
+to-report distance-from-to [from-taz to-taz]
+  report item ((from-taz - 1) * n-nodes + to-taz - 1 ) od-dist
+end
+to-report od-index [destination source]
+  report ((destination - 1) * n-nodes + source - 1)
+end
+
+to-report my-od-index
+  report (([id] of destination-taz - 1) * n-nodes + [id] of current-taz - 1)
+end
+
+to-report driver-soc [the-driver]
+  report [state-of-charge] of the-driver
+end
 @#$#@#$#@
 GRAPHICS-WINDOW
-375
-19
-775
-425
+86
+10
+331
+207
 -1
 -1
-15.0
+6.654
 1
 10
 1
@@ -483,110 +491,11 @@ GRAPHICS-WINDOW
 ticks
 30.0
 
-INPUTBOX
-149
-41
-304
-101
-n-nodes
-5
-1
-0
-Number
-
-INPUTBOX
-836
-30
-1071
-90
-alternative-input-file
-../inputs/alternative_4_5.txt
-1
-0
-String
-
-INPUTBOX
-26
-45
-129
-105
-batt-cap-mean
-24
-1
-0
-Number
-
-INPUTBOX
-25
-111
-123
-171
-batt-cap-stdv
-1
-1
-0
-Number
-
-INPUTBOX
-24
-177
-115
-237
-batt-cap-range
-5
-1
-0
-Number
-
-INPUTBOX
-24
-305
-134
-365
-fuel-economy-stdv
-0.05
-1
-0
-Number
-
-INPUTBOX
-24
-369
-141
-429
-fuel-economy-range
-0.1
-1
-0
-Number
-
-INPUTBOX
-837
-97
-1072
-157
-driver-input-file
-../inputs/p1r1_5.txt
-1
-0
-String
-
-INPUTBOX
-152
-115
-307
-175
-safety-factor
-0.1
-1
-0
-Number
-
 BUTTON
-163
-267
-229
-300
+9
+10
+75
+43
 NIL
 setup
 NIL
@@ -600,10 +509,10 @@ NIL
 1
 
 BUTTON
-165
-317
-228
-350
+9
+47
+72
+80
 NIL
 go
 T

@@ -144,10 +144,13 @@ od.pm.old <- read.table(paste(path.to.geatm,'OD_Tables/OD by type PM (2020).txt'
 names(od.pm.old) <- c('from','to','hbw','hbshop','hbelem','hbuniv','hbro','nhb','ix','xi','ee','demand')
 
 # for testing
-od <- od.24.old[59585:59605,]
+to.keep <- 100:120
+od <- od.24.old[od.24.old$from %in% to.keep & od.24.old$to %in% to.keep,]
+od <- od.24.old
 od.weighted <- od
 for(taz.i in 1:length(taz.weights.by.penetration)){
   newtaz <- as.numeric(names(taz.weights.by.penetration[taz.i]))
+  cat(newtaz)
   od.from.inds  <- which(od$from==newtaz)
   od.to.inds    <- which(od$to  ==newtaz)
   od.from.diff  <- (taz.weights.by.penetration[taz.i] - 1) * sum(od$demand[od.from.inds])
@@ -161,17 +164,19 @@ for(taz.i in 1:length(taz.weights.by.penetration)){
     from.to.distribute  <- od.from.diff * distance.weight
     distance.weight.from.inds <- which(od$from==distance.weight.taz)
     if(length(distance.weight.from.inds)>0){
-      from.distributed.additive <- from.to.distribute * od$demand[distance.weight.from.inds] / sum(od$demand[distance.weight.from.inds])
-      from.distributed.multiplicative <- (from.distributed.additive + od$demand[distance.weight.from.inds])/ od$demand[distance.weight.from.inds]
-      od.weighted[distance.weight.from.inds,3:ncol(od)] <- apply(od[distance.weight.from.inds,3:ncol(od)],2,function(x){ x * from.distributed.multiplicative })
+      from.distributed.additive <- from.to.distribute * od.weighted$demand[distance.weight.from.inds] / sum(od.weighted$demand[distance.weight.from.inds])
+      from.distributed.multiplicative <- (from.distributed.additive + od.weighted$demand[distance.weight.from.inds])/ od.weighted$demand[distance.weight.from.inds]
+      from.distributed.multiplicative[is.nan(from.distributed.multiplicative)] <- 1
+      od.weighted[distance.weight.from.inds,ncol(od)] <- od.weighted[distance.weight.from.inds,ncol(od)] * from.distributed.multiplicative
     }
     #to
     to.to.distribute    <- od.to.diff * distance.weight
     distance.weight.to.inds   <- which(od$to==distance.weight.taz)
-    if(length(distance.weight.from.inds)>0){
-      to.distributed.additive <- to.to.distribute * od$demand[distance.weight.to.inds] / sum(od$demand[distance.weight.to.inds])
-      to.distributed.multiplicative <- (to.distributed.additive + od$demand[distance.weight.to.inds])/od$demand[distance.weight.to.inds]
-      od.weighted[distance.weight.to.inds,3:ncol(od)] <- apply(od[distance.weight.to.inds,3:ncol(od)],2,function(x){ x * to.distributed.multiplicative })
+    if(length(distance.weight.to.inds)>0){
+      to.distributed.additive <- to.to.distribute * od.weighted$demand[distance.weight.to.inds] / sum(od.weighted$demand[distance.weight.to.inds])
+      to.distributed.multiplicative <- (to.distributed.additive + od.weighted$demand[distance.weight.to.inds])/od.weighted$demand[distance.weight.to.inds]
+      to.distributed.multiplicative[is.nan(to.distributed.multiplicative)] <- 1
+      od.weighted[distance.weight.to.inds,ncol(od)] <- od.weighted[distance.weight.to.inds,ncol(od)] * to.distributed.multiplicative
     }
   }
 }

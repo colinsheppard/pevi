@@ -8,7 +8,7 @@ globals [
   od-time
   od-enroute
   
-  n-nodes
+  n-tazs
   
   schedule  ;; this global variable holds the dynamic schedule for the PEVI program, appended by the drivers from their itineraries
   
@@ -34,7 +34,8 @@ globals [
 
 breed [drivers driver]
 breed [chargers charger]
-breed [nodes node]
+breed [tazs taz]
+breed [charger-types charger-type]
 
 drivers-own [
 ;; VEHICLE
@@ -70,7 +71,7 @@ drivers-own [
   trip-distance
   journey-distance
   remaining-range
-  travel-dist ; used to store distance driven since departure
+  charging-distance ; distance for which the driver intends to gain adequate charge (either trip-distance or journey-distance)
   departure-time ;When the vehicle is set to leave the taz
   arrival-time ; when a car is supposed to arrive
   minimum-acceptable-charge ; The charge required to reach the next destination
@@ -93,6 +94,7 @@ drivers-own [
 
 ;; TRACKING
   num-denials
+  taz-list
   
 ;; CANDIDATE ADDITIONS TO MODEL DESCRIPTION
   kwh-received ; a count of how much energy each driver has charged
@@ -102,24 +104,31 @@ drivers-own [
 chargers-own[
   location         ; TAZ # for each charger
   current-driver   ; driver currenlty being serviced, nobody indicates charger is available
-  charger-type     ; 1, 2, or 3
-  charge-rate      ; kWh / hr
+  this-charger-type     ; 1, 2, or 3 ***address name later?
+
   num-sessions     ; count of charging sessions
   energy-delivered ; kWh
-  energy-price     ; $0.14/kWh
+
   last-charger-cost
   current-charger-cost
  ]
 
-nodes-own[
+tazs-own[
   id              ; TAZ id
   chargers-in-taz ; list of all non-home chargers
-  home-charger    ; special charger available to all drivers when in their home taz
+  ;home-charger    ; special charger available to all drivers when in their home taz
   drivers-in-taz  ; list of drivers currently in TAZ
   
   neighbor-tazs   ; list of tazs within charger-search-distance of this taz
   
-  n-levels        ; list containing the number of chargers for levels 1,2,3 at index 0,1,2
+  n-levels        ; list containing the number of chargers for levels 0,1,2,3 at index 0,1,2,3, where 0=home
+]
+
+charger-types-own[
+  level            ; 0,1,2,3, where 0=home
+  charge-rate      ; kWh / hr  
+  energy-price     ; $0.14/kWh  
+  charge-time-need
 ]
 
 ;;;;;;;;;;;;;;;;;;;;
@@ -131,15 +140,16 @@ to setup
  
   set schedule dynamic-scheduler:create
    
-  create-turtles 1 [ setxy 0 0 set color black] ;This invisible turtle makes sure we start at node 1 not node 0
+  create-turtles 1 [ setxy 0 0 set color black] ;This invisible turtle makes sure we start at taz 1 not taz 0
   
   set parameter-file "params.txt"
   read-parameter-file
   
   setup-od-data
-  setup-nodes
+  setup-tazs
   convert-enroute-ids
   setup-drivers
+  setup-charger-types
   setup-chargers
 end 
 
@@ -185,76 +195,29 @@ to seek-charger
   set extra-charge-time-for-travel 0
   
   ;; submodel action 1:
-  ifelse time-until-depart > willing-to-roam-time-threshold [  
-    set willing-to-roam? true  ;; temporarily setting this to FALSE to test this submodel
+  ifelse time-until-depart < willing-to-roam-time-threshold [  
+    set willing-to-roam? true  
   ][
-    set willing-to-roam? true 
+    set willing-to-roam? false 
   ]
-  set charger-in-origin-or-destination true  ; TODO this needs to be updated once en-route/neighbor charging is implemented    
+  ;set charger-in-origin-or-destination true  ; TODO this needs to be updated once en-route/neighbor charging is implemented    
   ;; submodel action 2:
   ifelse willing-to-roam? [
-    ;; driver will roam to find charger -- looks at ALL CHARGERS
-    ;; 1st -- look at chargers in current TAZ
-    foreach [chargers-in-taz] of current-taz [
-      if [current-driver] of ? = nobody [
-        print (word precision ticks 3 " " self " found " ?)
-        ask ? [
-          set current-driver myself 
-        ]
-        set current-charger ?
-        charge-time-event-scheduler
-        stop
-      ]
-    ]
+
+    ;; look in temp/PEVI-seek-charge-scrap-code.txt for this code. temporarily removed for clarity.
+
   ][  
-    ;; driver will NOT roam to find charger -- looks only in current TAZ
+    ;; 1. build a list of tazs to search -- only current TAZ
+    set taz-list (current-taz)
+    ;; 2. calculate trip-charge-time-need for each type of charger
+    foreach [level] of charger-types [  ;; calculates the charge-time-need(ed) for each level of charger.
+      set [charge-time-need] of ? max sentence 0 ((charging-distance * charge-safety-factor * electric-fuel-consumption - state-of-charge * battery-capacity) / [charge-rate] of ?)
+    ]
+    
     let check-prices 0
     foreach [chargers-in-taz] of current-taz [
-      if [current-driver] of ? = nobody [
-;        print (word precision ticks 3 " " self " found " ?)
-   ;     set current-charger ?
-;      print (word "current tctn: " current-trip-charge-time-need)
- ;       print (word "soc: " state-of-charge " battcap: " battery-capacity " chargerate: " [charge-rate] of current-charger " trip-distance: " trip-distance " csf: " charge-safety-factor " efc: " electric-fuel-consumption)
-        ;; WORKING HERE!!! ^
 
-
-        ask ? [
-          ;set current-charger-cost (([time-opportunity-cost] of myself) * (([extra-time-until-end-charge] of myself) + ([extra-time-for-travel] of myself)) + energy-price * charge-rate * (([current-trip-charge-time-need] of myself) + ([extra-charge-time-for-travel] of myself)))
-          set current-charger-cost (12.50 * (0 + 0) + energy-price * charge-rate * (([current-trip-charge-time-need] of myself) + 0))
-          ; charger-cost = energy-price * charge-rate * trip-charge-time-need
-          print (word "in ask ?, current tctn: " ([current-trip-charge-time-need] of myself))
-        ]
-        print (word precision ticks 3 " " self " current-charger-cost: " [current-charger-cost] of current-charger)        
-        print (word "CHECK-PRICES: " check-prices)
-        
-        ifelse check-prices = 0 [
-          ask ? [
-            set current-driver myself 
-          ]
-          print (word precision ticks 3 " " self " charger: " current-charger " price: " [current-charger-cost] of current-charger)
-          print (word precision ticks 3 " " self " trip ct: " trip-charge-time-need " journey ct: " journey-charge-time-need " full ct: " full-charge-time-need)
-
-          set trip-charge-time-need current-trip-charge-time-need
-          set journey-charge-time-need current-journey-charge-time-need
-          set full-charge-time-need current-full-charge-time-need
-        ]
-        [   ;; check-prices > 0        
-          if ([last-charger-cost] of current-charger) > ([current-charger-cost] of current-charger) [
-            ask ? [
-              set current-driver myself 
-            ]
-            set trip-charge-time-need current-trip-charge-time-need
-            set journey-charge-time-need current-journey-charge-time-need
-            set full-charge-time-need current-full-charge-time-need          
-          ]
-        ]    
-        
-        ask ? [
-          set last-charger-cost current-charger-cost
-        ]
-        set check-prices (check-prices + 1)
-      ]
-    ] 
+    ]
   ]
     
   if current-charger = nobody [  
@@ -303,14 +266,14 @@ to charge-time-event-scheduler
                                                     journey-charge-time-need 
                                                     time-until-depart 
                                                     charger-in-origin-or-destination 
-                                                    [charger-type] of current-charger)
+                                                    [this-charger-type] of current-charger)
   let next-event-scheduled-at 0 
-  ifelse (time-until-depart > 0.5) and ([charger-type] of current-charger < 3) and (time-until-end-charge < trip-charge-time-need) [  ;; charger = 1 or 2                                                                                                    
+  ifelse (time-until-depart > 0.5) and ([this-charger-type] of current-charger < 3) and (time-until-end-charge < trip-charge-time-need) [  ;; charger = 1 or 2                                                                                                    
     set next-event-scheduled-at ticks + min (sentence wait-time-mean (time-until-depart - 0.5)) ;; TODO make wait-time-mean random draw with max of time-until-depart - 0.5  
     dynamic-scheduler:add schedule self task retry-seek next-event-scheduled-at
     print (word precision ticks 3 " " self " scheduling retry-seek, time-until-end-charge: " time-until-end-charge ", trip-charge-time-need: " trip-charge-time-need)
   ][
-    ifelse (time-until-depart > 0.5) and ([charger-type] of current-charger < 2) and (time-until-end-charge < journey-charge-time-need) [  ;; charger = 1
+    ifelse (time-until-depart > 0.5) and ([this-charger-type] of current-charger < 2) and (time-until-end-charge < journey-charge-time-need) [  ;; charger = 1
       set next-event-scheduled-at ticks + min (sentence wait-time-mean (time-until-depart - 0.5)) ;; TODO make wait-time-mean random draw with max of time-until-depart - 0.5  
       dynamic-scheduler:add schedule self task retry-seek next-event-scheduled-at
       print (word precision ticks 3 " " self " scheduling retry-seek for " next-event-scheduled-at " time-until-end-charge: " time-until-end-charge ", journey-charge-time-need: " journey-charge-time-need)
@@ -325,7 +288,7 @@ to charge-time-event-scheduler
   ]
 end
 
-to-report calc-time-until-end-charge [#full-charge-time-need #trip-charge-time-need #journey-charge-time-need #time-until-depart #charger-in-origin-or-destination #charger-type]
+to-report calc-time-until-end-charge [#full-charge-time-need #trip-charge-time-need #journey-charge-time-need #time-until-depart #charger-in-origin-or-destination #this-charger-type]
   ifelse #full-charge-time-need < #trip-charge-time-need [  ;; if sufficent time to charge to full
     report #full-charge-time-need
   ][                                                      
@@ -338,7 +301,7 @@ to-report calc-time-until-end-charge [#full-charge-time-need #trip-charge-time-n
         ;; charge to full if enough time @ home/work
         report min sentence #time-until-depart #full-charge-time-need 
       ][                                                  
-        ifelse #charger-type = 3 [  
+        ifelse #this-charger-type = 3 [  
           ;; charge until departure or journey charge time, whichever comes first 
           report min (sentence #time-until-depart #journey-charge-time-need #full-charge-time-need)
         ][
@@ -401,6 +364,8 @@ to depart
     ifelse state-of-charge = 1 [ 
       print (word precision ticks 3 " " self " cannot make trip with full battery") ;; TODO this shouldn't happen when PHEV are implemented
     ][
+      print (word precision ticks 3 " " self " cannot make TRIP with current charge. Seeking charger.")
+      set charging-distance trip-distance
       seek-charger   
     ]
   ][  
@@ -433,6 +398,8 @@ to arrive
       ifelse state-of-charge = 1 [ 
         print (word precision ticks 3 " " self " cannot make trip with full battery") ;; TODO this shouldn't happen when PHEV are implemented
       ][
+        print (word precision ticks 3 " " self " cannot make JOURNEY with current charge. Seeking charger.")
+        set charging-distance journey-distance
         seek-charger  
       ]
     ][
@@ -448,8 +415,8 @@ end
 to update-itinerary
   ifelse (current-itin-row + 1 < length itin-from) [
     set current-itin-row current-itin-row + 1
-    set current-taz node item current-itin-row itin-from
-    set destination-taz node item current-itin-row itin-to
+    set current-taz taz item current-itin-row itin-from
+    set destination-taz taz item current-itin-row itin-to
     ifelse ((item current-itin-row itin-depart) < ticks)[     
       change-depart-time ticks
     ][
@@ -462,14 +429,14 @@ to update-itinerary
 end
 
 to-report distance-from-to [from-taz to-taz]
-  report item ((from-taz - 1) * n-nodes + to-taz - 1 ) od-dist
+  report item ((from-taz - 1) * n-tazs + to-taz - 1 ) od-dist
 end
 to-report od-index [destination source]
-  report ((destination - 1) * n-nodes + source - 1)
+  report ((destination - 1) * n-tazs + source - 1)
 end
 
 to-report my-od-index
-  report (([id] of destination-taz - 1) * n-nodes + [id] of current-taz - 1)
+  report (([id] of destination-taz - 1) * n-tazs + [id] of current-taz - 1)
 end
 
 to-report driver-soc [the-driver]
@@ -541,7 +508,7 @@ MONITOR
 292
 14
 1077
-60
+59
 od-enroute
 od-enroute
 17

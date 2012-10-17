@@ -7,7 +7,7 @@ to read-parameter-file
     file-open parameter-file
     while [not file-at-end?][
       let param-name file-read
-      ifelse param-name = "n-nodes" [ set n-nodes file-read ][  ; TODO, infer this from the od input file
+      ifelse param-name = "n-tazs" [ set n-tazs file-read ][  ; TODO, infer this from the od input file
       ifelse param-name = "charge-safety-factor" [ set charge-safety-factor file-read ][
       ifelse param-name = "charger-search-distance" [ set charger-search-distance file-read ][
       ifelse param-name = "wait-time-mean" [ set wait-time-mean file-read ][
@@ -33,16 +33,16 @@ end
 to setup-od-data
   print "setup-od-data"
   ; Reads in main driver input file: Origin, destination, # of trips, distance, time
-  set od-from   n-values (n-nodes * n-nodes) [0] 
-  set od-to     n-values (n-nodes * n-nodes) [0] 
-  set od-dist   n-values (n-nodes * n-nodes) [0] 
-  set od-time   n-values (n-nodes * n-nodes) [0] 
-  set od-enroute n-values (n-nodes * n-nodes) [n-values (0) [0]] 
+  set od-from   n-values (n-tazs * n-tazs) [0] 
+  set od-to     n-values (n-tazs * n-tazs) [0] 
+  set od-dist   n-values (n-tazs * n-tazs) [0] 
+  set od-time   n-values (n-tazs * n-tazs) [0] 
+  set od-enroute n-values (n-tazs * n-tazs) [n-values (0) [0]] 
   
   ifelse (file-exists? od-input-file) [ ; ../inputs/OD_Matrix_5.txt
     file-close
     file-open od-input-file
-    foreach n-values (n-nodes * n-nodes) [?] [
+    foreach n-values (n-tazs * n-tazs) [?] [
      set od-from   replace-item ? od-from file-read 
      set od-to     replace-item ? od-to   file-read 
      set od-dist   replace-item ? od-dist file-read 
@@ -73,40 +73,38 @@ to-report split [ #string #sep ] ; #sep must be non-empty string
 end
 
 ;;;;;;;;;;;;;;;;;;;;
-;; SETUP NODES
+;; SETUP tazS
 ;;;;;;;;;;;;;;;;;;;;
-to setup-nodes
-  print "setup-nodes"
-  create-nodes n-nodes
-  ask nodes [
+to setup-tazs
+  print "setup-tazs"
+  create-tazs n-tazs
+  ask tazs [
     set shape "star"
     set color yellow
     set size 0.5
-    set n-levels n-values 3 [-99]
+    set n-levels n-values 4 [-99]  ; 10.17 ac - 4 levels of chargers, 0,1,2,3, 0=home
     set chargers-in-taz n-values 0 [0]
   ]
   ifelse (file-exists? charger-input-file) [ ; ../inputs/alternative_4_5.txt
     file-close
     file-open charger-input-file
-    foreach sort nodes[ ;this block reads taz-id, location, and charger info into each node
-      ask ? [
+    ask tazs [
         set id file-read
-        setxy file-read file-read
-        foreach [0 1 2] [
-          set n-levels replace-item ? n-levels file-read
+        ;setxy file-read file-read  ; 10.17 ac - removed columns for xy locations of chargers from alt_4_5.txt
+        foreach [0 1 2 3] [
+          set n-levels replace-item ? n-levels file-read ; sets the number of level X chargers in each TAZ
         ]
         set neighbor-tazs n-values 0 [0]
-        foreach n-values n-nodes [? + 1] [
-          if not (? = id) and (distance-from-to id ? <= charger-search-distance) [
-           set neighbor-tazs fput node ? neighbor-tazs
-          ]
+        foreach n-values n-tazs [? + 1] [
+        if not (? = id) and (distance-from-to id ? <= charger-search-distance) [
+         set neighbor-tazs fput taz ? neighbor-tazs
         ]
-      ]    
-    ]
+      ]
+    ]    
   ]
   [ user-message (word "Input file '" charger-input-file "' not found!")]
    
-end ;setup-nodes
+end ;setup-tazs
 
 ;;;;;;;;;;;;;;;;;;;;;;;
 ;; CONVERT ENROUTE IDS
@@ -115,7 +113,7 @@ to convert-enroute-ids
   foreach n-values length od-enroute [?] [
     let old-enroute-list item ? od-enroute
     foreach n-values length old-enroute-list [?] [
-      set old-enroute-list replace-item ? old-enroute-list (node item ? old-enroute-list)
+      set old-enroute-list replace-item ? old-enroute-list (taz item ? old-enroute-list)
     ]
     set od-enroute replace-item ? od-enroute old-enroute-list
   ]
@@ -193,29 +191,59 @@ to setup-itinerary
 end ;setup-itinerary
 
 ;;;;;;;;;;;;;;;;;;;;
+;; SETUP CHARGER-TYPES
+;;;;;;;;;;;;;;;;;;;;
+to setup-charger-types
+  print "setup-charger-types"
+  
+  create-charger-types 1 [
+    set level 0          ; dedicated home charger
+    set charge-rate 1.92 ; kW. 120V x 16A peak current, single phase: http://www.sae.org/mags/AEI/7479
+    set energy-price 0.14 ; 
+  ]
+  create-charger-types 1 [  ; 
+    set level 1
+    set charge-rate 2.4 ; Charger rate is the charger power in kW. Data from (Markel 2010), see project document
+    set energy-price 0.14 ; 
+  ]
+  create-charger-types 1 [  ; 
+    set level 2
+    set charge-rate 19.2 ; Charger rate is the charger power in kW. Data from (Markel 2010), see project document
+    set energy-price 0.14 ; 
+  ]
+  create-charger-types 1 [  ; 
+    set level 3
+    set charge-rate 30 ; Charger rate is the charger power in kW. Data from (Markel 2010), see project document
+                       ; Charger rate may be anywhere from 20-250kW (Markel 2010)
+    set energy-price 0.14 ; 
+  ]
+end 
+
+;;;;;;;;;;;;;;;;;;;;
 ;; SETUP CHARGERS
 ;;;;;;;;;;;;;;;;;;;;
 to setup-chargers
   print "setup-chargers"
-  ; The charger level, location, and quantity of chargers was read in during setup-nodes.
-  ; Now chargers of each level are created at the appropriate node.
+  ; The charger level, location, and quantity of chargers was read in during setup-tazs.
+  ; Now chargers of each level are created at the appropriate taz.
   ; Charger-rate is currently a separate state variable from charger level. We may want to combine the two later, if
   ; we do not use "charger level" for anything else.
 
-  foreach sort nodes [                       ; At each node,  chargers equal to "taz-chargers"are created.
+  ask tazs [                       ; At each taz,  chargers equal to "taz-chargers"are created.
     create-chargers [item 0 n-levels] of ? [  ; The location of each charger created is then set as the current TAZ location
-      set charger-type 1
-      set charge-rate 2.4 ; Charger rate is the charger power in kW. Data from (Markel 2010), see project document
+      set this-charger-type one-of charger-types with [level = 0]
       set location ?
     ]
-    create-chargers [item 0 n-levels] of ? [  ; The location of each charger created is then set as the current TAZ location
-      set charger-type 2
-      set charge-rate 19.2 ; Charger rate is the charger power in kW. Data from (Markel 2010), see project document
+    create-chargers [item 1 n-levels] of ? [  ; The location of each charger created is then set as the current TAZ location
+      set this-charger-type one-of charger-types with [level = 1]
       set location ?
     ]
-    create-chargers [item 0 n-levels] of ? [  ; The location of each charger created is then set as the current TAZ location
-      set charger-type 3
-      set charge-rate 30 ; Charger rate is the charger power in kW. Data from (Markel 2010), see project document
+    create-chargers [item 2 n-levels] of ? [  ; The location of each charger created is then set as the current TAZ location
+      set this-charger-type one-of charger-types with [level = 2]
+      set location ?
+    ]
+    create-chargers [item 3 n-levels] of ? [  ; The location of each charger created is then set as the current TAZ location
+      set this-charger-type one-of charger-types with [level = 3]
       set location ?
     ]
   ]  
@@ -224,8 +252,8 @@ to setup-chargers
     set color red
     set size 1
     set current-driver nobody
-    set xcor [xcor] of location
-    set ycor [ycor] of location
+    ;set xcor [xcor] of location
+    ;set ycor [ycor] of location
     ask location[
       set chargers-in-taz lput myself chargers-in-taz
     ]

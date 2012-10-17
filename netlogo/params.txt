@@ -1,4 +1,4 @@
-"n-nodes"	5 
+"n-tazs"	5 
 "charge-safety-factor"	1.1
 "charger-search-distance"	50
 "wait-time-mean"	0.5

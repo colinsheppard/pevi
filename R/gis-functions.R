@@ -1,4 +1,5 @@
 # area.of.union
+# NOTE - this fails to properly account for holes in polygons, use gArea and gUnion from package rgeos instead (see TAZ-weighting.R for example)
 # this gives you the area of the union of any number of SpatialPolygonsDataFrame objects including multiple rows within
 # make sure that both objects are in the same projection before attempting
 #
@@ -17,6 +18,7 @@ area.of.union <- function(spatial.polys.list){
         polys.polys <- slot(polys[[polys.i]], "Polygons")
         for(polys.polys.i in 1:length(polys.polys)){
           pp.coords <- slot(polys.polys[[polys.polys.i]], "coords")
+          if(slot(polys.polys[[polys.polys.i]], "hole")){ pp.coords <- pp.coords[nrow(pp.coords):1,] }
           if(first.union){
             result.gpc.poly <- as(pp.coords, "gpc.poly")
             first.union <- F
@@ -31,7 +33,9 @@ area.of.union <- function(spatial.polys.list){
 }
 
 map.color <- function (x,c.map){
-  c.map[round((length(c.map)-1)*(x-min(x))/diff(range(x))+1,0)]
+  res <- c.map[round((length(c.map)-1)*(x-min(x,na.rm=T))/diff(range(x,na.rm=T))+1,0)]
+  res[is.na(res)] <- "#000000"
+  return(res)
 }
 
 shp.to.kml <- function(shp,kml.filename,kmlname="KML Name", kmldescription="<i>Description</i>",borders='white',lwds=1.5,colors='red',id.col='id',name.col='id',description.cols=NA){

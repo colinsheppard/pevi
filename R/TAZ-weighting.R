@@ -1,5 +1,13 @@
+######################################################################################################
+# TAZ WEIGHTING
+# 
+# Take the aggregated TAZ data and corresponding travel demand data and use vehicle registration data
+# by zip and population data by tract to weight the travel demand data and the distribution of homes
+# needed by the itinerary builder
+######################################################################################################
+
 library(colinmisc)
-load.libraries(c('maptools','plotrix','stats','gpclib','plyr','png','RgoogleMaps','lattice','stringr','ggplot2','rgdal','XML','plotKML'))
+load.libraries(c('maptools','plotrix','stats','gpclib','plyr','png','RgoogleMaps','lattice','stringr','ggplot2','rgdal','XML','plotKML','rgeos'))
 gpclibPermit()
 
 path.to.geatm  <- '~/Dropbox/serc/pev-colin/data/GEATM-2020/'
@@ -10,6 +18,14 @@ path.to.pevi   <- '~/Dropbox/serc/pev-colin/pevi/'
 path.to.parcel <- '~/Dropbox/serc/pev-colin/data/HUM-PARCELS/'
 
 source(paste(path.to.pevi,'R/gis-functions.R',sep=''))
+
+# load aggregated tazs and travel demand data
+taz <- readShapePoly(paste(path.to.pevi,'inputs/development/aggregated-taz',sep=''))
+load(paste(path.to.pevi,'inputs/development/aggregated-taz-fieldnames.Rdata',sep=''))
+names(taz@data) <- c('row',agg.taz.shp.fieldnames)
+od.24.new <- read.csv(paste(path.to.geatm,'od_24_new.csv',sep=''))
+od.am.new <- read.csv(paste(path.to.geatm,'od_am_new.csv',sep=''))
+od.pm.new <- read.csv(paste(path.to.geatm,'od_pm_new.csv',sep=''))
 
 zips    <- readShapePoly(paste(path.to.geatm,'../CA-ZIPS/tl_2010_06_zcta510.shp',sep=''))
 zips@data$INTPTLAT10 <- as.numeric(as.character(zips@data$INTPTLAT10))
@@ -33,40 +49,39 @@ tracts@data$ID <- unlist(lapply(tracts@polygons,function(x){slot(x,'ID')}))
 #plot(taz[taz.id,],col='#ee229922',add=T)
 #plot(zips[zip.id,],col='#3399ff22',add=T)
 
-
 if(!file.exists(paste(path.to.geatm,"zip-and-tract-fraction-in-taz-matrix.Rdata",sep=''))){
   # get the data frame ready for storage of the results which will hold the fraction of each zip (the columns) by area that 
   # are in each TAZ (the rows), where the 'null' column contains the fraction of the TAZ with no associated zip code
   zips.in.taz <- as.data.frame(matrix(0,nrow(taz@data),length(hum.zips)+1))
   names(zips.in.taz) <- c('null',as.character(zips[hum.zips,]@data$ZCTA5CE10))
-  row.names(zips.in.taz) <- as.character(sort(taz@data$NEWTAZ))
+  row.names(zips.in.taz) <- as.character(sort(taz@data$id))
 
   tracts.in.taz <- as.data.frame(matrix(0,nrow(taz@data),nrow(tracts@data)))
   names(tracts.in.taz) <- as.character(tracts@data$NAME10)
-  row.names(tracts.in.taz) <- as.character(sort(taz@data$NEWTAZ))
+  row.names(tracts.in.taz) <- as.character(sort(taz@data$id))
 
   # precalculate the area of each zip/tract polygons to reduce redundancy
   zip.areas <- list()
   for(zip.i in names(zips.in.taz)[2:ncol(zips.in.taz)]){
     zip.id <- which(zips@data$ZCTA5CE10 == zip.i)
-    zip.areas[[zip.i]] <- area.of.union(zips[zip.id,])
+    zip.areas[[zip.i]] <- gArea(zips[zip.id,])
   }
   tract.areas <- list()
   for(tract.i in names(tracts.in.taz)){
     tract.id <- which(tracts@data$NAME10 == tract.i)
-    tract.areas[[tract.i]] <- area.of.union(tracts[tract.id,])
+    tract.areas[[tract.i]] <- gArea(tracts[tract.id,])
   }
 
   for(taz.i in row.names(zips.in.taz)){
     print(taz.i)
-    taz.id <- which(taz@data$NEWTAZ == taz.i)
-    taz.area <- area.of.union(taz[taz.id,])
+    taz.id <- which(taz@data$id == taz.i)
+    taz.area <- gArea(taz[taz.id,])
     cum.frac <- 0
     for(zip.i in names(zips.in.taz)[2:ncol(zips.in.taz)]){
       if(cum.frac >= 1)next
       zip.id <- which(zips@data$ZCTA5CE10 == zip.i)
       # now calculate the fraction by area of zip.i in taz.i
-      zips.in.taz[taz.i,zip.i] <- (taz.area + zip.areas[[zip.i]] - area.of.union(list(taz[taz.id,],zips[zip.id,]))) / taz.area
+      zips.in.taz[taz.i,zip.i] <- (taz.area + zip.areas[[zip.i]] - gArea(gUnion(taz[taz.id,],zips[zip.id,]))) / taz.area
       cum.frac <- cum.frac + zips.in.taz[taz.i,zip.i]
     }
     cum.frac <- 0
@@ -74,18 +89,17 @@ if(!file.exists(paste(path.to.geatm,"zip-and-tract-fraction-in-taz-matrix.Rdata"
       if(cum.frac >= 1)next
       tract.id <- which(tracts@data$NAME10 == tract.i)
       # now calculate the fraction by area of tract.i in taz.i
-      tracts.in.taz[taz.i,tract.i] <- (taz.area + tract.areas[[tract.i]] - area.of.union(list(taz[taz.id,],tracts[tract.id,]))) / taz.area
+      tracts.in.taz[taz.i,tract.i] <- (taz.area + tract.areas[[tract.i]] - gArea(gUnion(taz[taz.id,],tracts[tract.id,]))) / taz.area
       cum.frac <- cum.frac + tracts.in.taz[taz.i,tract.i]
     }
   }
+  # for zips, make null contain all of remaining area not attributed to zip polygons
   zips.in.taz[,'null'] <- apply(zips.in.taz[,2:ncol(zips.in.taz)],1,function(x){ 1-sum(x) }) 
-  # the first 10 rows are the boundary TAZs which should have 1 for null and zero for all other zips and for all tracts
-  zips.in.taz[1:10,'null'] <- 1
-  zips.in.taz[1:10,2:ncol(zips.in.taz)] <- 0
-  tracts.in.taz[1:10,] <- 0
+  # for tracts, deal with tazs containing external boxes by rescaling to 1 
+  tracts.in.taz <- t(apply(tracts.in.taz,1,function(x){ x / sum(x) }))
+  
   # remove 0 columns which represent zip codes or tracts outside of humboldt
   zips.in.taz <- zips.in.taz[,-which(apply(zips.in.taz,2,sum)<=0)]
-  tracts.in.taz <- tracts.in.taz[,-which(apply(tracts.in.taz,2,sum)<=0)]
   save(zips.in.taz,tracts.in.taz,file=paste(path.to.geatm,"zip-and-tract-fraction-in-taz-matrix.Rdata",sep=''))
 }else{
   load(paste(path.to.geatm,"zip-and-tract-fraction-in-taz-matrix.Rdata",sep=''))
@@ -98,11 +112,11 @@ aggregate.fracs <- ddply(veh,.(FUEL.TYPE,year),function(df){ data.frame(frac=sum
 frac.weight.by.zip.year <- ddply(frac.by.zip.year,.(FUEL.TYPE,zip.city,year),function(df){ data.frame(frac.weight=df$frac/subset(aggregate.fracs,year==df$year[1] & FUEL.TYPE==df$FUEL.TYPE[1])$frac) })
 
 # plot those weights
-ggplot(subset(frac.weight.by.zip.year,FUEL.TYPE%in%c("GAS/ELEC","ELECTRIC")),aes(x=year,y=frac.weight))+geom_bar(stat="identity",position="dodge",aes(fill=FUEL.TYPE))+facet_wrap(~zip.city)+scale_y_continuous(name="Ratio of Zip-Level Penetration to Aggregated Penetration")
+#ggplot(subset(frac.weight.by.zip.year,FUEL.TYPE%in%c("GAS/ELEC","ELECTRIC")),aes(x=year,y=frac.weight))+geom_bar(stat="identity",position="dodge",aes(fill=FUEL.TYPE))+facet_wrap(~zip.city)+scale_y_continuous(name="Ratio of Zip-Level Penetration to Aggregated Penetration")
 
 # do it again but aggregate EV/Hybrids first 
 frac.weight.by.zip.year.simple <- ddply(subset(frac.by.zip.year,FUEL.TYPE%in%c("GAS/ELEC","ELECTRIC")),.(zip.city,year),function(df){ data.frame(zip=df$zip[1],frac.weight=sum(df$frac)/sum(subset(aggregate.fracs,year==df$year[1] & FUEL.TYPE %in% df$FUEL.TYPE)$frac)) })
-ggplot(frac.weight.by.zip.year.simple,aes(x=year,y=frac.weight))+geom_bar(stat="identity")+facet_wrap(~zip.city)+scale_y_continuous(name="Ratio of Zip-Level Penetration to Aggregate Penetration")
+#ggplot(frac.weight.by.zip.year.simple,aes(x=year,y=frac.weight))+geom_bar(stat="identity")+facet_wrap(~zip.city)+scale_y_continuous(name="Ratio of Zip-Level Penetration to Aggregate Penetration")
 
 # Finally, take the average ratio in each zip code over the 7 year time frame
 frac.est <- ddply(frac.weight.by.zip.year.simple,.(zip),function(df){ data.frame(frac.weight=mean(df$frac.weight)) })
@@ -124,9 +138,9 @@ w.by.distance <- matrix(0,nrow(d),ncol(d))
 max.d <- max(d)
 for(row.i in 1:nrow(d)){
   w.by.distance[row.i,row.i] <- 0.5
-  top.10 <- sort(d[row.i,-row.i])[1:round(ncol(d)/10)]
-  top.10.inds <- as.numeric(names(top.10))
-  w.by.distance[row.i,top.10.inds] <- (max.d-top.10)^10/sum((max.d-top.10)^10)/2
+  top.20 <- sort(d[row.i,-row.i])[1:round(ncol(d)/5)]
+  top.20.inds <- as.numeric(names(top.20))
+  w.by.distance[row.i,top.20.inds] <- (max.d-top.20)^10/sum((max.d-top.20)^10)/2
 }
 
 # now apply these estimates to the matrix
@@ -135,9 +149,7 @@ w.by.penetration.matrix <- t(apply(zips.in.taz,1,function(x){ x * w.by.penetrati
 taz.weights.by.penetration <- apply(w.by.penetration.matrix,1,sum)
 
 # for testing
-to.keep <- 100:120
-od <- od.24.old[od.24.old$from %in% to.keep & od.24.old$to %in% to.keep,]
-od <- od.24.old
+od <- od.24.new
 od.weighted <- od
 for(taz.i in 1:length(taz.weights.by.penetration)){
   newtaz <- as.numeric(names(taz.weights.by.penetration[taz.i]))

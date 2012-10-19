@@ -211,7 +211,7 @@ to seek-charger
     set taz-list (current-taz)
     ;; 2. calculate trip-charge-time-need for each type of charger
     foreach [level] of charger-types [  ;; calculates the charge-time-need(ed) for each level of charger.
-      set [charge-time-need] of ? max sentence 0 ((charging-distance * charge-safety-factor * electric-fuel-consumption - state-of-charge * battery-capacity) / [charge-rate] of ?)
+;      set [charge-time-need] of ? max sentence 0 ((charging-distance * charge-safety-factor * electric-fuel-consumption - state-of-charge * battery-capacity) / [charge-rate] of ?)
     ]
     
     let check-prices 0

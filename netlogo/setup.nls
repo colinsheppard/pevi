@@ -229,7 +229,8 @@ to setup-chargers
   ; Charger-rate is currently a separate state variable from charger level. We may want to combine the two later, if
   ; we do not use "charger level" for anything else.
 
-  ask tazs [                       ; At each taz,  chargers equal to "taz-chargers"are created.
+  ; At each taz,  chargers equal to "taz-chargers"are created.
+  foreach sort tazs [
     create-chargers [item 0 n-levels] of ? [  ; The location of each charger created is then set as the current TAZ location
       set this-charger-type one-of charger-types with [level = 0]
       set location ?

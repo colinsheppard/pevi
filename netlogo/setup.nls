@@ -73,7 +73,7 @@ to-report split [ #string #sep ] ; #sep must be non-empty string
 end
 
 ;;;;;;;;;;;;;;;;;;;;
-;; SETUP tazS
+;; SETUP TAZS
 ;;;;;;;;;;;;;;;;;;;;
 to setup-tazs
   print "setup-tazs"
@@ -90,7 +90,6 @@ to setup-tazs
     file-open charger-input-file
     ask tazs [
         set id file-read
-        ;setxy file-read file-read  ; 10.17 ac - removed columns for xy locations of chargers from alt_4_5.txt
         foreach [0 1 2 3] [
           set n-levels replace-item ? n-levels file-read ; sets the number of level X chargers in each TAZ
         ]

@@ -154,7 +154,7 @@ to setup
 end 
 
 to go
-  dynamic-scheduler:go-until schedule 6.5
+  dynamic-scheduler:go-until schedule 25
 end
 
 ;;;;;;;;;;;;;;;;;;;;

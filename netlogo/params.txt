@@ -7,6 +7,6 @@
 "batt-cap-range"	5
 "fuel-economy-stdv"	0.05
 "fuel-economy-range"	0.1
-"charger-input-file"	"../inputs/alternative_4_5.txt"
+"charger-input-file"	"../../../pev-shared/data/inputs/alternative_4_5.txt"
 "driver-input-file"	"../../../pev-shared/data/inputs/p1r1_5.txt"
 "od-input-file"	"../../../pev-shared/data/inputs/OD_Matrix_5.txt"

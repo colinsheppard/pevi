@@ -207,18 +207,18 @@ to setup-charger-types
   create-charger-types 1 [  ; 
     set level 1
     set charge-rate 2.4 ; Charger rate is the charger power in kW. Data from (Markel 2010), see project document
-    set energy-price 0.14 ; 
+    set energy-price 0.15 ; 
   ]
   create-charger-types 1 [  ; 
     set level 2
     set charge-rate 19.2 ; Charger rate is the charger power in kW. Data from (Markel 2010), see project document
-    set energy-price 0.14 ; 
+    set energy-price 0.16 ; 
   ]
   create-charger-types 1 [  ; 
     set level 3
     set charge-rate 30 ; Charger rate is the charger power in kW. Data from (Markel 2010), see project document
                        ; Charger rate may be anywhere from 20-250kW (Markel 2010)
-    set energy-price 0.14 ; 
+    set energy-price 0.17 ; 
   ]
 end 
 

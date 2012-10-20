@@ -155,7 +155,7 @@ to setup
 end 
 
 to go
-  dynamic-scheduler:go-until schedule 25
+  dynamic-scheduler:go-until schedule 1
 end
 
 ;;;;;;;;;;;;;;;;;;;;
@@ -192,12 +192,12 @@ to seek-charger
   let #extra-time-until-end-charge 0
   let #extra-time-for-travel 0
   let #extra-distance-for-travel 0
-  let #extra-charge-time-for-travel 0
-  let #trip-charge-time-need-by-type n-values count charger-types [-99]
+  let #extra-energy-for-travel 0
   let #charger-in-origin-or-destination true
   let #min-cost 1e99
   let #min-taz -99
   let #min-charger-type -99
+  let #trip-charge-time-need-by-type n-values count charger-types [-99]
   
   ;; submodel action 1:
   ifelse time-until-depart < willing-to-roam-time-threshold [  
@@ -214,42 +214,44 @@ to seek-charger
     set taz-list (sentence current-taz)
   ]
   
-  ;; 2. calculate trip-charge-time-need for each type of charger
-  foreach [sentence level charge-rate] of charger-types [
-    set #trip-charge-time-need-by-type replace-item (item 0 ?) #trip-charge-time-need-by-type ((trip-distance * charge-safety-factor * electric-fuel-consumption - state-of-charge * battery-capacity) / (item 1 ?))
+  ;; 2. calculate trip-energy-need
+  let #trip-energy-need max (sentence 0 (trip-distance * charge-safety-factor * electric-fuel-consumption - state-of-charge * battery-capacity))
+  foreach [sentence level charge-rate] of charger-types [  
+    set #trip-charge-time-need-by-type replace-item (item 0 ?) #trip-charge-time-need-by-type (#trip-energy-need / (item 1 ?))
   ]
-  print (word precision ticks 3 " " self " seek-charger charge-time-need-by-type:" #trip-charge-time-need-by-type)
 
   foreach taz-list [
     let #this-taz ?
     set #extra-time-for-travel 0
     set #extra-distance-for-travel 0
+    set #extra-energy-for-travel #extra-distance-for-travel * electric-fuel-consumption * charge-safety-factor
     set #charger-in-origin-or-destination true
     foreach [level] of charger-types [
       let #level ?
-      let #this-charger-type one-of charger-types with [ level = 2 ]
+      let #this-charger-type one-of charger-types with [ level = #level ]
       if count (available-chargers #this-taz #level) > 0[
-        print (word precision ticks 3 " " self " seek-charger found available charger in taz:" #this-taz " level:" ?)
         ifelse #charger-in-origin-or-destination [
-          set #extra-time-until-end-charge max (sentence 0 ((item #level #trip-charge-time-need-by-type) - time-until-depart))
+          set #extra-time-until-end-charge max (sentence 0 (item #level #trip-charge-time-need-by-type - time-until-depart))
         ][
           set #extra-time-until-end-charge 0 ;calc-time-until-end-charge full-charge-time-need #trip-charge-time-need #journey-charge-time-need #time-until-depart #charger-in-origin-or-destination #this-charger-type
         ]
-        let #this-cost time-opportunity-cost * (#extra-time-for-travel + #extra-time-until-end-charge) + 
-            ([energy-price] of #this-charger-type) * (item #level #trip-charge-time-need-by-type + #extra-charge-time-for-travel) * ([charge-rate] of #this-charger-type)
-        if #this-cost < #min-cost [
+        let #this-cost (time-opportunity-cost * (#extra-time-for-travel + #extra-time-until-end-charge) + 
+            ([energy-price] of #this-charger-type) * (#trip-energy-need + #extra-energy-for-travel) * ([charge-rate] of #this-charger-type))
+        if #this-cost < #min-cost or (#this-cost = #min-cost and [level] of #this-charger-type > [level] of #min-charger-type) [
           set #min-cost #this-cost
           set #min-taz #this-taz
           set #min-charger-type #this-charger-type 
         ]
+        print (word precision ticks 3 " " self " seek-charger checking taz:" #this-taz " level:" #level " this-cost:" #this-cost " rate:" ([charge-rate] of #this-charger-type) " energyprice:" ([energy-price] of #this-charger-type))
       ]
     ]
   ]
   ifelse #min-taz = -99 [  
-    print (word precision ticks 3 " " self " NO CHARGER FOUND ") 
+    print (word precision ticks 3 " " self " seek charger - none available") 
     set num-denials (num-denials + 1)
     wait-time-event-scheduler  
   ][
+    print (word precision ticks 3 " " self " least cost option is taz:" #min-taz " level:" ([level] of #min-charger-type) " cost:" #min-cost)
     set current-charger one-of available-chargers #min-taz [level] of #min-charger-type
     ask current-charger[
       set current-driver myself

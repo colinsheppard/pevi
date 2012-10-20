@@ -84,7 +84,7 @@ to setup-tazs
     set color yellow
     set size 0.5
     set n-levels n-values 4 [-99]  ; 10.17 ac - 4 levels of chargers, 0,1,2,3, 0=home
-    set chargers-by-type n-values n-charger-types [n-values 0 [0]]
+    set chargers-by-type n-values n-charger-types [0]
   ]
   ifelse (file-exists? charger-input-file) [ ; ../inputs/alternative_4_5.txt
     file-close
@@ -233,21 +233,27 @@ to setup-chargers
 
   ; At each taz,  chargers equal to "taz-chargers"are created.
   foreach sort tazs [
-    create-chargers [item 0 n-levels] of ? [  ; The location of each charger created is then set as the current TAZ location
+    let #this-taz ?
+    create-chargers [item 0 n-levels] of #this-taz [  ; The location of each charger created is then set as the current TAZ location
       set this-charger-type one-of charger-types with [level = 0]
       set location ?
     ]
-    create-chargers [item 1 n-levels] of ? [  ; The location of each charger created is then set as the current TAZ location
+    create-chargers [item 1 n-levels] of #this-taz [  ; The location of each charger created is then set as the current TAZ location
       set this-charger-type one-of charger-types with [level = 1]
       set location ?
     ]
-    create-chargers [item 2 n-levels] of ? [  ; The location of each charger created is then set as the current TAZ location
+    create-chargers [item 2 n-levels] of #this-taz [  ; The location of each charger created is then set as the current TAZ location
       set this-charger-type one-of charger-types with [level = 2]
       set location ?
     ]
-    create-chargers [item 3 n-levels] of ? [  ; The location of each charger created is then set as the current TAZ location
+    create-chargers [item 3 n-levels] of #this-taz [  ; The location of each charger created is then set as the current TAZ location
       set this-charger-type one-of charger-types with [level = 3]
       set location ?
+    ]
+    foreach n-values n-charger-types [?] [
+      ask #this-taz [
+        set chargers-by-type replace-item ? chargers-by-type chargers with [([level] of this-charger-type = ?) and (location = myself)]
+      ]
     ]
   ]  
   ask chargers [
@@ -258,8 +264,5 @@ to setup-chargers
     ;set xcor [xcor] of location
     ;set ycor [ycor] of location
     let #level [level] of this-charger-type
-    ask location[
-      set chargers-by-type replace-item #level chargers-by-type lput myself item #level chargers-by-type
-    ]
   ]
 end ;setup-chargers

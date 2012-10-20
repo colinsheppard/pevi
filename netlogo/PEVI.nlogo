@@ -215,7 +215,7 @@ to seek-charger
 
   ][  
     ;; 1. build a list of tazs to search -- only current TAZ
-    set taz-list (current-taz)
+    set taz-list (sentence current-taz)
   ]
   
   ;; 2. calculate trip-charge-time-need for each type of charger
@@ -224,22 +224,30 @@ to seek-charger
   ]
   print (word precision ticks 3 " " self " seek-charger charge-time-need-by-type:" #charge-time-need-by-type)
 
-
   foreach taz-list [
-    let this-taz ?
+    let #this-taz ?
     set #extra-time-for-travel 0
     set #extra-distance-for-travel 0
     set #charger-in-origin-or-destination true
     foreach [level] of charger-types [
-      
+      if num-available-chargers #this-taz ? > 0[
+        print (word precision ticks 3 " " self " seek-charger found available charger in taz:" #this-taz " level:" ?)  
+      ]
     ]
   ]
-    
   if current-charger = nobody [  
     print (word precision ticks 3 " " self " NO CHARGER FOUND ") 
     set num-denials (num-denials + 1)
     wait-time-event-scheduler  
   ]
+end
+
+to-report num-available-chargers [#taz #level]
+  let #num-found 0
+  ask #taz[
+    set #num-found count ((item #level chargers-by-type) with [current-driver = nobody])
+  ]
+  report #num-found
 end
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; WAIT TIME EVENT SCHEDULER

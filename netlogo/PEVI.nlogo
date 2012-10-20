@@ -504,17 +504,6 @@ NIL
 NIL
 1
 
-MONITOR
-292
-14
-1077
-59
-od-enroute
-od-enroute
-17
-1
-11
-
 @#$#@#$#@
 ## ## WHAT IS IT?
 

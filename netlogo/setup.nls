@@ -8,6 +8,7 @@ to read-parameter-file
     while [not file-at-end?][
       let param-name file-read
       ifelse param-name = "n-tazs" [ set n-tazs file-read ][  ; TODO, infer this from the od input file
+      ifelse param-name = "n-charger-types" [ set n-charger-types file-read ][  ; TODO, infer this from the od input file
       ifelse param-name = "charge-safety-factor" [ set charge-safety-factor file-read ][
       ifelse param-name = "charger-search-distance" [ set charger-search-distance file-read ][
       ifelse param-name = "wait-time-mean" [ set wait-time-mean file-read ][
@@ -19,7 +20,7 @@ to read-parameter-file
       ifelse param-name = "charger-input-file" [ set charger-input-file file-read ][
       ifelse param-name = "driver-input-file" [ set driver-input-file file-read ][
       ifelse param-name = "od-input-file" [ set od-input-file file-read ][
-      ]]]]]]]]]]]]
+      ]]]]]]]]]]]]]
     ]
     file-close
   ][ 
@@ -83,20 +84,22 @@ to setup-tazs
     set color yellow
     set size 0.5
     set n-levels n-values 4 [-99]  ; 10.17 ac - 4 levels of chargers, 0,1,2,3, 0=home
-    set chargers-in-taz n-values 0 [0]
+    set chargers-by-type n-values n-charger-types [n-values 0 [0]]
   ]
   ifelse (file-exists? charger-input-file) [ ; ../inputs/alternative_4_5.txt
     file-close
     file-open charger-input-file
-    ask tazs [
+    foreach sort tazs [  ; we want the who value to match the id, so we sort them, this assumes the text file has sequential ids starting from 1
+      ask ? [
         set id file-read
         foreach [0 1 2 3] [
           set n-levels replace-item ? n-levels file-read ; sets the number of level X chargers in each TAZ
         ]
         set neighbor-tazs n-values 0 [0]
         foreach n-values n-tazs [? + 1] [
-        if not (? = id) and (distance-from-to id ? <= charger-search-distance) [
-         set neighbor-tazs fput taz ? neighbor-tazs
+          if not (? = id) and (distance-from-to id ? <= charger-search-distance) [
+            set neighbor-tazs fput taz ? neighbor-tazs
+          ]
         ]
       ]
     ]    
@@ -254,8 +257,9 @@ to setup-chargers
     set current-driver nobody
     ;set xcor [xcor] of location
     ;set ycor [ycor] of location
+    let #level [level] of this-charger-type
     ask location[
-      set chargers-in-taz lput myself chargers-in-taz
+      set chargers-by-type replace-item #level chargers-by-type lput myself item #level chargers-by-type
     ]
   ]
 end ;setup-chargers

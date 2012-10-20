@@ -9,6 +9,7 @@ globals [
   od-enroute
   
   n-tazs
+  n-charger-types
   
   schedule  ;; this global variable holds the dynamic schedule for the PEVI program, appended by the drivers from their itineraries
   
@@ -115,8 +116,8 @@ chargers-own[
 
 tazs-own[
   id              ; TAZ id
-  chargers-in-taz ; list of all non-home chargers
-  ;home-charger    ; special charger available to all drivers when in their home taz
+  chargers-by-type ; list of lists of chargers organized by type, e.g. [ [level-0] [level-1-a level-1-b ....] [level-2-a level-2-b ....] [level-3-a ....] ]
+  home-charger    ; special charger available to all drivers when in their home taz
   drivers-in-taz  ; list of drivers currently in TAZ
   
   neighbor-tazs   ; list of tazs within charger-search-distance of this taz
@@ -190,9 +191,15 @@ end
 to seek-charger
   print (word precision ticks 3 " " self " seek-charger ")
   set time-until-depart departure-time - ticks
-  set extra-time-until-end-charge 0
-  set extra-time-for-travel 0
-  set extra-charge-time-for-travel 0
+  let #extra-time-until-end-charge 0
+  let #extra-time-for-travel 0
+  let #extra-distance-for-travel 0
+  let #extra-charge-time-for-travel 0
+  let #charge-time-need-by-type n-values count charger-types [-99]
+  let #charger-in-origin-or-destination true
+  let #min-cost 1e99
+  let #min-taz -99
+  let #min-charger-type -99
   
   ;; submodel action 1:
   ifelse time-until-depart < willing-to-roam-time-threshold [  
@@ -209,14 +216,22 @@ to seek-charger
   ][  
     ;; 1. build a list of tazs to search -- only current TAZ
     set taz-list (current-taz)
-    ;; 2. calculate trip-charge-time-need for each type of charger
-    foreach [level] of charger-types [  ;; calculates the charge-time-need(ed) for each level of charger.
-;      set [charge-time-need] of ? max sentence 0 ((charging-distance * charge-safety-factor * electric-fuel-consumption - state-of-charge * battery-capacity) / [charge-rate] of ?)
-    ]
-    
-    let check-prices 0
-    foreach [chargers-in-taz] of current-taz [
+  ]
+  
+  ;; 2. calculate trip-charge-time-need for each type of charger
+  foreach [sentence level charge-rate] of charger-types [
+    set #charge-time-need-by-type replace-item (item 0 ?) #charge-time-need-by-type ((charging-distance * charge-safety-factor * electric-fuel-consumption - state-of-charge * battery-capacity) / (item 1 ?))
+  ]
+  print (word precision ticks 3 " " self " seek-charger charge-time-need-by-type:" #charge-time-need-by-type)
 
+
+  foreach taz-list [
+    let this-taz ?
+    set #extra-time-for-travel 0
+    set #extra-distance-for-travel 0
+    set #charger-in-origin-or-destination true
+    foreach [level] of charger-types [
+      
     ]
   ]
     

@@ -1,4 +1,5 @@
-"n-tazs"	5 
+"n-tazs"	5
+"n-charger-types"	4 
 "charge-safety-factor"	1.1
 "charger-search-distance"	50
 "wait-time-mean"	0.5

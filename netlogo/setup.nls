@@ -17,10 +17,11 @@ to read-parameter-file
       ifelse param-name = "batt-cap-range" [set batt-cap-range file-read ][
       ifelse param-name = "fuel-economy-stdv" [ set fuel-economy-stdv file-read ][
       ifelse param-name = "fuel-economy-range" [ set fuel-economy-range file-read ][
+      ifelse param-name = "time-opportunity-cost" [ set time-opportunity-cost file-read ][
       ifelse param-name = "charger-input-file" [ set charger-input-file file-read ][
       ifelse param-name = "driver-input-file" [ set driver-input-file file-read ][
       ifelse param-name = "od-input-file" [ set od-input-file file-read ][
-      ]]]]]]]]]]]]]
+      ]]]]]]]]]]]]]]
     ]
     file-close
   ][ 

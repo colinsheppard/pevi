@@ -28,6 +28,7 @@ globals [
   fuel-economy-stdv
   fuel-economy-range
   charger-search-distance
+  time-opportunity-cost
   
   ;; globals needed for testing
   test-driver
@@ -66,7 +67,7 @@ drivers-own [
   current-itin-row          ; index of current location in the itinerary (referring to next trip or current trip if traveling)
 
 ;; CONVENIENCE VARIABLES
-;; these are used to implement the model, but are in the model description
+;; these are used to implement the model, but are not in the model description
   trip-time 
   travel-time 
   trip-distance
@@ -88,7 +89,6 @@ drivers-own [
   time-until-end-charge
   willing-to-roam-time-threshold  ;; added 9.28 ac
   willing-to-roam?
-  time-opportunity-cost
   extra-time-until-end-charge
   extra-time-for-travel
   extra-charge-time-for-travel
@@ -167,8 +167,6 @@ to-report need-to-charge [calling-event]
   ifelse ( (calling-event = "arrive" and remaining-range < journey-distance * charge-safety-factor) or 
            (calling-event = "depart" and remaining-range < trip-distance * charge-safety-factor) )[ ; TODO add random draw here for people who charge but don't need to
     report true
-    print (word precision ticks 3 " " self " NEEDS TO CHARGE! ")
-    set num-denials 0
   ][
     report false
   ]
@@ -195,7 +193,7 @@ to seek-charger
   let #extra-time-for-travel 0
   let #extra-distance-for-travel 0
   let #extra-charge-time-for-travel 0
-  let #charge-time-need-by-type n-values count charger-types [-99]
+  let #trip-charge-time-need-by-type n-values count charger-types [-99]
   let #charger-in-origin-or-destination true
   let #min-cost 1e99
   let #min-taz -99
@@ -210,9 +208,7 @@ to seek-charger
   ;set charger-in-origin-or-destination true  ; TODO this needs to be updated once en-route/neighbor charging is implemented    
   ;; submodel action 2:
   ifelse willing-to-roam? [
-
     ;; look in temp/PEVI-seek-charge-scrap-code.txt for this code. temporarily removed for clarity.
-
   ][  
     ;; 1. build a list of tazs to search -- only current TAZ
     set taz-list (sentence current-taz)
@@ -220,9 +216,9 @@ to seek-charger
   
   ;; 2. calculate trip-charge-time-need for each type of charger
   foreach [sentence level charge-rate] of charger-types [
-    set #charge-time-need-by-type replace-item (item 0 ?) #charge-time-need-by-type ((charging-distance * charge-safety-factor * electric-fuel-consumption - state-of-charge * battery-capacity) / (item 1 ?))
+    set #trip-charge-time-need-by-type replace-item (item 0 ?) #trip-charge-time-need-by-type ((trip-distance * charge-safety-factor * electric-fuel-consumption - state-of-charge * battery-capacity) / (item 1 ?))
   ]
-  print (word precision ticks 3 " " self " seek-charger charge-time-need-by-type:" #charge-time-need-by-type)
+  print (word precision ticks 3 " " self " seek-charger charge-time-need-by-type:" #trip-charge-time-need-by-type)
 
   foreach taz-list [
     let #this-taz ?
@@ -230,24 +226,43 @@ to seek-charger
     set #extra-distance-for-travel 0
     set #charger-in-origin-or-destination true
     foreach [level] of charger-types [
-      if num-available-chargers #this-taz ? > 0[
-        print (word precision ticks 3 " " self " seek-charger found available charger in taz:" #this-taz " level:" ?)  
+      let #level ?
+      let #this-charger-type one-of charger-types with [ level = 2 ]
+      if count (available-chargers #this-taz #level) > 0[
+        print (word precision ticks 3 " " self " seek-charger found available charger in taz:" #this-taz " level:" ?)
+        ifelse #charger-in-origin-or-destination [
+          set #extra-time-until-end-charge max (sentence 0 ((item #level #trip-charge-time-need-by-type) - time-until-depart))
+        ][
+          set #extra-time-until-end-charge 0 ;calc-time-until-end-charge full-charge-time-need #trip-charge-time-need #journey-charge-time-need #time-until-depart #charger-in-origin-or-destination #this-charger-type
+        ]
+        let #this-cost time-opportunity-cost * (#extra-time-for-travel + #extra-time-until-end-charge) + 
+            ([energy-price] of #this-charger-type) * (item #level #trip-charge-time-need-by-type + #extra-charge-time-for-travel) * ([charge-rate] of #this-charger-type)
+        if #this-cost < #min-cost [
+          set #min-cost #this-cost
+          set #min-taz #this-taz
+          set #min-charger-type #this-charger-type 
+        ]
       ]
     ]
   ]
-  if current-charger = nobody [  
+  ifelse #min-taz = -99 [  
     print (word precision ticks 3 " " self " NO CHARGER FOUND ") 
     set num-denials (num-denials + 1)
     wait-time-event-scheduler  
+  ][
+    set current-charger one-of available-chargers #min-taz [level] of #min-charger-type
+    ask current-charger[
+      set current-driver myself
+    ]
   ]
 end
 
-to-report num-available-chargers [#taz #level]
-  let #num-found 0
+to-report available-chargers [#taz #level]
+  let #found-chargers 0
   ask #taz[
-    set #num-found count ((item #level chargers-by-type) with [current-driver = nobody])
+    set #found-chargers ((item #level chargers-by-type) with [current-driver = nobody])
   ]
-  report #num-found
+  report #found-chargers
 end
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; WAIT TIME EVENT SCHEDULER
@@ -418,13 +433,7 @@ to arrive
       
   if not itin-complete? [
     ifelse need-to-charge "arrive" [   
-      ifelse state-of-charge = 1 [ 
-        print (word precision ticks 3 " " self " cannot make trip with full battery") ;; TODO this shouldn't happen when PHEV are implemented
-      ][
-        print (word precision ticks 3 " " self " cannot make JOURNEY with current charge. Seeking charger.")
-        set charging-distance journey-distance
-        seek-charger  
-      ]
+        seek-charger
     ][
       itinerary-event-scheduler  
     ]

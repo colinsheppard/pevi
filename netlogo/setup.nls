@@ -18,10 +18,11 @@ to read-parameter-file
       ifelse param-name = "fuel-economy-stdv" [ set fuel-economy-stdv file-read ][
       ifelse param-name = "fuel-economy-range" [ set fuel-economy-range file-read ][
       ifelse param-name = "time-opportunity-cost" [ set time-opportunity-cost file-read ][
+      ifelse param-name = "willing-to-roam-time-threshold" [ set willing-to-roam-time-threshold file-read ][
       ifelse param-name = "charger-input-file" [ set charger-input-file file-read ][
       ifelse param-name = "driver-input-file" [ set driver-input-file file-read ][
       ifelse param-name = "od-input-file" [ set od-input-file file-read ][
-      ]]]]]]]]]]]]]]
+      ]]]]]]]]]]]]]]]
     ]
     file-close
   ][ 
@@ -146,7 +147,6 @@ to setup-drivers
       set electric-fuel-consumption 0.35
     ]
     set state-of-charge 1
-    set willing-to-roam-time-threshold 0.2  ;; driver is willing to roam for 20 minutes. ac 9.28
     set state "not-charging"
     set current-charger nobody
     set journey-distance 0
@@ -176,6 +176,7 @@ to setup-itinerary
         set itin-from n-values 1 [file-read]     ; creates global itin-from
         set itin-to n-values 1 [file-read]       ; creates global itin-to
         set itin-depart n-values 1 [file-read]   ; creates global itin-depart
+        set home-taz taz file-read
         if file-at-end? = false [
           set next-driver file-read
           set this-itin true
@@ -183,6 +184,7 @@ to setup-itinerary
             set itin-from  lput file-read itin-from
             set itin-to  lput file-read itin-to
             set itin-depart lput file-read itin-depart
+            if not (home-taz = taz file-read) [ user-message (word "Inconsistent home taz specified for driver " this-driver ) ]
             ifelse file-at-end? [ set next-driver -1][ set next-driver file-read ]
           ] ; end while this-itin
         ]

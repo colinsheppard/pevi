@@ -29,6 +29,7 @@ globals [
   fuel-economy-range
   charger-search-distance
   time-opportunity-cost
+  willing-to-roam-time-threshold
   
   ;; globals needed for testing
   test-driver
@@ -69,7 +70,6 @@ drivers-own [
 ;; CONVENIENCE VARIABLES
 ;; these are used to implement the model, but are not in the model description
   trip-time 
-  travel-time 
   trip-distance
   journey-distance
   remaining-range
@@ -87,7 +87,7 @@ drivers-own [
   full-charge-time-need
   current-full-charge-time-need
   time-until-end-charge
-  willing-to-roam-time-threshold  ;; added 9.28 ac
+
   willing-to-roam?
   extra-time-until-end-charge
   extra-time-for-travel
@@ -155,7 +155,7 @@ to setup
 end 
 
 to go
-  dynamic-scheduler:go-until schedule 1
+  dynamic-scheduler:go-until schedule go-until-time
 end
 
 ;;;;;;;;;;;;;;;;;;;;
@@ -177,14 +177,15 @@ end
 ;;;;;;;;;;;;;;;;;;;;
 to retry-seek
   print (word precision ticks 3 " " self " retry-seek ")
-
+  set remaining-range (state-of-charge * battery-capacity / electric-fuel-consumption )
   seek-charger
 end
 
 ;;;;;;;;;;;;;;;;;;;;
 ;; SEEK CHARGER
 ;;;;;;;;;;;;;;;;;;;;
-;; trip-charge-time-need set in CHARGE-TIME-EVENT-SCHEDULER 
+;; remaining-charge set by retry-seek
+;; trip-distance set by update-itinerary
 ;;;;;;;;;;;;;;;;;;;;
 to seek-charger
   print (word precision ticks 3 " " self " seek-charger ")
@@ -208,41 +209,68 @@ to seek-charger
   ;set charger-in-origin-or-destination true  ; TODO this needs to be updated once en-route/neighbor charging is implemented    
   ;; submodel action 2:
   ifelse willing-to-roam? [
-    ;; look in temp/PEVI-seek-charge-scrap-code.txt for this code. temporarily removed for clarity.
+    set taz-list remove-duplicates (sentence current-taz destination-taz item my-od-index od-enroute)
   ][  
     ;; 1. build a list of tazs to search -- only current TAZ
     set taz-list (sentence current-taz)
   ]
   
   ;; 2. calculate trip-energy-need
-  let #trip-energy-need max (sentence 0 (trip-distance * charge-safety-factor * electric-fuel-consumption - state-of-charge * battery-capacity))
+  let #trip-or-journey-energy-need -99
+  ifelse time-until-depart < 1 [
+    set #trip-or-journey-energy-need max (sentence 0 (trip-distance * charge-safety-factor * electric-fuel-consumption - state-of-charge * battery-capacity))
+  ][
+    set #trip-or-journey-energy-need max (sentence 0 (journey-distance * charge-safety-factor * electric-fuel-consumption - state-of-charge * battery-capacity))
+  ]
+  set #trip-or-journey-energy-need min (sentence ((1 - state-of-charge) * battery-capacity) #trip-or-journey-energy-need)
   foreach [sentence level charge-rate] of charger-types [  
-    set #trip-charge-time-need-by-type replace-item (item 0 ?) #trip-charge-time-need-by-type (#trip-energy-need / (item 1 ?))
+    set #trip-charge-time-need-by-type replace-item (item 0 ?) #trip-charge-time-need-by-type (#trip-or-journey-energy-need / (item 1 ?))
   ]
 
   foreach taz-list [
-    let #this-taz ?
-    set #extra-time-for-travel 0
-    set #extra-distance-for-travel 0
-    set #extra-energy-for-travel #extra-distance-for-travel * electric-fuel-consumption * charge-safety-factor
-    set #charger-in-origin-or-destination true
-    foreach [level] of charger-types [
-      let #level ?
-      let #this-charger-type one-of charger-types with [ level = #level ]
-      if count (available-chargers #this-taz #level) > 0[
-        ifelse #charger-in-origin-or-destination [
-          set #extra-time-until-end-charge max (sentence 0 (item #level #trip-charge-time-need-by-type - time-until-depart))
-        ][
-          set #extra-time-until-end-charge 0 ;calc-time-until-end-charge full-charge-time-need #trip-charge-time-need #journey-charge-time-need #time-until-depart #charger-in-origin-or-destination #this-charger-type
+    if distance-from-to [id] of current-taz [id] of ? <= remaining-range [
+      let #this-taz ?
+      set #charger-in-origin-or-destination (#this-taz = current-taz or #this-taz = destination-taz)
+      ifelse #charger-in-origin-or-destination [
+        set #extra-time-for-travel 0
+        set #extra-distance-for-travel 0
+      ][
+        set #extra-time-for-travel (time-from-to [id] of current-taz [id] of #this-taz + time-from-to [id] of #this-taz [id] of destination-taz - trip-time)
+        set #extra-distance-for-travel (distance-from-to [id] of current-taz [id] of #this-taz + distance-from-to [id] of #this-taz [id] of destination-taz - trip-distance)
+      ]
+      set #extra-energy-for-travel #extra-distance-for-travel * electric-fuel-consumption * charge-safety-factor
+
+      foreach [level] of charger-types [
+        let #level ?
+        let #this-charger-type one-of charger-types with [ level = #level ]
+        let #this-charge-rate [charge-rate] of #this-charger-type
+        if (count (available-chargers #this-taz #level) > 0) and (#level > 0 or #this-taz = home-taz) [
+          ifelse #charger-in-origin-or-destination [
+            set #extra-time-until-end-charge max (sentence 0 (item #level #trip-charge-time-need-by-type - time-until-depart))
+          ][
+            let #leg-one-trip-distance distance-from-to [id] of current-taz [id] of #this-taz
+            let #leg-two-trip-distance distance-from-to [id] of #this-taz [id] of destination-taz
+            let #mid-journey-distance journey-distance - #leg-one-trip-distance
+            let #mid-state-of-charge ((1 - state-of-charge) * battery-capacity - #leg-one-trip-distance * electric-fuel-consumption) / battery-capacity
+            let #trip-charge-time-need max sentence 0 ((#leg-two-trip-distance * charge-safety-factor * electric-fuel-consumption - #mid-state-of-charge * battery-capacity) / #this-charge-rate)
+            let #journey-charge-time-need max sentence 0 ((#mid-journey-distance * charge-safety-factor * electric-fuel-consumption - #mid-state-of-charge * battery-capacity) / #this-charge-rate)
+            let #full-charge-time-need (1 - #mid-state-of-charge) * battery-capacity / #this-charge-rate
+            set #extra-time-until-end-charge calc-time-until-end-charge #full-charge-time-need 
+                                                                        #trip-charge-time-need 
+                                                                        #journey-charge-time-need 
+                                                                        (time-until-depart - time-from-to [id] of current-taz [id] of #this-taz)
+                                                                        #charger-in-origin-or-destination
+                                                                        #this-charger-type
+          ]
+          let #this-cost (time-opportunity-cost * (#extra-time-for-travel + #extra-time-until-end-charge) + 
+            ([energy-price] of #this-charger-type) * (#trip-or-journey-energy-need + #extra-energy-for-travel))
+          if #this-cost < #min-cost or (#this-cost = #min-cost and [level] of #this-charger-type > [level] of #min-charger-type) [
+            set #min-cost #this-cost
+            set #min-taz #this-taz
+            set #min-charger-type #this-charger-type 
+          ]
+          print (word precision ticks 3 " " self " seek-charger checking taz:" #this-taz " in-orig-dest? " #charger-in-origin-or-destination " level:" #level " this-cost:" #this-cost " rate:" ([charge-rate] of #this-charger-type) " energyprice:" ([energy-price] of #this-charger-type) " trip-or-journey-energy-need:" #trip-or-journey-energy-need)
         ]
-        let #this-cost (time-opportunity-cost * (#extra-time-for-travel + #extra-time-until-end-charge) + 
-            ([energy-price] of #this-charger-type) * (#trip-energy-need + #extra-energy-for-travel) * ([charge-rate] of #this-charger-type))
-        if #this-cost < #min-cost or (#this-cost = #min-cost and [level] of #this-charger-type > [level] of #min-charger-type) [
-          set #min-cost #this-cost
-          set #min-taz #this-taz
-          set #min-charger-type #this-charger-type 
-        ]
-        print (word precision ticks 3 " " self " seek-charger checking taz:" #this-taz " level:" #level " this-cost:" #this-cost " rate:" ([charge-rate] of #this-charger-type) " energyprice:" ([energy-price] of #this-charger-type))
       ]
     ]
   ]
@@ -256,6 +284,8 @@ to seek-charger
     ask current-charger[
       set current-driver myself
     ]
+    set charger-in-origin-or-destination (#min-taz = current-taz or #min-taz = destination-taz)
+    charge-time-event-scheduler
   ]
 end
 
@@ -297,9 +327,9 @@ end
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 to charge-time-event-scheduler
   set state "charging"
-  set trip-charge-time-need max sentence 0 ((trip-distance * charge-safety-factor * electric-fuel-consumption - state-of-charge * battery-capacity) / [charge-rate] of current-charger)
-  set journey-charge-time-need max sentence 0 ((journey-distance * charge-safety-factor * electric-fuel-consumption - state-of-charge * battery-capacity) / [charge-rate] of current-charger)
-  set full-charge-time-need (1 - state-of-charge) * battery-capacity / [charge-rate] of current-charger
+  set trip-charge-time-need max sentence 0 ((trip-distance * charge-safety-factor * electric-fuel-consumption - state-of-charge * battery-capacity) / charge-rate-of current-charger)
+  set journey-charge-time-need max sentence 0 ((journey-distance * charge-safety-factor * electric-fuel-consumption - state-of-charge * battery-capacity) / charge-rate-of current-charger)
+  set full-charge-time-need (1 - state-of-charge) * battery-capacity / charge-rate-of current-charger
 
   set time-until-end-charge (calc-time-until-end-charge full-charge-time-need 
                                                     trip-charge-time-need 
@@ -308,12 +338,12 @@ to charge-time-event-scheduler
                                                     charger-in-origin-or-destination 
                                                     [this-charger-type] of current-charger)
   let next-event-scheduled-at 0 
-  ifelse (time-until-depart > 0.5) and ([this-charger-type] of current-charger < 3) and (time-until-end-charge < trip-charge-time-need) [  ;; charger = 1 or 2                                                                                                    
+  ifelse (time-until-depart > 0.5) and ([level] of [this-charger-type] of current-charger < 3) and (time-until-end-charge < trip-charge-time-need) [                                                                                                    
     set next-event-scheduled-at ticks + min (sentence wait-time-mean (time-until-depart - 0.5)) ;; TODO make wait-time-mean random draw with max of time-until-depart - 0.5  
     dynamic-scheduler:add schedule self task retry-seek next-event-scheduled-at
     print (word precision ticks 3 " " self " scheduling retry-seek, time-until-end-charge: " time-until-end-charge ", trip-charge-time-need: " trip-charge-time-need)
   ][
-    ifelse (time-until-depart > 0.5) and ([this-charger-type] of current-charger < 2) and (time-until-end-charge < journey-charge-time-need) [  ;; charger = 1
+    ifelse (time-until-depart > 0.5) and ([level] of [this-charger-type] of current-charger < 2) and (time-until-end-charge < journey-charge-time-need) [
       set next-event-scheduled-at ticks + min (sentence wait-time-mean (time-until-depart - 0.5)) ;; TODO make wait-time-mean random draw with max of time-until-depart - 0.5  
       dynamic-scheduler:add schedule self task retry-seek next-event-scheduled-at
       print (word precision ticks 3 " " self " scheduling retry-seek for " next-event-scheduled-at " time-until-end-charge: " time-until-end-charge ", journey-charge-time-need: " journey-charge-time-need)
@@ -341,7 +371,7 @@ to-report calc-time-until-end-charge [#full-charge-time-need #trip-charge-time-n
         ;; charge to full if enough time @ home/work
         report min sentence #time-until-depart #full-charge-time-need 
       ][                                                  
-        ifelse #this-charger-type = 3 [  
+        ifelse [level] of #this-charger-type = 3 [  
           ;; charge until departure or journey charge time, whichever comes first 
           report min (sentence #time-until-depart #journey-charge-time-need #full-charge-time-need)
         ][
@@ -377,7 +407,7 @@ end
 ;;;;;;;;;;;;;;;;;;;;
 
 to end-charge
-  set state-of-charge (state-of-charge + time-until-end-charge * [charge-rate] of current-charger / battery-capacity)
+  set state-of-charge (state-of-charge + time-until-end-charge * charge-rate-of current-charger / battery-capacity)
   print (word precision ticks 3 " " self " ending charge soc:" precision state-of-charge 3)
   ask current-charger [ set current-driver nobody ]
   set current-charger nobody
@@ -435,12 +465,11 @@ to arrive
       
   if not itin-complete? [
     ifelse need-to-charge "arrive" [   
-        seek-charger
+      seek-charger
     ][
       itinerary-event-scheduler  
     ]
   ]
-
 end
 
 ;;;;;;;;;;;;;;;;;;;;
@@ -457,13 +486,20 @@ to update-itinerary
       set departure-time item current-itin-row itin-depart
     ] 
     set trip-distance item my-od-index od-dist
+    set trip-time item my-od-index od-time
   ][
     set itin-complete? true
   ]
 end
 
+to-report charge-rate-of [#charger]
+  report [charge-rate] of ([this-charger-type] of #charger)
+end
 to-report distance-from-to [from-taz to-taz]
   report item ((from-taz - 1) * n-tazs + to-taz - 1 ) od-dist
+end
+to-report time-from-to [from-taz to-taz]
+  report item ((from-taz - 1) * n-tazs + to-taz - 1 ) od-time
 end
 to-report od-index [destination source]
   report ((destination - 1) * n-tazs + source - 1)
@@ -537,6 +573,21 @@ NIL
 NIL
 NIL
 1
+
+SLIDER
+293
+18
+465
+51
+go-until-time
+go-until-time
+0
+30
+30
+0.5
+1
+NIL
+HORIZONTAL
 
 @#$#@#$#@
 ## ## WHAT IS IT?

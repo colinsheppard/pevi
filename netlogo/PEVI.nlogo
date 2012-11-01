@@ -18,6 +18,7 @@ globals [
   charger-input-file
   driver-input-file
   od-input-file
+  vehicle-type-input-file
   
 ;; PARAMETERS
   charge-safety-factor
@@ -30,12 +31,14 @@ globals [
   charger-search-distance
   time-opportunity-cost
   willing-to-roam-time-threshold
+  frac-phev
   
   ;; globals needed for testing
   test-driver
 ]
 
 breed [drivers driver]
+breed [vehicle-types vehicle-type]
 breed [chargers charger]
 breed [tazs taz]
 breed [charger-types charger-type]
@@ -65,6 +68,7 @@ drivers-own [
   itin-trip-type
   itin-change-flag
   itin-delay-amount
+  max-trip-distance
   current-itin-row          ; index of current location in the itinerary (referring to next trip or current trip if traveling)
 
 ;; CONVENIENCE VARIABLES
@@ -130,6 +134,15 @@ charger-types-own[
   charge-rate      ; kWh / hr  
   energy-price     ; $0.14/kWh  
   charge-time-need
+]
+
+vehicle-types-own[
+  name
+  electric-fuel-consumption
+  gas-fuel-consumption
+  battery-capacity
+  frac-of-pevs
+  is-phev?
 ]
 
 ;;;;;;;;;;;;;;;;;;;;

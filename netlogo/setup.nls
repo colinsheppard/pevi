@@ -19,10 +19,12 @@ to read-parameter-file
       ifelse param-name = "fuel-economy-range" [ set fuel-economy-range file-read ][
       ifelse param-name = "time-opportunity-cost" [ set time-opportunity-cost file-read ][
       ifelse param-name = "willing-to-roam-time-threshold" [ set willing-to-roam-time-threshold file-read ][
+      ifelse param-name = "frac-phev" [ set frac-phev file-read ][
       ifelse param-name = "charger-input-file" [ set charger-input-file file-read ][
       ifelse param-name = "driver-input-file" [ set driver-input-file file-read ][
       ifelse param-name = "od-input-file" [ set od-input-file file-read ][
-      ]]]]]]]]]]]]]]]
+      ifelse param-name = "vehicle-type-input-file" [ set vehicle-type-input-file file-read ][
+      ]]]]]]]]]]]]]]]]]
     ]
     file-close
   ][ 
@@ -128,19 +130,29 @@ end
 ;;;;;;;;;;;;;;;;;;;;
 to setup-drivers
   print "setup-drivers"
-  ; creating drivers based on GEATM data, in setup-itinerary procedure. 
+
+  setup-vehicle-types
   setup-itinerary
+
+  ; assing driver vehicles to a vehicle type
+  let #bev-ranges n-values 0 [?]
+  ask vehicle-types [
+    if not is-phev? [
+      set #bev-ranges lput (battery-capacity / electric-fuel-consumption) #bev-ranges
+    ]
+  ]
+  show #bev-ranges
+  stop
+  
   ; initialize driver state variables
   ask drivers [
-    set is-phev? false ; TODO needs to be determined during itinerary setup
     set current-itin-row -1
     update-itinerary
     set shape "car"
     set color green
     set size 2
-    set time-opportunity-cost 12.5  ; $/kWh
     ifelse is-phev? [
-      set battery-capacity 10 ; TODO replace with values from a vehicle type distribution input file
+      set battery-capacity 10
       set electric-fuel-consumption 0.35   ; kWh/mile
     ][ 
       set battery-capacity 25
@@ -149,14 +161,47 @@ to setup-drivers
     set state-of-charge 1
     set state "not-charging"
     set current-charger nobody
+
+    set is-phev? false
     set journey-distance 0
     foreach n-values length itin-from [?] [
-      set journey-distance (journey-distance + distance-from-to (item ? itin-from) (item ? itin-to) )
+      let #this-trip-distance distance-from-to (item ? itin-from) (item ? itin-to)
+      set journey-distance (journey-distance + #this-trip-distance)
     ]
     set itin-complete? false
     itinerary-event-scheduler
   ]
 end ;setup-drivers
+
+;;;;;;;;;;;;;;;;;;;;
+;; SETUP VEHICLE TYPES
+;;;;;;;;;;;;;;;;;;;;
+to setup-vehicle-types
+  print "setup-vehicle-types"
+  
+  ifelse (file-exists? vehicle-type-input-file) [
+    file-close
+    file-open vehicle-type-input-file
+    let #cumul-frac-pevs 0
+    while [file-at-end? = false] [
+      create-vehicle-types 1 [
+        set name file-read
+        set electric-fuel-consumption file-read
+        set gas-fuel-consumption file-read
+        set battery-capacity file-read
+        set frac-of-pevs file-read
+        set #cumul-frac-pevs #cumul-frac-pevs + frac-of-pevs
+        set is-phev? (gas-fuel-consumption > 0)
+      ]
+    ]
+    file-close
+    if #cumul-frac-pevs != 1 [
+       user-message (word "Vehicle type fractions do not sum to 1.")
+    ]
+  ][ 
+    user-message (word "Input file '" vehicle-type-input-file "' not found!") 
+  ]
+end 
 
 ;;;;;;;;;;;;;;;;;;;;
 ;; SETUP INTINERARY
@@ -177,6 +222,7 @@ to setup-itinerary
         set itin-to n-values 1 [file-read]       ; creates global itin-to
         set itin-depart n-values 1 [file-read]   ; creates global itin-depart
         set home-taz taz file-read
+        set max-trip-distance distance-from-to item 0 itin-to item 0 itin-from
         if file-at-end? = false [
           set next-driver file-read
           set this-itin true
@@ -184,6 +230,9 @@ to setup-itinerary
             set itin-from  lput file-read itin-from
             set itin-to  lput file-read itin-to
             set itin-depart lput file-read itin-depart
+            if max-trip-distance < distance-from-to item 0 itin-to item 0 itin-from[
+              set max-trip-distance distance-from-to item 0 itin-to item 0 itin-from
+            ]
             if not (home-taz = taz file-read) [ user-message (word "Inconsistent home taz specified for driver " this-driver ) ]
             ifelse file-at-end? [ set next-driver -1][ set next-driver file-read ]
           ] ; end while this-itin

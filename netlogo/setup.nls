@@ -135,34 +135,69 @@ to setup-drivers
   setup-itinerary
 
   ; assing driver vehicles to a vehicle type
-  let #bev-ranges n-values 0 [?]
-  ask vehicle-types [
-    if not is-phev? [
-      set #bev-ranges lput (battery-capacity / electric-fuel-consumption) #bev-ranges
+  ; first deal with drivers that must belong to certain vehicle types due to lengthy trips in their itinerary
+  let #bev-types vehicle-types with [not is-phev?]
+  let #phev-types sort vehicle-types with [is-phev?]
+  let #used-bev-types n-values 0 [?]
+  while [count #bev-types > 0][
+    ask max-one-of #bev-types [ battery-capacity / electric-fuel-consumption ][     
+      ; find the drivers that can't make their longest trip using the current bev type
+      let #impossible-drivers drivers with [max-trip-distance > [battery-capacity] of myself / [electric-fuel-consumption] of myself]
+      ;show (word (count #impossible-drivers) " needing more range")
+      
+      ; find the other vehicle types that can be assigned to this driver (must check whether their num-drivers is over quota yet)
+      let #available-types n-values 0 [?]
+      foreach (sentence #phev-types #used-bev-types) [
+        if [num-vehicles] of ? / count drivers < [frac-of-pevs] of ? [
+           set #available-types lput ? #available-types
+        ] 
+      ]
+      ;show (word "available types: " #available-types)
+      
+      ; now do the assignmnets
+      ask #impossible-drivers [
+        if length #available-types = 0 [ error "There are too many drivers with trips longer than the range of the BEVs types provided and not enough longer range BEVs and/or PHEVs to acommodate them" ]
+        set this-vehicle-type one-of #available-types
+        ask this-vehicle-type [ set num-vehicles num-vehicles + 1 ]
+        if [num-vehicles] of this-vehicle-type / count drivers >= [frac-of-pevs] of this-vehicle-type [
+          set #available-types remove this-vehicle-type #available-types
+        ]
+      ]
+      set #bev-types #bev-types with [self != myself]
+      set #used-bev-types lput self #used-bev-types
     ]
   ]
-  show #bev-ranges
-  stop
   
-  ; initialize driver state variables
+  ; second assign the remaining vehicle types to drivers according to the remainder
+  let #unassinged-drivers sort drivers with [this-vehicle-type = nobody]
+  let #available-types vehicle-types with [(frac-of-pevs * count drivers) - num-vehicles > 0 ]
+  ask #available-types [
+    while[(frac-of-pevs * count drivers) - num-vehicles > 0 and length #unassinged-drivers > 0 ][
+      ask one-of #unassinged-drivers [
+        set this-vehicle-type myself
+        set #unassinged-drivers remove self #unassinged-drivers 
+      ]
+      set num-vehicles num-vehicles + 1
+    ]
+  ]
+  
+  ; finally initialize driver state variables
   ask drivers [
     set current-itin-row -1
     update-itinerary
     set shape "car"
     set color green
     set size 2
-    ifelse is-phev? [
-      set battery-capacity 10
-      set electric-fuel-consumption 0.35   ; kWh/mile
-    ][ 
-      set battery-capacity 25
-      set electric-fuel-consumption 0.35
-    ]
+    
+    set is-phev? [is-phev?] of this-vehicle-type
+    set battery-capacity [battery-capacity] of this-vehicle-type
+    set electric-fuel-consumption [electric-fuel-consumption] of this-vehicle-type
+    set hybrid-fuel-consumption [hybrid-fuel-consumption] of this-vehicle-type
+
     set state-of-charge 1
     set state "not-charging"
     set current-charger nobody
-
-    set is-phev? false
+  
     set journey-distance 0
     foreach n-values length itin-from [?] [
       let #this-trip-distance distance-from-to (item ? itin-from) (item ? itin-to)
@@ -187,11 +222,12 @@ to setup-vehicle-types
       create-vehicle-types 1 [
         set name file-read
         set electric-fuel-consumption file-read
-        set gas-fuel-consumption file-read
+        set hybrid-fuel-consumption file-read
         set battery-capacity file-read
         set frac-of-pevs file-read
         set #cumul-frac-pevs #cumul-frac-pevs + frac-of-pevs
-        set is-phev? (gas-fuel-consumption > 0)
+        set is-phev? (hybrid-fuel-consumption > 0)
+        set num-vehicles 0
       ]
     ]
     file-close
@@ -222,7 +258,8 @@ to setup-itinerary
         set itin-to n-values 1 [file-read]       ; creates global itin-to
         set itin-depart n-values 1 [file-read]   ; creates global itin-depart
         set home-taz taz file-read
-        set max-trip-distance distance-from-to item 0 itin-to item 0 itin-from
+        set max-trip-distance (distance-from-to item 0 itin-to item 0 itin-from) * charge-safety-factor
+        set this-vehicle-type nobody
         if file-at-end? = false [
           set next-driver file-read
           set this-itin true
@@ -230,8 +267,8 @@ to setup-itinerary
             set itin-from  lput file-read itin-from
             set itin-to  lput file-read itin-to
             set itin-depart lput file-read itin-depart
-            if max-trip-distance < distance-from-to item 0 itin-to item 0 itin-from[
-              set max-trip-distance distance-from-to item 0 itin-to item 0 itin-from
+            if max-trip-distance < (distance-from-to item 0 itin-to item 0 itin-from) * charge-safety-factor[
+              set max-trip-distance (distance-from-to item 0 itin-to item 0 itin-from) * charge-safety-factor
             ]
             if not (home-taz = taz file-read) [ user-message (word "Inconsistent home taz specified for driver " this-driver ) ]
             ifelse file-at-end? [ set next-driver -1][ set next-driver file-read ]

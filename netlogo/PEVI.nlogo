@@ -45,7 +45,7 @@ breed [charger-types charger-type]
 
 drivers-own [
 ;; VEHICLE
-  vehicle-type              ; e.g. 'leaf' or 'volt'
+  this-vehicle-type              ; e.g. 'leaf' or 'volt'
   is-phev?                  
   battery-capacity          ; kwh
   electric-fuel-consumption ; kwh / mile
@@ -139,9 +139,10 @@ charger-types-own[
 vehicle-types-own[
   name
   electric-fuel-consumption
-  gas-fuel-consumption
+  hybrid-fuel-consumption
   battery-capacity
   frac-of-pevs
+  num-vehicles
   is-phev?
 ]
 

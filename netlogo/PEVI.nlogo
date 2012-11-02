@@ -97,11 +97,13 @@ drivers-own [
   extra-charge-time-for-travel
 
 ;; TRACKING
+  energy-used
+  gasoline-used
   num-denials
   taz-list
   
 ;; CANDIDATE ADDITIONS TO MODEL DESCRIPTION
-  kwh-received ; a count of how much energy each driver has charged
+  energy-received ; a count of how much energy each driver has charged
 
 ]
 
@@ -466,7 +468,16 @@ end
 ;; ARRIVE
 ;;;;;;;;;;;;;;;;;;;;
 to arrive
-  set state-of-charge (state-of-charge - trip-distance * electric-fuel-consumption / battery-capacity)
+  ; account for energy / gas used in the trip
+  let #charge-used trip-distance * electric-fuel-consumption / battery-capacity
+  ifelse not is-bev? and state-of-charge - #charge-used < 0 [
+    set energy-used energy-used + state-of-charge * battery-capacity
+    set gasoline-used gasoline-used + (#charge-used - state-of-charge) * battery-capacity / electric-fuel-consumption * hybrid-fuel-consumption
+    set state-of-charge 0
+  ][
+    set state-of-charge state-of-charge - #charge-used
+    set energy-used energy-used + #charge-used * battery-capacity
+  ]
   set journey-distance journey-distance - trip-distance
   print (word precision ticks 3 " " self " arriving, trip-distance: " trip-distance " soc:" state-of-charge " elec-fc:" electric-fuel-consumption " cap" battery-capacity)
   update-itinerary 
@@ -533,10 +544,10 @@ GRAPHICS-WINDOW
 86
 10
 331
-207
+228
 -1
 -1
-6.654
+7.5
 1
 10
 1

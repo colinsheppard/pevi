@@ -32,6 +32,7 @@ globals [
   time-opportunity-cost
   willing-to-roam-time-threshold
   frac-phev
+  probability-of-unneeded-charge
   
   ;; globals needed for testing
   test-driver
@@ -53,7 +54,6 @@ drivers-own [
   
 ;; DEMOGRAPHY  
   home-taz
-  probability-of-unneeded-charge
 
 ;; OPERATION
   state                     ; discrete string value: not-charging, traveling, charging
@@ -181,10 +181,15 @@ to-report need-to-charge [calling-event]
     set remaining-range 9999999
   ]
   ifelse ( (calling-event = "arrive" and remaining-range < journey-distance * charge-safety-factor) or 
-           (calling-event = "depart" and remaining-range < trip-distance * charge-safety-factor) )[ ; TODO add random draw here for people who charge but don't need to
+           (calling-event = "depart" and remaining-range < trip-distance * charge-safety-factor) )[
     report true
   ][
-    report false
+    ifelse random-float 1 < probability-of-unneeded-charge [
+        print (word precision ticks 3 " " self " need-to-charge randomly chose to charge")
+        report true
+    ][
+      report false
+    ]
   ]
 end
 
@@ -220,22 +225,16 @@ to seek-charger
   let #min-charger-type -99
   let #trip-charge-time-need-by-type n-values count charger-types [-99]
   
-  ;; submodel action 1:
   ifelse time-until-depart < willing-to-roam-time-threshold [  
     set willing-to-roam? true  
   ][
     set willing-to-roam? false 
   ]
-  ;set charger-in-origin-or-destination true  ; TODO this needs to be updated once en-route/neighbor charging is implemented    
-  ;; submodel action 2:
   ifelse willing-to-roam? [
     set taz-list remove-duplicates (sentence current-taz destination-taz item my-od-index od-enroute)
   ][  
-    ;; 1. build a list of tazs to search -- only current TAZ
     set taz-list (sentence current-taz)
   ]
-  
-  ;; 2. calculate trip-energy-need
   let #trip-or-journey-energy-need -99
   ifelse time-until-depart < 1 [
     set #trip-or-journey-energy-need max (sentence 0 (trip-distance * charge-safety-factor * electric-fuel-consumption - state-of-charge * battery-capacity))
@@ -319,13 +318,9 @@ to wait-time-event-scheduler
   print (word precision ticks 3 " " self " wait-time-event-scheduler remaining-range:" remaining-range " trip-distance:" trip-distance " time-until-depart:" time-until-depart)
   set state "not charging"
   ifelse remaining-range / charge-safety-factor < trip-distance [
-;    if departure-time <= ticks [
-;      change-depart-time ticks + wait-time-mean
-;    ]
     dynamic-scheduler:add schedule self task retry-seek ticks + wait-time-mean ;; TODO make wait-time-mean random draw
   ][
     ifelse remaining-range / charge-safety-factor >= journey-distance or time-until-depart <= 1 [
-;      change-depart-time ticks 
 ;      print (word precision ticks 3 " " self " in wait-time-event-sched, deciding to depart at time " ticks)
       dynamic-scheduler:add schedule self task depart departure-time
     ][

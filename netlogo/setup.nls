@@ -24,7 +24,8 @@ to read-parameter-file
       ifelse param-name = "driver-input-file" [ set driver-input-file file-read ][
       ifelse param-name = "od-input-file" [ set od-input-file file-read ][
       ifelse param-name = "vehicle-type-input-file" [ set vehicle-type-input-file file-read ][
-      ]]]]]]]]]]]]]]]]]
+      ifelse param-name = "probability-of-unneeded-charge" [ set probability-of-unneeded-charge file-read ][
+      ]]]]]]]]]]]]]]]]]]
     ]
     file-close
   ][ 

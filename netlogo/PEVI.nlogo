@@ -46,7 +46,7 @@ breed [charger-types charger-type]
 drivers-own [
 ;; VEHICLE
   this-vehicle-type              ; e.g. 'leaf' or 'volt'
-  is-phev?                  
+  is-bev?                  
   battery-capacity          ; kwh
   electric-fuel-consumption ; kwh / mile
   hybrid-fuel-consumption   ; gallon / mile, for phev charge sustaining mode
@@ -77,7 +77,6 @@ drivers-own [
   trip-distance
   journey-distance
   remaining-range
-  charging-distance ; distance for which the driver intends to gain adequate charge (either trip-distance or journey-distance)
   departure-time ;When the vehicle is set to leave the taz
   arrival-time ; when a car is supposed to arrive
   minimum-acceptable-charge ; The charge required to reach the next destination
@@ -143,7 +142,7 @@ vehicle-types-own[
   battery-capacity
   frac-of-pevs
   num-vehicles
-  is-phev?
+  is-bev?
 ]
 
 ;;;;;;;;;;;;;;;;;;;;
@@ -176,8 +175,11 @@ end
 ;; NEED TO CHARGE
 ;;;;;;;;;;;;;;;;;;;;
 to-report need-to-charge [calling-event]
-  set remaining-range (state-of-charge * battery-capacity / electric-fuel-consumption )
-
+  ifelse is-bev? [
+    set remaining-range (state-of-charge * battery-capacity / electric-fuel-consumption )
+  ][
+    set remaining-range 9999999
+  ]
   ifelse ( (calling-event = "arrive" and remaining-range < journey-distance * charge-safety-factor) or 
            (calling-event = "depart" and remaining-range < trip-distance * charge-safety-factor) )[ ; TODO add random draw here for people who charge but don't need to
     report true
@@ -191,7 +193,11 @@ end
 ;;;;;;;;;;;;;;;;;;;;
 to retry-seek
   print (word precision ticks 3 " " self " retry-seek ")
-  set remaining-range (state-of-charge * battery-capacity / electric-fuel-consumption )
+   ifelse is-bev? [
+    set remaining-range (state-of-charge * battery-capacity / electric-fuel-consumption )
+  ][
+    set remaining-range 9999999
+  ]
   seek-charger
 end
 
@@ -303,17 +309,11 @@ to seek-charger
   ]
 end
 
-to-report available-chargers [#taz #level]
-  let #found-chargers 0
-  ask #taz[
-    set #found-chargers ((item #level chargers-by-type) with [current-driver = nobody])
-  ]
-  report #found-chargers
-end
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; WAIT TIME EVENT SCHEDULER
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; wait-time-mean set in params.txt
+;; remaining-range set in need-to-charge and retry-seek
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 to wait-time-event-scheduler
   print (word precision ticks 3 " " self " wait-time-event-scheduler remaining-range:" remaining-range " trip-distance:" trip-distance " time-until-depart:" time-until-depart)
@@ -449,7 +449,6 @@ to depart
       print (word precision ticks 3 " " self " cannot make trip with full battery") ;; TODO this shouldn't happen when PHEV are implemented
     ][
       print (word precision ticks 3 " " self " cannot make TRIP with current charge. Seeking charger.")
-      set charging-distance trip-distance
       seek-charger   
     ]
   ][  
@@ -504,6 +503,14 @@ to update-itinerary
   ][
     set itin-complete? true
   ]
+end
+
+to-report available-chargers [#taz #level]
+  let #found-chargers 0
+  ask #taz[
+    set #found-chargers ((item #level chargers-by-type) with [current-driver = nobody])
+  ]
+  report #found-chargers
 end
 
 to-report charge-rate-of [#charger]

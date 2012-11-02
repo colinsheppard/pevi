@@ -136,8 +136,8 @@ to setup-drivers
 
   ; assing driver vehicles to a vehicle type
   ; first deal with drivers that must belong to certain vehicle types due to lengthy trips in their itinerary
-  let #bev-types vehicle-types with [not is-phev?]
-  let #phev-types sort vehicle-types with [is-phev?]
+  let #bev-types vehicle-types with [is-bev?]
+  let #phev-types sort vehicle-types with [not is-bev?]
   let #used-bev-types n-values 0 [?]
   while [count #bev-types > 0][
     ask max-one-of #bev-types [ battery-capacity / electric-fuel-consumption ][     
@@ -189,7 +189,7 @@ to setup-drivers
     set color green
     set size 2
     
-    set is-phev? [is-phev?] of this-vehicle-type
+    set is-bev? [is-bev?] of this-vehicle-type
     set battery-capacity [battery-capacity] of this-vehicle-type
     set electric-fuel-consumption [electric-fuel-consumption] of this-vehicle-type
     set hybrid-fuel-consumption [hybrid-fuel-consumption] of this-vehicle-type
@@ -226,7 +226,7 @@ to setup-vehicle-types
         set battery-capacity file-read
         set frac-of-pevs file-read
         set #cumul-frac-pevs #cumul-frac-pevs + frac-of-pevs
-        set is-phev? (hybrid-fuel-consumption > 0)
+        set is-bev? (hybrid-fuel-consumption <= 0)
         set num-vehicles 0
       ]
     ]

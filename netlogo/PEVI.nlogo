@@ -320,13 +320,13 @@ to wait-time-event-scheduler
   print (word precision ticks 3 " " self " wait-time-event-scheduler remaining-range:" remaining-range " trip-distance:" trip-distance " time-until-depart:" time-until-depart)
   set state "not charging"
   ifelse remaining-range / charge-safety-factor < trip-distance [
-    dynamic-scheduler:add schedule self task retry-seek ticks + wait-time-mean ;; TODO make wait-time-mean random draw
+    dynamic-scheduler:add schedule self task retry-seek ticks + random-exponential wait-time-mean
   ][
     ifelse remaining-range / charge-safety-factor >= journey-distance or time-until-depart <= 1 [
 ;      print (word precision ticks 3 " " self " in wait-time-event-sched, deciding to depart at time " ticks)
       dynamic-scheduler:add schedule self task depart departure-time
     ][
-      dynamic-scheduler:add schedule self task retry-seek ticks + wait-time-mean ;; TODO make wait-time-mean random draw
+      dynamic-scheduler:add schedule self task retry-seek ticks + random-exponential wait-time-mean
     ]
   ]
 end
@@ -350,12 +350,12 @@ to charge-time-event-scheduler
                                                     [this-charger-type] of current-charger)
   let next-event-scheduled-at 0 
   ifelse (time-until-depart > 0.5) and ([level] of [this-charger-type] of current-charger < 3) and (time-until-end-charge < trip-charge-time-need) [                                                                                                    
-    set next-event-scheduled-at ticks + min (sentence wait-time-mean (time-until-depart - 0.5)) ;; TODO make wait-time-mean random draw with max of time-until-depart - 0.5  
+    set next-event-scheduled-at ticks + min (sentence (random-exponential wait-time-mean) (time-until-depart - 0.5)) 
     dynamic-scheduler:add schedule self task retry-seek next-event-scheduled-at
     print (word precision ticks 3 " " self " scheduling retry-seek, time-until-end-charge: " time-until-end-charge ", trip-charge-time-need: " trip-charge-time-need)
   ][
     ifelse (time-until-depart > 0.5) and ([level] of [this-charger-type] of current-charger < 2) and (time-until-end-charge < journey-charge-time-need) [
-      set next-event-scheduled-at ticks + min (sentence wait-time-mean (time-until-depart - 0.5)) ;; TODO make wait-time-mean random draw with max of time-until-depart - 0.5  
+      set next-event-scheduled-at ticks + min (sentence (random-exponential wait-time-mean) (time-until-depart - 0.5))  
       dynamic-scheduler:add schedule self task retry-seek next-event-scheduled-at
       print (word precision ticks 3 " " self " scheduling retry-seek for " next-event-scheduled-at " time-until-end-charge: " time-until-end-charge ", journey-charge-time-need: " journey-charge-time-need)
     ][
@@ -443,7 +443,7 @@ to depart
   ;print (word precision ticks 3 " " self " itinerary (upon departure):" itin-depart)
   ifelse need-to-charge "depart" [  
     ifelse state-of-charge = 1 [ 
-      print (word precision ticks 3 " " self " cannot make trip with full battery") ;; TODO this shouldn't happen when PHEV are implemented
+      error (word precision ticks 3 " " self " cannot make trip with full battery")
     ][
       print (word precision ticks 3 " " self " cannot make TRIP with current charge. Seeking charger.")
       seek-charger   
@@ -610,7 +610,7 @@ go-until-time
 go-until-time
 0
 30
-30
+6
 0.5
 1
 NIL

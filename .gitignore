@@ -2,3 +2,6 @@
 inputs/*
 outputs/*
 netlogo/temp/*
+netlogo/array
+netlogo/dynamic-scheduler
+postgis

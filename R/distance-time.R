@@ -197,23 +197,8 @@ for(from.name in dimnames(route.hists)$from.name){
   }
 }
 
-
-
-# the following is a start at sampling elevation along the whole stretch of each row in network (which is a line with multiple vertices), the elev at each vertex is returned along with the ID of the network row.  Now we just need to summarize the data into an average gradient
-
-SELECT points.gid,ST_Value(img.rast,points.geom) AS elev FROM north_coast AS img, (select gid,ST_Pointn(dumpedgeom,generate_series(1,ST_NPoints(dumpedgeom))) AS geom FROM network) AS points LIMIT 10;
-  
-
-
-
-SELECT points.gid,points.length,
-        ST_Value(img.rast,points.geom1) AS elev1,
-        ST_Value(img.rast,points.geom2) AS elev2, 
-        ST_Distance_Sphere(points.geom1,points.geom2)*0.000621371 AS dist,
-        ((ST_Value(img.rast,points.geom2) - ST_Value(img.rast,points.geom1))/(3.28 * ST_Distance_Sphere(points.geom1,points.geom2))) AS gradient
-      FROM north_coast AS img, 
-        (SELECT gid,length,ST_AsText(ST_Pointn(dumpedgeom,generate_series(1,ST_NPoints(dumpedgeom)-1))) AS geom1, ST_AsText(ST_Pointn(dumpedgeom,generate_series(2,ST_NPoints(dumpedgeom)))) AS geom2,ST_AsText(startpoint) FROM network WHERE gid=2924) AS points
-  
-
-SELECT gid,length,ST_AsText(CASE WHEN endpoint = ST_Pointn(dumpedgeom,1) THEN ST_Pointn(dumpedgeom,generate_series(1,ST_NPoints(dumpedgeom)-1)) ELSE ST_Pointn(dumpedgeom,generate_series(ST_NPoints(dumpedgeom),2,-1)) END) AS geom1, ST_AsText(CASE WHEN endpoint = ST_Pointn(dumpedgeom,1) THEN ST_Pointn(dumpedgeom,generate_series(2,ST_NPoints(dumpedgeom))) ELSE ST_Pointn(dumpedgeom,generate_series(ST_NPoints(dumpedgeom)-1,1,-1)) END) AS geom2,ST_AsText(endpoint) FROM network WHERE gid=140;
-
+# finally, summarize the routes to get the distance/time/performance/enroute for each pairing
+load(file=paste(path.to.pevi,'inputs/routing.Rdata',sep=''))
+disttime <- ddply(route.ordered,.(from_taz,to_taz),function(df){ data.frame(miles=sum(df$length),time=sum(df$length/df$ab_speed))})
+names(disttime) <- c('from','to','miles','time')
+write.csv(disttime,file=paste(path.to.geatm,'taz-dist-time.csv',sep=''),row.names=F)

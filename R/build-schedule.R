@@ -1,6 +1,7 @@
 library(colinmisc)
 load.libraries(c('sas7bdat','plyr','ggplot2','gtools','doMC'))
 
+make.plots  <- F
 num.processors <- 10
 registerDoMC(num.processors)
 
@@ -25,9 +26,7 @@ if(!file.exists(paste(path.to.geatm,"od-aggregated.Rdata",sep=''))){
   od.24.new <- read.csv(paste(path.to.geatm,"od_24_new.csv",sep=""))
   od.am.new <- read.csv(paste(path.to.geatm,"od_am_new.csv",sep=""))
   od.pm.new <- read.csv(paste(path.to.geatm,"od_pm_new.csv",sep=""))
-  dist <- read.table(paste(path.to.geatm,"taz-dist-time.txt",sep=""),sep="\t",header=T)
-  names(dist) <- c('from','to','demand','miles','time')
-  dist$time <- dist$time/60
+  dist <- read.csv(paste(path.to.geatm,"taz-dist-time.csv",sep=""))
   save(od.24.new,od.am.new,od.pm.new,dist,file=paste(path.to.geatm,"od-aggregated.Rdata",sep=''))
 }else{
   load(paste(path.to.geatm,"od-aggregated.Rdata",sep=''))
@@ -74,33 +73,35 @@ if(!file.exists(paste(path.to.nhts,"TripChaining/tour09.Rdata",sep=''))){
   load(paste(path.to.nhts,"TripChaining/tour09.Rdata",sep=''))
 }
 
-# explore the NHTS Trip Chaining Data
-#tours[1:20,c('HOUSEID','PERSONID','TOUR','TOURTYPE','STOPS','BEGNTIME','ENDTTIME','TOT_DWEL','TOT_DWEL2','TOT_DWEL3','DIST_M','TOT_CMIN','begin','end')]
+if(make.plots){
+  # explore the NHTS Trip Chaining Data
+  #tours[1:20,c('HOUSEID','PERSONID','TOUR','TOURTYPE','STOPS','BEGNTIME','ENDTTIME','TOT_DWEL','TOT_DWEL2','TOT_DWEL3','DIST_M','TOT_CMIN','begin','end')]
 
-# What is the distribution of total dwell time (including time spent at destination) for each tour type
-ggplot(tours,aes(x=TOT_DWEL4/60))+
-scale_x_continuous(name="Total Tour Dwell Time (hours)")+
-opts(title = "2009 National Household Travel Survery - Trip Chaining Dataset") +
-geom_histogram()+
-facet_wrap(~TOURTYPE)
+  # What is the distribution of total dwell time (including time spent at destination) for each tour type
+  ggplot(tours,aes(x=TOT_DWEL4/60))+
+  scale_x_continuous(name="Total Tour Dwell Time (hours)")+
+  opts(title = "2009 National Household Travel Survery - Trip Chaining Dataset") +
+  geom_histogram()+
+  facet_wrap(~TOURTYPE)
 
-ggplot(subset(tours,HHSTATE=="CA"),aes(x=TOT_DWEL4/60))+
-scale_x_continuous(name="Total Tour Dwell Time (hours)")+
-opts(title = "2009 NHTS - CA Subset") +
-geom_histogram()+
-facet_wrap(~TOURTYPE)
+  ggplot(subset(tours,HHSTATE=="CA"),aes(x=TOT_DWEL4/60))+
+  scale_x_continuous(name="Total Tour Dwell Time (hours)")+
+  opts(title = "2009 NHTS - CA Subset") +
+  geom_histogram()+
+  facet_wrap(~TOURTYPE)
 
-ggplot(subset(tours,HHSTATE=="CA" & URBRUR==2),aes(x=TOT_DWEL4/60))+
-scale_x_continuous(name="Total Tour Dwell Time (hours)",limits=c(0,24))+
-opts(title = "2009 NHTS - Rural CA Subset") +
-geom_histogram()+
-facet_wrap(~TOURTYPE)
+  ggplot(subset(tours,HHSTATE=="CA" & URBRUR==2),aes(x=TOT_DWEL4/60))+
+  scale_x_continuous(name="Total Tour Dwell Time (hours)",limits=c(0,24))+
+  opts(title = "2009 NHTS - Rural CA Subset") +
+  geom_histogram()+
+  facet_wrap(~TOURTYPE)
 
-ggplot(subset(tours,URBRUR==2),aes(x=TOT_DWEL4/60))+
-scale_x_continuous(name="Total Tour Dwell Time (hours)")+
-opts(title = "2009 NHTS - Rural US Subset") +
-geom_histogram()+
-facet_wrap(~TOURTYPE)
+  ggplot(subset(tours,URBRUR==2),aes(x=TOT_DWEL4/60))+
+  scale_x_continuous(name="Total Tour Dwell Time (hours)")+
+  opts(title = "2009 NHTS - Rural US Subset") +
+  geom_histogram()+
+  facet_wrap(~TOURTYPE)
+}
 
 # based on comparing the various subsets, use US rural as the basis for the HEVI model, exclude non POV travel and long distance travel (>300 miles)
 if(!file.exists(paste(path.to.nhts,'data-preprocessed-for-scheduling.Rdata',sep=''))){
@@ -205,7 +206,7 @@ if(!file.exists(paste(path.to.nhts,'data-preprocessed-for-scheduling.Rdata',sep=
 }
 
 source(paste(path.to.pevi,'R/create-schedule.R',sep=''))
-pev.pens <- c(0.005,0.01,0.02,0.04,0.08)
+pev.pens <- c(0.005,0.01,0.02,0.04)
 replicate <- 1
 prob.weights <- data.frame(pen=pev.pens,'0'=NA,'1'=NA,'2'=NA,'3'=NA,'4'=NA,'5'=NA)
 schedule <- list()
@@ -263,7 +264,6 @@ num.vehicles <- data.frame(penetration=pev.pens,expected=NA,scheduled=NA)
 synth.tours.per <- list()
 dwell.times     <- list()
 compute.new <- T
-make.plots  <- T
 
 if(make.plots){
   #dev.new()

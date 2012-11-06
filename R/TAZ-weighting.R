@@ -24,8 +24,11 @@ taz <- readShapePoly(paste(path.to.pevi,'inputs/development/aggregated-taz',sep=
 load(paste(path.to.pevi,'inputs/development/aggregated-taz-fieldnames.Rdata',sep=''))
 names(taz@data) <- c('row',agg.taz.shp.fieldnames)
 od.24.new <- read.csv(paste(path.to.geatm,'od_24_new.csv',sep=''))
+od.24.new <- od.24.new[,-which(names(od.24.new)=="X")]
 od.am.new <- read.csv(paste(path.to.geatm,'od_am_new.csv',sep=''))
+od.am.new <- od.am.new[,-which(names(od.am.new)=="X")]
 od.pm.new <- read.csv(paste(path.to.geatm,'od_pm_new.csv',sep=''))
+od.pm.new <- od.pm.new[,-which(names(od.pm.new)=="X")]
 
 zips    <- readShapePoly(paste(path.to.geatm,'../CA-ZIPS/tl_2010_06_zcta510.shp',sep=''))
 zips@data$INTPTLAT10 <- as.numeric(as.character(zips@data$INTPTLAT10))
@@ -138,7 +141,7 @@ taz.weights.by.penetration <- apply(w.by.penetration.matrix,1,sum)
 od.sums <- ddply(od.24.new,.(from),function(df){ sum(df$demand) })
 taz.weights.by.penetration <- taz.weights.by.penetration * sum(od.sums$V1) / sum(od.sums$V1 * taz.weights.by.penetration) 
 
-# for testing
+# do the weighting
 od <- od.24.new
 od.weighted <- od
 for(taz.i in 1:length(taz.weights.by.penetration)){
@@ -150,7 +153,20 @@ for(taz.i in 1:length(taz.weights.by.penetration)){
   od.weighted$demand[od.to.inds] <-  od.weighted$demand[od.to.inds] * taz.weights.by.penetration[taz.i] 
 }
 
-# plot in g-earth the difference in total demand
+weighting.factors <- od.weighted$demand / od$demand
+od.weighted[,c('hbw','hbshop','hbelem','hbuniv','hbro','nhb','ix','xi','ee')] <- od.weighted[,c('hbw','hbshop','hbelem','hbuniv','hbro','nhb','ix','xi','ee')] * weighting.factors
+od.24.weighted <- od.weighted
+od.am.weighted <- od.am.new
+od.am.weighted[,c('hbw','hbshop','hbelem','hbuniv','hbro','nhb','ix','xi','ee','demand')] <- od.am.weighted[,c('hbw','hbshop','hbelem','hbuniv','hbro','nhb','ix','xi','ee','demand')] * weighting.factors
+od.pm.weighted <- od.pm.new
+od.pm.weighted[,c('hbw','hbshop','hbelem','hbuniv','hbro','nhb','ix','xi','ee','demand')] <- od.pm.weighted[,c('hbw','hbshop','hbelem','hbuniv','hbro','nhb','ix','xi','ee','demand')] * weighting.factors
+
+write.csv(od.24.weighted,paste(path.to.geatm,'od_24_weighted.csv',sep=''),row.names=F)
+write.csv(od.am.weighted,paste(path.to.geatm,'od_am_weighted.csv',sep=''),row.names=F)
+write.csv(od.pm.weighted,paste(path.to.geatm,'od_pm_weighted.csv',sep=''),row.names=F)
+
+
+# plot in g-earth the ratio 
 taz@data$weighted.demand <- ddply(od.weighted,.(from),function(df){ sum(df$demand) })$V1[taz$id]
 taz@data$penetration.weights <- taz.weights.by.penetration[taz$id]
 taz$ID <- sapply(slot(taz, "polygons"),function(x){ slot(x,'ID')})

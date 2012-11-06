@@ -201,4 +201,6 @@ for(from.name in dimnames(route.hists)$from.name){
 load(file=paste(path.to.pevi,'inputs/routing.Rdata',sep=''))
 disttime <- ddply(route.ordered,.(from_taz,to_taz),function(df){ data.frame(miles=sum(df$length),time=sum(df$length/df$ab_speed))})
 names(disttime) <- c('from','to','miles','time')
+disttime <- rbind(disttime,data.frame(from=unique(disttime$from),to=unique(disttime$from),miles=sqrt(taz$ACRES[match(unique(disttime$from),taz$id)]*0.001563)/2,time=sqrt(taz$ACRES[match(unique(disttime$from),taz$id)]*0.001563)/30/2))
 write.csv(disttime,file=paste(path.to.geatm,'taz-dist-time.csv',sep=''),row.names=F)
+

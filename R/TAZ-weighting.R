@@ -130,23 +130,27 @@ frac.est <- frac.est[!frac.est$zip %in% c(95502,95518,95534),]
 # for zip codes that weren't in the polk data (mostly border zips outside of humboldt with tiny fractions inside TAZs), we add rows to frac.est make them have a weight of 1
 frac.est <- rbind(frac.est,data.frame(zip=names(zips.in.taz)[! names(zips.in.taz) %in% frac.est$zip],frac.weight=1))
 
-# create the distance matrix on the original TAZ data (@ 40 deg N it's ~53 miles / deg long and ~69 miles / deg lat)
-coords.in.miles <- data.frame(x=coordinates(taz)[,1]*53,y=coordinates(taz)[,2]*69)
-d <- as.matrix(dist(coords.in.miles))
+# load the distance-time matrix for the aggregated TAZ data
+d <- read.csv(paste(path.to.geatm,'taz-dist-time.csv',sep=''))
+
 # create corresponding matrix of weights on each row of distance matrix where a quadratic relationship favoring proximity is established
-w.by.distance <- matrix(0,nrow(d),ncol(d))
-max.d <- max(d)
-for(row.i in 1:nrow(d)){
-  w.by.distance[row.i,row.i] <- 0.5
-  top.20 <- sort(d[row.i,-row.i])[1:round(ncol(d)/5)]
-  top.20.inds <- as.numeric(names(top.20))
-  w.by.distance[row.i,top.20.inds] <- (max.d-top.20)^10/sum((max.d-top.20)^10)/2
+n.taz <- sqrt(nrow(d))
+w.by.distance <- matrix(0,n.taz,n.taz)
+max.d <- max(d$miles)
+for(taz.i in unique(d$from)){
+  w.by.distance[taz.i,taz.i] <- 0.5
+  d.sub <- subset(d,from==taz.i & to!=taz.i)
+  top.20.inds <- order(d$miles[d$from==taz.i & d$to!=taz.i])[1:round(n.taz/5)]
+  w.by.distance[taz.i,d.sub$to[top.20.inds]] <- (max.d-d$miles[top.20.inds])^10/sum((max.d-d$miles[top.20.inds])^10)/2
 }
 
 # now apply these estimates to the matrix
 w.by.penetration <- frac.est$frac.weight[match(names(zips.in.taz),frac.est$zip)]
 w.by.penetration.matrix <- t(apply(zips.in.taz,1,function(x){ x * w.by.penetration }))
 taz.weights.by.penetration <- apply(w.by.penetration.matrix,1,sum)
+# scale these weights evenly so that the weighted sum of od trips is equivalent before and after
+od.sums <- ddply(od,.(from),function(df){ sum(df$demand) })
+taz.weights.by.penetration <- taz.weights.by.penetration * sum(od.sums$V1) / sum(od.sums$V1 * taz.weights.by.penetration) 
 
 # for testing
 od <- od.24.new
@@ -158,6 +162,7 @@ for(taz.i in 1:length(taz.weights.by.penetration)){
   od.to.inds    <- which(od$to  ==newtaz)
   od.from.diff  <- (taz.weights.by.penetration[taz.i] - 1) * sum(od$demand[od.from.inds])
   od.to.diff  <- (taz.weights.by.penetration[taz.i] - 1) * sum(od$demand[od.to.inds])
+  neg.inds <- c()
 
   # now distribute those diffs based on the weights.by.distance matrix
   for(distance.weight.i in which(w.by.distance[taz.i,] > 0)){
@@ -167,19 +172,64 @@ for(taz.i in 1:length(taz.weights.by.penetration)){
     from.to.distribute  <- od.from.diff * distance.weight
     distance.weight.from.inds <- which(od$from==distance.weight.taz)
     if(length(distance.weight.from.inds)>0){
-      from.distributed.additive <- from.to.distribute * od.weighted$demand[distance.weight.from.inds] / sum(od.weighted$demand[distance.weight.from.inds])
+      from.distributed.additive <- from.to.distribute * od$demand[distance.weight.from.inds] / sum(od$demand[distance.weight.from.inds])
       from.distributed.multiplicative <- (from.distributed.additive + od.weighted$demand[distance.weight.from.inds])/ od.weighted$demand[distance.weight.from.inds]
-      from.distributed.multiplicative[is.nan(from.distributed.multiplicative)] <- 1
+      from.distributed.multiplicative[is.nan(from.distributed.multiplicative) | abs(from.distributed.multiplicative) == Inf] <- 1
       od.weighted[distance.weight.from.inds,ncol(od)] <- od.weighted[distance.weight.from.inds,ncol(od)] * from.distributed.multiplicative
+      if(any(is.nan(od.weighted[distance.weight.from.inds,ncol(od)]))) stop('here 1')
+      neg.inds <- which(od.weighted[distance.weight.from.inds,ncol(od)] < 0)
+      while(length(neg.inds)>0){
+        # redistrib the negative demand to the positive ones
+        with.negs <- od.weighted[distance.weight.from.inds,ncol(od)]
+        pos.redist <- -sum(with.negs[neg.inds])
+        with.negs[neg.inds] <- 0
+        if(sum(with.negs)>0){
+          if(sum(with.negs)-pos.redist > 0){
+            od.weighted[distance.weight.from.inds,ncol(od)] <- with.negs * (sum(with.negs)-pos.redist)/sum(with.negs)
+          }else{
+            od.weighted[distance.weight.from.inds,ncol(od)] <- 0
+          }
+        }
+        if(any(is.nan(od.weighted[distance.weight.from.inds,ncol(od)]))) stop('here 2')
+        neg.inds <- which(od.weighted[distance.weight.from.inds,ncol(od)] < 0)
+      }
     }
     #to
     to.to.distribute    <- od.to.diff * distance.weight
     distance.weight.to.inds   <- which(od$to==distance.weight.taz)
     if(length(distance.weight.to.inds)>0){
-      to.distributed.additive <- to.to.distribute * od.weighted$demand[distance.weight.to.inds] / sum(od.weighted$demand[distance.weight.to.inds])
+      to.distributed.additive <- to.to.distribute * od$demand[distance.weight.to.inds] / sum(od$demand[distance.weight.to.inds])
       to.distributed.multiplicative <- (to.distributed.additive + od.weighted$demand[distance.weight.to.inds])/od.weighted$demand[distance.weight.to.inds]
-      to.distributed.multiplicative[is.nan(to.distributed.multiplicative)] <- 1
+      to.distributed.multiplicative[is.nan(to.distributed.multiplicative)| abs(to.distributed.multiplicative) == Inf] <- 1
       od.weighted[distance.weight.to.inds,ncol(od)] <- od.weighted[distance.weight.to.inds,ncol(od)] * to.distributed.multiplicative
+      if(any(is.nan(od.weighted[distance.weight.to.inds,ncol(od)]))) stop('here 3')
+      neg.inds <- which(od.weighted[distance.weight.to.inds,ncol(od)] < 0)
+      while(length(neg.inds)>0){
+        # redistrib the negative demand to the positive ones
+        with.negs <- od.weighted[distance.weight.to.inds,ncol(od)]
+        pos.redist <- -sum(with.negs[neg.inds])
+        with.negs[neg.inds] <- 0
+        if(sum(with.negs)>0){
+          if(sum(with.negs)-pos.redist > 0){
+            od.weighted[distance.weight.to.inds,ncol(od)] <- with.negs * (sum(with.negs)-pos.redist)/sum(with.negs)
+          }else{
+            od.weighted[distance.weight.to.inds,ncol(od)] <- 0
+          }
+        }
+        if(any(is.nan(od.weighted[distance.weight.to.inds,ncol(od)]))) stop('here 4')
+        neg.inds <- which(od.weighted[distance.weight.to.inds,ncol(od)] < 0)
+      }
     }
   }
 }
+
+# plot in g-earth the difference in total demand
+taz@data$weighted.demand <- ddply(od.weighted,.(from),function(df){ sum(df$demand) })$V1[taz$id]
+taz@data$penetration.weights <- taz.weights.by.penetration[taz$id]
+taz$ID <- sapply(slot(taz, "polygons"),function(x){ slot(x,'ID')})
+
+c.map <- paste(map.color(taz@data$weighted.demand,blue2red(50)),'7F',sep='')
+shp.to.kml(taz,paste(path.to.pevi,'inputs/development/penetration-weighting.kml',sep=''),'Penetration Weighting','Color denotes total daily demand','red',1.5,c.map,id.col='ID',name.col='name',description.cols=c('id','name','total.demand.from','weighted.demand','penetration.weights'))
+
+
+

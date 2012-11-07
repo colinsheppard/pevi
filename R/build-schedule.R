@@ -1,5 +1,5 @@
 library(colinmisc)
-load.libraries(c('sas7bdat','plyr','ggplot2','gtools','doMC'))
+load.libraries(c('sas7bdat','plyr','ggplot2','gtools','doMC','reshape'))
 
 make.plots  <- F
 num.processors <- 10
@@ -17,17 +17,14 @@ load(paste(path.to.geatm,"od-aggregated.Rdata",sep=''))
 load(paste(path.to.nhts,"TripChaining/chntrp09.Rdata",sep=''))
 load(paste(path.to.nhts,"HHV2PUB.Rdata",sep=''))
 load(paste(path.to.nhts,"TripChaining/tour09.Rdata",sep=''))
-load(file=paste(path.to.nhts,'data-preprocessed-for-scheduling.Rdata',sep=''))
-
-
-# play with deriving a schedule based on trip numbers and pev penetration
 
 if(!file.exists(paste(path.to.geatm,"od-aggregated.Rdata",sep=''))){
-  od.24.new <- read.csv(paste(path.to.geatm,"od_24_new.csv",sep=""))
-  od.am.new <- read.csv(paste(path.to.geatm,"od_am_new.csv",sep=""))
-  od.pm.new <- read.csv(paste(path.to.geatm,"od_pm_new.csv",sep=""))
+  od.24.weighted <- read.csv(paste(path.to.geatm,"od_24_weighted.csv",sep=""))
+  od.am.weighted <- read.csv(paste(path.to.geatm,"od_am_weighted.csv",sep=""))
+  od.pm.weighted <- read.csv(paste(path.to.geatm,"od_pm_weighted.csv",sep=""))
+  home.dist <- read.csv(paste(path.to.geatm,'home-distribution.csv',sep=''))
   dist <- read.csv(paste(path.to.geatm,"taz-dist-time.csv",sep=""))
-  save(od.24.new,od.am.new,od.pm.new,dist,file=paste(path.to.geatm,"od-aggregated.Rdata",sep=''))
+  save(od.24.weighted,od.am.weighted,od.pm.weighted,dist,home.dist,file=paste(path.to.geatm,"od-aggregated.Rdata",sep=''))
 }else{
   load(paste(path.to.geatm,"od-aggregated.Rdata",sep=''))
 }
@@ -105,13 +102,31 @@ if(make.plots){
 
 # based on comparing the various subsets, use US rural as the basis for the HEVI model, exclude non POV travel and long distance travel (>300 miles)
 if(!file.exists(paste(path.to.nhts,'data-preprocessed-for-scheduling.Rdata',sep=''))){
-  rur.tours <- subset(tours,URBRUR==2 & PMT_POV>0 & TOT_MILS<300)
-  rur.tours$tours.left.in.journey <- ddply(rur.tours,.(journey.id),function(df){ data.frame(tours.left.in.journey=(nrow(df)-1):0) },.parallel=T)$tours.left.in.journey
-  # get rid of some bad data: NA for TOT_DWEL4, begin, end
-  rur.tours <- rur.tours[!rur.tours$journey.id %in% rur.tours$journey.id[is.na(rur.tours$TOT_DWEL4)&rur.tours$tours.left.in.journey>0],]
-  rur.tours$TOT_DWEL4[is.na(rur.tours$TOT_DWEL4)] <- 0
-  rur.tours <- rur.tours[!rur.tours$journey.id %in% rur.tours$journey.id[is.na(rur.tours$end)],]
-  rur.tours$index <- 1:nrow(rur.tours)
+  if(!file.exists(paste(path.to.nhts,'rur-tours.Rdata',sep=''))){
+    rur.tours <- subset(tours,URBRUR==2 & PMT_POV>0 & TOT_MILS<300)
+    rur.tours$tours.left.in.journey <- ddply(rur.tours,.(journey.id),function(df){ data.frame(tours.left.in.journey=(nrow(df)-1):0) },.parallel=T)$tours.left.in.journey
+    # get rid of some bad data: NA for TOT_DWEL4, begin, end
+    rur.tours <- rur.tours[!rur.tours$journey.id %in% rur.tours$journey.id[is.na(rur.tours$TOT_DWEL4)&rur.tours$tours.left.in.journey>0],]
+    rur.tours$TOT_DWEL4[is.na(rur.tours$TOT_DWEL4)] <- 0
+    rur.tours <- rur.tours[!rur.tours$journey.id %in% rur.tours$journey.id[is.na(rur.tours$end)],]
+    rur.tours$index <- 1:nrow(rur.tours)
+    rur.tours.per <- ddply(rur.tours,.(journey.id),nrow,.parallel=T) # takes a long time but is important to verifying that the schedule reflects the NHTS data
+
+    # type mappings
+    type.map <- list()
+    type.map[['hw']] <- c('HW','WH')
+    type.map[['ho']] <- c('HO','OH','HH')
+    type.map[['ow']] <- c('OW','WO','OO','WW')
+    type.map.rev <- melt(type.map)
+    names(type.map.rev) <- c('tour.type','geatm.type')
+
+    # add a geatm.type field to rur.tours
+    rur.tours$geatm.type <- as.character(type.map.rev$geatm.type[match(rur.tours$TOURTYPE,type.map.rev$tour.type)])
+
+    save(rur.tours,rur.tours.per,type.map,type.map.rev,file=paste(path.to.nhts,'rur-tours.Rdata',sep=''))
+  }else{
+    load(paste(path.to.nhts,'rur-tours.Rdata',sep=''))
+  }
 
   # how many unique tours do we have? Answer 831317, 233820 rural
   #length(unique(paste(tours$HOUSEID,tours$PERSONID,tours$TOUR)))
@@ -131,18 +146,18 @@ if(!file.exists(paste(path.to.nhts,'data-preprocessed-for-scheduling.Rdata',sep=
   #facet_wrap(~TOURTYPE)
 
   # prepare OD data by condensing trip types into HW, HO, OW categories
-  od.24.simp <- od.24.new[,c('from','to')]
-  od.24.simp$hw <- od.24.new[,'hbw']
-  od.24.simp$ho <- apply(od.24.new[,c('hbshop','hbelem','hbuniv','hbro')],1,sum)
-  od.24.simp$ow <- apply(od.24.new[,c('nhb','ix','xi','ee')],1,sum)
-  od.am.simp <- od.am.new[,c('from','to')]
-  od.am.simp$hw <- od.am.new[,'hbw']
-  od.am.simp$ho <- apply(od.am.new[,c('hbshop','hbelem','hbuniv','hbro')],1,sum)
-  od.am.simp$ow <- apply(od.am.new[,c('nhb','ix','xi','ee')],1,sum)
-  od.pm.simp <- od.pm.new[,c('from','to')]
-  od.pm.simp$hw <- od.pm.new[,'hbw']
-  od.pm.simp$ho <- apply(od.pm.new[,c('hbshop','hbelem','hbuniv','hbro')],1,sum)
-  od.pm.simp$ow <- apply(od.pm.new[,c('nhb','ix','xi','ee')],1,sum)
+  od.24.simp <- od.24.weighted[,c('from','to')]
+  od.24.simp$hw <- od.24.weighted[,'hbw']
+  od.24.simp$ho <- apply(od.24.weighted[,c('hbshop','hbelem','hbuniv','hbro')],1,sum)
+  od.24.simp$ow <- apply(od.24.weighted[,c('nhb','ix','xi','ee')],1,sum)
+  od.am.simp <- od.am.weighted[,c('from','to')]
+  od.am.simp$hw <- od.am.weighted[,'hbw']
+  od.am.simp$ho <- apply(od.am.weighted[,c('hbshop','hbelem','hbuniv','hbro')],1,sum)
+  od.am.simp$ow <- apply(od.am.weighted[,c('nhb','ix','xi','ee')],1,sum)
+  od.pm.simp <- od.pm.weighted[,c('from','to')]
+  od.pm.simp$hw <- od.pm.weighted[,'hbw']
+  od.pm.simp$ho <- apply(od.pm.weighted[,c('hbshop','hbelem','hbuniv','hbro')],1,sum)
+  od.pm.simp$ow <- apply(od.pm.weighted[,c('nhb','ix','xi','ee')],1,sum)
 
   # by how much do we need to scale the AM / PM hours (AM 6:45-7:45, PM 16:30-17:30) to make the aggregate NHTS match GEATM
   od.24.tot <- sum(od.24.simp[,3:5])
@@ -155,17 +170,6 @@ if(!file.exists(paste(path.to.nhts,'data-preprocessed-for-scheduling.Rdata',sep=
   am.scale <- (od.am.tot/od.24.tot)/(nh.am.tot/nh.24.tot)
   pm.scale <- (od.pm.tot/od.24.tot)/(nh.pm.tot/nh.24.tot)
   offpeak.scale <- ((od.24.tot-od.am.tot-od.pm.tot)/od.24.tot )/((nh.24.tot - nh.am.tot - nh.pm.tot)/nh.24.tot)
-
-  # type mappings
-  type.map <- list()
-  type.map[['hw']] <- c('HW','WH')
-  type.map[['ho']] <- c('HO','OH','HH')
-  type.map[['ow']] <- c('OW','WO','OO','WW')
-  type.map.rev <- melt(type.map)
-  names(type.map.rev) <- c('tour.type','geatm.type')
-
-  # add a geatm.type field to rur.tours
-  rur.tours$geatm.type <- as.character(type.map.rev$geatm.type[match(rur.tours$TOURTYPE,type.map.rev$tour.type)])
 
   # subset rur.tours by type
   rur.by.type <- list()
@@ -193,19 +197,13 @@ if(!file.exists(paste(path.to.nhts,'data-preprocessed-for-scheduling.Rdata',sep=
   # verify that it all sums to 1
   #weighted.mean(colSums(epdfs)[2:4],c(nrow(rur.by.type[['hw']]),nrow(rur.by.type[['ho']]),nrow(rur.by.type[['ow']])))
 
-  rur.tours.per <- ddply(rur.tours,.(journey.id),nrow,.parallel=T) # takes a long time but is important to verifying that the schedule reflects the NHTS data
-
-  # the following were found using an optimization that attempted to match the NHTS distribution of tours per driver to the synthetic schedulel 
-  #prob.weights <- list()
-  #prob.weights[['0.03']] <- c(1e-6,0.66,1,0.79,0.93,0.40)
-  #prob.weights[['0.05']] <- c(0.07,0.9,0.5,0.17,0.4,0.5)
-
-  save(rur.tours,rur.by.type,rur.tours.per,ecdfs,epdfs,type.map,type.map.rev,od.24.simp,od.am.simp,od.pm.simp,prob.weights,file=paste(path.to.nhts,'data-preprocessed-for-scheduling.Rdata',sep=''))
+  save(rur.tours,rur.by.type,rur.tours.per,ecdfs,epdfs,type.map,type.map.rev,od.24.simp,od.am.simp,od.pm.simp,file=paste(path.to.nhts,'data-preprocessed-for-scheduling.Rdata',sep=''))
 }else{
   load(file=paste(path.to.nhts,'data-preprocessed-for-scheduling.Rdata',sep=''))
 }
 
 source(paste(path.to.pevi,'R/create-schedule.R',sep=''))
+target.trips.per.driver <- 2.37
 pev.pens <- c(0.005,0.01,0.02,0.04)
 replicate <- 1
 prob.weights <- data.frame(pen=pev.pens,'0'=NA,'1'=NA,'2'=NA,'3'=NA,'4'=NA,'5'=NA)
@@ -221,7 +219,7 @@ if(!file.exists(paste(path.to.outputs,'schedules-20120425.Rdata',sep=''))){
       load(paste(path.to.outputs,"0saved-state-pen",pev.penetration*100,".Rdata",sep=''))
       prob.weights[prob.weights$pen == pev.penetration, 2:7] <- apply(all.ptx[,1:6,gen.num-1],2,mean)
       
-      schedule[[pev.pen.char]] <- create.schedule(pev.penetration,prob.weights[prob.weights$pen == pev.penetration,2:7])
+      schedule[[pev.pen.char]] <- create.schedule(pev.penetration,prob.weightsprob.weights[prob.weights$pen == pev.penetration,2:7])
   }
   save(schedule,prob.weights,file=paste(path.to.outputs,'schedules-20120425.Rdata',sep=''))
 }else{

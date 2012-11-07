@@ -1,4 +1,4 @@
-create.schedule <- function(pev.penetration,prob.weights,scale.dist.thresh=1){
+create.schedule <- function(pev.penetration,prob.weights,target.trips.per.driver,scale.dist.thresh=1){
   prob.weights.all <- c(prob.weights,rep(1,20))
   od.counts <- cbind(od.24.simp[,c('from','to')],od.24.simp[,c('hw','ho','ow')]*pev.penetration)
   names(od.counts) <- c('from','to','hw.mean','ho.mean','ow.mean')
@@ -51,7 +51,7 @@ create.schedule <- function(pev.penetration,prob.weights,scale.dist.thresh=1){
   max.length.remaining <- max(rur.tours$tours.left.in.journey)
 
   for(od.i in 1:nrow(od.counts)){
-    if(od.i%%2000 == 0)print(paste("pev ",pev.penetration," rep ",replicate," progress: ",roundC(od.i/nrow(od.counts)*100,1),"%",sep=''))
+    if(od.i%%5000 == 0)print(paste("pev ",pev.penetration," rep ",replicate," progress: ",roundC(od.i/nrow(od.counts)*100,1),"%",sep=''))
     to.i <- od.counts$to[od.i]
     from.i <- od.counts$from[od.i]
     home.taz <- from.i

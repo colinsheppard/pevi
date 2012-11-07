@@ -184,11 +184,21 @@ to-report need-to-charge [calling-event]
   ]
   ifelse ( (calling-event = "arrive" and remaining-range < journey-distance * charge-safety-factor) or 
            (calling-event = "depart" and remaining-range < trip-distance * charge-safety-factor) )[
+    if (calling-event = "arrive" and remaining-range < journey-distance * charge-safety-factor)[
+     print (word precision ticks 3 " " self " remaining range is less than journey distance: " (journey-distance * charge-safety-factor))
+    ]
+    if (calling-event = "depart" and remaining-range < trip-distance * charge-safety-factor)[
+      print (word precision ticks 3 " " self " remaining range is less than trip distance: " (trip-distance * charge-safety-factor))
+    ]
     report true
   ][
-    ifelse random-float 1 < probability-of-unneeded-charge [
-        print (word precision ticks 3 " " self " need-to-charge randomly chose to charge")
+    ifelse (state-of-charge < 1) [  ;; drivers only consider unneeded charge if their vehicle does not have a full state of charge
+      ifelse random-float 1 < probability-of-unneeded-charge [
+        print (word precision ticks 3 " " self " need-to-charge randomly chose to charge, SOC: " state-of-charge)
         report true
+      ][
+        report false
+      ]
     ][
       report false
     ]
@@ -442,7 +452,7 @@ to depart
   print (word precision ticks 3 " " self " departing, soc:" state-of-charge)
   ;print (word precision ticks 3 " " self " itinerary (upon departure):" itin-depart)
   ifelse need-to-charge "depart" [  
-    ifelse state-of-charge = 1 [ 
+    ifelse state-of-charge = 1 [  ;; random decision to charge prevents BEVs from leaving sometimes. ac 11.07
       error (word precision ticks 3 " " self " cannot make trip with full battery")
     ][
       print (word precision ticks 3 " " self " cannot make TRIP with current charge. Seeking charger.")
@@ -610,7 +620,7 @@ go-until-time
 go-until-time
 0
 30
-6
+22.5
 0.5
 1
 NIL

@@ -10,8 +10,8 @@
 "fuel-economy-range"	0.1
 "time-opportunity-cost"	12.50
 "willing-to-roam-time-threshold"	1
-"probability-of-unneeded-charge"	0.1
-"charger-input-file"	"../../pev-shared/data/inputs/chargers.txt"
-"driver-input-file"	"../../pev-shared/data/inputs/itineraries.txt"
-"od-input-file"	"../../pev-shared/data/inputs/time-distance.txt"
-"vehicle-type-input-file"	"../../pev-shared/data/inputs/vehicle-types.txt"
+"probability-of-unneeded-charge"	0.9
+"charger-input-file"	"../../../pev-shared/data/inputs/chargers.txt"
+"driver-input-file"	"../../../pev-shared/data/inputs/itineraries-test.txt"
+"od-input-file"	"../../../pev-shared/data/inputs/time-distance.txt"
+"vehicle-type-input-file"	"../../../pev-shared/data/inputs/vehicle-types-test.txt"

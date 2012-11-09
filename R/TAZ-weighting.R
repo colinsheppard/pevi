@@ -193,6 +193,10 @@ taz@data$weighted.demand <- ddply(od.weighted,.(from),function(df){ sum(df$deman
 taz@data$penetration.weights <- taz.weights.by.penetration[taz$id]
 taz$ID <- sapply(slot(taz, "polygons"),function(x){ slot(x,'ID')})
 
+writePolyShape(taz,paste(path.to.pevi,'inputs/development/aggregated-taz-with-weights',sep=''))
+taz.shp.fieldnames <- names(taz@data)
+save(taz.shp.fieldnames,file=paste(path.to.pevi,'inputs/development/aggregated-taz-with-weights-fieldnames.Rdata',sep=''))
+
 c.map <- paste(map.color(taz@data$penetration.weights,blue2red(50)),'7F',sep='')
 shp.to.kml(taz,paste(path.to.pevi,'inputs/development/penetration-weighting.kml',sep=''),'Penetration Weighting','Color denotes weighted derived from vehicle registration data.','red',1.5,c.map,id.col='ID',name.col='name',description.cols=c('id','name','total.demand.from','weighted.demand','penetration.weights','penetration.weights.unscaled'))
 

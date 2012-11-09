@@ -1,5 +1,5 @@
 library(colinmisc)
-load.libraries(c('sas7bdat','plyr','ggplot2','gtools','doMC','reshape'))
+load.libraries(c('sas7bdat','plyr','ggplot2','gtools','doMC','reshape','maptools'))
 
 make.plots  <- F
 num.processors <- 10
@@ -13,6 +13,10 @@ path.to.nhts <- '~/Dropbox/serc/pev-colin/data/NHTS/'
 path.to.pevi <- '~/Dropbox/serc/pev-colin/pevi/'
 path.to.plots <- '~/Dropbox/serc/pev-colin/plots/'
 
+taz <- readShapePoly(paste(path.to.pevi,'inputs/development/aggregated-taz-with-weights',sep=''))
+load(paste(path.to.pevi,'inputs/development/aggregated-taz-with-weights-fieldnames.Rdata',sep=''))
+names(taz@data) <- c('row',taz.shp.fieldnames)
+
 load(paste(path.to.geatm,"od-aggregated.Rdata",sep=''))
 load(paste(path.to.nhts,"TripChaining/chntrp09.Rdata",sep=''))
 load(paste(path.to.nhts,"HHV2PUB.Rdata",sep=''))
@@ -24,7 +28,17 @@ if(!file.exists(paste(path.to.geatm,"od-aggregated.Rdata",sep=''))){
   od.pm.weighted <- read.csv(paste(path.to.geatm,"od_pm_weighted.csv",sep=""))
   home.dist <- read.csv(paste(path.to.geatm,'home-distribution.csv',sep=''))
   dist <- read.csv(paste(path.to.geatm,"taz-dist-time.csv",sep=""))
-  save(od.24.weighted,od.am.weighted,od.pm.weighted,dist,home.dist,file=paste(path.to.geatm,"od-aggregated.Rdata",sep=''))
+  taz.10 <- list() # either all neighbors within 10 miles or the 10 closest neighbors, whichever yields more, 54% of rural tours <= 10 miles
+  for(taz.i in unique(dist$from)){
+    within10 <- dist$to[dist$from==taz.i][which(dist$miles[dist$from==taz.i]<=10)]
+    closest10 <- dist$to[dist$from==taz.i][order(dist$miles[dist$from==taz.i])][1:10]
+    if(length(within10)>length(closest10)){
+      taz.10[[taz.i]] <- within10
+    }else{
+      taz.10[[taz.i]] <- closest10
+    }
+  } 
+  save(od.24.weighted,od.am.weighted,od.pm.weighted,dist,home.dist,taz.10,file=paste(path.to.geatm,"od-aggregated.Rdata",sep=''))
 }else{
   load(paste(path.to.geatm,"od-aggregated.Rdata",sep=''))
 }
@@ -202,11 +216,12 @@ if(!file.exists(paste(path.to.nhts,'data-preprocessed-for-scheduling.Rdata',sep=
   load(file=paste(path.to.nhts,'data-preprocessed-for-scheduling.Rdata',sep=''))
 }
 
-source(paste(path.to.pevi,'R/create-schedule.R',sep=''))
-target.trips.per.driver <- 2.37
 pev.pens <- c(0.005,0.01,0.02,0.04)
 replicate <- 1
-prob.weights <- data.frame(pen=pev.pens,'0'=NA,'1'=NA,'2'=NA,'3'=NA,'4'=NA,'5'=NA)
+source(paste(path.to.pevi,'R/create-schedule.R',sep=''))
+schedule <- create.schedule(0.001,1)
+print(paste(nrow(schedule)/length(unique(schedule$driver)),nrow(schedule),length(unique(schedule$driver))))
+
 schedule <- list()
 
 if(!file.exists(paste(path.to.outputs,'schedules-20120425.Rdata',sep=''))){

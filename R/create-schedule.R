@@ -260,7 +260,7 @@ pick.driver <- function(type,from.i,to.i,hour){
           cand.trips <- which(schedule$to == from.i & schedule$arrive < hour & schedule$home == from.i)
         }
         if(length(cand.trips)>0){
-          print(paste('found a trip to canablize',type,from.i,to.i,hour))
+          print(paste('found a trip to cannibalize',type,from.i,to.i,hour))
           prev.trip <- sample.one(cand.trips)
           driver.i <- schedule$driver[prev.trip]
           driver.home <- schedule$home[prev.trip]

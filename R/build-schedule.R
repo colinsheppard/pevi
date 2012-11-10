@@ -219,10 +219,23 @@ if(!file.exists(paste(path.to.nhts,'data-preprocessed-for-scheduling.Rdata',sep=
 pev.pens <- c(0.005,0.01,0.02,0.04)
 replicate <- 1
 source(paste(path.to.pevi,'R/create-schedule.R',sep=''))
-schedule <- create.schedule(0.001,1)
-print(paste(nrow(schedule)/length(unique(schedule$driver)),nrow(schedule),length(unique(schedule$driver))))
+#schedule <- create.schedule(0.001,1)
+#print(paste(nrow(schedule)/length(unique(schedule$driver)),nrow(schedule),length(unique(schedule$driver))))
 
-schedule <- list()
+num.replicates <- 10
+schedule.reps <- list()
+for(pev.penetration in pev.pens){
+  pev.pen.char <- roundC(pev.penetration,2)
+  schedule.reps[[pev.pen.char]] <- list()
+  for(replicate in 1:num.replicates){
+    print(paste('Penetration ',pev.penetration,' replicate ',replicate,sep=''))
+
+    schedule.reps[[pev.pen.char]][[as.character(replicate)]] <- create.schedule(pev.penetration,1)
+
+    write.table(schedule.reps[[pev.pen.char]][[as.character(replicate)]],file=paste(path.to.pevi,"inputs/driver-schedule-pen",pev.penetration*100,"-rep",replicate,"-20121109.txt",sep=''),sep='\t',row.names=F,quote=F)
+  }
+}
+save(schedule.reps,file=paste(path.to.outputs,'schedule-replicates-20121109.Rdata',sep=''))
 
 if(!file.exists(paste(path.to.outputs,'schedules-20120425.Rdata',sep=''))){
   # collect the the probability weights determined by the optimization, 

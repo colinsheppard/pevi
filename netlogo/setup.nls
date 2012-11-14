@@ -143,7 +143,7 @@ to setup-drivers
   while [count #bev-types > 0][
     ask max-one-of #bev-types [ battery-capacity / electric-fuel-consumption ][     
       ; find the drivers that can't make their longest trip using the current bev type
-      let #impossible-drivers drivers with [max-trip-distance > [battery-capacity] of myself / [electric-fuel-consumption] of myself]
+      let #impossible-drivers drivers with [max-trip-distance * charge-safety-factor > [battery-capacity] of myself / [electric-fuel-consumption] of myself]
       ;show (word (count #impossible-drivers) " needing more range")
       
       ; find the other vehicle types that can be assigned to this driver (must check whether their num-drivers is over quota yet)
@@ -180,6 +180,10 @@ to setup-drivers
       ]
       set num-vehicles num-vehicles + 1
     ]
+  ]
+  ; if drivers remaing unassigned, give them a PHEV
+  ask drivers with [this-vehicle-type = nobody] [
+    set this-vehicle-type one-of vehicle-types with [not is-bev?]
   ]
   
   ; finally initialize driver state variables
@@ -248,18 +252,20 @@ to setup-itinerary
   ifelse (file-exists? driver-input-file) [ ; ../inputs/p1r1_5.txt  
     file-close
     file-open driver-input-file
-    let itin-row 0
+   
     let this-itin true
     let next-driver file-read
     let this-driver 0
     while [file-at-end? = false] [
       set this-driver next-driver
       create-drivers 1 [
+        set id this-driver
         set itin-from n-values 1 [file-read]     ; creates global itin-from
         set itin-to n-values 1 [file-read]       ; creates global itin-to
         set itin-depart n-values 1 [file-read]   ; creates global itin-depart
         set home-taz taz file-read
-        set max-trip-distance (distance-from-to item 0 itin-to item 0 itin-from) * charge-safety-factor
+        let itin-row 0
+        set max-trip-distance (distance-from-to item itin-row itin-to item itin-row itin-from)
         set this-vehicle-type nobody
         if file-at-end? = false [
           set next-driver file-read
@@ -268,10 +274,11 @@ to setup-itinerary
             set itin-from  lput file-read itin-from
             set itin-to  lput file-read itin-to
             set itin-depart lput file-read itin-depart
-            if max-trip-distance < (distance-from-to item 0 itin-to item 0 itin-from) * charge-safety-factor[
-              set max-trip-distance (distance-from-to item 0 itin-to item 0 itin-from) * charge-safety-factor
+            set itin-row itin-row + 1
+            if max-trip-distance < (distance-from-to item itin-row itin-to item itin-row itin-from)[
+              set max-trip-distance (distance-from-to item itin-row itin-to item itin-row itin-from)
             ]
-            if not (home-taz = taz file-read) [ user-message (word "Inconsistent home taz specified for driver " this-driver ) ]
+            if not (home-taz = taz file-read) [ user-message (word "Inconsistent home taz specified for driver " id ) ]
             ifelse file-at-end? [ set next-driver -1][ set next-driver file-read ]
           ] ; end while this-itin
         ]

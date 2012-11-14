@@ -225,17 +225,38 @@ source(paste(path.to.pevi,'R/create-schedule.R',sep=''))
 num.replicates <- 10
 schedule.reps <- list()
 for(pev.penetration in pev.pens){
-  pev.pen.char <- roundC(pev.penetration,2)
+  pev.pen.char <- roundC(pev.penetration,3)
   schedule.reps[[pev.pen.char]] <- list()
   for(replicate in 1:num.replicates){
     print(paste('Penetration ',pev.penetration,' replicate ',replicate,sep=''))
-
     schedule.reps[[pev.pen.char]][[as.character(replicate)]] <- create.schedule(pev.penetration,1)
-
-    write.table(schedule.reps[[pev.pen.char]][[as.character(replicate)]],file=paste(path.to.pevi,"inputs/driver-schedule-pen",pev.penetration*100,"-rep",replicate,"-20121109.txt",sep=''),sep='\t',row.names=F,quote=F)
+    write.table(schedule.reps[[pev.pen.char]][[as.character(replicate)]][,c('driver','from','to','depart','home')],file=paste(path.to.pevi,"inputs/driver-schedule-pen",pev.penetration*100,"-rep",replicate,"-20121109.txt",sep=''),sep='\t',row.names=F,quote=F)
+    save(schedule.reps,file=paste(path.to.outputs,'schedule-replicates-20121109.Rdata',sep=''))
   }
 }
 save(schedule.reps,file=paste(path.to.outputs,'schedule-replicates-20121109.Rdata',sep=''))
+
+# summarize the results
+load(file=paste(path.to.outputs,'schedule-replicates-20121109.Rdata',sep=''))
+n.scheds <- num.replicates * length(pev.pens)
+sum.sched <- data.frame(pen=rep(pev.pens,num.replicates),rep=rep(1:num.replicates,each=length(pev.pens)),n.drivers=rep(NA,n.scheds),n.trips=rep(NA,n.scheds),trips.per.driver=rep(NA,n.scheds),home.rmse=rep(NA,n.scheds),home.maxe=rep(NA,n.scheds),home.max.taz=rep(NA,n.scheds))
+for(pev.penetration in pev.pens){
+  pev.pen.char <- roundC(pev.penetration,3)
+  for(replicate in 1:num.replicates){
+    if(!is.null(schedule.reps[[pev.pen.char]][[as.character(replicate)]])){
+
+      sched.home.dist <- ddply(schedule,.(home),function(df){ data.frame(num.drivers=nrow(df)) })
+      sched.home.dist$frac <- sched.home.dist$num.drivers / sum(sched.home.dist$num.drivers)
+      if(nrow(sched.home.dist) < nrow(taz@data)){
+        sched.home.dist <- rbind(sched.home.dist,data.frame(home=which(! 1:nrow(taz@data) %in% sched.home.dist$home),num.drivers=0,frac=0))
+      }
+      sched.home.dist$real <- home.dist$frac.homes[match(sched.home.dist$home,home.dist$taz)]
+
+      sum.sched[sum.sched$pen == pev.penetration & sum.sched$rep==replicate,3:8] <- c(length(unique(schedule.reps[[pev.pen.char]][[as.character(replicate)]]$driver)),nrow(schedule.reps[[pev.pen.char]][[as.character(replicate)]]),nrow(schedule.reps[[pev.pen.char]][[as.character(replicate)]])/length(unique(schedule.reps[[pev.pen.char]][[as.character(replicate)]]$driver)),sqrt(mean((sched.home.dist$real-sched.home.dist$frac)^2))*100,max(sched.home.dist$real-sched.home.dist$frac)*100,sched.home.dist$home[which.max(sched.home.dist$real-sched.home.dist$frac)])
+    }
+  }
+}
+
 
 if(!file.exists(paste(path.to.outputs,'schedules-20120425.Rdata',sep=''))){
   # collect the the probability weights determined by the optimization, 
@@ -292,9 +313,9 @@ dwell.times     <- list()
 compute.new <- T
 
 if(make.plots){
-  #dev.new()
-  #dev.tours.per <- dev.cur()
-  #plot(ecdf(rur.tours.per$V1),main="Empirical CDF of # Trips Per Driver")
+  dev.new()
+  dev.tours.per <- dev.cur()
+  plot(ecdf(rur.tours.per$V1),main="Empirical CDF of # Trips Per Driver")
 }
 
 for(pev.penetration in pev.pens){
@@ -372,23 +393,6 @@ if(make.plots){
   ggplot(subset(ks.tests,test=='dwell.time'),aes(x=penetration,y=log(p.value+1e-14,10)))+geom_point()+facet_wrap(~level)
   ggplot(subset(ks.tests,test=='departure.time'),aes(x=penetration,y=log(p.value+1e-14,10)))+geom_point()+facet_wrap(~level)
 }
-
-
-# Generate replicates of each penetration level and save as schedule file for use in simulation
-num.replicates <- 5
-schedule.reps <- list()
-for(pev.penetration in pev.pens){
-  pev.pen.char <- roundC(pev.penetration,2)
-  schedule.reps[[pev.pen.char]] <- list()
-  for(replicate in 1:num.replicates){
-    print(paste('Penetration ',pev.penetration,' replicate ',replicate,sep=''))
-
-    schedule.reps[[pev.pen.char]][[as.character(replicate)]] <- create.schedule(pev.penetration,prob.weights[prob.weights$pen == pev.penetration,2:7])
-
-    write.table(schedule[[pev.pen.char]],file=paste(path.to.pevi,"inputs/driver-schedule-pen",pev.penetration*100,"-rep",replicate,"-20120425.txt",sep=''),sep='\t',row.names=F,quote=F)
-  }
-}
-save(schedule.reps,file=paste(path.to.outputs,'schedule-replicates-20120425.Rdata',sep=''))
 
 if(F){
 

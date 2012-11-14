@@ -1,9 +1,10 @@
 create.schedule <- function(pev.penetration,scale.dist.thresh=1){
   environment(pick.driver) <- sys.frame(sys.nframe())
   environment(find.consistent.journey) <- sys.frame(sys.nframe())
-   ##for testing
-   #pev.penetration <- .001
-   #scale.dist.thresh <- 1
+   #for testing
+   pev.penetration <- .001
+   scale.dist.thresh <- 1
+   set.seed(1)
 
   od.counts <- cbind(od.24.simp[,c('from','to')],od.24.simp[,c('hw','ho','ow')]*pev.penetration)
   names(od.counts) <- c('from','to','hw.mean','ho.mean','ow.mean')
@@ -139,6 +140,7 @@ create.schedule <- function(pev.penetration,scale.dist.thresh=1){
           if(!is.na(driver$to.erase.inds)){
             schedule <- rbind(schedule[-driver$to.erase.inds,],schedule[10000001:(10000000+length(driver$to.erase.inds)),])
           }
+          if(driver.i > tot.drivers) tot.drivers <- driver.i
           n.cand.trips <- length(na.omit(cand.schedule$driver))
           schedule[num.trips:(num.trips+n.cand.trips-1),] <- cand.schedule[1:n.cand.trips,]
           if(any(is.na(cand.schedule$home[1:n.cand.trips])))stop(paste('na in home',num.trips,(num.trips+n.cand.trips-1)))
@@ -181,7 +183,7 @@ create.schedule <- function(pev.penetration,scale.dist.thresh=1){
   } # end foreach row in od
   schedule$type <- as.factor(schedule$type)
   levels(schedule$type) <- levels(rur.tours$TOURTYPE)
-  return(schedule)
+  return(na.omit(ddply(schedule[order(schedule$driver),],.(driver),function(df){ df[order(df$depart),] })))
 }
 
 #cand.schedule[2:nrow(cand.schedule),] <- NA
@@ -255,7 +257,7 @@ pick.driver <- function(type,from.i,to.i,hour){
       }else{
         # can we canibalize the schedule, throw away a couple of trips of a driver that's otherwise consistent
         if(type == 'ow'){
-          cand.trips <- which(schedule$to %in% taz.10[[from.i]] & schedule$arrive < hour & schedule$home != from.i)
+          cand.trips <- which(schedule$to == from.i & schedule$arrive < hour & schedule$home != from.i)
         }else{
           cand.trips <- which(schedule$to == from.i & schedule$arrive < hour & schedule$home == from.i)
         }
@@ -268,8 +270,7 @@ pick.driver <- function(type,from.i,to.i,hour){
           if(length(to.erase.inds)==0){ to.erase.inds <- NA }
         }else{
           print(paste("no available drivers, creating one"))
-          tot.drivers <- tot.drivers + 1
-          driver.i <- tot.drivers
+          driver.i <- tot.drivers + 1
           if(type == 'ow'){
             driver.home <- sample(taz.10[[from.i]],1)
           }else{
@@ -288,4 +289,22 @@ sample.one <- function(x){
   }else{
     return(sample(x,1))
   }
+}
+
+
+## debugging stuff
+if(F){
+  
+  order.sched <- na.omit(schedule[order(schedule$driver),])
+
+  find.problem <- function(df){ 
+    if(nrow(df)==1){ 
+      return(F) 
+    }else{
+      return(any(df$to[1:(nrow(df)-1)] != df$from[2:nrow(df)]))
+    }
+  }
+
+  inconsist.drivers <- ddply(order.sched,.(driver),find.problem)
+
 }

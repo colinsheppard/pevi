@@ -54,6 +54,7 @@ drivers-own [
   
 ;; DEMOGRAPHY  
   home-taz
+  id
 
 ;; OPERATION
   state                     ; discrete string value: not-charging, traveling, charging
@@ -185,16 +186,16 @@ to-report need-to-charge [calling-event]
   ifelse ( (calling-event = "arrive" and remaining-range < journey-distance * charge-safety-factor) or 
            (calling-event = "depart" and remaining-range < trip-distance * charge-safety-factor) )[
     if (calling-event = "arrive" and remaining-range < journey-distance * charge-safety-factor)[
-     print (word precision ticks 3 " " self " remaining range is less than journey distance: " (journey-distance * charge-safety-factor))
+     ;print (word precision ticks 3 " " self " remaining range is less than journey distance: " (journey-distance * charge-safety-factor))
     ]
     if (calling-event = "depart" and remaining-range < trip-distance * charge-safety-factor)[
-      print (word precision ticks 3 " " self " remaining range is less than trip distance: " (trip-distance * charge-safety-factor))
+      ;print (word precision ticks 3 " " self " remaining range is less than trip distance: " (trip-distance * charge-safety-factor))
     ]
     report true
   ][
     ifelse (state-of-charge < 1) [  ;; drivers only consider unneeded charge if their vehicle does not have a full state of charge
       ifelse random-float 1 < probability-of-unneeded-charge [
-        print (word precision ticks 3 " " self " need-to-charge randomly chose to charge, SOC: " state-of-charge)
+        ;print (word precision ticks 3 " " self " need-to-charge randomly chose to charge, SOC: " state-of-charge)
         report true
       ][
         report false
@@ -209,7 +210,7 @@ end
 ;; RETRY SEEK
 ;;;;;;;;;;;;;;;;;;;;
 to retry-seek
-  print (word precision ticks 3 " " self " retry-seek ")
+  ;print (word precision ticks 3 " " self " retry-seek ")
    ifelse is-bev? [
     set remaining-range (state-of-charge * battery-capacity / electric-fuel-consumption )
   ][
@@ -225,7 +226,7 @@ end
 ;; trip-distance set by update-itinerary
 ;;;;;;;;;;;;;;;;;;;;
 to seek-charger
-  print (word precision ticks 3 " " self " seek-charger ")
+  ;print (word precision ticks 3 " " self " seek-charger ")
   set time-until-depart departure-time - ticks
   let #extra-time-until-end-charge 0
   let #extra-time-for-travel 0
@@ -300,17 +301,17 @@ to seek-charger
             set #min-taz #this-taz
             set #min-charger-type #this-charger-type 
           ]
-          print (word precision ticks 3 " " self " seek-charger checking taz:" #this-taz " in-orig-dest? " #charger-in-origin-or-destination " level:" #level " this-cost:" #this-cost " rate:" ([charge-rate] of #this-charger-type) " energyprice:" ([energy-price] of #this-charger-type) " trip-or-journey-energy-need:" #trip-or-journey-energy-need)
+          ;print (word precision ticks 3 " " self " seek-charger checking taz:" #this-taz " in-orig-dest? " #charger-in-origin-or-destination " level:" #level " this-cost:" #this-cost " rate:" ([charge-rate] of #this-charger-type) " energyprice:" ([energy-price] of #this-charger-type) " trip-or-journey-energy-need:" #trip-or-journey-energy-need)
         ]
       ]
     ]
   ]
   ifelse #min-taz = -99 [  
-    print (word precision ticks 3 " " self " seek charger - none available") 
+    ;print (word precision ticks 3 " " self " seek charger - none available") 
     set num-denials (num-denials + 1)
     wait-time-event-scheduler  
   ][
-    print (word precision ticks 3 " " self " least cost option is taz:" #min-taz " level:" ([level] of #min-charger-type) " cost:" #min-cost)
+    ;print (word precision ticks 3 " " self " least cost option is taz:" #min-taz " level:" ([level] of #min-charger-type) " cost:" #min-cost)
     set current-charger one-of available-chargers #min-taz [level] of #min-charger-type
     ask current-charger[
       set current-driver myself
@@ -327,13 +328,13 @@ end
 ;; remaining-range set in need-to-charge and retry-seek
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 to wait-time-event-scheduler
-  print (word precision ticks 3 " " self " wait-time-event-scheduler remaining-range:" remaining-range " trip-distance:" trip-distance " time-until-depart:" time-until-depart)
+  ;print (word precision ticks 3 " " self " wait-time-event-scheduler remaining-range:" remaining-range " trip-distance:" trip-distance " time-until-depart:" time-until-depart)
   set state "not charging"
   ifelse remaining-range / charge-safety-factor < trip-distance [
     dynamic-scheduler:add schedule self task retry-seek ticks + random-exponential wait-time-mean
   ][
     ifelse remaining-range / charge-safety-factor >= journey-distance or time-until-depart <= 1 [
-;      print (word precision ticks 3 " " self " in wait-time-event-sched, deciding to depart at time " ticks)
+;      ;print (word precision ticks 3 " " self " in wait-time-event-sched, deciding to depart at time " ticks)
       dynamic-scheduler:add schedule self task depart departure-time
     ][
       dynamic-scheduler:add schedule self task retry-seek ticks + random-exponential wait-time-mean
@@ -362,16 +363,16 @@ to charge-time-event-scheduler
   ifelse (time-until-depart > 0.5) and ([level] of [this-charger-type] of current-charger < 3) and (time-until-end-charge < trip-charge-time-need) [                                                                                                    
     set next-event-scheduled-at ticks + min (sentence (random-exponential wait-time-mean) (time-until-depart - 0.5)) 
     dynamic-scheduler:add schedule self task retry-seek next-event-scheduled-at
-    print (word precision ticks 3 " " self " scheduling retry-seek, time-until-end-charge: " time-until-end-charge ", trip-charge-time-need: " trip-charge-time-need)
+    ;print (word precision ticks 3 " " self " scheduling retry-seek, time-until-end-charge: " time-until-end-charge ", trip-charge-time-need: " trip-charge-time-need)
   ][
     ifelse (time-until-depart > 0.5) and ([level] of [this-charger-type] of current-charger < 2) and (time-until-end-charge < journey-charge-time-need) [
       set next-event-scheduled-at ticks + min (sentence (random-exponential wait-time-mean) (time-until-depart - 0.5))  
       dynamic-scheduler:add schedule self task retry-seek next-event-scheduled-at
-      print (word precision ticks 3 " " self " scheduling retry-seek for " next-event-scheduled-at " time-until-end-charge: " time-until-end-charge ", journey-charge-time-need: " journey-charge-time-need)
+      ;print (word precision ticks 3 " " self " scheduling retry-seek for " next-event-scheduled-at " time-until-end-charge: " time-until-end-charge ", journey-charge-time-need: " journey-charge-time-need)
     ][
       set next-event-scheduled-at ticks + time-until-end-charge
       dynamic-scheduler:add schedule self task end-charge next-event-scheduled-at
-      print (word precision ticks 3 " " self " scheduling end-charge, time-until-end-charge: " time-until-end-charge)
+      ;print (word precision ticks 3 " " self " scheduling end-charge, time-until-end-charge: " time-until-end-charge)
     ]
   ]
   if next-event-scheduled-at > departure-time[
@@ -410,7 +411,7 @@ end
 
 to change-depart-time [new-depart-time]
   set itin-depart replace-item current-itin-row itin-depart new-depart-time
-  print (word precision ticks 3 " " self " new-depart-time: " new-depart-time " for row: " current-itin-row " new itin-depart: " itin-depart)      
+  ;print (word precision ticks 3 " " self " new-depart-time: " new-depart-time " for row: " current-itin-row " new itin-depart: " itin-depart)      
   if current-itin-row < (length itin-depart - 1)[
     foreach n-values (length itin-depart - current-itin-row - 1) [current-itin-row + ? + 1] [ change-depart-time-row ?  ]
   ]
@@ -429,7 +430,7 @@ end
 
 to end-charge
   set state-of-charge (state-of-charge + time-until-end-charge * charge-rate-of current-charger / battery-capacity)
-  print (word precision ticks 3 " " self " ending charge soc:" precision state-of-charge 3)
+  ;print (word precision ticks 3 " " self " ending charge soc:" precision state-of-charge 3)
   ask current-charger [ set current-driver nobody ]
   set current-charger nobody
 
@@ -453,9 +454,9 @@ to depart
   ;print (word precision ticks 3 " " self " itinerary (upon departure):" itin-depart)
   ifelse need-to-charge "depart" [  
     ifelse state-of-charge = 1 [  ;; random decision to charge prevents BEVs from leaving sometimes. ac 11.07
-      error (word precision ticks 3 " " self " cannot make trip with full battery")
+      error (word "ERROR: " precision ticks 3 " " self " cannot make trip with full battery")
     ][
-      print (word precision ticks 3 " " self " cannot make TRIP with current charge. Seeking charger.")
+      ;print (word precision ticks 3 " " self " cannot make TRIP with current charge. Seeking charger.")
       seek-charger   
     ]
   ][  
@@ -471,7 +472,7 @@ to travel-time-event-scheduler
   set trip-time item my-od-index od-time
   set arrival-time (ticks + trip-time)
   dynamic-scheduler:add schedule self task arrive arrival-time
-  print (word precision ticks 3 " " self " next arrival time: " precision arrival-time 3)
+  ;print (word precision ticks 3 " " self " next arrival time: " precision arrival-time 3)
 end
 
 ;;;;;;;;;;;;;;;;;;;;
@@ -489,7 +490,7 @@ to arrive
     set energy-used energy-used + #charge-used * battery-capacity
   ]
   set journey-distance journey-distance - trip-distance
-  print (word precision ticks 3 " " self " arriving, trip-distance: " trip-distance " soc:" state-of-charge " elec-fc:" electric-fuel-consumption " cap" battery-capacity)
+  ;print (word precision ticks 3 " " self " arriving, trip-distance: " trip-distance " soc:" state-of-charge " elec-fc:" electric-fuel-consumption " cap" battery-capacity)
   update-itinerary 
       
   if not itin-complete? [
@@ -620,7 +621,7 @@ go-until-time
 go-until-time
 0
 30
-22.5
+30
 0.5
 1
 NIL

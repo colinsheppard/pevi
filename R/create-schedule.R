@@ -2,9 +2,9 @@ create.schedule <- function(pev.penetration,scale.dist.thresh=1){
   environment(pick.driver) <- sys.frame(sys.nframe())
   environment(find.consistent.journey) <- sys.frame(sys.nframe())
    #for testing
-   pev.penetration <- .001
-   scale.dist.thresh <- 1
-   set.seed(1)
+   #pev.penetration <- .001
+   #scale.dist.thresh <- 1
+   #set.seed(1)
 
   od.counts <- cbind(od.24.simp[,c('from','to')],od.24.simp[,c('hw','ho','ow')]*pev.penetration)
   names(od.counts) <- c('from','to','hw.mean','ho.mean','ow.mean')

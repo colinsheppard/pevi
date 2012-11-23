@@ -91,6 +91,7 @@ drivers-own [
   full-charge-time-need
   current-full-charge-time-need
   time-until-end-charge
+  type-assignment-code
 
   willing-to-roam?
   extra-time-until-end-charge
@@ -331,13 +332,17 @@ to wait-time-event-scheduler
   ;print (word precision ticks 3 " " self " wait-time-event-scheduler remaining-range:" remaining-range " trip-distance:" trip-distance " time-until-depart:" time-until-depart)
   set state "not charging"
   ifelse remaining-range / charge-safety-factor < trip-distance [
-    dynamic-scheduler:add schedule self task retry-seek ticks + random-exponential wait-time-mean
+    let event-time-from-now min(sentence (random-exponential wait-time-mean) (time-until-depart - 0.5))
+    if event-time-from-now < 0 [ set event-time-from-now 0 ]
+    dynamic-scheduler:add schedule self task retry-seek ticks + event-time-from-now
   ][
     ifelse remaining-range / charge-safety-factor >= journey-distance or time-until-depart <= 1 [
-;      ;print (word precision ticks 3 " " self " in wait-time-event-sched, deciding to depart at time " ticks)
+      ;print (word precision ticks 3 " " self " in wait-time-event-sched, deciding to depart at time " ticks)
       dynamic-scheduler:add schedule self task depart departure-time
     ][
-      dynamic-scheduler:add schedule self task retry-seek ticks + random-exponential wait-time-mean
+      let event-time-from-now min(sentence (random-exponential wait-time-mean) (time-until-depart - 0.5))
+      if event-time-from-now < 0 [ set event-time-from-now 0 ]
+      dynamic-scheduler:add schedule self task retry-seek ticks + event-time-from-now
     ]
   ]
 end
@@ -450,7 +455,7 @@ end
 ;; DEPART
 ;;;;;;;;;;;;;;;;;;;;
 to depart
-  print (word precision ticks 3 " " self " departing, soc:" state-of-charge)
+  ;print (word precision ticks 3 " " self " departing, soc:" state-of-charge)
   ;print (word precision ticks 3 " " self " itinerary (upon departure):" itin-depart)
   ifelse need-to-charge "depart" [  
     ifelse state-of-charge = 1 [  ;; random decision to charge prevents BEVs from leaving sometimes. ac 11.07
@@ -572,8 +577,8 @@ GRAPHICS-WINDOW
 25
 0
 24
-0
-0
+1
+1
 1
 ticks
 30.0
@@ -956,7 +961,7 @@ Polygon -7500403 true true 270 75 225 30 30 225 75 270
 Polygon -7500403 true true 30 75 75 30 270 225 225 270
 
 @#$#@#$#@
-NetLogo 5.0.1
+NetLogo 5.0
 @#$#@#$#@
 @#$#@#$#@
 @#$#@#$#@

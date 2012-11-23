@@ -15,7 +15,6 @@ names(taz@data) <- c('row',agg.taz.shp.fieldnames)
 for(i in 1:nrow(taz@data)){
   taz@data$shp.id[i] <- as.numeric(slot(slot(taz[i,],"polygons")[[1]],"ID"))
 }
-  
 
 pts <- readShapePoints(paste(path.to.google,'TAZ-Centers',sep=''))
 
@@ -154,19 +153,6 @@ order.route <- function(df){
 }
 
 # assemble the routes into order based on start/end ids
-route.dir <- paste(path.to.plots,"gradient-analysis/",sep='')
-make.dir(route.dir)
-for(from.id in 1:52){
-  from.name <- taz@data$name[match(from.id,taz@data$id)]
-  route <- dbGetQuery(con,paste("SELECT r.to_taz,r.gradient,n.length,n.start_id,n.end_id,n.ab_speed FROM taz_route AS r LEFT JOIN network AS n ON r.network_id=n.gid WHERE r.from_taz=",from.id,sep=''))
-
-  route.ordered <- ddply(route,.(to_taz),order.route)
-  route.ordered$name <- taz@data$name[match(route.ordered$to_taz,taz@data$id)]
-
-  pdf.file <- paste(route.dir,'/gradient-by-speed-and-length-',from.name,'.pdf',sep='')
-  p<-ggplot(subset(route.ordered,abs(gradient)<.05),aes(x=ab_speed,y=gradient*100,size=length,colour=length))+geom_point(position='jitter',height=0,width=2)+facet_wrap(~name,scales="free_y")+labs(title=as.character(from.name))
-  ggsave(pdf.file,plot=p,width=21,height=13)
-}
 
 ggplot(subset(route.ordered,abs(gradient)<.05),aes(x=cum.dist,y=gradient*100))+geom_point()+facet_wrap(~name,scales='free_x')
 ggplot(subset(route.ordered,abs(gradient)<.05),aes(x=cum.dist,y=gradient*100))+geom_point()+facet_wrap(~name,scales='free')
@@ -180,6 +166,7 @@ x.labs <- c("[-0.6,-0.05)","[-0.05,-0.04)","[-0.04,-0.03)","[-0.03,-0.02)","[-0.
 y.bins <- c(0,25,40,50,60,70)
 y.labs <- c("[0,25)","[25,40)","[40,50)","[50,60)","[60,70)")
 route <- dbGetQuery(con,paste("SELECT r.from_taz,r.to_taz,r.gradient,n.length,n.start_id,n.end_id,n.ab_speed FROM taz_route AS r LEFT JOIN network AS n ON r.network_id=n.gid",sep=''))
+#route <- dbGetQuery(con,paste("SELECT r.from_taz,r.to_taz,r.gradient,n.length,n.start_id,n.end_id,n.ab_speed,ST_X(startpoint) AS startx,ST_Y(startpoint) AS starty,ST_X(endpoint) AS endx,ST_Y(endpoint) AS endy FROM taz_route AS r LEFT JOIN network AS n ON r.network_id=n.gid",sep=''))
 route.ordered <- ddply(route,.(from_taz,to_taz),order.route)
 route.ordered$to.name <- taz@data$name[match(route.ordered$to_taz,taz@data$id)]
 route.ordered$from.name <- taz@data$name[match(route.ordered$from_taz,taz@data$id)]
@@ -187,6 +174,57 @@ route.ordered$gradient.binned <- factor(x.labs[findInterval(route.ordered$gradie
 route.ordered$speed.binned    <- factor(y.labs[findInterval(route.ordered$ab_speed,y.bins)],levels=y.labs)
 route.hists <- cast(melt(route.ordered,id.vars=c('to.name','from.name','gradient.binned','speed.binned'),measure.vars=c('length')),gradient.binned ~ speed.binned ~ variable ~ to.name ~ from.name,fun.aggregate=sum)
 save(route.ordered,route.hists,file=paste(path.to.pevi,'inputs/routing.Rdata',sep=''))
+load(paste(path.to.pevi,'inputs/routing.Rdata',sep=''))
+
+pts$name <- as.character(pts$Name)
+for(from.id in 1:52){
+  for(to.id in 1:52){
+    if(from.id == to.id)next
+    row.i <- which(route.ordered$from_taz==from.id & route.ordered$to_taz==to.id & route.ordered$order==1)
+    if(any(pts$nn.id == route.ordered$end_id[row.i])){
+      sub.inds <- which(route.ordered$from_taz==from.id & route.ordered$to_taz==to.id)
+      route.ordered$gradient[sub.inds] <- -route.ordered$gradient[sub.inds]
+      temp.start <- route.ordered$start_id[sub.inds]
+      route.ordered$start_id[sub.inds] <- route.ordered$end_id[sub.inds]
+      route.ordered$end_id[sub.inds] <- temp.start
+    }
+    if(! pts$Name[pts$nn.id==route.ordered$start_id[row.i]] == route.ordered$from.name[row.i]){
+      sub.inds <- which(route.ordered$from_taz==from.id & route.ordered$to_taz==to.id)
+      route.ordered$gradient[sub.inds] <- -route.ordered$gradient[sub.inds]
+      temp.start <- route.ordered$start_id[sub.inds]
+      route.ordered$start_id[sub.inds] <- route.ordered$end_id[sub.inds]
+      route.ordered$end_id[sub.inds] <- temp.start
+      route.ordered$order[sub.inds] <- max(route.ordered$order[sub.inds]) - route.ordered$order[sub.inds] + 1
+    }
+  }
+}
+route.hists <- cast(melt(route.ordered,id.vars=c('to.name','from.name','gradient.binned','speed.binned'),measure.vars=c('length')),gradient.binned ~ speed.binned ~ variable ~ to.name ~ from.name,fun.aggregate=sum)
+save(route.ordered,route.hists,file=paste(path.to.pevi,'inputs/routing-corrected.Rdata',sep=''))
+
+# finally find enroute
+taz.nodes <- data.frame(node.id=sort(unique(route.ordered$end_id)),taz=NA)
+for(node.id in taz.nodes$node.id){
+  res <- dbGetQuery(con,paste("SELECT id FROM aggregated_taz WHERE ST_Contains(geom,(SELECT geom FROM node WHERE id=",node.id,"))"))
+  if(length(res)==0){ 
+    print(paste("couldn't find taz for node ",node.id))
+  }else{
+    taz.nodes$taz[taz.nodes$node.id == node.id] <- res
+  }
+}
+# damn edge cases, had to look this up in GEarth
+taz.nodes$taz[taz.nodes$node.id == 2457] <- 19
+route.ordered$end.taz <- taz.nodes$taz[match(route.ordered$end_id,taz.nodes$node.id)]
+save(route.ordered,route.hists,file=paste(path.to.pevi,'inputs/routing-corrected.Rdata',sep=''))
+
+route.dir <- paste(path.to.plots,"gradient-analysis/",sep='')
+make.dir(route.dir)
+for(from.id in 1:52){
+  from.name <- taz@data$name[match(from.id,taz@data$id)]
+
+  pdf.file <- paste(route.dir,'/gradient-by-speed-and-length-',from.name,'.pdf',sep='')
+  p<-ggplot(subset(route.ordered,from_taz == from.id & abs(gradient)<.05),aes(x=ab_speed,y=gradient*100,size=length,colour=length))+geom_point(position='jitter',height=0,width=2)+facet_wrap(~to.name,scales="free_y")+labs(title=as.character(from.name))
+  ggsave(pdf.file,plot=p,width=21,height=13)
+}
 
 for(from.name in dimnames(route.hists)$from.name){
   for(to.name in dimnames(route.hists)$to.name){
@@ -199,7 +237,7 @@ for(from.name in dimnames(route.hists)$from.name){
 
 # finally, summarize the routes to get the distance/time/performance/enroute for each pairing
 load(file=paste(path.to.pevi,'inputs/routing.Rdata',sep=''))
-disttime <- ddply(route.ordered,.(from_taz,to_taz),function(df){ data.frame(miles=sum(df$length),time=sum(df$length/df$ab_speed),enroute='')})
+disttime <- ddply(route.ordered,.(from_taz,to_taz),function(df){ data.frame(miles=sum(df$length),time=sum(df$length/df$ab_speed),enroute=paste(unique(df$end.taz),collapse=","))})
 names(disttime) <- c('from','to','miles','time','enroute')
 disttime <- rbind(disttime,data.frame(from=unique(disttime$from),to=unique(disttime$from),miles=sqrt(taz$ACRES[match(unique(disttime$from),taz$id)]*0.001563)/2,time=sqrt(taz$ACRES[match(unique(disttime$from),taz$id)]*0.001563)/30/2,enroute=''))
 disttime <- ddply(disttime[order(disttime$from),],.(from),function(df){ df[order(df$to),] })

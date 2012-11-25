@@ -366,3 +366,12 @@ to setup-chargers
     let #level [level] of this-charger-type
   ]
 end ;setup-chargers
+
+;;;;;;;;;;;;;;;;;;;;
+;; SETUP LOGGING
+;;;;;;;;;;;;;;;;;;;;
+to setup-logging
+  file-close
+  if file-exists? "logfile.txt" [ file-delete "logfile.txt" ]
+  file-open "logfile.txt"
+end ;setup-logging

@@ -94,6 +94,7 @@ drivers-own [
   type-assignment-code
 
   willing-to-roam?
+  charging-on-a-whim?
   extra-time-until-end-charge
   extra-time-for-travel
   extra-charge-time-for-travel
@@ -102,7 +103,6 @@ drivers-own [
   energy-used
   gasoline-used
   num-denials
-  taz-list
   
 ;; CANDIDATE ADDITIONS TO MODEL DESCRIPTION
   energy-received ; a count of how much energy each driver has charged
@@ -169,6 +169,7 @@ to setup
   setup-drivers
   setup-charger-types
   setup-chargers
+  setup-logging
 end 
 
 to go
@@ -179,6 +180,7 @@ end
 ;; NEED TO CHARGE
 ;;;;;;;;;;;;;;;;;;;;
 to-report need-to-charge [calling-event]
+  set charging-on-a-whim? false
   ifelse is-bev? [
     set remaining-range (state-of-charge * battery-capacity / electric-fuel-consumption )
   ][
@@ -196,7 +198,8 @@ to-report need-to-charge [calling-event]
   ][
     ifelse (state-of-charge < 1) [  ;; drivers only consider unneeded charge if their vehicle does not have a full state of charge
       ifelse random-float 1 < probability-of-unneeded-charge [
-        ;print (word precision ticks 3 " " self " need-to-charge randomly chose to charge, SOC: " state-of-charge)
+;        print (word precision ticks 3 " " self " need-to-charge on a whim, SOC: " state-of-charge)
+        set charging-on-a-whim? true
         report true
       ][
         report false
@@ -212,7 +215,10 @@ end
 ;;;;;;;;;;;;;;;;;;;;
 to retry-seek
   ;print (word precision ticks 3 " " self " retry-seek ")
-   ifelse is-bev? [
+  if item current-itin-row itin-depart < ticks [
+    change-depart-time ticks
+  ]  
+  ifelse is-bev? [
     set remaining-range (state-of-charge * battery-capacity / electric-fuel-consumption )
   ][
     set remaining-range 9999999
@@ -239,13 +245,14 @@ to seek-charger
   let #min-charger-type -99
   let #trip-charge-time-need-by-type n-values count charger-types [-99]
   
-  ifelse time-until-depart < willing-to-roam-time-threshold [  
+  ifelse not charging-on-a-whim? and is-bev? and time-until-depart < willing-to-roam-time-threshold [  
     set willing-to-roam? true  
   ][
     set willing-to-roam? false 
   ]
+  let taz-list n-values 0 [?]
   ifelse willing-to-roam? [
-    set taz-list remove-duplicates (sentence current-taz destination-taz item my-od-index od-enroute)
+    set taz-list remove-duplicates (sentence current-taz destination-taz [neighbor-tazs] of current-taz item my-od-index od-enroute)
   ][  
     set taz-list (sentence current-taz)
   ]
@@ -313,12 +320,21 @@ to seek-charger
     wait-time-event-scheduler  
   ][
     ;print (word precision ticks 3 " " self " least cost option is taz:" #min-taz " level:" ([level] of #min-charger-type) " cost:" #min-cost)
-    set current-charger one-of available-chargers #min-taz [level] of #min-charger-type
-    ask current-charger[
-      set current-driver myself
+    ifelse #min-taz = current-taz [
+      set current-charger one-of available-chargers #min-taz [level] of #min-charger-type
+      ask current-charger[
+        set current-driver myself
+      ]
+      set charger-in-origin-or-destination (#min-taz = current-taz or #min-taz = destination-taz)
+      charge-time-event-scheduler
+    ][
+      ifelse #min-taz = destination-taz [
+        change-depart-time ticks
+      ][
+        add-trip-to-itinerary #min-taz
+        travel-time-event-scheduler
+      ]
     ]
-    set charger-in-origin-or-destination (#min-taz = current-taz or #min-taz = destination-taz)
-    charge-time-event-scheduler
   ]
 end
 
@@ -329,11 +345,11 @@ end
 ;; remaining-range set in need-to-charge and retry-seek
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 to wait-time-event-scheduler
-  ;print (word precision ticks 3 " " self " wait-time-event-scheduler remaining-range:" remaining-range " trip-distance:" trip-distance " time-until-depart:" time-until-depart)
+  file-print (word precision ticks 3 " " self " wait-time-event-scheduler remaining-range:" remaining-range " trip-distance:" trip-distance " time-until-depart:" time-until-depart)
+  file-flush
   set state "not charging"
   ifelse remaining-range / charge-safety-factor < trip-distance [
-    let event-time-from-now min(sentence (random-exponential wait-time-mean) (time-until-depart - 0.5))
-    if event-time-from-now < 0 [ set event-time-from-now 0 ]
+    let event-time-from-now random-exponential wait-time-mean
     dynamic-scheduler:add schedule self task retry-seek ticks + event-time-from-now
   ][
     ifelse remaining-range / charge-safety-factor >= journey-distance or time-until-depart <= 1 [
@@ -429,13 +445,47 @@ to change-depart-time-row [row-num]
   ]
 end
 
+to add-trip-to-itinerary [new-destination-taz]
+  ;print (word precision ticks 3 " " self " new-taz: " new-destination-taz " for row: " current-itin-row " itin-depart: " itin-depart " itin-from: " itin-from " itin-to: " itin-to)
+  
+  ; start from the end and work backwards to the current-itin-row
+  let last-row (length itin-depart - 1)
+  set itin-depart lput (item last-row itin-depart) itin-depart
+  set itin-to lput (item last-row itin-to) itin-to
+  set itin-from lput (item last-row itin-from) itin-from
+  
+  ; update all subsequent trips, including their departure time if necessary
+  foreach n-values (last-row - current-itin-row) [last-row - ?] [
+    set itin-depart replace-item ? itin-depart item (? - 1) itin-depart
+    set itin-to replace-item ? itin-to item (? - 1) itin-to
+    set itin-from replace-item ? itin-from item (? - 1) itin-from
+  
+  ]
+  ; change the current destination to the new one and set depart time to now
+  set itin-to replace-item current-itin-row itin-to [who] of new-destination-taz
+  set itin-from replace-item (current-itin-row + 1) itin-from [who] of new-destination-taz
+  set itin-depart replace-item current-itin-row itin-depart ticks
+  
+  ; note that any inconsistent departure times will get resolved later through calls to change-departure-time
+  
+  ; rewind current-itin-row by one and use update-itinerary to take care of setting state var's
+  set current-itin-row current-itin-row - 1
+  update-itinerary
+  
+  file-print (word precision ticks 3 " " self " new-taz: " new-destination-taz " for row: " current-itin-row " itin-depart: " itin-depart " itin-from: " itin-from " itin-to: " itin-to)      
+  file-flush
+end
+
 ;;;;;;;;;;;;;;;;;;;;
 ;; END CHARGE
 ;;;;;;;;;;;;;;;;;;;;
 
 to end-charge
-  set state-of-charge (state-of-charge + time-until-end-charge * charge-rate-of current-charger / battery-capacity)
-  ;print (word precision ticks 3 " " self " ending charge soc:" precision state-of-charge 3)
+  let energy-charged time-until-end-charge * charge-rate-of current-charger
+  set energy-received energy-received + energy-charged
+  set state-of-charge (state-of-charge + energy-charged / battery-capacity)
+  file-print (word precision ticks 3 " " self " ending charge soc:" precision state-of-charge 3)
+  file-flush
   ask current-charger [ set current-driver nobody ]
   set current-charger nobody
 
@@ -455,8 +505,8 @@ end
 ;; DEPART
 ;;;;;;;;;;;;;;;;;;;;
 to depart
-  ;print (word precision ticks 3 " " self " departing, soc:" state-of-charge)
-  ;print (word precision ticks 3 " " self " itinerary (upon departure):" itin-depart)
+  file-print (word precision ticks 3 " " self " departing, soc:" state-of-charge)
+  file-flush
   ifelse need-to-charge "depart" [  
     ifelse state-of-charge = 1 [  ;; random decision to charge prevents BEVs from leaving sometimes. ac 11.07
       error (word "ERROR: " precision ticks 3 " " self " cannot make trip with full battery")
@@ -961,7 +1011,7 @@ Polygon -7500403 true true 270 75 225 30 30 225 75 270
 Polygon -7500403 true true 30 75 75 30 270 225 225 270
 
 @#$#@#$#@
-NetLogo 5.0
+NetLogo 5.0.1
 @#$#@#$#@
 @#$#@#$#@
 @#$#@#$#@

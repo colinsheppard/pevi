@@ -173,7 +173,8 @@ to setup
 end 
 
 to go
-  dynamic-scheduler:go-until schedule go-until-time
+  dynamic-scheduler:go schedule
+;  dynamic-scheduler:go-until schedule go-until-time
 end
 
 ;;;;;;;;;;;;;;;;;;;;
@@ -315,11 +316,11 @@ to seek-charger
     ]
   ]
   ifelse #min-taz = -99 [  
-    ;print (word precision ticks 3 " " self " seek charger - none available") 
+    file-print (word precision ticks 3 " " self " seek charger - none available") 
     set num-denials (num-denials + 1)
     wait-time-event-scheduler  
   ][
-    ;print (word precision ticks 3 " " self " least cost option is taz:" #min-taz " level:" ([level] of #min-charger-type) " cost:" #min-cost)
+    file-print (word precision ticks 3 " " self " least cost option is taz:" #min-taz " level:" ([level] of #min-charger-type) " cost:" #min-cost)
     ifelse #min-taz = current-taz [
       set current-charger one-of available-chargers #min-taz [level] of #min-charger-type
       ask current-charger[
@@ -349,8 +350,12 @@ to wait-time-event-scheduler
   file-flush
   set state "not charging"
   ifelse remaining-range / charge-safety-factor < trip-distance [
-    let event-time-from-now random-exponential wait-time-mean
-    dynamic-scheduler:add schedule self task retry-seek ticks + event-time-from-now
+    ifelse ticks > 24 [
+      set state "stranded"
+    ][
+      let event-time-from-now random-exponential wait-time-mean
+      dynamic-scheduler:add schedule self task retry-seek ticks + event-time-from-now
+    ]
   ][
     ifelse remaining-range / charge-safety-factor >= journey-distance or time-until-depart <= 1 [
       ;print (word precision ticks 3 " " self " in wait-time-event-sched, deciding to depart at time " ticks)
@@ -749,8 +754,8 @@ SLIDER
 go-until-time
 go-until-time
 0
-30
-30
+36
+36
 0.5
 1
 NIL

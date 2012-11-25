@@ -250,11 +250,11 @@ to seek-charger
   ][
     set willing-to-roam? false 
   ]
-  let taz-list n-values 0 [?]
+  let #taz-list n-values 0 [?]
   ifelse willing-to-roam? [
-    set taz-list remove-duplicates (sentence current-taz destination-taz [neighbor-tazs] of current-taz item my-od-index od-enroute)
+    set #taz-list remove-duplicates (sentence current-taz destination-taz [neighbor-tazs] of current-taz item my-od-index od-enroute)
   ][  
-    set taz-list (sentence current-taz)
+    set #taz-list (sentence current-taz)
   ]
   let #trip-or-journey-energy-need -99
   ifelse time-until-depart < 1 [
@@ -267,7 +267,7 @@ to seek-charger
     set #trip-charge-time-need-by-type replace-item (item 0 ?) #trip-charge-time-need-by-type (#trip-or-journey-energy-need / (item 1 ?))
   ]
 
-  foreach taz-list [
+  foreach #taz-list [
     if distance-from-to [id] of current-taz [id] of ? <= remaining-range [
       let #this-taz ?
       set #charger-in-origin-or-destination (#this-taz = current-taz or #this-taz = destination-taz)
@@ -379,21 +379,22 @@ to charge-time-event-scheduler
                                                     journey-charge-time-need 
                                                     time-until-depart 
                                                     charger-in-origin-or-destination 
-                                                    [this-charger-type] of current-charger)
+                                                    [this-charger-type] of current-charger) + 0.001
   let next-event-scheduled-at 0 
   ifelse (time-until-depart > 0.5) and ([level] of [this-charger-type] of current-charger < 3) and (time-until-end-charge < trip-charge-time-need) [                                                                                                    
     set next-event-scheduled-at ticks + min (sentence (random-exponential wait-time-mean) (time-until-depart - 0.5)) 
     dynamic-scheduler:add schedule self task retry-seek next-event-scheduled-at
-    ;print (word precision ticks 3 " " self " scheduling retry-seek, time-until-end-charge: " time-until-end-charge ", trip-charge-time-need: " trip-charge-time-need)
+    file-print (word precision ticks 3 " " self " scheduling retry-seek, time-until-end-charge: " time-until-end-charge ", trip-charge-time-need: " trip-charge-time-need)
   ][
     ifelse (time-until-depart > 0.5) and ([level] of [this-charger-type] of current-charger < 2) and (time-until-end-charge < journey-charge-time-need) [
       set next-event-scheduled-at ticks + min (sentence (random-exponential wait-time-mean) (time-until-depart - 0.5))  
       dynamic-scheduler:add schedule self task retry-seek next-event-scheduled-at
-      ;print (word precision ticks 3 " " self " scheduling retry-seek for " next-event-scheduled-at " time-until-end-charge: " time-until-end-charge ", journey-charge-time-need: " journey-charge-time-need)
+      file-print (word precision ticks 3 " " self " scheduling retry-seek for " next-event-scheduled-at " time-until-end-charge: " time-until-end-charge ", journey-charge-time-need: " journey-charge-time-need)
     ][
+      file-print (word precision ticks 3 " " self " scheduling end-charge, time-until-end-charge: " time-until-end-charge " time-until-depart: " time-until-depart " trip-charge-time-need: " trip-charge-time-need)
+      file-flush
       set next-event-scheduled-at ticks + time-until-end-charge
       dynamic-scheduler:add schedule self task end-charge next-event-scheduled-at
-      ;print (word precision ticks 3 " " self " scheduling end-charge, time-until-end-charge: " time-until-end-charge)
     ]
   ]
   if next-event-scheduled-at > departure-time[
@@ -483,7 +484,7 @@ end
 to end-charge
   let energy-charged time-until-end-charge * charge-rate-of current-charger
   set energy-received energy-received + energy-charged
-  set state-of-charge (state-of-charge + energy-charged / battery-capacity)
+  set state-of-charge min (sentence 1 (state-of-charge + energy-charged / battery-capacity))
   file-print (word precision ticks 3 " " self " ending charge soc:" precision state-of-charge 3)
   file-flush
   ask current-charger [ set current-driver nobody ]
@@ -509,7 +510,8 @@ to depart
   file-flush
   ifelse need-to-charge "depart" [  
     ifelse state-of-charge = 1 [  ;; random decision to charge prevents BEVs from leaving sometimes. ac 11.07
-      error (word "ERROR: " precision ticks 3 " " self " cannot make trip with full battery")
+      file-print (word precision ticks 3 " " self " cannot make trip with full battery -- breaking it up")
+      break-up-trip
     ][
       ;print (word precision ticks 3 " " self " cannot make TRIP with current charge. Seeking charger.")
       seek-charger   
@@ -517,6 +519,77 @@ to depart
   ][  
     travel-time-event-scheduler
   ]
+end
+
+;;;;;;;;;;;;;;;;;;;;
+;; BREAK UP TRIP
+;;;;;;;;;;;;;;;;;;;;
+to break-up-trip
+  let #taz-list item my-od-index od-enroute
+  let #this-taz current-taz
+  let #max-score 0
+  let #max-taz current-taz
+  let #max-dist 0
+  let #max-dist-taz current-taz
+  foreach #taz-list [
+    set #this-taz ?
+    let #this-score 0
+    if #this-taz != current-taz and 
+      (distance-from-to [id] of current-taz [id] of #this-taz) <= remaining-range and 
+      distance-from-to [id] of #this-taz [id] of destination-taz <= battery-capacity / electric-fuel-consumption / charge-safety-factor [
+
+      foreach [level] of charger-types [
+        let #level ?
+        if (count (available-chargers #this-taz #level) > 0) [
+          ifelse #level = 0 [ 
+            set #this-score #this-score + 2
+          ][
+            set #this-score #this-score + #level
+          ]  
+        ]
+      ]
+    ]
+    if #this-score > #max-score [ 
+      set #max-score #this-score
+      set #max-taz #this-taz
+    ]
+  ]
+  if #max-score = 0 [  ; do it again but don't restrict to taz's that get us
+    foreach #taz-list [
+      set #this-taz ?
+      let #this-score 0
+      let #this-dist distance-from-to [id] of current-taz [id] of #this-taz
+      if #this-taz != current-taz and #this-dist <= remaining-range [
+        foreach [level] of charger-types [
+          let #level ?
+          if (count (available-chargers #this-taz #level) > 0) [
+            ifelse #level = 0 [ 
+              set #this-score #this-score + 2
+            ][
+              set #this-score #this-score + #level
+            ]  
+          ]
+        ]
+      ]
+      if #this-score > #max-score [ 
+        set #max-score #this-score
+        set #max-taz #this-taz
+      ]
+      if #this-dist > #max-dist [ 
+        set #max-dist #this-dist
+        set #max-dist-taz #this-taz
+      ]
+    ]
+  ]
+  ifelse #max-score = 0 [
+    ; choose the furthest along and hope
+    add-trip-to-itinerary #max-dist-taz
+    file-print (word precision ticks 3 " " self " break-up-trip chosen taz (by distance only) " #max-dist-taz " with distance " #max-dist-taz)
+  ][
+    add-trip-to-itinerary #max-taz
+    file-print (word precision ticks 3 " " self " break-up-trip chosen taz " #max-taz " with score" #max-score)
+  ]
+  travel-time-event-scheduler
 end
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
@@ -545,7 +618,8 @@ to arrive
     set energy-used energy-used + #charge-used * battery-capacity
   ]
   set journey-distance journey-distance - trip-distance
-  ;print (word precision ticks 3 " " self " arriving, trip-distance: " trip-distance " soc:" state-of-charge " elec-fc:" electric-fuel-consumption " cap" battery-capacity)
+  file-print (word precision ticks 3 " " self " arriving, trip-distance: " trip-distance " soc:" state-of-charge " elec-fc:" electric-fuel-consumption " cap" battery-capacity)
+  file-flush
   update-itinerary 
       
   if not itin-complete? [

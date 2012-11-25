@@ -205,6 +205,11 @@ to setup-drivers
     set state-of-charge 1
     set state "not-charging"
     set current-charger nobody
+    set energy-used 0
+    set energy-received 0
+    set expenses 0
+    set miles-driven 0
+    set num-denials 0
   
     set journey-distance 0
     foreach n-values length itin-from [?] [
@@ -263,9 +268,9 @@ to setup-itinerary
       set this-driver next-driver
       create-drivers 1 [
         set id this-driver
-        set itin-from n-values 1 [file-read]     ; creates global itin-from
-        set itin-to n-values 1 [file-read]       ; creates global itin-to
-        set itin-depart n-values 1 [file-read]   ; creates global itin-depart
+        set itin-from n-values 1 [file-read]
+        set itin-to n-values 1 [file-read]  
+        set itin-depart n-values 1 [file-read]
         set home-taz taz file-read
         let itin-row 0
         set max-trip-distance (distance-from-to item itin-row itin-to item itin-row itin-from)
@@ -285,6 +290,8 @@ to setup-itinerary
             ifelse file-at-end? [ set next-driver -1][ set next-driver file-read ]
           ] ; end while this-itin
         ]
+        set itin-change-flag n-values length itin-depart [0]
+        set itin-delay-amount n-values length itin-depart [0]
       ] ; end create-drivers
     ] ; end while file-at-end
   ] ; end ifelse
@@ -302,22 +309,26 @@ to setup-charger-types
     set level 0          ; dedicated home charger
     set charge-rate 1.92 ; kW. 120V x 16A peak current, single phase: http://www.sae.org/mags/AEI/7479
     set energy-price 0.14 ; 
+    set installed-cost 2 ; $1000
   ]
   create-charger-types 1 [  ; 
     set level 1
     set charge-rate 2.4 ; Charger rate is the charger power in kW. Data from (Markel 2010), see project document
-    set energy-price 0.15 ; 
+    set energy-price 0.15 ;
+    set installed-cost 2 ; $1000
   ]
   create-charger-types 1 [  ; 
     set level 2
     set charge-rate 19.2 ; Charger rate is the charger power in kW. Data from (Markel 2010), see project document
     set energy-price 0.16 ; 
+    set installed-cost 6 ; $1000
   ]
   create-charger-types 1 [  ; 
     set level 3
     set charge-rate 30 ; Charger rate is the charger power in kW. Data from (Markel 2010), see project document
                        ; Charger rate may be anywhere from 20-250kW (Markel 2010)
-    set energy-price 0.17 ; 
+    set energy-price 0.17 ;
+    set installed-cost 50 ; $1000
   ]
 end 
 
@@ -374,4 +385,13 @@ to setup-logging
   file-close
   if file-exists? "logfile.txt" [ file-delete "logfile.txt" ]
   file-open "logfile.txt"
-end ;setup-logging
+end
+
+;;;;;;;;;;;;;;;;;;;;
+;; SETUP SUMMARY
+;;;;;;;;;;;;;;;;;;;;
+to setup-summary
+  file-close
+  if file-exists? "summary.txt" [ file-delete "summary.txt" ]
+  file-open "summary.txt"
+end

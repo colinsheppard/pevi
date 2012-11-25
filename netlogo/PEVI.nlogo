@@ -101,7 +101,9 @@ drivers-own [
 
 ;; TRACKING
   energy-used
+  expenses
   gasoline-used
+  miles-driven
   num-denials
   
 ;; CANDIDATE ADDITIONS TO MODEL DESCRIPTION
@@ -116,9 +118,6 @@ chargers-own[
 
   num-sessions     ; count of charging sessions
   energy-delivered ; kWh
-
-  last-charger-cost
-  current-charger-cost
  ]
 
 tazs-own[
@@ -135,7 +134,8 @@ tazs-own[
 charger-types-own[
   level            ; 0,1,2,3, where 0=home
   charge-rate      ; kWh / hr  
-  energy-price     ; $0.14/kWh  
+  energy-price     ; $0.14/kWh
+  installed-cost   ; $
   charge-time-need
 ]
 
@@ -384,7 +384,7 @@ to charge-time-event-scheduler
                                                     journey-charge-time-need 
                                                     time-until-depart 
                                                     charger-in-origin-or-destination 
-                                                    [this-charger-type] of current-charger) + 0.001
+                                                    [this-charger-type] of current-charger) + 0.001  ; .001 or 3.6 sec is a fudge factor to deal with roundoff error causing drivers to have 1e-15 too little charge 
   let next-event-scheduled-at 0 
   ifelse (time-until-depart > 0.5) and ([level] of [this-charger-type] of current-charger < 3) and (time-until-end-charge < trip-charge-time-need) [                                                                                                    
     set next-event-scheduled-at ticks + min (sentence (random-exponential wait-time-mean) (time-until-depart - 0.5)) 
@@ -437,6 +437,10 @@ end
 ;;;;;;;;;;;;;;;;;;;;;;;;;
 
 to change-depart-time [new-depart-time]
+  let #delay-duration new-depart-time - item current-itin-row itin-depart
+  if #delay-duration > 0.002 [ ; unfortunately need this due to the roundoff issue mentioned in charge-time-event-scheduler
+    set itin-delay-amount replace-item current-itin-row itin-delay-amount (item current-itin-row itin-delay-amount + #delay-duration)
+  ]
   set itin-depart replace-item current-itin-row itin-depart new-depart-time
   ;print (word precision ticks 3 " " self " new-depart-time: " new-depart-time " for row: " current-itin-row " new itin-depart: " itin-depart)      
   if current-itin-row < (length itin-depart - 1)[
@@ -447,7 +451,12 @@ end
 
 to change-depart-time-row [row-num]
   if item row-num itin-depart < item (row-num - 1) itin-depart[
+    let #prev-depart-time item row-num itin-depart
     set itin-depart replace-item row-num itin-depart (0.5 + item (row-num - 1) itin-depart) ;; TODO make sub-model about how itin is adjusted when multiple trips are impacted
+    let #delay-duration item row-num itin-depart - #prev-depart-time
+    if #delay-duration > 0.002 [ ; unfortunately need this due to the roundoff issue mentioned in charge-time-event-scheduler
+      set itin-delay-amount replace-item row-num itin-delay-amount (item row-num itin-delay-amount + #delay-duration)
+    ]
   ]
 end
 
@@ -459,18 +468,22 @@ to add-trip-to-itinerary [new-destination-taz]
   set itin-depart lput (item last-row itin-depart) itin-depart
   set itin-to lput (item last-row itin-to) itin-to
   set itin-from lput (item last-row itin-from) itin-from
-  
+  set itin-delay-amount lput (item last-row itin-delay-amount) itin-delay-amount
+  set itin-change-flag lput 0 itin-change-flag
+    
   ; update all subsequent trips, including their departure time if necessary
   foreach n-values (last-row - current-itin-row) [last-row - ?] [
     set itin-depart replace-item ? itin-depart item (? - 1) itin-depart
     set itin-to replace-item ? itin-to item (? - 1) itin-to
     set itin-from replace-item ? itin-from item (? - 1) itin-from
-  
+    set itin-delay-amount replace-item ? itin-delay-amount item (? - 1) itin-delay-amount
   ]
-  ; change the current destination to the new one and set depart time to now
+  ; change the current destination to the new one and set depart time to now, and delay to 0
   set itin-to replace-item current-itin-row itin-to [who] of new-destination-taz
   set itin-from replace-item (current-itin-row + 1) itin-from [who] of new-destination-taz
   set itin-depart replace-item current-itin-row itin-depart ticks
+  set itin-delay-amount replace-item current-itin-row itin-delay-amount 0
+  set itin-change-flag replace-item current-itin-row itin-change-flag 1
   
   ; note that any inconsistent departure times will get resolved later through calls to change-departure-time
   
@@ -478,7 +491,7 @@ to add-trip-to-itinerary [new-destination-taz]
   set current-itin-row current-itin-row - 1
   update-itinerary
   
-  file-print (word precision ticks 3 " " self " new-taz: " new-destination-taz " for row: " current-itin-row " itin-depart: " itin-depart " itin-from: " itin-from " itin-to: " itin-to)      
+  file-print (word precision ticks 3 " " self " add-trip-to-itinerary new-taz: " new-destination-taz " for row: " current-itin-row " itin-depart: " itin-depart " itin-from: " itin-from " itin-to: " itin-to)      
   file-flush
 end
 
@@ -489,6 +502,7 @@ end
 to end-charge
   let energy-charged time-until-end-charge * charge-rate-of current-charger
   set energy-received energy-received + energy-charged
+  set expenses expenses + energy-charged * energy-price-of current-charger
   set state-of-charge min (sentence 1 (state-of-charge + energy-charged / battery-capacity))
   file-print (word precision ticks 3 " " self " ending charge soc:" precision state-of-charge 3)
   file-flush
@@ -546,8 +560,8 @@ to break-up-trip
       foreach [level] of charger-types [
         let #level ?
         if (count (available-chargers #this-taz #level) > 0) [
-          ifelse #level = 0 [ 
-            set #this-score #this-score + 2
+          ifelse #level = 0 [
+            if #this-taz = home-taz [ set #this-score #this-score + 4 ]
           ][
             set #this-score #this-score + #level
           ]  
@@ -614,6 +628,7 @@ end
 to arrive
   ; account for energy / gas used in the trip
   let #charge-used trip-distance * electric-fuel-consumption / battery-capacity
+  set miles-driven miles-driven + trip-distance
   ifelse not is-bev? and state-of-charge - #charge-used < 0 [
     set energy-used energy-used + state-of-charge * battery-capacity
     set gasoline-used gasoline-used + (#charge-used - state-of-charge) * battery-capacity / electric-fuel-consumption * hybrid-fuel-consumption
@@ -667,6 +682,9 @@ end
 to-report charge-rate-of [#charger]
   report [charge-rate] of ([this-charger-type] of #charger)
 end
+to-report energy-price-of [#charger]
+  report [energy-price] of ([this-charger-type] of #charger)
+end
 to-report distance-from-to [from-taz to-taz]
   report item ((from-taz - 1) * n-tazs + to-taz - 1 ) od-dist
 end
@@ -684,11 +702,30 @@ end
 to-report driver-soc [the-driver]
   report [state-of-charge] of the-driver
 end
+
+to summarize
+  setup-summary
+  file-print (word "metric,value")
+  file-print (word "num.drivers," count drivers)
+  file-print (word "num.trips," sum [ length itin-change-flag - sum itin-change-flag ] of drivers)
+  file-print (word "total.delay," sum [ sum itin-delay-amount  ] of drivers)
+  file-print (word "mean.delay," mean [ sum itin-delay-amount  ] of drivers)
+  file-print (word "frac.drivers.delayed," (count drivers with [ sum itin-delay-amount > 0 ] / count drivers))
+  file-print (word "num.unscheduled.trips," sum [ sum itin-change-flag ] of drivers)
+  file-print (word "energy.charged," sum [ energy-received ] of drivers)
+  file-print (word "driver.expenses," sum [ expenses ] of drivers)
+  file-print (word "infrastructure.cost," sum [ [installed-cost] of this-charger-type ] of chargers)
+  file-print (word "gasoline.used," sum [ gasoline-used ] of drivers)
+  file-print (word "miles.driven," sum [ miles-driven ] of drivers)
+  file-print (word "num.denials," sum [ num-denials ] of drivers)
+  file-print (word "frac.denied," (count drivers with [num-denials > 0] / count drivers))
+  file-flush
+end
 @#$#@#$#@
 GRAPHICS-WINDOW
-86
+130
 10
-331
+375
 228
 -1
 -1
@@ -747,10 +784,10 @@ NIL
 1
 
 SLIDER
-293
-18
-465
-51
+362
+16
+534
+49
 go-until-time
 go-until-time
 0
@@ -760,6 +797,23 @@ go-until-time
 1
 NIL
 HORIZONTAL
+
+BUTTON
+10
+93
+110
+126
+NIL
+summarize
+NIL
+1
+T
+OBSERVER
+NIL
+NIL
+NIL
+NIL
+0
 
 @#$#@#$#@
 ## ## WHAT IS IT?

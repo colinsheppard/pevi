@@ -4,5 +4,6 @@ outputs/*
 netlogo/temp/*
 netlogo/array
 netlogo/logfile.txt
+netlogo/summary.txt
 netlogo/dynamic-scheduler
 postgis

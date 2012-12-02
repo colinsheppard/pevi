@@ -169,7 +169,9 @@ to setup
   setup-drivers
   setup-charger-types
   setup-chargers
-  setup-logging
+  reset-logfile "drivers"
+  reset-logfile "charging"
+  log-data "charging" (sentence "time" "charger.level" "location" "driver" "vehicle.type" "duration" "energy" "begin.soc")
 end 
 
 to go
@@ -295,7 +297,12 @@ to seek-charger
             let #mid-state-of-charge ((1 - state-of-charge) * battery-capacity - #leg-one-trip-distance * electric-fuel-consumption) / battery-capacity
             let #trip-charge-time-need max sentence 0 ((#leg-two-trip-distance * charge-safety-factor * electric-fuel-consumption - #mid-state-of-charge * battery-capacity) / #this-charge-rate)
             let #journey-charge-time-need max sentence 0 ((#mid-journey-distance * charge-safety-factor * electric-fuel-consumption - #mid-state-of-charge * battery-capacity) / #this-charge-rate)
-            let #full-charge-time-need (1 - #mid-state-of-charge) * battery-capacity / #this-charge-rate
+            let #full-charge-time-need 0
+            ifelse #level = 3[
+              set #full-charge-time-need max (sentence 0 ((0.8 - #mid-state-of-charge) * battery-capacity / #this-charge-rate)) 
+            ][
+              set #full-charge-time-need (1 - #mid-state-of-charge) * battery-capacity / #this-charge-rate
+            ]
             set #extra-time-until-end-charge calc-time-until-end-charge #full-charge-time-need 
                                                                         #trip-charge-time-need 
                                                                         #journey-charge-time-need 
@@ -303,12 +310,15 @@ to seek-charger
                                                                         #charger-in-origin-or-destination
                                                                         #this-charger-type
           ]
-          let #this-cost (time-opportunity-cost * (#extra-time-for-travel + #extra-time-until-end-charge) + 
-            ([energy-price] of #this-charger-type) * (#trip-or-journey-energy-need + #extra-energy-for-travel))
-          if #this-cost < #min-cost or (#this-cost = #min-cost and [level] of #this-charger-type > [level] of #min-charger-type) [
-            set #min-cost #this-cost
-            set #min-taz #this-taz
-            set #min-charger-type #this-charger-type 
+          ;; the following condition avoids the case when driver would have over 0.8 soc and attempt to charge at level III
+          if #level < 3 or #extra-time-until-end-charge > 0 [
+            let #this-cost (time-opportunity-cost * (#extra-time-for-travel + #extra-time-until-end-charge) + 
+              ([energy-price] of #this-charger-type) * (#trip-or-journey-energy-need + #extra-energy-for-travel))
+            if #this-cost < #min-cost or (#this-cost = #min-cost and [level] of #this-charger-type > [level] of #min-charger-type) [
+              set #min-cost #this-cost
+              set #min-taz #this-taz
+              set #min-charger-type #this-charger-type 
+            ]
           ]
           ;print (word precision ticks 3 " " self " seek-charger checking taz:" #this-taz " in-orig-dest? " #charger-in-origin-or-destination " level:" #level " this-cost:" #this-cost " rate:" ([charge-rate] of #this-charger-type) " energyprice:" ([energy-price] of #this-charger-type) " trip-or-journey-energy-need:" #trip-or-journey-energy-need)
         ]
@@ -316,11 +326,11 @@ to seek-charger
     ]
   ]
   ifelse #min-taz = -99 [  
-    file-print (word precision ticks 3 " " self " seek charger - none available") 
+;    file-print (word precision ticks 3 " " self " seek charger - none available") 
     set num-denials (num-denials + 1)
     wait-time-event-scheduler  
   ][
-    file-print (word precision ticks 3 " " self " least cost option is taz:" #min-taz " level:" ([level] of #min-charger-type) " cost:" #min-cost)
+;    file-print (word precision ticks 3 " " self " least cost option is taz:" #min-taz " level:" ([level] of #min-charger-type) " cost:" #min-cost)
     ifelse #min-taz = current-taz [
       set current-charger one-of available-chargers #min-taz [level] of #min-charger-type
       ask current-charger[
@@ -346,8 +356,7 @@ end
 ;; remaining-range set in need-to-charge and retry-seek
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 to wait-time-event-scheduler
-  file-print (word precision ticks 3 " " self " wait-time-event-scheduler remaining-range:" remaining-range " trip-distance:" trip-distance " time-until-depart:" time-until-depart)
-  file-flush
+;  log-data "events" (sentence precision ticks 3 " " self " wait-time-event-scheduler remaining-range:" remaining-range " trip-distance:" trip-distance " time-until-depart:" time-until-depart)
   set state "not charging"
   ifelse remaining-range / charge-safety-factor < trip-distance [
     ifelse ticks > 24 [
@@ -377,8 +386,11 @@ to charge-time-event-scheduler
   set state "charging"
   set trip-charge-time-need max sentence 0 ((trip-distance * charge-safety-factor * electric-fuel-consumption - state-of-charge * battery-capacity) / charge-rate-of current-charger)
   set journey-charge-time-need max sentence 0 ((journey-distance * charge-safety-factor * electric-fuel-consumption - state-of-charge * battery-capacity) / charge-rate-of current-charger)
-  set full-charge-time-need (1 - state-of-charge) * battery-capacity / charge-rate-of current-charger
-
+  ifelse level-of current-charger = 3 [
+    set full-charge-time-need max (sentence 0 ((0.8 - state-of-charge) * battery-capacity / charge-rate-of current-charger))
+  ][
+    set full-charge-time-need (1 - state-of-charge) * battery-capacity / charge-rate-of current-charger
+  ]
   set time-until-end-charge (calc-time-until-end-charge full-charge-time-need 
                                                     trip-charge-time-need 
                                                     journey-charge-time-need 
@@ -386,20 +398,20 @@ to charge-time-event-scheduler
                                                     charger-in-origin-or-destination 
                                                     [this-charger-type] of current-charger) + 0.001  ; .001 or 3.6 sec is a fudge factor to deal with roundoff error causing drivers to have 1e-15 too little charge 
   let next-event-scheduled-at 0 
-  ifelse (time-until-depart > 0.5) and ([level] of [this-charger-type] of current-charger < 3) and (time-until-end-charge < trip-charge-time-need) [                                                                                                    
+  ifelse (time-until-depart > 0.5) and (level-of current-charger < 3) and (time-until-end-charge < trip-charge-time-need) [                                                                                                    
     set next-event-scheduled-at ticks + min (sentence (random-exponential wait-time-mean) (time-until-depart - 0.5)) 
     dynamic-scheduler:add schedule self task retry-seek next-event-scheduled-at
-    file-print (word precision ticks 3 " " self " scheduling retry-seek, time-until-end-charge: " time-until-end-charge ", trip-charge-time-need: " trip-charge-time-need)
+;    file-print (word precision ticks 3 " " self " scheduling retry-seek, time-until-end-charge: " time-until-end-charge ", trip-charge-time-need: " trip-charge-time-need)
   ][
-    ifelse (time-until-depart > 0.5) and ([level] of [this-charger-type] of current-charger < 2) and (time-until-end-charge < journey-charge-time-need) [
+    ifelse (time-until-depart > 0.5) and (level-of current-charger < 2) and (time-until-end-charge < journey-charge-time-need) [
       set next-event-scheduled-at ticks + min (sentence (random-exponential wait-time-mean) (time-until-depart - 0.5))  
       dynamic-scheduler:add schedule self task retry-seek next-event-scheduled-at
-      file-print (word precision ticks 3 " " self " scheduling retry-seek for " next-event-scheduled-at " time-until-end-charge: " time-until-end-charge ", journey-charge-time-need: " journey-charge-time-need)
+;      file-print (word precision ticks 3 " " self " scheduling retry-seek for " next-event-scheduled-at " time-until-end-charge: " time-until-end-charge ", journey-charge-time-need: " journey-charge-time-need)
     ][
-      file-print (word precision ticks 3 " " self " scheduling end-charge, time-until-end-charge: " time-until-end-charge " time-until-depart: " time-until-depart " trip-charge-time-need: " trip-charge-time-need)
-      file-flush
+;      file-print (word precision ticks 3 " " self " scheduling end-charge, time-until-end-charge: " time-until-end-charge " time-until-depart: " time-until-depart " trip-charge-time-need: " trip-charge-time-need)
       set next-event-scheduled-at ticks + time-until-end-charge
       dynamic-scheduler:add schedule self task end-charge next-event-scheduled-at
+      log-data "charging" (sentence ticks level-of current-charger [id] of current-taz [id] of self [name] of this-vehicle-type (next-event-scheduled-at - ticks) ((next-event-scheduled-at - ticks) * charge-rate-of current-charger) state-of-charge)
     ]
   ]
   if next-event-scheduled-at > departure-time[
@@ -491,8 +503,7 @@ to add-trip-to-itinerary [new-destination-taz]
   set current-itin-row current-itin-row - 1
   update-itinerary
   
-  file-print (word precision ticks 3 " " self " add-trip-to-itinerary new-taz: " new-destination-taz " for row: " current-itin-row " itin-depart: " itin-depart " itin-from: " itin-from " itin-to: " itin-to)      
-  file-flush
+;  file-print (word precision ticks 3 " " self " add-trip-to-itinerary new-taz: " new-destination-taz " for row: " current-itin-row " itin-depart: " itin-depart " itin-from: " itin-from " itin-to: " itin-to)      
 end
 
 ;;;;;;;;;;;;;;;;;;;;
@@ -504,8 +515,7 @@ to end-charge
   set energy-received energy-received + energy-charged
   set expenses expenses + energy-charged * energy-price-of current-charger
   set state-of-charge min (sentence 1 (state-of-charge + energy-charged / battery-capacity))
-  file-print (word precision ticks 3 " " self " ending charge soc:" precision state-of-charge 3)
-  file-flush
+  log-driver "end charge"
   ask current-charger [ set current-driver nobody ]
   set current-charger nobody
 
@@ -525,11 +535,10 @@ end
 ;; DEPART
 ;;;;;;;;;;;;;;;;;;;;
 to depart
-  file-print (word precision ticks 3 " " self " departing, soc:" state-of-charge)
-  file-flush
+;  log-data "drivers" (sentence precision ticks 3 [id] of self "departing" state-of-charge)
   ifelse need-to-charge "depart" [  
     ifelse state-of-charge = 1 [  ;; random decision to charge prevents BEVs from leaving sometimes. ac 11.07
-      file-print (word precision ticks 3 " " self " cannot make trip with full battery -- breaking it up")
+;      file-print (word precision ticks 3 " " self " cannot make trip with full battery -- breaking it up")
       break-up-trip
     ][
       ;print (word precision ticks 3 " " self " cannot make TRIP with current charge. Seeking charger.")
@@ -603,10 +612,10 @@ to break-up-trip
   ifelse #max-score = 0 [
     ; choose the furthest along and hope
     add-trip-to-itinerary #max-dist-taz
-    file-print (word precision ticks 3 " " self " break-up-trip chosen taz (by distance only) " #max-dist-taz " with distance " #max-dist-taz)
+;    log-data "break-up-trip" (sentence precision ticks 3 " " [id] of self "distance" #max-dist-taz #max-dist)
   ][
     add-trip-to-itinerary #max-taz
-    file-print (word precision ticks 3 " " self " break-up-trip chosen taz " #max-taz " with score" #max-score)
+;    log-data "break-up-trip" (sentence precision ticks 3 " " [id] of self "score" #max-taz #max-score)
   ]
   travel-time-event-scheduler
 end
@@ -638,8 +647,8 @@ to arrive
     set energy-used energy-used + #charge-used * battery-capacity
   ]
   set journey-distance journey-distance - trip-distance
-  file-print (word precision ticks 3 " " self " arriving, trip-distance: " trip-distance " soc:" state-of-charge " elec-fc:" electric-fuel-consumption " cap" battery-capacity)
-  file-flush
+  log-driver "arriving"
+;  file-flush
   update-itinerary 
       
   if not itin-complete? [
@@ -685,6 +694,9 @@ end
 to-report energy-price-of [#charger]
   report [energy-price] of ([this-charger-type] of #charger)
 end
+to-report level-of [#charger]
+  report [level] of ([this-charger-type] of #charger)
+end
 to-report distance-from-to [from-taz to-taz]
   report item ((from-taz - 1) * n-tazs + to-taz - 1 ) od-dist
 end
@@ -704,21 +716,41 @@ to-report driver-soc [the-driver]
 end
 
 to summarize
-  setup-summary
-  file-print (word "metric,value")
-  file-print (word "num.drivers," count drivers)
-  file-print (word "num.trips," sum [ length itin-change-flag - sum itin-change-flag ] of drivers)
-  file-print (word "total.delay," sum [ sum itin-delay-amount  ] of drivers)
-  file-print (word "mean.delay," mean [ sum itin-delay-amount  ] of drivers)
-  file-print (word "frac.drivers.delayed," (count drivers with [ sum itin-delay-amount > 0 ] / count drivers))
-  file-print (word "num.unscheduled.trips," sum [ sum itin-change-flag ] of drivers)
-  file-print (word "energy.charged," sum [ energy-received ] of drivers)
-  file-print (word "driver.expenses," sum [ expenses ] of drivers)
-  file-print (word "infrastructure.cost," sum [ [installed-cost] of this-charger-type ] of chargers)
-  file-print (word "gasoline.used," sum [ gasoline-used ] of drivers)
-  file-print (word "miles.driven," sum [ miles-driven ] of drivers)
-  file-print (word "num.denials," sum [ num-denials ] of drivers)
-  file-print (word "frac.denied," (count drivers with [num-denials > 0] / count drivers))
+  reset-logfile "driver-summary"
+  log-data "driver-summary" (sentence "metric" "vehicle-type" "home" "value")
+  foreach sort remove-duplicates [home-taz] of drivers [
+    let #home-taz ?
+    ask vehicle-types [
+      let subset drivers with [home-taz = #home-taz and this-vehicle-type = myself]
+      log-data "driver-summary" (sentence "num.drivers" name [id] of #home-taz (count subset))
+      log-data "driver-summary" (sentence "num.trips" name [id] of #home-taz (sum [ length itin-change-flag - sum itin-change-flag ] of subset))
+      log-data "driver-summary" (sentence "total.delay" name [id] of #home-taz sum [ sum itin-delay-amount  ] of subset)
+      log-data "driver-summary" (sentence "num.delayed" name [id] of #home-taz count subset with [ sum itin-delay-amount > 0 ])
+      log-data "driver-summary" (sentence "num.unscheduled.trips" name [id] of #home-taz sum [ sum itin-change-flag ] of subset)
+      log-data "driver-summary" (sentence "energy.charged" name [id] of #home-taz sum [ energy-received ] of subset)
+      log-data "driver-summary" (sentence "driver.expenses" name [id] of #home-taz sum [ expenses ] of subset)
+      log-data "driver-summary" (sentence "gasoline.used" name [id] of #home-taz sum [ gasoline-used ] of subset)
+      log-data "driver-summary" (sentence "miles.driven" name [id] of #home-taz sum [ miles-driven ] of subset)
+      log-data "driver-summary" (sentence "num.denials" name [id] of #home-taz sum [ num-denials ] of subset)
+    ]
+  ]
+
+
+ 
+  log-data "summary" (sentence "metric" "value")
+  log-data "summary" (sentence "num.drivers" count drivers)
+  log-data "summary" (sentence "num.trips" sum [ length itin-change-flag - sum itin-change-flag ] of drivers)
+  log-data "summary" (sentence "total.delay" sum [ sum itin-delay-amount  ] of drivers)
+  log-data "summary" (sentence "mean.delay" mean [ sum itin-delay-amount  ] of drivers)
+  log-data "summary" (sentence "frac.drivers.delayed" (count drivers with [ sum itin-delay-amount > 0 ] / count drivers))
+  log-data "summary" (sentence "num.unscheduled.trips" sum [ sum itin-change-flag ] of drivers)
+  log-data "summary" (sentence "energy.charged" sum [ energy-received ] of drivers)
+  log-data "summary" (sentence "driver.expenses" sum [ expenses ] of drivers)
+  log-data "summary" (sentence "infrastructure.cost" sum [ [installed-cost] of this-charger-type ] of chargers)
+  log-data "summary" (sentence "gasoline.used" sum [ gasoline-used ] of drivers)
+  log-data "summary" (sentence "miles.driven" sum [ miles-driven ] of drivers)
+  log-data "summary" (sentence "num.denials" sum [ num-denials ] of drivers)
+  log-data "summary" (sentence "frac.denied" (count drivers with [num-denials > 0] / count drivers))
   file-flush
 end
 @#$#@#$#@

@@ -379,19 +379,29 @@ to setup-chargers
 end ;setup-chargers
 
 ;;;;;;;;;;;;;;;;;;;;
-;; SETUP LOGGING
+;; LOG DATA
 ;;;;;;;;;;;;;;;;;;;;
-to setup-logging
-  file-close
-  if file-exists? "logfile.txt" [ file-delete "logfile.txt" ]
-  file-open "logfile.txt"
+to log-data [logfile data-list]
+  open-logfile logfile
+  file-print reduce [(word ?1 "," ?2)] data-list
 end
 
 ;;;;;;;;;;;;;;;;;;;;
-;; SETUP SUMMARY
+;; OPEN LOGFILE
 ;;;;;;;;;;;;;;;;;;;;
-to setup-summary
+to open-logfile [logfile]
   file-close
-  if file-exists? "summary.txt" [ file-delete "summary.txt" ]
-  file-open "summary.txt"
+  file-open word logfile "-out.csv" 
+end
+
+;;;;;;;;;;;;;;;;;;;;
+;; RESET LOGFILE
+;;;;;;;;;;;;;;;;;;;;
+to reset-logfile [logfile]
+  file-close
+  if file-exists? word logfile "-out.csv" [ file-delete word logfile "-out.csv" ]
+end
+
+to log-driver [event-name]
+  log-data "drivers" (sentence precision ticks 3 [id] of self event-name state-of-charge)
 end

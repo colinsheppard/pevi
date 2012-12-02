@@ -6,4 +6,5 @@ netlogo/array
 netlogo/logfile.txt
 netlogo/summary.txt
 netlogo/dynamic-scheduler
+netlogo/*-out.csv
 postgis

@@ -172,6 +172,8 @@ to setup
   reset-logfile "drivers"
   reset-logfile "charging"
   log-data "charging" (sentence "time" "charger.level" "location" "driver" "vehicle.type" "duration" "energy" "begin.soc" "end.soc" "charging.on.whim")
+  reset-logfile "wait-time"
+  log-data "wait-time" (sentence "time" "driver" "vehicle.type" "soc" "trip.distance" "journey.distance" "time.until.depart" "result.action" "time.from.now")
 end 
 
 to go
@@ -364,23 +366,25 @@ end
 ;; remaining-range set in need-to-charge and retry-seek
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 to wait-time-event-scheduler
-;  log-data "events" (sentence precision ticks 3 " " self " wait-time-event-scheduler remaining-range:" remaining-range " trip-distance:" trip-distance " time-until-depart:" time-until-depart)
   set state "not charging"
   ifelse remaining-range / charge-safety-factor < trip-distance [
     ifelse ticks > 24 [
       set state "stranded"
+      log-data "wait-time" (sentence ticks id [name] of this-vehicle-type state-of-charge trip-distance journey-distance time-until-depart "stranded" -1)
     ][
       let event-time-from-now random-exponential wait-time-mean
       dynamic-scheduler:add schedule self task retry-seek ticks + event-time-from-now
+      log-data "wait-time" (sentence ticks id [name] of this-vehicle-type state-of-charge trip-distance journey-distance time-until-depart "retry-seek" event-time-from-now)
     ]
   ][
     ifelse remaining-range / charge-safety-factor >= journey-distance or time-until-depart <= 1 [
-      ;print (word precision ticks 3 " " self " in wait-time-event-sched, deciding to depart at time " ticks)
       dynamic-scheduler:add schedule self task depart departure-time
+      log-data "wait-time" (sentence ticks id [name] of this-vehicle-type state-of-charge trip-distance journey-distance time-until-depart "depart" departure-time)
     ][
       let event-time-from-now min(sentence (random-exponential wait-time-mean) (time-until-depart - 0.5))
       if event-time-from-now < 0 [ set event-time-from-now 0 ]
       dynamic-scheduler:add schedule self task retry-seek ticks + event-time-from-now
+      log-data "wait-time" (sentence ticks id [name] of this-vehicle-type state-of-charge trip-distance journey-distance time-until-depart "retry-seek" event-time-from-now)
     ]
   ]
 end
@@ -863,6 +867,28 @@ NIL
 NIL
 NIL
 0
+
+SWITCH
+481
+206
+622
+239
+log-wait-time
+log-wait-time
+0
+1
+-1000
+
+SWITCH
+481
+252
+620
+285
+log-charging
+log-charging
+1
+1
+-1000
 
 @#$#@#$#@
 ## ## WHAT IS IT?

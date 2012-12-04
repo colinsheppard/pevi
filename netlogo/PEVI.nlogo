@@ -73,31 +73,22 @@ drivers-own [
   current-itin-row          ; index of current location in the itinerary (referring to next trip or current trip if traveling)
 
 ;; CONVENIENCE VARIABLES
-;; these are used to implement the model, but are not in the model description
-  trip-time 
-  trip-distance
   journey-distance
+  trip-distance
   remaining-range
-  departure-time ;When the vehicle is set to leave the taz
-  arrival-time ; when a car is supposed to arrive
-  minimum-acceptable-charge ; The charge required to reach the next destination
-  itin-complete?
+  departure-time
   charger-in-origin-or-destination
   time-until-depart
   trip-charge-time-need
-  current-trip-charge-time-need
   journey-charge-time-need
-  current-journey-charge-time-need
   full-charge-time-need
-  current-full-charge-time-need
   time-until-end-charge
+  trip-time
+  itin-complete?  
   type-assignment-code
 
   willing-to-roam?
   charging-on-a-whim?
-  extra-time-until-end-charge
-  extra-time-for-travel
-  extra-charge-time-for-travel
 
 ;; TRACKING
   energy-used
@@ -647,9 +638,7 @@ end
 to travel-time-event-scheduler
   set state "traveling"
   set trip-time item my-od-index od-time
-  set arrival-time (ticks + trip-time)
-  dynamic-scheduler:add schedule self task arrive arrival-time
-  ;print (word precision ticks 3 " " self " next arrival time: " precision arrival-time 3)
+  dynamic-scheduler:add schedule self task arrive (ticks + trip-time)
 end
 
 ;;;;;;;;;;;;;;;;;;;;

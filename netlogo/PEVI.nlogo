@@ -165,6 +165,8 @@ to setup
   log-data "charging" (sentence "time" "charger.level" "location" "driver" "vehicle.type" "duration" "energy" "begin.soc" "end.soc" "charging.on.whim")
   reset-logfile "wait-time"
   log-data "wait-time" (sentence "time" "driver" "vehicle.type" "soc" "trip.distance" "journey.distance" "time.until.depart" "result.action" "time.from.now")
+  reset-logfile "charge-time"
+  log-data "charge-time" (sentence "time" "driver" "charger.in.origin.dest" "level" "soc" "trip.distance" "journey.distance" "time.until.depart" "result.action" "time.from.now")
 end 
 
 to go
@@ -403,17 +405,17 @@ to charge-time-event-scheduler
   let next-event-scheduled-at 0 
   ifelse (time-until-depart > 0.5) and (level-of current-charger < 3) and (time-until-end-charge < trip-charge-time-need) [                                                                                                    
     set next-event-scheduled-at ticks + min (sentence (random-exponential wait-time-mean) (time-until-depart - 0.5)) 
-    dynamic-scheduler:add schedule self task retry-seek next-event-scheduled-at
+    dynamic-scheduler:add schedule self task end-charge-then-retry next-event-scheduled-at
 ;    file-print (word precision ticks 3 " " self " scheduling retry-seek, time-until-end-charge: " time-until-end-charge ", trip-charge-time-need: " trip-charge-time-need)
   ][
     ifelse (time-until-depart > 0.5) and (level-of current-charger < 2) and (time-until-end-charge < journey-charge-time-need) [
       set next-event-scheduled-at ticks + min (sentence (random-exponential wait-time-mean) (time-until-depart - 0.5))  
-      dynamic-scheduler:add schedule self task retry-seek next-event-scheduled-at
+      dynamic-scheduler:add schedule self task end-charge-then-retry next-event-scheduled-at
 ;      file-print (word precision ticks 3 " " self " scheduling retry-seek for " next-event-scheduled-at " time-until-end-charge: " time-until-end-charge ", journey-charge-time-need: " journey-charge-time-need)
     ][
 ;      file-print (word precision ticks 3 " " self " scheduling end-charge, time-until-end-charge: " time-until-end-charge " time-until-depart: " time-until-depart " trip-charge-time-need: " trip-charge-time-need)
       set next-event-scheduled-at ticks + time-until-end-charge
-      dynamic-scheduler:add schedule self task end-charge next-event-scheduled-at
+      dynamic-scheduler:add schedule self task end-charge-then-itin next-event-scheduled-at
       log-data "charging" (sentence ticks 
         level-of current-charger 
         [id] of current-taz 
@@ -522,6 +524,16 @@ end
 ;; END CHARGE
 ;;;;;;;;;;;;;;;;;;;;
 
+to end-charge-then-itin
+  end-charge
+  itinerary-event-scheduler
+end
+
+to end-charge-then-retry
+  end-charge
+  retry-seek
+end
+
 to end-charge
   let energy-charged time-until-end-charge * charge-rate-of current-charger
   set energy-received energy-received + energy-charged
@@ -530,8 +542,6 @@ to end-charge
   log-driver "end charge"
   ask current-charger [ set current-driver nobody ]
   set current-charger nobody
-
-  itinerary-event-scheduler
 end
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
@@ -875,6 +885,17 @@ SWITCH
 285
 log-charging
 log-charging
+1
+1
+-1000
+
+SWITCH
+483
+301
+642
+334
+log-charge-time
+log-charge-time
 1
 1
 -1000

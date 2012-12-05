@@ -23,7 +23,7 @@ ggplot(dr,aes(x=vehicle.type,y=value))+geom_boxplot()+facet_wrap(~metric,scales=
 
 dr.summed <- ddply(dr,.(vehicle.type,metric),function(df){ data.frame(value=sum(df$value)) })
 
-ggplot(dr,aes(x=vehicle.type,y=value))+geom_bar(stat='identity')+facet_wrap(~metric,scales='free_y')
+ggplot(dr.summed,aes(x=vehicle.type,y=value))+geom_bar(stat='identity')+facet_wrap(~metric,scales='free_y')
 
 ch <- read.csv(paste(path.to.pevi,"netlogo/charging-out.csv",sep='')) #,stringsAsFactors=F
 ch <- ddply(ch,.(driver),function(df){ data.frame(df,event.num=1:nrow(df))})

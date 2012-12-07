@@ -384,7 +384,8 @@ end ;setup-chargers
 to log-data [logfile data-list]
   if (logfile = "wait-time" and log-wait-time) or
      (logfile = "charging" and log-charging) or
-     (logfile = "charge-time" and log-charge-time)
+     (logfile = "charge-time" and log-charge-time) or
+     (logfile = "summary" and log-charge-time)
   [
     open-logfile logfile
     file-print reduce [(word ?1 "," ?2)] data-list

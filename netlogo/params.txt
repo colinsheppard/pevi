@@ -11,7 +11,7 @@
 "time-opportunity-cost"	12.50
 "willing-to-roam-time-threshold"	1
 "probability-of-unneeded-charge"	0.01
-"charger-input-file"	"../inputs/chargers.txt"
-"driver-input-file"	"../inputs/driver-schedule-pen4-rep2-20121109.txt"
-"od-input-file"	"../inputs/taz-dist-time.txt"
-"vehicle-type-input-file"	"../inputs/vehicle-types.txt"
+"charger-input-file"	"../../../pev-shared/data/inputs/chargers.txt"
+"driver-input-file"	"../../../pev-shared/data/inputs/driver-schedule-pen4-rep2-20121109.txt"
+"od-input-file"	"../../../pev-shared/data/inputs/taz-dist-time.txt"
+"vehicle-type-input-file"	"../../../pev-shared/data/inputs/vehicle-types.txt"

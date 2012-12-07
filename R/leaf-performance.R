@@ -100,12 +100,12 @@ tot.miles.begin <- tot.miles
 ch <- read.csv(paste(path.to.leaf,'data/charging-event.csv',sep=''))
 ch$hour <- (ch$minute + ch$second/60)/60
 
-plot(ch$hour,ch$soc,type='l',main="GHD Leaf Charging Event - October 2012",xlab="Hour",ylab="State of Charge (%)",ylim=c(0,100))
-abline(lm('soc ~ hour',ch),lty=2,col='red')
-text(-0.25,35,paste('r-squared: ',roundC(summary(lm('soc ~ hour',ch))$r.squared,3),sep=''),pos=4)
+plot(ch$hour,ch$soc,type='l',main="GHD Leaf Charging Event - October 2012",xlab="Hour",ylab="State of Charge (%)",ylim=c(0,100)) abline(lm('soc ~ hour',ch),lty=2,col='red') text(-0.25,35,paste('r-squared: ',roundC(summary(lm('soc ~ hour',ch))$r.squared,3),sep=''),pos=4)
 abline(h=max(ch$soc))
 text(-0.25,max(ch$soc)-5,paste('max soc: ',roundC(max(ch$soc),2),sep=''),pos=4)
 
+# load data and translate lat,lon to actually start at GHD
+ghd <- c(-124.163904,40.803678)*100
 
 dbuser<-"pev"
 dbpassword<-""
@@ -115,12 +115,58 @@ con <- dbConnect(PostgreSQL(), user=dbuser, password=dbpassword, dbname=dbname, 
 
 dr <- read.csv(paste(path.to.leaf,'data/bear-river-ridge.csv',sep=''))
 dr$route <- "Bear River Ridge"
-dr <- rbind(dr,data.frame(read.csv(paste(path.to.leaf,'data/cr-sunny-brae.csv',sep='')),route="CR / Sunny Brae"))
-dr <- rbind(dr,data.frame(read.csv(paste(path.to.leaf,'data/hydesville.csv',sep='')),route="Hydesville"))
-dr <- rbind(dr,data.frame(read.csv(paste(path.to.leaf,'data/willow-creek-trip.csv',sep='')),route="Willow Creek"))
-names(dr) <- c("seconds","minutes","long","lat","elev","vel","soc","battery.volts","motor.amps","route")
-dr$lat <- dr$lat/100
-dr$long <- dr$long/100
+
+# bear river ridge, shift so that the turn around point of the journey is at intersection of mattole and brr rd. or -124.283656 40.509905 which happens at minute 32
+dr$X.Longitude. <- dr$X.Longitude. + (-12428.3656 + 12416.73)
+dr$X.Latitude. <- dr$X.Latitude. + (4050.9905 - 4030.592)
+# scale lat/lon data thinks GHD is at -124.2146, 40.68633
+ll <- c(-124.2867,40.50985)*100 # mattole and BRR rd
+scale.x <- (ghd[1] - ll[1])/(-12421.46 - ll[1])
+scale.y <- (ghd[2] - ll[2])/(4068.633 - ll[2])
+dr$X.Longitude. <- (dr$X.Longitude. - ll[1]) * scale.x + ll[1]
+dr$X.Latitude. <- (dr$X.Latitude. - ll[2]) * scale.y + ll[2]
+
+cr <- data.frame(read.csv(paste(path.to.leaf,'data/cr-sunny-brae.csv',sep='')),route="CR / Sunny Brae")
+cr$X.Longitude. <- cr$X.Longitude. + 12409.85 + ghd[1]
+cr$X.Latitude. <- cr$X.Latitude. - 4048.228 + ghd[2]
+# scale lat/lon data thinks samoa & 101 -124.1153, 40.83946  actually at -124.083115, 40.863439
+scale.x <- (-12408.3115 - ghd[1])/(-12411.53 - ghd[1])
+scale.y <- (4086.3439 - ghd[2])/(4083.946 - ghd[2])
+cr$X.Longitude. <- (cr$X.Longitude. - ghd[1]) * scale.x + ghd[1]
+cr$X.Latitude. <- (cr$X.Latitude. - ghd[2]) * scale.y + ghd[2]
+
+
+hy <- data.frame(read.csv(paste(path.to.leaf,'data/hydesville.csv',sep='')),route="Hydesville")
+hy$X.Longitude. <- hy$X.Longitude. + 12409.85 + ghd[1]
+hy$X.Latitude. <- hy$X.Latitude. - 4048.228 + ghd[2]
+# scale lat/lon data thinks lower right (carlotta) is at -124.2146, 40.68633 actually at -124.040724, 40.534442
+scale.x <- (-12404.0724 - ghd[1])/(-12421.46 - ghd[1])
+scale.y <- (4053.4442 - ghd[2])/(4068.633 - ghd[2])
+hy$X.Longitude. <- (hy$X.Longitude. - ghd[1]) * scale.x + ghd[1]
+hy$X.Latitude. <- (hy$X.Latitude. - ghd[2]) * scale.y + ghd[2]
+
+# willow creek high point according to g-earth
+# 40.897982, -123.774316, elev= 2820
+# willow creek high point according to logger
+# 40.53846, -123.4643
+# the second half of trip was adjusted in original data, by adding -0.4003 to the long for those rows after minute 22, second 36.231
+wc <- data.frame(read.csv(paste(path.to.leaf,'data/willow-creek.csv',sep='')),route="Willow Creek")
+wc$X.Longitude.[(which(wc$X.Time.Stamp==36.231 & wc$X.Session.Time == 22)+1):nrow(wc)] <- wc$X.Longitude.[(which(wc$X.Time.Stamp==36.231 & wc$X.Session.Time == 22) + 1):nrow(wc)] - 40.03
+wc$X.Longitude. <- wc$X.Longitude. + 12409.85 + ghd[1]
+wc$X.Latitude. <- wc$X.Latitude. - 4048.228 + ghd[2]
+# intersection of 299 & 96, should be at -123.631308, 40.939521, data says -123.8446, 40.88502
+scale.x <- (-12363.1308 - ghd[1])/(-12384.46 - ghd[1])
+scale.y <- (4093.9521 - ghd[2])/(4088.502 - ghd[2])
+wc$X.Longitude. <- (wc$X.Longitude. - ghd[1]) * scale.x + ghd[1]
+wc$X.Latitude. <- (wc$X.Latitude. - ghd[2]) * scale.y + ghd[2]
+
+
+
+dr <- rbind(dr,cr,hy,wc)
+
+names(dr) <- c("seconds","minutes","long","lat","elev","vel","soc","battery.volts","motor.amps","battery.amps","route")
+dr$lat <- as.integer(dr$lat/100) + (dr$lat - as.integer(dr$lat/100)*100)/60
+dr$long <- as.integer(dr$long/100) + (dr$long - as.integer(dr$long/100)*100)/60
 dr$hour <- (dr$minutes + dr$seconds/60)/60
 dr <- ddply(dr,.(route),function(df){ 
   df <- df[order(df$hour),]
@@ -138,38 +184,23 @@ dr <- ddply(dr,.(route),function(df){
         ST_Transform(ST_GeomFromText('POINT(",df$long[i]," ",df$lat[i],")', 4326),26941)
       )",sep='')))
   }
+  df$vel3[2:nrow(df)] <- df$dist3[2:nrow(df)] / diff(df$hour)
   df
 })
-dr$vel3[2:nrow(dr)] <- dr$dist3[2:nrow(dr)] / diff(dr$hour)
-
-# translate lat,lon to actually start at GHD
-ghd <- c(-124.163904,40.803678)
-dr2 <- ddply(subset(dr,route %in% c("CR / Sunny Brae","Hydesville","Willow Creek")),.(route),function(df){ 
-  df <- df[order(df$hour),]
-  df$long <- df$long + ghd[1] - -124.0985
-  df$lat  <- df$lat  + ghd[2] - 40.48228
-  df
-})
-
-
-# willow creek high point according to g-earth
-# 40.897982, -123.774316, elev= 2820
-# willow creek high point according to logger
-# 40.53846, -123.4643
-# the second half of trip was adjusted in original data, by adding -0.4003 to the long for those rows after minute 22, second 36.231
-
-# bear river ridge, shifted in original data so that the turn around point of the journey is at intersection of mattole and brr rd. or -124.283656 40.509905 which happens at minute 23
-
-dr <- rbind(subset(dr,route=="Bear River Ridge"),dr2)
+#dr$dist3[dr$dist3>200] <- NA
+#dr$vel3[dr$vel3>75] <- NA
+dr$vel[dr$route=="Willow Creek"] <- dr$vel3[dr$route=="Willow Creek"]
+dr$vel[dr$route=="Willow Creek" & dr$vel>60] <- 60
 
 save(dr,file=paste(path.to.leaf,'data/all-trips-cleaned.Rdata',sep=''))
+load(file=paste(path.to.leaf,'data/all-trips-cleaned.Rdata',sep=''))
 
-dr <- ddply(dr,.(route),function(df){ 
+dr <- ddply(dr,.(route),function(df){
   df <- df[order(df$hour),]
-  df$gradient <- c(NA,diff(df$elev)/(diff(df$dist3)*1609.344))
+  df$gradient <- c(NA,diff(df$elev)/(df$dist3[2:nrow(df)]*1609.344))
   df
 })
-dr$gradient[abs(dr$gradient)> 0.6] <- NA
+dr$gradient[abs(dr$gradient)> 0.1] <- NA
 
 x.bins <- c(-0.6,seq(-0.05,0.05,by=0.01),0.6)
 x.labs <- c("[-0.6,-0.05)","[-0.05,-0.04)","[-0.04,-0.03)","[-0.03,-0.02)","[-0.02,-0.01)","[-0.01,0.00)","[0.00,0.01)","[0.01,0.02)","[0.02,0.03)","[0.03,0.04)","[0.04,0.05)","[0.05,0.6)","NA")
@@ -178,12 +209,13 @@ y.labs <- c("[0,25)","[25,40)","[40,50)","[50,60)","[60,70)","NA")
 intervs <- findInterval(dr$gradient,x.bins)
 intervs[is.na(intervs)] <- length(x.labs)
 dr$gradient.binned <- factor(x.labs[intervs],levels=x.labs)
-intervs <- findInterval(dr$vel3,y.bins)
+intervs <- findInterval(dr$vel,y.bins)
 intervs[is.na(intervs)] <- length(y.labs)
 dr$speed.binned    <- factor(y.labs[intervs],levels=y.labs)
 dr.hists <- cast(melt(dr,id.vars=c('route','gradient.binned','speed.binned'),measure.vars=c('dist3')),gradient.binned ~ speed.binned ~ variable ~ route,fun.aggregate=sum)
 save(dr,dr.hists,file=paste(path.to.leaf,'data/all-trips-cleaned.Rdata',sep=''))
 
+load(file=paste(path.to.leaf,'data/all-trips-cleaned.Rdata',sep=''))
 # Sum of hists
 
                #speed.binned
@@ -201,4 +233,59 @@ save(dr,dr.hists,file=paste(path.to.leaf,'data/all-trips-cleaned.Rdata',sep=''))
   #[0.04,0.05)   0.4708181  1.618442 0.0180372 0.02138794 0.000000000 0.03104598
   #[0.05,0.6)    6.4056909 12.179532 0.7079687 0.08894877 0.018204674 0.06532273
   #NA            1.8005173  1.377210 0.2172528 0.03271469 0.018628229         NA
+
+ggplot(dr,aes(x=vel,y=gradient*100,size=dist3,colour=dist3))+geom_point(position='jitter',height=0,width=2)+facet_wrap(~route,scales="free_y")
+
+# calculate performance for each row
+dr$battery.energy <- dr$soc / 100 * 24000
+dr <- ddply(dr,.(route),function(df){
+  df <- df[order(df$hour),]
+  df$delta.t[2:nrow(df)] <- diff(df$hour)
+  df$delta.e[2:nrow(df)] <- -diff(df$battery.energy)
+  df
+})
+dr$wh <- dr$battery.volts * dr$battery.amps * dr$delta.t
+dr$perf <- dr$wh / 1000 / dr$dist3
+dr$perf[abs(dr$perf)==Inf] <- NA
+dr$perf2 <- dr$delta.e / 1000 / dr$dist3
+dr$perf2[abs(dr$perf2)>10] <- NA
+dr$perf2[which(dr$perf2==0)] <- dr$perf[which(dr$perf2==0)]
+
+# performance vs gradient, colored by speed, note we omit very high performance as they probably include stops
+ggplot(subset(dr,perf<5),aes(x=gradient*100,y=perf,size=dist3,colour=dist3))+geom_point()+facet_wrap(~route)
+ggplot(subset(dr,perf<5),aes(x=gradient*100,y=perf,size=dist3,colour=dist3))+geom_point()
+ggplot(subset(dr,perf<2),aes(x=gradient*100,y=perf,size=dist3,colour=dist3))+geom_point()+facet_wrap(~speed.binned)
+ggplot(subset(dr,perf<10),aes(x=gradient*100,y=perf))+geom_point()+geom_point(colour='red',aes(x=gradient*100,y=perf2))+facet_wrap(~route)
+
+ggplot(subset(dr,abs(perf2)<5),aes(x=gradient*100,y=perf2,size=dist3,colour=dist3))+geom_point()+facet_wrap(~speed.binned)
+
+# make 2-minute averages
+dr <- ddply(dr,.(route),function(df){
+  df <- df[order(df$hour),]
+  df$two.min <- as.integer(df$hour*3600) - as.integer(df$hour*3600) %% 2
+  df$cum.dist <- c(0,cumsum(df$dist3[2:nrow(df)]))
+  df
+})
+perf.two <- ddply(dr,.(route,two.min),function(df){ data.frame(gradient=weighted.mean(df$gradient,df$dist3,na.rm=T),perf.two=weighted.mean(df$perf,df$dist3,na.rm=T))})
+# make 5-minute averages
+dr <- ddply(dr,.(route),function(df){
+  df <- df[order(df$hour),]
+  df$five.min <- as.integer(df$hour*3600) - as.integer(df$hour*3600) %% 5
+  df
+})
+perf.five <- ddply(dr,.(route,five.min),function(df){ data.frame(gradient=weighted.mean(df$gradient,df$dist3,na.rm=T),perf.five=weighted.mean(df$perf,df$dist3,na.rm=T))})
+
+# make 15-minute averages
+dr <- ddply(dr,.(route),function(df){
+  df <- df[order(df$hour),]
+  df$fift.min <- as.integer(df$hour*3600) - as.integer(df$hour*3600) %% 15
+  df
+})
+perf.fift <- ddply(dr,.(route,fift.min),function(df){ data.frame(gradient=weighted.mean(df$gradient,df$dist3,na.rm=T),perf.fift=weighted.mean(df$perf,df$dist3,na.rm=T))})
+ggplot(subset(perf.two,perf.two<5),aes(x=gradient*100,y=perf.two))+geom_point()+facet_wrap(~route)
+ggplot(subset(perf.five,perf.five<5),aes(x=gradient*100,y=perf.five))+geom_point()+facet_wrap(~route)
+ggplot(subset(perf.fift,perf.fift<5),aes(x=gradient*100,y=perf.fift))+geom_point()+facet_wrap(~route)
+
+ggplot(dr,aes(x=cum.dist,y=elev))+geom_point()+facet_wrap(~route,scales="free_y")
+ggplot(dr,aes(x=long,y=lat))+geom_point()+facet_wrap(~route,scales="free")
 

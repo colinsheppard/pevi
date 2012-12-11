@@ -16,6 +16,12 @@ taz <- readShapePoly(paste(path.to.pevi,'inputs/development/aggregated-taz',sep=
 load(paste(path.to.pevi,'inputs/development/aggregated-taz-fieldnames.Rdata',sep=''))
 names(taz@data) <- c('row',agg.taz.shp.fieldnames)
 
+# setup bins for gradient and speed
+x.bins <- c(-0.6,seq(-0.05,0.05,by=0.01),0.6)
+x.labs <- c("[-0.6,-0.05)","[-0.05,-0.04)","[-0.04,-0.03)","[-0.03,-0.02)","[-0.02,-0.01)","[-0.01,0.00)","[0.00,0.01)","[0.01,0.02)","[0.02,0.03)","[0.03,0.04)","[0.04,0.05)","[0.05,0.6)","NA")
+y.bins <- c(0,25,40,50,60,70)
+y.labs <- c("[0,25)","[25,40)","[40,50)","[50,60)","[60,70)","NA")
+
 #"Alderpoint"
 #"ARC_Giuntoli"
 #"ARC_Greenview"
@@ -115,52 +121,9 @@ con <- dbConnect(PostgreSQL(), user=dbuser, password=dbpassword, dbname=dbname, 
 
 dr <- read.csv(paste(path.to.leaf,'data/bear-river-ridge.csv',sep=''))
 dr$route <- "Bear River Ridge"
-
-# bear river ridge, shift so that the turn around point of the journey is at intersection of mattole and brr rd. or -124.283656 40.509905 which happens at minute 32
-dr$X.Longitude. <- dr$X.Longitude. + (-12428.3656 + 12416.73)
-dr$X.Latitude. <- dr$X.Latitude. + (4050.9905 - 4030.592)
-# scale lat/lon data thinks GHD is at -124.2146, 40.68633
-ll <- c(-124.2867,40.50985)*100 # mattole and BRR rd
-scale.x <- (ghd[1] - ll[1])/(-12421.46 - ll[1])
-scale.y <- (ghd[2] - ll[2])/(4068.633 - ll[2])
-dr$X.Longitude. <- (dr$X.Longitude. - ll[1]) * scale.x + ll[1]
-dr$X.Latitude. <- (dr$X.Latitude. - ll[2]) * scale.y + ll[2]
-
 cr <- data.frame(read.csv(paste(path.to.leaf,'data/cr-sunny-brae.csv',sep='')),route="CR / Sunny Brae")
-cr$X.Longitude. <- cr$X.Longitude. + 12409.85 + ghd[1]
-cr$X.Latitude. <- cr$X.Latitude. - 4048.228 + ghd[2]
-# scale lat/lon data thinks samoa & 101 -124.1153, 40.83946  actually at -124.083115, 40.863439
-scale.x <- (-12408.3115 - ghd[1])/(-12411.53 - ghd[1])
-scale.y <- (4086.3439 - ghd[2])/(4083.946 - ghd[2])
-cr$X.Longitude. <- (cr$X.Longitude. - ghd[1]) * scale.x + ghd[1]
-cr$X.Latitude. <- (cr$X.Latitude. - ghd[2]) * scale.y + ghd[2]
-
-
 hy <- data.frame(read.csv(paste(path.to.leaf,'data/hydesville.csv',sep='')),route="Hydesville")
-hy$X.Longitude. <- hy$X.Longitude. + 12409.85 + ghd[1]
-hy$X.Latitude. <- hy$X.Latitude. - 4048.228 + ghd[2]
-# scale lat/lon data thinks lower right (carlotta) is at -124.2146, 40.68633 actually at -124.040724, 40.534442
-scale.x <- (-12404.0724 - ghd[1])/(-12421.46 - ghd[1])
-scale.y <- (4053.4442 - ghd[2])/(4068.633 - ghd[2])
-hy$X.Longitude. <- (hy$X.Longitude. - ghd[1]) * scale.x + ghd[1]
-hy$X.Latitude. <- (hy$X.Latitude. - ghd[2]) * scale.y + ghd[2]
-
-# willow creek high point according to g-earth
-# 40.897982, -123.774316, elev= 2820
-# willow creek high point according to logger
-# 40.53846, -123.4643
-# the second half of trip was adjusted in original data, by adding -0.4003 to the long for those rows after minute 22, second 36.231
 wc <- data.frame(read.csv(paste(path.to.leaf,'data/willow-creek.csv',sep='')),route="Willow Creek")
-wc$X.Longitude.[(which(wc$X.Time.Stamp==36.231 & wc$X.Session.Time == 22)+1):nrow(wc)] <- wc$X.Longitude.[(which(wc$X.Time.Stamp==36.231 & wc$X.Session.Time == 22) + 1):nrow(wc)] - 40.03
-wc$X.Longitude. <- wc$X.Longitude. + 12409.85 + ghd[1]
-wc$X.Latitude. <- wc$X.Latitude. - 4048.228 + ghd[2]
-# intersection of 299 & 96, should be at -123.631308, 40.939521, data says -123.8446, 40.88502
-scale.x <- (-12363.1308 - ghd[1])/(-12384.46 - ghd[1])
-scale.y <- (4093.9521 - ghd[2])/(4088.502 - ghd[2])
-wc$X.Longitude. <- (wc$X.Longitude. - ghd[1]) * scale.x + ghd[1]
-wc$X.Latitude. <- (wc$X.Latitude. - ghd[2]) * scale.y + ghd[2]
-
-
 
 dr <- rbind(dr,cr,hy,wc)
 
@@ -174,10 +137,19 @@ dr <- ddply(dr,.(route),function(df){
 dr$dist[which(dr$dist>10)] <- NA
 dr$vel2[2:nrow(dr)] <- dr$dist[2:nrow(dr)] / diff(dr$hour)
 
+# get rid of rows where there is no apparent movement (lat,long unchanged) as these mess up calc's further on
+dr <- ddply(dr,.(route),function(df){ 
+  df <- df[order(df$hour),]
+  df$to.remove <- c(NA,(df$lat[2:nrow(df)]==df$lat[1:(nrow(df)-1)] & df$long[2:nrow(df)]==df$long[1:(nrow(df)-1)]))
+  df
+})
+dr <- rbind(dr[is.na(dr$to.remove),],dr[which(!dr$to.remove),])
+
 dr <- ddply(dr,.(route),function(df){ 
   df <- df[order(df$hour),]
   df$dist3 <- NA
-  for(i in 2:nrow(df)){
+  for(i in which(!is.na(df$lat[1:(nrow(df)-1)]) & !is.na(df$long[1:(nrow(df)-1)]) & !is.na(df$lat[2:nrow(df)]) & !is.na(df$long[2:nrow(df)]))){
+    if(i==1)next
     # 26941 is California Zone I state plane projection in meters (then converted to miles using 0.00062137119)
     df$dist3[i] <- as.numeric(0.00062137119 * dbGetQuery(con,paste("SELECT ST_Distance(
         ST_Transform(ST_GeomFromText('POINT(",df$long[i-1]," ",df$lat[i-1],")',4326),26941),
@@ -185,27 +157,33 @@ dr <- ddply(dr,.(route),function(df){
       )",sep='')))
   }
   df$vel3[2:nrow(df)] <- df$dist3[2:nrow(df)] / diff(df$hour)
+  df$cum.dist <- c(0,cumsum(df$dist3[2:nrow(df)]))
   df
 })
-#dr$dist3[dr$dist3>200] <- NA
-#dr$vel3[dr$vel3>75] <- NA
+#dr$elev2 <- NA
+#for(i in which(!is.na(dr$lat) & !is.na(dr$long))){
+  #dr$elev2[i] <- as.numeric(dbGetQuery(con,paste("SELECT ST_Value(rast,ST_GeomFromText('POINT(",dr$long[i]," ",dr$lat[i],")', 4326)) FROM north_coast",sep='')))
+#}
+# get rid of NA rows for critical data
+dr <- dr[-which(is.na(dr$dist3)),]
+#dr$elev.resid <- lm('elev ~ elev2',dr)$residuals
+dr$elev.resid <- dr$elev - dr$elev2
+
+#ggplot(dr,aes(x=long,y=lat,size=abs(elev.resid),colour=abs(elev.resid)))+geom_point()
+#ggplot(dr,aes(x=cum.dist,y=elev,size=abs(elev.resid),colour=abs(elev.resid)))+geom_point()+facet_wrap(~route)
+#plot(dr$elev,dr$elev2)
 dr$vel[dr$route=="Willow Creek"] <- dr$vel3[dr$route=="Willow Creek"]
 dr$vel[dr$route=="Willow Creek" & dr$vel>60] <- 60
-
-save(dr,file=paste(path.to.leaf,'data/all-trips-cleaned.Rdata',sep=''))
-load(file=paste(path.to.leaf,'data/all-trips-cleaned.Rdata',sep=''))
 
 dr <- ddply(dr,.(route),function(df){
   df <- df[order(df$hour),]
   df$gradient <- c(NA,diff(df$elev)/(df$dist3[2:nrow(df)]*1609.344))
+  #df$gradient2 <- c(NA,diff(df$elev2)/(df$dist3[2:nrow(df)]*1609.344))
   df
 })
-dr$gradient[abs(dr$gradient)> 0.1] <- NA
+dr <- dr[abs(dr$gradient) < 0.15,]
+#dr <- dr[abs(dr$gradient2) < 0.15,]
 
-x.bins <- c(-0.6,seq(-0.05,0.05,by=0.01),0.6)
-x.labs <- c("[-0.6,-0.05)","[-0.05,-0.04)","[-0.04,-0.03)","[-0.03,-0.02)","[-0.02,-0.01)","[-0.01,0.00)","[0.00,0.01)","[0.01,0.02)","[0.02,0.03)","[0.03,0.04)","[0.04,0.05)","[0.05,0.6)","NA")
-y.bins <- c(0,25,40,50,60,70)
-y.labs <- c("[0,25)","[25,40)","[40,50)","[50,60)","[60,70)","NA")
 intervs <- findInterval(dr$gradient,x.bins)
 intervs[is.na(intervs)] <- length(x.labs)
 dr$gradient.binned <- factor(x.labs[intervs],levels=x.labs)
@@ -213,9 +191,6 @@ intervs <- findInterval(dr$vel,y.bins)
 intervs[is.na(intervs)] <- length(y.labs)
 dr$speed.binned    <- factor(y.labs[intervs],levels=y.labs)
 dr.hists <- cast(melt(dr,id.vars=c('route','gradient.binned','speed.binned'),measure.vars=c('dist3')),gradient.binned ~ speed.binned ~ variable ~ route,fun.aggregate=sum)
-save(dr,dr.hists,file=paste(path.to.leaf,'data/all-trips-cleaned.Rdata',sep=''))
-
-load(file=paste(path.to.leaf,'data/all-trips-cleaned.Rdata',sep=''))
 # Sum of hists
 
                #speed.binned
@@ -251,6 +226,10 @@ dr$perf2 <- dr$delta.e / 1000 / dr$dist3
 dr$perf2[abs(dr$perf2)>10] <- NA
 dr$perf2[which(dr$perf2==0)] <- dr$perf[which(dr$perf2==0)]
 
+save(dr,dr.hists,file=paste(path.to.leaf,'data/all-trips-cleaned.Rdata',sep=''))
+
+load(file=paste(path.to.leaf,'data/all-trips-cleaned.Rdata',sep=''))
+
 # performance vs gradient, colored by speed, note we omit very high performance as they probably include stops
 ggplot(subset(dr,perf<5),aes(x=gradient*100,y=perf,size=dist3,colour=dist3))+geom_point()+facet_wrap(~route)
 ggplot(subset(dr,perf<5),aes(x=gradient*100,y=perf,size=dist3,colour=dist3))+geom_point()
@@ -259,33 +238,82 @@ ggplot(subset(dr,perf<10),aes(x=gradient*100,y=perf))+geom_point()+geom_point(co
 
 ggplot(subset(dr,abs(perf2)<5),aes(x=gradient*100,y=perf2,size=dist3,colour=dist3))+geom_point()+facet_wrap(~speed.binned)
 
-# make 2-minute averages
-dr <- ddply(dr,.(route),function(df){
-  df <- df[order(df$hour),]
-  df$two.min <- as.integer(df$hour*3600) - as.integer(df$hour*3600) %% 2
-  df$cum.dist <- c(0,cumsum(df$dist3[2:nrow(df)]))
-  df
-})
-perf.two <- ddply(dr,.(route,two.min),function(df){ data.frame(gradient=weighted.mean(df$gradient,df$dist3,na.rm=T),perf.two=weighted.mean(df$perf,df$dist3,na.rm=T))})
-# make 5-minute averages
-dr <- ddply(dr,.(route),function(df){
-  df <- df[order(df$hour),]
-  df$five.min <- as.integer(df$hour*3600) - as.integer(df$hour*3600) %% 5
-  df
-})
-perf.five <- ddply(dr,.(route,five.min),function(df){ data.frame(gradient=weighted.mean(df$gradient,df$dist3,na.rm=T),perf.five=weighted.mean(df$perf,df$dist3,na.rm=T))})
+# make 1,2,...-minute averages
+for(avg.int in c(1,2,5,10,15)){
+  dr <- ddply(dr,.(route),function(df){
+    df <- df[order(df$hour),]
+    df[[paste("avg.int.",avg.int,sep='')]] <- as.integer(df$hour*3600) - as.integer(df$hour*3600) %% avg.int
+    df
+  })
+}
+# make 0.25,0.5,1,2...-mile averages
+for(avg.mile in c(0.1,0.25,0.5,1,2)){
+  dr <- ddply(dr,.(route),function(df){
+    df <- df[order(df$hour),]
+    df[[paste("avg.mile.",avg.mile,sep='')]] <- (as.integer(df$cum.dist*100) - as.integer(df$cum.dist*100)%%(avg.mile*100))/100
+    df
+  })
+}
+for(avg.mile in c(0.1,0.25,0.5,1,2)){
+  perf.new <- streval(paste("ddply(dr,.(route,avg.mile.",avg.mile,"),function(df){ data.frame(dist=sum(df$dist3,na.rm=T),gradient=weighted.mean(df$gradient,df$dist3,na.rm=T),perf=weighted.mean(df$perf,df$dist3,na.rm=T),speed=weighted.mean(df$vel,df$dist3,na.rm=T))})",sep=''))
+  intervs <- findInterval(perf.new$speed,y.bins)
+  intervs[is.na(intervs)] <- length(y.labs)
+  perf.new$speed.binned    <- factor(y.labs[intervs],levels=y.labs)
 
-# make 15-minute averages
-dr <- ddply(dr,.(route),function(df){
-  df <- df[order(df$hour),]
-  df$fift.min <- as.integer(df$hour*3600) - as.integer(df$hour*3600) %% 15
-  df
-})
-perf.fift <- ddply(dr,.(route,fift.min),function(df){ data.frame(gradient=weighted.mean(df$gradient,df$dist3,na.rm=T),perf.fift=weighted.mean(df$perf,df$dist3,na.rm=T))})
-ggplot(subset(perf.two,perf.two<5),aes(x=gradient*100,y=perf.two))+geom_point()+facet_wrap(~route)
-ggplot(subset(perf.five,perf.five<5),aes(x=gradient*100,y=perf.five))+geom_point()+facet_wrap(~route)
-ggplot(subset(perf.fift,perf.fift<5),aes(x=gradient*100,y=perf.fift))+geom_point()+facet_wrap(~route)
+  # conduct regression analysis
+  reg.data <- subset(na.omit(perf.new),abs(perf)<5)
+  #reg.data <- subset(na.omit(perf.new),abs(perf)<5 & speed.binned!="[60,70)")
 
+  print(avg.mile)
+  print(summary(lm('perf ~ gradient + speed',reg.data)))
+  print(avg.mile)
+  print(summary(lm('perf ~ gradient * speed',reg.data)))
+  print(avg.mile)
+  print(summary(lm('perf ~ gradient*speed + I(gradient^2) + I(speed^2)',reg.data)))
+  print(avg.mile)
+  print(summary(lm('perf ~ gradient*speed - speed',reg.data)))
+  print(avg.mile)
+  print(summary(lm('perf ~ gradient + speed.binned',reg.data)))
+
+  fit <- lm('perf ~ gradient + speed',reg.data)
+  ab <- data.frame(sp=c(12.5,32.5,45,55,65),speed.binned=levels(reg.data$speed.binned)[1:(length(levels(reg.data$speed.binned))-1)])
+  #ab <- data.frame(sp=c(12.5,32.5,45,55),speed.binned=levels(reg.data$speed.binned)[1:(length(levels(reg.data$speed.binned))-2)])
+  ab$a <- fit$coefficients[1] + fit$coefficients[3]*ab$sp
+  ab$b <- fit$coefficients[2]
+  #p <- ggplot(reg.data,aes(x=gradient*100,y=perf,size=dist,colour=dist))+geom_point()+facet_wrap(~speed.binned)+geom_abline(aes(intercept=a,slope=b/100),data=ab)
+  p <- ggplot(reg.data,aes(x=gradient*100,y=perf,size=dist,colour=dist))+geom_point()+facet_wrap(~speed.binned)
+  ggsave(file=paste(path.to.plots,'/leaf-performance/performace-vs-gradient-by-speed-mile-avg-',avg.mile,'.pdf',sep=''),p,width=10,height=8)
+}
+for(avg.int in c(1,2,5,10,15)){
+  perf.new <- streval(paste("ddply(dr,.(route,avg.int.",avg.int,"),function(df){ data.frame(dist=sum(df$dist3,na.rm=T),gradient=weighted.mean(df$gradient,df$dist3,na.rm=T),perf=weighted.mean(df$perf,df$dist3,na.rm=T),speed=weighted.mean(df$vel,df$dist3,na.rm=T))})",sep=''))
+  intervs <- findInterval(perf.new$speed,y.bins)
+  intervs[is.na(intervs)] <- length(y.labs)
+  perf.new$speed.binned    <- factor(y.labs[intervs],levels=y.labs)
+
+  # conduct regression analysis
+  reg.data <- subset(na.omit(perf.new),abs(perf)<5)
+  #reg.data <- subset(na.omit(perf.new),abs(perf)<5 & speed.binned!="[60,70)")
+
+  print(avg.int)
+  print(summary(lm('perf ~ gradient + speed',reg.data)))
+  print(avg.int)
+  print(summary(lm('perf ~ gradient * speed',reg.data)))
+  print(avg.int)
+  print(summary(lm('perf ~ gradient*speed + I(gradient^2) + I(speed^2)',reg.data)))
+  print(avg.int)
+  print(summary(lm('perf ~ gradient*speed - speed',reg.data)))
+
+  fit <- lm('perf ~ gradient*speed - speed',reg.data)
+
+  ab <- data.frame(sp=c(12.5,32.5,45,55,65),speed.binned=levels(reg.data$speed.binned)[1:(length(levels(reg.data$speed.binned))-1)])
+  #ab <- data.frame(sp=c(12.5,32.5,45,55),speed.binned=levels(reg.data$speed.binned)[1:(length(levels(reg.data$speed.binned))-2)])
+  ab$a <- fit$coefficients[1]
+  ab$b <- fit$coefficients[2] + fit$coefficients[3]*ab$sp
+  p <- ggplot(reg.data,aes(x=gradient*100,y=perf,size=dist,colour=dist))+geom_point()+facet_wrap(~speed.binned)+geom_abline(aes(intercept=a,slope=b/100),data=ab)
+  ggsave(file=paste(path.to.plots,'/leaf-performance/performace-vs-gradient-by-speed-time-avg-',avg.int,'.pdf',sep=''),p,width=10,height=8)
+}
+
+ggplot(subset(perf.new,perf<5),aes(x=gradient*100,y=perf))+geom_point()+facet_wrap(~route)
 ggplot(dr,aes(x=cum.dist,y=elev))+geom_point()+facet_wrap(~route,scales="free_y")
 ggplot(dr,aes(x=long,y=lat))+geom_point()+facet_wrap(~route,scales="free")
 

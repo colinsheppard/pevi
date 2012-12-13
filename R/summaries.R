@@ -35,10 +35,12 @@ ggplot(ch,aes(x=time,y=duration,colour=factor(charger.level)))+geom_point()+face
 ggplot(ch,aes(x=time,y=begin.soc,colour=factor(charger.level)))+geom_point()+facet_wrap(~vehicle.type)
 ggplot(ch,aes(x=time,y=begin.soc,colour=factor(event.num)))+geom_point()+facet_grid(charger.level~vehicle.type)
 ggplot(ch,aes(x=time,y=begin.soc,colour=factor(charger.level),shape=factor(charger.level),size=2))+geom_point()+facet_wrap(~vehicle.type)
-ggplot(ch,aes(x=time,y=end.soc,colour=factor(charger.level),shape=factor(charger.level),size=2))+geom_point()+facet_wrap(~vehicle.type)
+
+ggplot(ch,aes(x=time,y=end.soc,colour=factor(event.num),shape=factor(charger.level)))+geom_point()+facet_grid(after.end.charge~vehicle.type)
 
 # SEGMENTS
 ggplot(ch,aes(x=time,xend=time+duration,y=begin.soc,yend=end.soc,colour=energy))+geom_segment()+facet_grid(charger.level~vehicle.type)
 
 # DRIVERS WHO DONT CHARGE UNTIL FULL
 ggplot(subset(ch,end.soc<1),aes(x=time,xend=time+duration,y=begin.soc,yend=end.soc,colour=factor(charger.level),shape=factor(charger.level),size=2))+geom_segment()+facet_wrap(~vehicle.type)
+

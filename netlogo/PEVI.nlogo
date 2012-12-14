@@ -168,7 +168,7 @@ to setup
   reset-logfile "charge-time"
   log-data "charge-time" (sentence "time" "driver" "charger.in.origin.dest" "level" "soc" "trip.distance" "journey.distance" "time.until.depart" "result.action" "time.from.now")
   reset-logfile "need-to-charge"
-  log-data "need-to-charge" (sentence "time" "driver" "charger.in.origin.dest" "level" "soc" "trip.distance" "journey.distance" "time.until.depart" "result.action" "time.from.now")
+  log-data "need-to-charge" (sentence "time" "driver" "vehicle.type" "soc" "trip.distance" "journey.distance" "time.until.depart" "calling.event" "remaining.range" "charging.on.a.whim?" "need.to.charge?")
 
 end 
 
@@ -195,17 +195,61 @@ to-report need-to-charge [calling-event]
     if (calling-event = "depart" and remaining-range < trip-distance * charge-safety-factor)[
       ;print (word precision ticks 3 " " self " remaining range is less than trip distance: " (trip-distance * charge-safety-factor))
     ]
+    log-data "need-to-charge" (sentence 
+      ticks 
+      id 
+      [name] of this-vehicle-type 
+      state-of-charge trip-distance 
+      journey-distance 
+      time-until-depart 
+      calling-event 
+      remaining-range 
+      charging-on-a-whim?
+      "true")
     report true
   ][
     ifelse (state-of-charge < 1) [  ;; drivers only consider unneeded charge if their vehicle does not have a full state of charge
       ifelse time-until-depart >= 0.5 and random-float 1 < probability-of-unneeded-charge [
 ;        print (word precision ticks 3 " " self " need-to-charge on a whim, SOC: " state-of-charge)
-        set charging-on-a-whim?
+        set charging-on-a-whim? true
+        log-data "need-to-charge" (sentence 
+          ticks 
+          id 
+          [name] of this-vehicle-type 
+          state-of-charge trip-distance 
+          journey-distance 
+          time-until-depart 
+          calling-event 
+          remaining-range 
+          charging-on-a-whim?
+          "true")
         report true
       ][
+        log-data "need-to-charge" (sentence 
+          ticks 
+          id 
+          [name] of this-vehicle-type 
+          state-of-charge trip-distance 
+          journey-distance 
+          time-until-depart 
+          calling-event 
+          remaining-range 
+          charging-on-a-whim?
+          "false")
         report false
       ]
     ][
+      log-data "need-to-charge" (sentence 
+        ticks 
+        id 
+        [name] of this-vehicle-type 
+        state-of-charge trip-distance 
+        journey-distance 
+        time-until-depart 
+        calling-event 
+        remaining-range 
+        charging-on-a-whim?
+        "false")
       report false
     ]
   ]
@@ -669,6 +713,8 @@ to arrive
     set state-of-charge state-of-charge - #charge-used
     set energy-used energy-used + #charge-used * battery-capacity
   ]
+  
+  ; output here
   set journey-distance journey-distance - trip-distance
   log-driver "arriving"
 ;  file-flush
@@ -877,7 +923,7 @@ SWITCH
 239
 log-wait-time
 log-wait-time
-0
+1
 1
 -1000
 
@@ -900,6 +946,17 @@ SWITCH
 log-charge-time
 log-charge-time
 1
+1
+-1000
+
+SWITCH
+493
+350
+675
+383
+log-need-to-charge
+log-need-to-charge
+0
 1
 -1000
 

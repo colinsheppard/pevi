@@ -7,7 +7,7 @@
 ######################################################################################################
 
 library(colinmisc)
-load.libraries(c('maptools','plotrix','stats','gpclib','plyr','png','RgoogleMaps','lattice','stringr','ggplot2','rgdal','XML','plotKML','rgeos'))
+load.libraries(c('maptools','plotrix','stats','gpclib','plyr','png','RgoogleMaps','lattice','stringr','ggplot2','rgdal','XML','plotKML','rgeos','doMC'))
 gpclibPermit()
 registerDoMC(7)
 
@@ -20,16 +20,17 @@ path.to.parcel <- '~/Dropbox/serc/pev-colin/data/HUM-PARCELS/'
 
 source(paste(path.to.pevi,'R/gis-functions.R',sep=''))
 
-# load aggregated tazs and travel demand data
-taz <- readShapePoly(paste(path.to.pevi,'inputs/development/aggregated-taz',sep=''))
+# load disaggregated tazs and travel demand data
+taz <- readShapePoly(paste(path.to.geatm,'Shape_Files/taz-LATLON.shp',sep=''))
+if(names(taz@data)[1]!="id")names(taz@data) <- c('id',names(taz@data)[2:ncol(taz@data)]) # make first column of shape data 'id' instead of 'ID'
+
+# load aggregated tazs
+agg.taz <- readShapePoly(paste(path.to.pevi,'inputs/development/aggregated-taz',sep=''))
 load(paste(path.to.pevi,'inputs/development/aggregated-taz-fieldnames.Rdata',sep=''))
-names(taz@data) <- c('row',agg.taz.shp.fieldnames)
-od.24.new <- read.csv(paste(path.to.geatm,'od_24_new.csv',sep=''))
-od.24.new <- od.24.new[,-which(names(od.24.new)=="X")]
-od.am.new <- read.csv(paste(path.to.geatm,'od_am_new.csv',sep=''))
-od.am.new <- od.am.new[,-which(names(od.am.new)=="X")]
-od.pm.new <- read.csv(paste(path.to.geatm,'od_pm_new.csv',sep=''))
-od.pm.new <- od.pm.new[,-which(names(od.pm.new)=="X")]
+names(agg.taz@data) <- c('row',agg.taz.shp.fieldnames)
+
+# load the od data, both dis/aggregated
+load(file=paste(path.to.geatm,'od-old-and-new.Rdata',sep=''))
 
 if(!file.exists(paste(path.to.geatm,'../CA-ZIPS/hum-zip-shp.Rdata',sep=''))){
   zips    <- readShapePoly(paste(path.to.geatm,'../CA-ZIPS/tl_2010_06_zcta510.shp',sep=''))
@@ -50,59 +51,114 @@ tracts@data$NAME10 <- as.character(tracts@data$NAME10)
 tract.pop <- read.csv(paste(path.to.geatm,'../HUM-CENSUS-TRACTS/2010-population-by-tract.csv',sep=''))
 tracts@data$population <- tract.pop$total.population[match(tracts@data$GEOID10,tract.pop$GEO.id)]
 tracts@data$ID <- unlist(lapply(tracts@polygons,function(x){slot(x,'ID')}))
-c.map <- paste(map.color(tracts@data$population,blue2red(50)),'7F',sep='')
-shp.to.kml(tracts,paste(path.to.google,'humboldt-census-tracts.kml',sep=''),'Population','','red',1.5,c.map,id.col='ID',name.col='name',description.cols=c('NAMELSAD10','population','NAME10'))
+hh <- read.csv(paste(path.to.geatm,'../HUM-CENSUS-TRACTS/household-size.csv',sep=''),skip=2)
 
+#c.map <- paste(map.color(tracts@data$population,blue2red(50)),'7F',sep='')
+#shp.to.kml(tracts,paste(path.to.google,'humboldt-census-tracts.kml',sep=''),'Population','','red',1.5,c.map,id.col='ID',name.col='name',description.cols=c('NAMELSAD10','population','NAME10'))
 
-# finding two overlapping polygons
-#taz.id <- which(taz@data$ID==519)
-#zip.id <- which(zips@data$ZCTA5CE10==95549)
-#plot(taz[taz.id,],col='#ee229922',add=T)
-#plot(zips[zip.id,],col='#3399ff22',add=T)
+# Join Humboldt parcel data with land use data (note: experimented with this but never actually used parcel data for anything)
+if(!file.exists(paste(path.to.parcel,'apn.Rdata',sep=''))){
+  land.use <- read.dbf(paste(path.to.parcel,'Hum-Land-Use.dbf',sep=''))
+  apn <- readShapePoly(paste(path.to.parcel,'Hum-Parcels-LongLat.shp',sep=''))
+  apn@data <- join(apn@data,land.use[,c('APN','USECODE','NEIGHCODE',"SITHSNBR","SITHSNBRSF","SITSTDIR","SITSTNAME", "SITSTTYPE","SITCITY","SITZIP","ZONING","GEN_PLAN")],by="APN")
+  use.codes <- read.csv(paste(path.to.parcel,'usecodes.csv',sep=''),colClasses=c('character','character','character','numeric'))
+  apn@data <- join(apn@data,use.codes,by="NEIGHCODE")
+  apn@data$color <- ifelse( apn@data$type == 'residential','#E300007F',ifelse(apn@data$type=='commercial','#004FE37F',ifelse(apn@data$type=='industrial','#00C4107F','#0000007F')))
+  apn@data$id <- sapply(slot(apn,'polygons'),function(x){ as.numeric(slot(x,'ID')) })
+  apn@data$use<-as.character(apn@data$use)
+  apn@data$type<-as.character(apn@data$type)
+  apn@data$EXLU4<-as.character(apn@data$EXLU4)
+  apn@data$ZONING<-as.character(apn@data$ZONING)
+  apn.cent <- SpatialPoints(coordinates(apn))
+  save(apn,apn.cent,file=paste(path.to.parcel,'apn.Rdata',sep=''))
+  #apn.sub <- apn[apn.cent[,1]>-124.14117 & apn.cent[,1] < -124.086455 & apn.cent[,2] < 40.874601 & apn.cent[,2] > 40.799047,]
+
+  #shp.to.kml(apn.sub,paste(path.to.parcel,'apn-subset.kml',sep=''),'Humboldt Parcels','Color denotes use category','white',0.5,apn.sub@data$color,name.col='APN',description.cols=c('EXLU4','ZONING','use','type','weight'))
+  #shp.to.kml(apn,paste(path.to.parcel,'apn.kml',sep=''),'Humboldt Parcels','Color denotes use category','white',0.5,apn@data$color,name.col='APN',description.cols=c('EXLU4','ZONING','use','type','weight'))
+}else{
+  load(file=paste(path.to.parcel,'apn.Rdata',sep=''))
+}
+
+# associate parcels with the TAZs, zips, and tracts that contain them
+apn$taz <- overlay(apn.cent,taz)
+apn$agg.taz <- overlay(apn.cent,agg.taz)
+apn$zip <- overlay(apn.cent,zips)
+apn$tract <- overlay(apn.cent,tracts)
+
+# look at residential parcels, make a modifier to the "weights" that makes the number of units / parcel sum up to the tract population 
+res.apn <- subset(apn@data,type=="residential" & ! use == "Vacant Single Family Residential")
+res.sum <- ddply(res.apn,.(tract),function(df){ 
+  hh.row <- which(hh$id2==tracts$GEOID10[df$tract[1]])
+  units.per.parcel <- tracts$population[df$tract[1]] / nrow(df) / hh$avg.household.size[hh.row]
+  weight.mod <- units.per.parcel/(sum(df$weight)/nrow(df))
+  data.frame(
+    n.unit.est=sum(df$weight,na.rm=T),
+    n.parcels=nrow(df),
+    pop=tracts$population[df$tract[1]],
+    n.units=hh$num.units[hh.row],
+    units.per.parcel=units.per.parcel,
+    weight.mod = weight.mod,
+    n.units.est = sum(df$weight * weight.mod)
+  )
+})
+plot(hh$num.units.occupied[-31],res.sum$n.units.est[order(tracts$GEOID10)])
+abline(0,1)
+# modify the weights
+res.apn <- ddply(res.apn,.(tract),function(df){ 
+                 df$weight <- df$weight * subset(res.sum,tract==df$tract[1])$weight.mod
+                 df
+})
+res.apn$pop <- res.apn$weight * hh$avg.household.size[match(tracts$GEOID10[res.apn$tract],hh$id2)]
+
+# now do the pop's come out? YES
+dply(res.apn,.(tract),function(df){ 
+  hh.row <- which(hh$id2==tracts$GEOID10[df$tract[1]])
+  data.frame(
+    pop.est=sum(df$weight,na.rm=T)*hh$avg.household.size[hh.row],
+    pop=tracts$population[df$tract[1]]
+  )
+})
+
 
 if(!file.exists(paste(path.to.geatm,"zip-and-tract-fraction-in-taz-matrix.Rdata",sep=''))){
   # get the data frame ready for storage of the results which will hold the fraction of each zip (the columns) by area that 
   # are in each TAZ (the rows), where the 'null' column contains the fraction of the TAZ with no associated zip code
   zips.in.taz <- as.data.frame(matrix(0,nrow(taz@data),nrow(zips@data)+1))
   names(zips.in.taz) <- c('null',as.character(zips@data$ZCTA5CE10))
-  row.names(zips.in.taz) <- as.character(sort(taz@data$id))
+  row.names(zips.in.taz) <- as.character(sort(taz@data$NEWTAZ))
 
   tazs.in.tract <- as.data.frame(matrix(0,nrow(tracts@data),nrow(taz@data)))
-  names(tazs.in.tract) <- as.character(sort(taz@data$id))
+  names(tazs.in.tract) <- as.character(sort(taz@data$NEWTAZ))
   row.names(tazs.in.tract) <- as.character(tracts@data$NAME10) 
 
   # precalculate the area of each zip/tract polygons to reduce redundancy
   zip.areas <- list()
   for(zip.i in names(zips.in.taz)[2:ncol(zips.in.taz)]){
-    zip.id <- which(zips@data$ZCTA5CE10 == zip.i)
-    zip.areas[[zip.i]] <- gArea(zips[zip.id,])
+    zip.code <- which(zips@data$ZCTA5CE10 == zip.i)
+    zip.areas[[zip.i]] <- gArea(zips[zip.code,])
   }
   tract.areas <- list()
-  for(tract.i in as.character(tracts@data$NAME10)){
-    tract.id <- which(tracts@data$NAME10 == tract.i)
-    tract.areas[[tract.i]] <- gArea(tracts[tract.id,])
+  for(tract.id in as.character(tracts@data$NAME10)){
+    tract.i <- which(tracts@data$NAME10 == tract.id)
+    tract.areas[[tract.id]] <- gArea(tracts[tract.i,])
   }
 
-  for(taz.i in row.names(zips.in.taz)){
-    print(taz.i)
-    taz.id <- which(taz@data$id == taz.i)
-    taz.area <- gArea(taz[taz.id,])
-    for(zip.i in names(zips.in.taz)[2:ncol(zips.in.taz)]){
-      zip.id <- which(zips@data$ZCTA5CE10 == zip.i)
-      # now calculate the fraction by area of zip.i in taz.i
-      zips.in.taz[taz.i,zip.i] <- (taz.area + zip.areas[[zip.i]] - gArea(gUnion(taz[taz.id,],zips[zip.id,]))) / taz.area
+  for(taz.id in row.names(zips.in.taz)){
+    print(taz.id)
+    taz.i <- which(taz@data$NEWTAZ == taz.id)
+    taz.area <- gArea(taz[taz.i,])
+    for(zip.code in names(zips.in.taz)[2:ncol(zips.in.taz)]){
+      zip.i <- which(zips@data$ZCTA5CE10 == zip.code)
+      # now calculate the fraction by area of zip.code in taz.id
+      zips.in.taz[taz.id,zip.code] <- (taz.area + zip.areas[[zip.code]] - gArea(gUnion(taz[taz.i,],zips[zip.i,]))) / taz.area
+    }
+    for(tract.id in as.character(tracts@data$NAME10)){
+      tract.i <- which(tracts@data$NAME10 == tract.id)
+      # now calculate the fraction by area of taz.id in tract.id
+      tazs.in.tract[tract.id,taz.id] <- (taz.area + tract.areas[[tract.id]] - gArea(gUnion(taz[taz.i,],tracts[tract.i,]))) / tract.areas[[tract.id]]
     }
   }
-  for(taz.i in row.names(zips.in.taz)){
-    print(taz.i)
-    taz.id <- which(taz@data$id == taz.i)
-    taz.area <- gArea(taz[taz.id,])
-    for(tract.i in as.character(tracts@data$NAME10)){
-      tract.id <- which(tracts@data$NAME10 == tract.i)
-      # now calculate the fraction by area of taz.i in tract.i
-      tazs.in.tract[tract.id,taz.i] <- (taz.area + tract.areas[[tract.i]] - gArea(gUnion(taz[taz.id,],tracts[tract.id,]))) / tract.areas[[tract.i]]
-    }
-  }
+
   # for zips, make null contain all of remaining area not attributed to zip polygons
   zips.in.taz[,'null'] <- apply(zips.in.taz[,2:ncol(zips.in.taz)],1,function(x){ 1-sum(x) }) 
   

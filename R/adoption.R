@@ -38,7 +38,7 @@ if(!file.exists(paste(path.to.humveh,'veh.Rdata',sep=''))){
   
 # Load vehicle specs from car query api database
 specs <- read.csv(paste(path.to.humveh,'car_query.csv',sep=''))
-specs$make.model <- toupper(paste(specs$model_make_id,specs$model_name,sep="_"))
+specs$make.model <- toupper(paste(specs$model_make_id,specs$model_name,sep=" "))
 
 # Hybrid and EV registrations by year and zip
 

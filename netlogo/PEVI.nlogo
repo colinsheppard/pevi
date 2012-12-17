@@ -197,7 +197,7 @@ to-report need-to-charge [calling-event]
     ifelse (state-of-charge < 1) [  ;; drivers only consider unneeded charge if their vehicle does not have a full state of charge
       ifelse time-until-depart >= 0.5 and random-float 1 < probability-of-unneeded-charge [
 ;        print (word precision ticks 3 " " self " need-to-charge on a whim, SOC: " state-of-charge)
-        set charging-on-a-whim? true
+        set charging-on-a-whim?
         report true
       ][
         report false
@@ -776,7 +776,7 @@ to summarize
   ]
 
 
- 
+  reset-logfile "summary"
   log-data "summary" (sentence "metric" "value")
   log-data "summary" (sentence "num.drivers" count drivers)
   log-data "summary" (sentence "num.trips" sum [ length itin-change-flag - sum itin-change-flag ] of drivers)

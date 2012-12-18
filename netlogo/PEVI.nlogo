@@ -169,6 +169,8 @@ to setup
   log-data "charge-time" (sentence "time" "driver" "charger.in.origin.dest" "level" "soc" "trip.distance" "journey.distance" "time.until.depart" "result.action" "time.from.now")
   reset-logfile "need-to-charge"
   log-data "need-to-charge" (sentence "time" "driver" "vehicle.type" "soc" "trip.distance" "journey.distance" "time.until.depart" "calling.event" "remaining.range" "charging.on.a.whim?" "need.to.charge?")
+  reset-logfile "trip-journey-timeuntildepart"
+  log-data "trip-journey-timeuntildepart" (sentence "time" "driver" "vehicle.type" "soc" "trip.distance" "journey.distance" "time.until.depart" "remaining.range")
 
 end 
 
@@ -279,7 +281,10 @@ end
 ;;;;;;;;;;;;;;;;;;;;
 to seek-charger
   ;print (word precision ticks 3 " " self " seek-charger ")
-  set time-until-depart departure-time - ticks
+  
+  ;; leave 'set time-until-depart' here, or move to ARRIVE?
+  
+  set time-until-depart departure-time - ticks  ;; when the driver is supposed to depart -- not yet scheduled in itinerary
   let #extra-time-until-end-charge 0
   let #extra-time-for-travel 0
   let #extra-distance-for-travel 0
@@ -404,6 +409,7 @@ end
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; wait-time-mean set in params.txt
 ;; remaining-range set in need-to-charge and retry-seek
+;; time-until-depart set in seek-charger
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 to wait-time-event-scheduler
   set state "not charging"
@@ -719,14 +725,29 @@ to arrive
   log-driver "arriving"
 ;  file-flush
   update-itinerary 
+  
+  ;; moved ' set time-until-depart departure-time - ticks ' here from SEEK-CHARGER
       
   if not itin-complete? [
+    set time-until-depart departure-time - ticks
     ifelse need-to-charge "arrive" [   
       seek-charger
     ][
       itinerary-event-scheduler  
     ]
   ]
+  
+  log-data "trip-journey-timeuntildepart" (sentence 
+    ticks 
+    id 
+    [name] of this-vehicle-type 
+    state-of-charge 
+    trip-distance 
+    journey-distance 
+    time-until-depart 
+    remaining-range)
+
+  
 end
 
 ;;;;;;;;;;;;;;;;;;;;
@@ -956,6 +977,17 @@ SWITCH
 383
 log-need-to-charge
 log-need-to-charge
+1
+1
+-1000
+
+SWITCH
+484
+159
+745
+192
+log-trip-journey-timeuntildepart
+log-trip-journey-timeuntildepart
 0
 1
 -1000

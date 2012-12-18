@@ -2,7 +2,7 @@ library(colinmisc)
 load.libraries(c('sas7bdat','plyr','ggplot2','gtools','doMC','reshape','maptools'))
 
 make.plots  <- F
-num.processors <- 10
+num.processors <- 7
 registerDoMC(num.processors)
 
 path.to.outputs <- '~/Dropbox/serc/pev-colin/data/scheduler-optim/'
@@ -23,9 +23,8 @@ load(paste(path.to.nhts,"HHV2PUB.Rdata",sep=''))
 load(paste(path.to.nhts,"TripChaining/tour09.Rdata",sep=''))
 
 if(!file.exists(paste(path.to.geatm,"od-aggregated.Rdata",sep=''))){
-  od.24.weighted <- read.csv(paste(path.to.geatm,"od_24_weighted.csv",sep=""))
-  od.am.weighted <- read.csv(paste(path.to.geatm,"od_am_weighted.csv",sep=""))
-  od.pm.weighted <- read.csv(paste(path.to.geatm,"od_pm_weighted.csv",sep=""))
+  # load od.24.weighted,od.am.weighted,od.pm.weighted
+  load(,file=paste(path.to.geatm,'od_weighted.Rdata',sep=''))
   home.dist <- read.csv(paste(path.to.geatm,'home-distribution.csv',sep=''))
   dist <- read.csv(paste(path.to.geatm,"taz-dist-time.csv",sep=""))
   taz.10 <- list() # either all neighbors within 10 miles or the 10 closest neighbors, whichever yields more, 54% of rural tours <= 10 miles
@@ -158,6 +157,10 @@ if(!file.exists(paste(path.to.nhts,'data-preprocessed-for-scheduling.Rdata',sep=
   #opts(title = "2009 NHTS - Rural US POV") +
   #geom_histogram(binwidth=1)+
   #facet_wrap(~TOURTYPE)
+
+  # what is the distribution of the type of the final tour of each journey
+  #end.tourtype <- ddply(rur.tours,.(journey.id),function(df){ as.character(df$TOURTYPE[nrow(df)]) }) 
+  #table(end.tourtype$V1)
 
   # prepare OD data by condensing trip types into HW, HO, OW categories
   od.24.simp <- od.24.weighted[,c('from','to')]

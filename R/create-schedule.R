@@ -40,7 +40,7 @@ create.schedule <- function(pev.penetration,scale.dist.thresh=1){
   home.drivers[[num.tazs]] <- list()
   driver.count <- 0
   for(taz.i in 1:num.tazs){
-    n.drivers <- rpois(1,home.dist$frac.home[home.dist$taz==taz.i] * expected.num.drivers)
+    n.drivers <- rpois(1,home.dist$frac.home[home.dist$agg.taz==taz.i] * expected.num.drivers)
     home.drivers[[taz.i]] <- list(driver=c(),count=0)
     if(n.drivers>0){
       for(i in 1:n.drivers){
@@ -116,7 +116,7 @@ create.schedule <- function(pev.penetration,scale.dist.thresh=1){
       driver.home <- driver$driver.home
       #print(paste(driver.i,driver.home))
       
-      # loop through the cands in random order until a enough consistent journeys are found, to satisfy the demand for drivers 
+      # loop through the cands in random order until enough consistent journeys are found to satisfy the demand for drivers 
       for(cand in shuffled.cands){
         use.cand <- T
         cand.schedule[,] <- NA 

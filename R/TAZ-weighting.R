@@ -124,8 +124,8 @@ ddply(res.apn,.(tract),function(df){
 taz.pop <- ddply(res.apn,.(agg.taz),function(df){ data.frame(pop=sum(df$pop))}) 
 agg.taz@data$population <- taz.pop$pop[order(taz.pop$agg.taz)]  # note that agg.taz is the ROW in agg.taz shp, 
 
-c.map <- paste(map.color(agg.taz@data$population,blue2red(50)),'7F',sep='')
-shp.to.kml(agg.taz,paste(path.to.google,'population-in-tazs.kml',sep=''),'Population','Color denotes population based on parcel level analysis','red',1.5,c.map,id.col='ID',name.col='name',description.cols=c('id','name','population','total.demand.from'))
+#c.map <- paste(map.color(agg.taz@data$population,blue2red(50)),'7F',sep='')
+#shp.to.kml(agg.taz,paste(path.to.google,'population-in-tazs.kml',sep=''),'Population','Color denotes population based on parcel level analysis','red',1.5,c.map,id.col='ID',name.col='name',description.cols=c('id','name','population','total.demand.from'))
 
 # now load up the data providing the fraction of EV's and Hybrids in Humboldt by zipcode and year from 2003-2011
 load(paste(path.to.humveh,'veh.Rdata',sep=''))  # veh
@@ -153,14 +153,14 @@ frac.est <- rbind(frac.est,data.frame(zip=95514,frac.weight=min(frac.est$frac.we
 # plot them
 zips@data$frac.weight <- frac.est$frac.weight[match(zips$ZCTA5CE10,frac.est$zip)]
 zips$ID <- sapply(slot(zips, "polygons"),function(x){ slot(x,'ID')})
-c.map <- paste(map.color(zips@data$frac.weight,blue2red(50)),'7F',sep='')
-shp.to.kml(zips,paste(path.to.google,'zips-with-pev-penetartion-weights.kml',sep=''),'Penetration By Zip','','white',1.5,c.map,id.col='ID',name.col='ZCTA5CE10',description.cols=c('ZCTA5CE10','frac.weight'))
+#c.map <- paste(map.color(zips@data$frac.weight,blue2red(50)),'7F',sep='')
+#shp.to.kml(zips,paste(path.to.google,'zips-with-pev-penetartion-weights.kml',sep=''),'Penetration By Zip','','white',1.5,c.map,id.col='ID',name.col='ZCTA5CE10',description.cols=c('ZCTA5CE10','frac.weight'))
 
 # now associate the weights with the parcels
 res.apn$pen.weight <- frac.est$frac.weight[match(zips$ZCTA5CE10[res.apn$zip],frac.est$zip)]
 res.apn$pen.weight[is.na(res.apn$pen.weight)] <- 1
 
-# now aggregate the weights to the tazs using a weighted.mean to population weight the resul
+# now aggregate the weights to the tazs using a weighted.mean to population weight the result
 taz.weights.by.penetration <- ddply(res.apn,.(agg.taz),function(df){ data.frame(pen.weight=weighted.mean(df$pen.weight,df$pop)) })
 # scale these weights evenly so that the weighted sum of od trips is equivalent before and after
 od.sums <- ddply(od.24.new,.(from),function(df){ sum(df$demand) })

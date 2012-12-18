@@ -414,6 +414,7 @@ to charge-time-event-scheduler
     dynamic-scheduler:add schedule self task end-charge-then-itin next-event-scheduled-at
     set after-end-charge "depart"
   ]
+  log-data "charge-time" (sentence ticks id charger-in-origin-or-destination (level-of current-charger) state-of-charge trip-distance journey-distance time-until-depart after-end-charge (next-event-scheduled-at - ticks))
   if next-event-scheduled-at > departure-time[
     change-depart-time next-event-scheduled-at
   ]
@@ -905,7 +906,7 @@ SWITCH
 285
 log-charging
 log-charging
-0
+1
 1
 -1000
 
@@ -916,7 +917,7 @@ SWITCH
 334
 log-charge-time
 log-charge-time
-1
+0
 1
 -1000
 

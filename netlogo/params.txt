@@ -1,7 +1,7 @@
 "n-tazs"	52
 "n-charger-types"	4 
 "charge-safety-factor"	1.1
-"charger-search-distance"	50
+"charger-search-distance"	5
 "wait-time-mean"	0.5
 "batt-cap-mean"	24
 "batt-cap-stdv"	1

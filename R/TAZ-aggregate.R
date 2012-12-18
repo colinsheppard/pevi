@@ -73,9 +73,7 @@ od.pm.new <- ddply(na.omit(od.pm.old),.(from.new,to.new),function(df){
   c(sum(df$hbw),sum(df$hbshop),sum(df$hbelem),sum(df$hbuniv),sum(df$hbro),sum(df$nhb),sum(df$ix),sum(df$xi),sum(df$ee),sum(df$demand)) })
 names(od.pm.new) <- c('from','to','hbw','hbshop','hbelem','hbuniv','hbro','nhb','ix','xi','ee','demand')
 
-write.csv(od.24.new,file=paste(path.to.geatm,'od_24_new.csv',sep=''))
-write.csv(od.am.new,file=paste(path.to.geatm,'od_am_new.csv',sep=''))
-write.csv(od.pm.new,file=paste(path.to.geatm,'od_pm_new.csv',sep=''))
+save(od.24.new,od.am.new,od.pm.new,od.24.old,od.am.old,od.pm.old,file=paste(path.to.geatm,'od-old-and-new.Rdata',sep=''))
 
 # check that the sum of the rows equals the value in the sum column
 # they are currently not quite equal and I suspect this is from omiting zones 1-10
@@ -143,27 +141,5 @@ for.c.map <- log(taz@data$total.demand.per.acre[-which(taz@data$total.demand.per
 for.c.map[for.c.map<=0] <- 0 
 c.map <- paste(map.color(for.c.map,blue2red(50)),'7F',sep='')
  shp.to.kml(taz[-which(taz@data$total.demand.per.acre==Inf),],paste(path.to.pevi,'inputs/development/disaggregated-taz-per-acre.kml',sep=''),'Disaggregated TAZs','Color denotes total daily demand per acre','white',1.5,c.map,name.col='NEWTAZ',description.cols=c('total.demand.per.acre','total.demand','NEWTAZ','ACRES'),id.col='ID')
-
-# Join Humboldt parcel data with land use data (note: experimented with this but nevery actually used parcel data for anything)
-
-#land.use <- read.dbf(paste(path.to.parcel,'Hum-Land-Use.dbf',sep=''))$dbf
-#subset(land.use,APN==50303106)
-#apn <- readShapePoly(paste(path.to.parcel,'Hum-Parcels-LongLat.shp',sep=''))
-#apn@data <- join(apn@data,land.use[,c('APN','USECODE','NEIGHCODE',"SITHSNBR","SITHSNBRSF","SITSTDIR","SITSTNAME", "SITSTTYPE","SITCITY","SITZIP","ZONING","GEN_PLAN")],by="APN")
-#use.codes <- read.csv(paste(path.to.parcel,'usecodes.csv',sep=''),colClasses=c('character','character','character','numeric'))
-#apn@data <- join(apn@data,use.codes,by="NEIGHCODE")
-#apn@data$color <- ifelse( apn@data$type == 'residential','#E300007F',ifelse(apn@data$type=='commercial','#004FE37F',ifelse(apn@data$type=='industrial','#00C4107F','#0000007F')))
-#apn@data$id <- sapply(slot(apn,'polygons'),function(x){ as.numeric(slot(x,'ID')) })
-#apn@data$use<-as.character(apn@data$use)
-#apn@data$type<-as.character(apn@data$type)
-#apn@data$EXLU4<-as.character(apn@data$EXLU4)
-#apn@data$ZONING<-as.character(apn@data$ZONING)
-
-#apn.cent <- coordinates(apn)
-#apn.sub <- apn[apn.cent[,1]>-124.14117 & apn.cent[,1] < -124.086455 & apn.cent[,2] < 40.874601 & apn.cent[,2] > 40.799047,]
-
-#shp.to.kml(apn.sub,paste(path.to.parcel,'apn-subset.kml',sep=''),'Humboldt Parcels','Color denotes use category','white',0.5,apn.sub@data$color,name.col='APN',description.cols=c('EXLU4','ZONING','use','type','weight'))
-
-#shp.to.kml(apn,paste(path.to.parcel,'apn.kml',sep=''),'Humboldt Parcels','Color denotes use category','white',0.5,apn@data$color,name.col='APN',description.cols=c('EXLU4','ZONING','use','type','weight'))
 
 

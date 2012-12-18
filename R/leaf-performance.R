@@ -16,6 +16,12 @@ taz <- readShapePoly(paste(path.to.pevi,'inputs/development/aggregated-taz',sep=
 load(paste(path.to.pevi,'inputs/development/aggregated-taz-fieldnames.Rdata',sep=''))
 names(taz@data) <- c('row',agg.taz.shp.fieldnames)
 
+# setup bins for gradient and speed
+x.bins <- c(-0.6,seq(-0.05,0.05,by=0.01),0.6)
+x.labs <- c("[-0.6,-0.05)","[-0.05,-0.04)","[-0.04,-0.03)","[-0.03,-0.02)","[-0.02,-0.01)","[-0.01,0.00)","[0.00,0.01)","[0.01,0.02)","[0.02,0.03)","[0.03,0.04)","[0.04,0.05)","[0.05,0.6)","NA")
+y.bins <- c(0,25,40,50,60,70)
+y.labs <- c("[0,25)","[25,40)","[40,50)","[50,60)","[60,70)","NA")
+
 #"Alderpoint"
 #"ARC_Giuntoli"
 #"ARC_Greenview"
@@ -100,12 +106,12 @@ tot.miles.begin <- tot.miles
 ch <- read.csv(paste(path.to.leaf,'data/charging-event.csv',sep=''))
 ch$hour <- (ch$minute + ch$second/60)/60
 
-plot(ch$hour,ch$soc,type='l',main="GHD Leaf Charging Event - October 2012",xlab="Hour",ylab="State of Charge (%)",ylim=c(0,100))
-abline(lm('soc ~ hour',ch),lty=2,col='red')
-text(-0.25,35,paste('r-squared: ',roundC(summary(lm('soc ~ hour',ch))$r.squared,3),sep=''),pos=4)
+plot(ch$hour,ch$soc,type='l',main="GHD Leaf Charging Event - October 2012",xlab="Hour",ylab="State of Charge (%)",ylim=c(0,100)) abline(lm('soc ~ hour',ch),lty=2,col='red') text(-0.25,35,paste('r-squared: ',roundC(summary(lm('soc ~ hour',ch))$r.squared,3),sep=''),pos=4)
 abline(h=max(ch$soc))
 text(-0.25,max(ch$soc)-5,paste('max soc: ',roundC(max(ch$soc),2),sep=''),pos=4)
 
+# load data and translate lat,lon to actually start at GHD
+ghd <- c(-124.163904,40.803678)*100
 
 dbuser<-"pev"
 dbpassword<-""
@@ -113,92 +119,108 @@ dbname<-"pev"
 dbhost<-"localhost"
 con <- dbConnect(PostgreSQL(), user=dbuser, password=dbpassword, dbname=dbname, host=dbhost)	
 
-dr <- read.csv(paste(path.to.leaf,'data/bear-river-ridge.csv',sep=''))
-dr$route <- "Bear River Ridge"
-dr <- rbind(dr,data.frame(read.csv(paste(path.to.leaf,'data/cr-sunny-brae.csv',sep='')),route="CR / Sunny Brae"))
-dr <- rbind(dr,data.frame(read.csv(paste(path.to.leaf,'data/hydesville.csv',sep='')),route="Hydesville"))
-dr <- rbind(dr,data.frame(read.csv(paste(path.to.leaf,'data/willow-creek-trip.csv',sep='')),route="Willow Creek"))
-names(dr) <- c("seconds","minutes","long","lat","elev","vel","soc","battery.volts","motor.amps","route")
-dr$lat <- dr$lat/100
-dr$long <- dr$long/100
+dr <- data.frame(read.csv(paste(path.to.leaf,'data/bear-river-ridge-high.csv',sep='')),route="Bear River Ridge")
+cr <- data.frame(read.csv(paste(path.to.leaf,'data/cr-sunny-brae-high.csv',sep='')),route="CR / Sunny Brae")
+hy <- data.frame(read.csv(paste(path.to.leaf,'data/hydesville-high.csv',sep='')),route="Hydesville")
+wc <- data.frame(read.csv(paste(path.to.leaf,'data/willow-creek-high.csv',sep='')),route="Willow Creek")
+
+dr <- rbind(dr,cr,hy,wc)
+
+names(dr) <- c("minutes","seconds","long","lat","elev","speed","soc","battery.volts","battery.amps","route")
+
+# get rid of rows with bad values for lat/long
+dr <- dr[-which(dr$lat == 0 | dr$long == 0),]
+
+dr$lat <- as.integer(dr$lat/100) + (dr$lat - as.integer(dr$lat/100)*100)/60
+dr$long <- as.integer(dr$long/100) + (dr$long - as.integer(dr$long/100)*100)/60
 dr$hour <- (dr$minutes + dr$seconds/60)/60
-dr <- ddply(dr,.(route),function(df){ 
-  df <- df[order(df$hour),]
-  data.frame(df,dist=c(NA,(2*asin(sqrt((sin((diff(df$lat))/2))^2 + cos(df$lat[1:(nrow(df)-1)])*cos(df$lat[2:nrow(df)])*(sin((diff(df$long))/2))^2))) * 111.32 * 0.6214) ) })
-dr$dist[which(dr$dist>10)] <- NA
-dr$vel2[2:nrow(dr)] <- dr$dist[2:nrow(dr)] / diff(dr$hour)
+dr$delta.t <- c(0,diff(dr$hour))
+dr$int.sec <- as.integer(dr$hour*3600) - as.integer(dr$hour*3600) %% 15
+
+dr <- ddply(dr,.(route,int.sec),function(df){ 
+  data.frame(
+    hour=df$hour[1],
+    long=weighted.mean(df$long,df$delta.t,na.rm=T),
+    lat=weighted.mean(df$lat,df$delta.t,na.rm=T),
+    elev=weighted.mean(df$elev,df$delta.t,na.rm=T),
+    speed=weighted.mean(df$speed,df$delta.t,na.rm=T),
+    soc=weighted.mean(df$soc,df$delta.t,na.rm=T),
+    battery.volts=weighted.mean(df$battery.volts,df$delta.t,na.rm=T),
+    battery.amps=weighted.mean(df$battery.amps,df$delta.t,na.rm=T),
+    delta.t=df$hour[nrow(df)]-df$hour[1])
+})
+dr <- subset(dr,delta.t*3600>=4.99)
+dr$wh <- dr$battery.volts * dr$battery.amps * dr$delta.t
 
 dr <- ddply(dr,.(route),function(df){ 
   df <- df[order(df$hour),]
-  df$dist3 <- NA
-  for(i in 2:nrow(df)){
+  df$dist <- NA
+  for(i in which(!is.na(df$lat[1:(nrow(df)-1)]) & !is.na(df$long[1:(nrow(df)-1)]) & !is.na(df$lat[2:nrow(df)]) & !is.na(df$long[2:nrow(df)]))){
+    if(i==1){
+      df$dist[i] <- 0
+      next
+    }
     # 26941 is California Zone I state plane projection in meters (then converted to miles using 0.00062137119)
-    df$dist3[i] <- as.numeric(0.00062137119 * dbGetQuery(con,paste("SELECT ST_Distance(
+    df$dist[i] <- as.numeric(0.00062137119 * dbGetQuery(con,paste("SELECT ST_Distance(
         ST_Transform(ST_GeomFromText('POINT(",df$long[i-1]," ",df$lat[i-1],")',4326),26941),
         ST_Transform(ST_GeomFromText('POINT(",df$long[i]," ",df$lat[i],")', 4326),26941)
       )",sep='')))
   }
+  df$speed2 <- c(0,df$dist[2:nrow(df)] / diff(df$hour))
+  df$cum.dist <- c(0,cumsum(df$dist[2:nrow(df)]))
   df
 })
-dr$vel3[2:nrow(dr)] <- dr$dist3[2:nrow(dr)] / diff(dr$hour)
+# nrow(subset(dr,dist==0))/nrow(dr)  #  3.9% of rows have 0 distance
+# sum(abs(subset(dr,dist==0)$wh))/sum(abs(dr$wh))  # only 0.3% of energy is in rows with 0 distance 
+# get rid of rows with 0 distance
+dr <- dr[-which(dr$dist==0),]
 
-# translate lat,lon to actually start at GHD
-ghd <- c(-124.163904,40.803678)
-dr2 <- ddply(subset(dr,route %in% c("CR / Sunny Brae","Hydesville","Willow Creek")),.(route),function(df){ 
+dr$speed[dr$route=="Willow Creek"] <- dr$speed2[dr$route=="Willow Creek"]
+dr$speed[dr$route=="Willow Creek" & dr$speed>60] <- 60
+
+dr <- ddply(dr,.(route),function(df){
   df <- df[order(df$hour),]
-  df$long <- df$long + ghd[1] - -124.0985
-  df$lat  <- df$lat  + ghd[2] - 40.48228
+  df$gradient <- c(0,diff(df$elev)/(df$dist[2:nrow(df)]*1609.344))
   df
 })
+# calculate performance for each row
+dr$perf <- dr$wh / 1000 / dr$dist
+dr <- na.omit(dr)
 
+# look into unrealistic gradients (for 15 sec data):
+# ggplot(subset(dr,abs(gradient)<0.25),aes(x=speed,y=gradient*100,size=dist,colour=dist))+geom_point()+facet_wrap(~route)
+# nrow(subset(dr,abs(gradient)>0.25))/nrow(dr)  # 7.7% of rows have gradient > 0.25
+# sum(abs(subset(dr,abs(gradient)>0.25)$wh))/sum(abs(dr$wh))  # only 0.6% of energy is in rows with gradient over 0.15
+# throw out the unrealistic gradients
+dr <- dr[abs(dr$gradient) < 0.25,]
 
-# willow creek high point according to g-earth
-# 40.897982, -123.774316, elev= 2820
-# willow creek high point according to logger
-# 40.53846, -123.4643
-# the second half of trip was adjusted in original data, by adding -0.4003 to the long for those rows after minute 22, second 36.231
+# look into throwing out speed
+# nrow(subset(dr,speed<5))/nrow(dr)  # 4.5% of rows have speed < 5
+# sum(abs(subset(dr,abs(gradient)>0.25)$wh))/sum(abs(dr$wh))  # only 0.4% of energy is in rows with speed < 5
+dr <- dr[dr$speed > 5,]
 
-# bear river ridge, shifted in original data so that the turn around point of the journey is at intersection of mattole and brr rd. or -124.283656 40.509905 which happens at minute 23
+# look into throwing out speed
+# nrow(subset(dr,speed<5))/nrow(dr)  # 0.7% of rows have perf > 2
+# sum(abs(subset(dr,abs(gradient)>0.25)$wh))/sum(abs(dr$wh))  # only 0.6% of energy is in rows with perf over 2
+dr <- dr[dr$perf < 2,]
 
-dr <- rbind(subset(dr,route=="Bear River Ridge"),dr2)
-
-save(dr,file=paste(path.to.leaf,'data/all-trips-cleaned.Rdata',sep=''))
-
-dr <- ddply(dr,.(route),function(df){ 
-  df <- df[order(df$hour),]
-  df$gradient <- c(NA,diff(df$elev)/(diff(df$dist3)*1609.344))
-  df
-})
-dr$gradient[abs(dr$gradient)> 0.6] <- NA
-
-x.bins <- c(-0.6,seq(-0.05,0.05,by=0.01),0.6)
-x.labs <- c("[-0.6,-0.05)","[-0.05,-0.04)","[-0.04,-0.03)","[-0.03,-0.02)","[-0.02,-0.01)","[-0.01,0.00)","[0.00,0.01)","[0.01,0.02)","[0.02,0.03)","[0.03,0.04)","[0.04,0.05)","[0.05,0.6)","NA")
-y.bins <- c(0,25,40,50,60,70)
-y.labs <- c("[0,25)","[25,40)","[40,50)","[50,60)","[60,70)","NA")
 intervs <- findInterval(dr$gradient,x.bins)
 intervs[is.na(intervs)] <- length(x.labs)
 dr$gradient.binned <- factor(x.labs[intervs],levels=x.labs)
-intervs <- findInterval(dr$vel3,y.bins)
+intervs <- findInterval(dr$speed,y.bins)
 intervs[is.na(intervs)] <- length(y.labs)
 dr$speed.binned    <- factor(y.labs[intervs],levels=y.labs)
-dr.hists <- cast(melt(dr,id.vars=c('route','gradient.binned','speed.binned'),measure.vars=c('dist3')),gradient.binned ~ speed.binned ~ variable ~ route,fun.aggregate=sum)
+dr.hists <- cast(melt(dr,id.vars=c('route','gradient.binned','speed.binned'),measure.vars=c('dist')),gradient.binned ~ speed.binned ~ variable ~ route,fun.aggregate=sum)
+
 save(dr,dr.hists,file=paste(path.to.leaf,'data/all-trips-cleaned.Rdata',sep=''))
+write.csv(dr,paste(path.to.leaf,'data/leaf-trips-cleaned.csv',sep=''))
 
-# Sum of hists
+load(file=paste(path.to.leaf,'data/all-trips-cleaned.Rdata',sep=''))
 
-               #speed.binned
-#gradient.binned    [0,25)   [25,40)   [40,50)    [50,60)     [60,70)         NA
-  #[-0.6,-0.05)  6.5405895 11.548172 0.3773506 0.00000000 0.008677182 0.01054585
-  #[-0.05,-0.04) 0.8921868  1.486686 0.2664096 0.00000000 0.000000000 0.00000000
-  #[-0.04,-0.03) 0.5504298  2.214045 0.2056079 0.03580833 0.009239853 0.00000000
-  #[-0.03,-0.02) 1.4049544  3.641098 0.1855021 0.00000000 0.000000000 0.01039613
-  #[-0.02,-0.01) 1.7433457  5.082657 0.4368757 0.02966753 0.037256449 0.03143676
-  #[-0.01,0.00)  2.3902644  9.583997 1.1727119 0.01590520 0.018628173 0.03426136
-  #[0.00,0.01)   2.6762964 12.698368 1.1979470 0.40813766 0.244778508 0.53073808
-  #[0.01,0.02)   1.7347942  5.519907 0.3815027 0.02854215 0.000000000 0.01223307
-  #[0.02,0.03)   1.0933193  3.766353 0.3272974 0.01655843 0.008683466 0.02402879
-  #[0.03,0.04)   1.3648474  2.844847 0.1505375 0.00000000 0.000000000 0.01160917
-  #[0.04,0.05)   0.4708181  1.618442 0.0180372 0.02138794 0.000000000 0.03104598
-  #[0.05,0.6)    6.4056909 12.179532 0.7079687 0.08894877 0.018204674 0.06532273
-  #NA            1.8005173  1.377210 0.2172528 0.03271469 0.018628229         NA
+ggplot(dr,aes(x=gradient*100,y=perf,size=dist,colour=dist))+geom_point()+facet_wrap(~speed.binned)
+print(summary(lm('perf ~ gradient',dr)))
+print(summary(lm('perf ~ gradient*speed',dr)))
+print(summary(lm('perf ~ gradient*speed - speed',dr)))
+print(summary(lm('perf ~ gradient*speed + I(gradient^2) + I(speed^2)',dr)))
+print(summary(lm('perf ~ gradient*speed + I(speed^2)',dr)))
 

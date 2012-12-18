@@ -1,3 +1,5 @@
+## Gov. Brown Executive Order Has an adoption goal of 10% of new light duty vehicles by 2015 and 25% by 2020.
+
 library(colinmisc)
 load.libraries(c('plyr','ggplot2','gtools','gdata','googleVis'))
 
@@ -34,6 +36,9 @@ if(!file.exists(paste(path.to.humveh,'veh.Rdata',sep=''))){
   load(paste(path.to.humveh,'veh.Rdata',sep=''))
 }
   
+# Load vehicle specs from car query api database
+specs <- read.csv(paste(path.to.humveh,'car_query.csv',sep=''))
+specs$make.model <- toupper(paste(specs$model_make_id,specs$model_name,sep=" "))
 
 # Hybrid and EV registrations by year and zip
 

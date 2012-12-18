@@ -406,18 +406,13 @@ to charge-time-event-scheduler
                                                     charger-in-origin-or-destination 
                                                     [this-charger-type] of current-charger) + 0.001  ; .001 or 3.6 sec is a fudge factor to deal with roundoff error causing drivers to have 1e-15 too little charge 
   let next-event-scheduled-at 0 
-  ifelse (time-until-depart > 0.5) and (level-of current-charger < 3) and (time-until-end-charge < trip-charge-time-need) [                                                                                                    
+  ifelse (time-until-depart > 0.5) and (level-of current-charger < 3) and (time-until-end-charge < journey-charge-time-need) [                                                                                                    
     set next-event-scheduled-at ticks + min (sentence (random-exponential wait-time-mean) (time-until-depart - 0.5)) 
     dynamic-scheduler:add schedule self task end-charge-then-retry next-event-scheduled-at
   ][
-    ifelse (time-until-depart > 0.5) and (level-of current-charger < 2) and (time-until-end-charge < journey-charge-time-need) [
-      set next-event-scheduled-at ticks + min (sentence (random-exponential wait-time-mean) (time-until-depart - 0.5))  
-      dynamic-scheduler:add schedule self task end-charge-then-retry next-event-scheduled-at
-    ][
-      set next-event-scheduled-at ticks + time-until-end-charge
-      dynamic-scheduler:add schedule self task end-charge-then-itin next-event-scheduled-at
-      set after-end-charge "depart"
-    ]
+    set next-event-scheduled-at ticks + time-until-end-charge
+    dynamic-scheduler:add schedule self task end-charge-then-itin next-event-scheduled-at
+    set after-end-charge "depart"
   ]
   if next-event-scheduled-at > departure-time[
     change-depart-time next-event-scheduled-at

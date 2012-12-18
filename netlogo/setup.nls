@@ -307,7 +307,7 @@ to setup-charger-types
   
   create-charger-types 1 [
     set level 0          ; dedicated home charger
-    set charge-rate 1.92 ; kW. 120V x 16A peak current, single phase: http://www.sae.org/mags/AEI/7479
+    set charge-rate 19.2 ; kW. 120V x 16A peak current, single phase: http://www.sae.org/mags/AEI/7479
     set energy-price 0.14 ; 
     set installed-cost 2 ; $1000
   ]

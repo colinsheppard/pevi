@@ -197,7 +197,7 @@ to-report need-to-charge [calling-event]
     ifelse (state-of-charge < 1) [  ;; drivers only consider unneeded charge if their vehicle does not have a full state of charge
       ifelse time-until-depart >= 0.5 and random-float 1 < probability-of-unneeded-charge [
 ;        print (word precision ticks 3 " " self " need-to-charge on a whim, SOC: " state-of-charge)
-        set charging-on-a-whim?
+        set charging-on-a-whim? true
         report true
       ][
         report false
@@ -518,6 +518,11 @@ to add-trip-to-itinerary [new-destination-taz]
   ; rewind current-itin-row by one and use update-itinerary to take care of setting state var's
   set current-itin-row current-itin-row - 1
   update-itinerary
+  ; update-itinerary does not update journey-distance, do so here by adding the difference between the previous trip and the current trip)
+  set journey-distance journey-distance + 
+    (distance-from-to (item current-itin-row itin-from) (item current-itin-row itin-to) + 
+    distance-from-to (item (current-itin-row + 1) itin-from) (item (current-itin-row + 1) itin-to) - 
+    distance-from-to (item current-itin-row itin-from) (item (current-itin-row + 1) itin-to) )
   
 ;  file-print (word precision ticks 3 " " self " add-trip-to-itinerary new-taz: " new-destination-taz " for row: " current-itin-row " itin-depart: " itin-depart " itin-from: " itin-from " itin-to: " itin-to)      
 end
@@ -776,7 +781,7 @@ to summarize
   ]
 
 
-  reset-logfile "summary"
+ 
   log-data "summary" (sentence "metric" "value")
   log-data "summary" (sentence "num.drivers" count drivers)
   log-data "summary" (sentence "num.trips" sum [ length itin-change-flag - sum itin-change-flag ] of drivers)

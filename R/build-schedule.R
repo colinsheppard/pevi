@@ -158,9 +158,10 @@ if(!file.exists(paste(path.to.nhts,'data-preprocessed-for-scheduling.Rdata',sep=
   #geom_histogram(binwidth=1)+
   #facet_wrap(~TOURTYPE)
 
-  # what is the distribution of the type of the final tour of each journey
+  # what is the distribution of the type of the final tour of each journey, answer 92.2% are to home
   #end.tourtype <- ddply(rur.tours,.(journey.id),function(df){ as.character(df$TOURTYPE[nrow(df)]) }) 
   #table(end.tourtype$V1)
+  # sum(table(end.tourtype$V1)[c(1,4,7)]/sum(table(end.tourtype$V1)))
 
   # prepare OD data by condensing trip types into HW, HO, OW categories
   od.24.simp <- od.24.weighted[,c('from','to')]
@@ -214,7 +215,7 @@ if(!file.exists(paste(path.to.nhts,'data-preprocessed-for-scheduling.Rdata',sep=
   # verify that it all sums to 1
   #weighted.mean(colSums(epdfs)[2:4],c(nrow(rur.by.type[['hw']]),nrow(rur.by.type[['ho']]),nrow(rur.by.type[['ow']])))
 
-  save(rur.tours,rur.by.type,rur.tours.per,ecdfs,epdfs,type.map,type.map.rev,od.24.simp,od.am.simp,od.pm.simp,file=paste(path.to.nhts,'data-preprocessed-for-scheduling.Rdata',sep=''))
+  save(rur.tours,rur.by.type,rur.tours.per,ecdfs,epdfs,type.map,type.map.rev,od.24.simp,od.am.simp,od.pm.simp,end.tourtype,file=paste(path.to.nhts,'data-preprocessed-for-scheduling.Rdata',sep=''))
 }else{
   load(file=paste(path.to.nhts,'data-preprocessed-for-scheduling.Rdata',sep=''))
 }
@@ -222,10 +223,12 @@ if(!file.exists(paste(path.to.nhts,'data-preprocessed-for-scheduling.Rdata',sep=
 pev.pens <- c(0.005,0.01,0.02,0.04)
 replicate <- 1
 source(paste(path.to.pevi,'R/create-schedule.R',sep=''))
-#schedule <- create.schedule(0.001,1)
+#schedule <- create.schedule(0.001,1,0.922)
 #print(paste(nrow(schedule)/length(unique(schedule$driver)),nrow(schedule),length(unique(schedule$driver))))
+# see what fraction of drivers end at home?
+# sum(ddply(schedule,.(driver),function(df){ df$to[nrow(df)]==df$home[1] })$V1)/length(unique(schedule$driver))
 
-num.replicates <- 10
+num.replicates <- 2
 schedule.reps <- list()
 for(pev.penetration in pev.pens){
   pev.pen.char <- roundC(pev.penetration,3)
@@ -234,13 +237,13 @@ for(pev.penetration in pev.pens){
     print(paste('Penetration ',pev.penetration,' replicate ',replicate,sep=''))
     schedule.reps[[pev.pen.char]][[as.character(replicate)]] <- create.schedule(pev.penetration,1)
     write.table(schedule.reps[[pev.pen.char]][[as.character(replicate)]][,c('driver','from','to','depart','home')],file=paste(path.to.pevi,"inputs/driver-schedule-pen",pev.penetration*100,"-rep",replicate,"-20121109.txt",sep=''),sep='\t',row.names=F,quote=F)
-    save(schedule.reps,file=paste(path.to.outputs,'schedule-replicates-20121109.Rdata',sep=''))
+    save(schedule.reps,file=paste(path.to.outputs,'schedule-replicates-20121219.Rdata',sep=''))
   }
 }
-save(schedule.reps,file=paste(path.to.outputs,'schedule-replicates-20121109.Rdata',sep=''))
+save(schedule.reps,file=paste(path.to.outputs,'schedule-replicates-20121219.Rdata',sep=''))
 
 # summarize the results
-load(file=paste(path.to.outputs,'schedule-replicates-20121109.Rdata',sep=''))
+load(file=paste(path.to.outputs,'schedule-replicates-20121219.Rdata',sep=''))
 n.scheds <- num.replicates * length(pev.pens)
 sum.sched <- data.frame(pen=rep(pev.pens,num.replicates),rep=rep(1:num.replicates,each=length(pev.pens)),n.drivers=rep(NA,n.scheds),n.trips=rep(NA,n.scheds),trips.per.driver=rep(NA,n.scheds),home.rmse=rep(NA,n.scheds),home.maxe=rep(NA,n.scheds),home.max.taz=rep(NA,n.scheds))
 for(pev.penetration in pev.pens){

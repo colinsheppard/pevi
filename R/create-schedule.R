@@ -137,7 +137,7 @@ create.schedule <- function(pev.penetration,scale.dist.thresh=1){
           }
         }
         if(use.cand){
-          if(!is.na(driver$to.erase.inds)){
+          if(!any(is.na(driver$to.erase.inds))){
             schedule <- rbind(schedule[-driver$to.erase.inds,],schedule[10000001:(10000000+length(driver$to.erase.inds)),])
           }
           if(driver.i > tot.drivers) tot.drivers <- driver.i

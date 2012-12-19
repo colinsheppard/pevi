@@ -170,7 +170,7 @@ to setup
   reset-logfile "need-to-charge"
   log-data "need-to-charge" (sentence "time" "driver" "vehicle.type" "soc" "trip.distance" "journey.distance" "time.until.depart" "calling.event" "remaining.range" "charging.on.a.whim?" "need.to.charge?")
   reset-logfile "trip-journey-timeuntildepart"
-  log-data "trip-journey-timeuntildepart" (sentence "time" "driver" "vehicle.type" "soc" "event" "trip.distance" "journey.distance" "time.until.depart" "remaining.range")
+  log-data "trip-journey-timeuntildepart" (sentence "time" "driver" "vehicle.type" "soc" "trip.distance" "journey.distance" "time.until.depart" "remaining.range")
 
 end 
 
@@ -621,45 +621,12 @@ to depart
   ifelse need-to-charge "depart" [  
     ifelse state-of-charge = 1 [  ;; random decision to charge prevents BEVs from leaving sometimes. ac 11.07
 ;      file-print (word precision ticks 3 " " self " cannot make trip with full battery -- breaking it up")
-      log-data "trip-journey-timeuntildepart" (sentence 
-        ticks 
-        id  
-        [name] of this-vehicle-type 
-        state-of-charge 
-        "break-up-trip"
-        trip-distance 
-        journey-distance 
-        time-until-depart 
-        remaining-range)
-
       break-up-trip
     ][
       ;print (word precision ticks 3 " " self " cannot make TRIP with current charge. Seeking charger.")
-      log-data "trip-journey-timeuntildepart" (sentence 
-        ticks 
-        id  
-        [name] of this-vehicle-type 
-        state-of-charge 
-        "seek-charger"
-        trip-distance 
-        journey-distance 
-        time-until-depart 
-        remaining-range)
-
       seek-charger   
     ]
   ][  
-    log-data "trip-journey-timeuntildepart" (sentence 
-      ticks 
-      id  
-      [name] of this-vehicle-type 
-      state-of-charge 
-      "depart"
-      trip-distance 
-      journey-distance 
-      time-until-depart 
-      remaining-range)
-      
     travel-time-event-scheduler
   ]
   
@@ -762,6 +729,8 @@ to arrive
   ]
   
   ; output here
+  let #completed-journey journey-distance
+  let #completed-trip trip-distance
   set journey-distance journey-distance - trip-distance
   log-driver "arriving"
 ;  file-flush
@@ -801,9 +770,8 @@ to arrive
     id 
     [name] of this-vehicle-type 
     state-of-charge 
-    "arrive"
-    trip-distance 
-    journey-distance 
+    #completed-trip 
+    #completed-journey 
     time-until-depart 
     remaining-range)
 
@@ -998,10 +966,10 @@ NIL
 0
 
 SWITCH
-481
-206
-622
-239
+558
+58
+699
+91
 log-wait-time
 log-wait-time
 1
@@ -1009,10 +977,10 @@ log-wait-time
 -1000
 
 SWITCH
-481
-252
-620
-285
+558
+104
+697
+137
 log-charging
 log-charging
 1
@@ -1020,10 +988,10 @@ log-charging
 -1000
 
 SWITCH
-483
-301
-642
-334
+560
+153
+719
+186
 log-charge-time
 log-charge-time
 1
@@ -1031,10 +999,10 @@ log-charge-time
 -1000
 
 SWITCH
-493
-350
-675
-383
+570
+202
+752
+235
 log-need-to-charge
 log-need-to-charge
 1
@@ -1042,10 +1010,10 @@ log-need-to-charge
 -1000
 
 SWITCH
-484
-159
-745
-192
+561
+11
+822
+44
 log-trip-journey-timeuntildepart
 log-trip-journey-timeuntildepart
 0

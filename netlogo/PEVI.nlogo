@@ -36,6 +36,7 @@ globals [
   
   ;; globals needed for testing
   test-driver
+  seek-charger-index
 ]
 
 breed [drivers driver]
@@ -167,6 +168,9 @@ to setup
   log-data "wait-time" (sentence "time" "driver" "vehicle.type" "soc" "trip.distance" "journey.distance" "time.until.depart" "result.action" "time.from.now")
   reset-logfile "charge-time"
   log-data "charge-time" (sentence "time" "driver" "charger.in.origin.dest" "level" "soc" "trip.distance" "journey.distance" "time.until.depart" "result.action" "time.from.now")
+  reset-logfile "seek-charger"
+  log-data "seek-charger" (sentence "time" "seek-charger-index" "driver" "charger.in.origin.dest" "level" "soc" "trip.distance" "journey.distance" "time.until.depart" "cost")
+  set seek-charger-index 0
 end 
 
 to go
@@ -231,6 +235,7 @@ end
 ;; trip-distance set by update-itinerary
 ;;;;;;;;;;;;;;;;;;;;
 to seek-charger
+  set seek-charger-index seek-charger-index + 1
   ;print (word precision ticks 3 " " self " seek-charger ")
   set time-until-depart departure-time - ticks
   let #extra-time-until-end-charge 0
@@ -322,6 +327,7 @@ to seek-charger
               set #min-taz #this-taz
               set #min-charger-type #this-charger-type 
             ]
+            log-data "seek-charger" (sentence ticks seek-charger-index id #charger-in-origin-or-destination #level state-of-charge trip-distance journey-distance time-until-depart #this-cost)
           ]
           ;print (word precision ticks 3 " " self " seek-charger checking taz:" #this-taz " in-orig-dest? " #charger-in-origin-or-destination " level:" #level " this-cost:" #this-cost " rate:" ([charge-rate] of #this-charger-type) " energyprice:" ([energy-price] of #this-charger-type) " trip-or-journey-energy-need:" #trip-or-journey-energy-need)
         ]
@@ -333,6 +339,7 @@ to seek-charger
     set num-denials (num-denials + 1)
     wait-time-event-scheduler  
   ][
+     log-data "seek-charger-result" (sentence ticks seek-charger-index id #charger-in-origin-or-destination #level state-of-charge trip-distance journey-distance time-until-depart #this-cost)
 ;    file-print (word precision ticks 3 " " self " least cost option is taz:" #min-taz " level:" ([level] of #min-charger-type) " cost:" #min-cost)
     ifelse #min-taz = current-taz [
       set current-charger one-of available-chargers #min-taz [level] of #min-charger-type
@@ -917,6 +924,17 @@ SWITCH
 334
 log-charge-time
 log-charge-time
+1
+1
+-1000
+
+SWITCH
+476
+377
+642
+410
+log-seek-charger
+log-seek-charger
 0
 1
 -1000

@@ -115,7 +115,7 @@ create.schedule <- function(pev.penetration,scale.dist.thresh=1,frac.end.at.home
       driver <- pick.driver(type,from.i,to.i,hour)
       driver.i <- driver$driver.i
       driver.home <- driver$driver.home
-      print(paste(driver.i,driver.home))
+      #print(paste(driver.i,driver.home))
       
       # loop through the cands in random order until enough consistent journeys are found to satisfy the demand for drivers 
       for(cand in shuffled.cands){
@@ -174,7 +174,7 @@ create.schedule <- function(pev.penetration,scale.dist.thresh=1,frac.end.at.home
           driver <- pick.driver(type,from.i,to.i,hour)
           driver.i <- driver$driver.i
           driver.home <- driver$driver.home
-          print(paste(driver.i,driver.home))
+          #print(paste(driver.i,driver.home))
         }
       }
       if(od.counts[od.i,type]>0){
@@ -221,8 +221,8 @@ find.consistent.journey <- function(journey.i,cand.schedule,journey,dists,dist.t
   new.hour <- as.integer(depart)
   new.from <- cand.schedule$to[journey.i-1]
   new.type <- journey$geatm.type[journey.i] 
-  # if the journey tourtype is to home, we restrict the search to going to the home taz
-  if(journey$home.end[journey.i]){
+  # if the journey tourtype is to home (and not the last trip of the journey), we restrict the search to going to the home taz
+  if(journey$home.end[journey.i] & journey.i < nrow(journey)){
     new.to.cands <- dist$to[  dist$to==driver.home & dist$from==new.from & abs(dist$miles - journey$TOT_MILS[journey.i]) < dist.thresh$miles[findInterval(journey$TOT_MILS[journey.i],dist.thresh$under)+1] ]
   }else{
     # otherwise, look for any TAZ that is near enough
@@ -283,14 +283,14 @@ pick.driver <- function(type,from.i,to.i,hour){
         cand.trips <- which(schedule$to == from.i & schedule$arrive < hour & schedule$home == from.i)
       }
       if(length(cand.trips)>0){
-        print(paste('found a trip to cannibalize',type,from.i,to.i,hour))
+        #print(paste('found a trip to cannibalize',type,from.i,to.i,hour))
         prev.trip <- sample.one(cand.trips)
         driver.i <- schedule$driver[prev.trip]
         driver.home <- schedule$home[prev.trip]
         to.erase.inds <- which(schedule$driver == schedule$driver[prev.trip] & schedule$arrive > schedule$arrive[prev.trip])
         if(length(to.erase.inds)==0){ to.erase.inds <- NA }
       }else{
-        print(paste("no available drivers, creating one"))
+        #print(paste("no available drivers, creating one"))
         driver.i <- tot.drivers + 1
         if(type == 'ow'){
           driver.home <- sample(taz.10[[from.i]],1)

@@ -16,9 +16,11 @@ globals [
 ;; FILE PATHS
   parameter-file
   charger-input-file
+  charger-type-input-file
   driver-input-file
   od-input-file
   vehicle-type-input-file
+  outputs-directory
   
 ;; PARAMETERS
   charge-safety-factor
@@ -128,7 +130,6 @@ charger-types-own[
   charge-rate      ; kWh / hr  
   energy-price     ; $0.14/kWh
   installed-cost   ; $
-  charge-time-need
 ]
 
 vehicle-types-own[
@@ -152,7 +153,7 @@ to setup
    
   create-turtles 1 [ setxy 0 0 set color black] ;This invisible turtle makes sure we start at taz 1 not taz 0
   
-  set parameter-file "params.txt"
+  if parameter-file = 0 [ set parameter-file "params.txt" ]
   read-parameter-file
   
   setup-od-data
@@ -339,7 +340,7 @@ to seek-charger
     set num-denials (num-denials + 1)
     wait-time-event-scheduler  
   ][
-     log-data "seek-charger-result" (sentence ticks seek-charger-index id #charger-in-origin-or-destination #level state-of-charge trip-distance journey-distance time-until-depart #this-cost)
+;     log-data "seek-charger-result" (sentence ticks seek-charger-index id #charger-in-origin-or-destination #level state-of-charge trip-distance journey-distance time-until-depart #this-cost)
 ;    file-print (word precision ticks 3 " " self " least cost option is taz:" #min-taz " level:" ([level] of #min-charger-type) " cost:" #min-cost)
     ifelse #min-taz = current-taz [
       set current-charger one-of available-chargers #min-taz [level] of #min-charger-type

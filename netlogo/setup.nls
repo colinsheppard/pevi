@@ -21,11 +21,13 @@ to read-parameter-file
       ifelse param-name = "willing-to-roam-time-threshold" [ set willing-to-roam-time-threshold file-read ][
       ifelse param-name = "frac-phev" [ set frac-phev file-read ][
       ifelse param-name = "charger-input-file" [ set charger-input-file file-read ][
+      ifelse param-name = "charger-type-input-file" [ set charger-type-input-file file-read ][
       ifelse param-name = "driver-input-file" [ set driver-input-file file-read ][
       ifelse param-name = "od-input-file" [ set od-input-file file-read ][
       ifelse param-name = "vehicle-type-input-file" [ set vehicle-type-input-file file-read ][
+      ifelse param-name = "outputs-directory" [ set outputs-directory file-read ][
       ifelse param-name = "probability-of-unneeded-charge" [ set probability-of-unneeded-charge file-read ][
-      ]]]]]]]]]]]]]]]]]]
+      ]]]]]]]]]]]]]]]]]]]]
     ]
     file-close
   ][ 
@@ -305,30 +307,20 @@ end ;setup-itinerary
 to setup-charger-types
   print "setup-charger-types"
   
-  create-charger-types 1 [
-    set level 0          ; dedicated home charger
-    set charge-rate 19.2 ; kW. 120V x 16A peak current, single phase: http://www.sae.org/mags/AEI/7479
-    set energy-price 0.14 ; 
-    set installed-cost 2 ; $1000
-  ]
-  create-charger-types 1 [  ; 
-    set level 1
-    set charge-rate 2.4 ; Charger rate is the charger power in kW. Data from (Markel 2010), see project document
-    set energy-price 0.15 ;
-    set installed-cost 2 ; $1000
-  ]
-  create-charger-types 1 [  ; 
-    set level 2
-    set charge-rate 19.2 ; Charger rate is the charger power in kW. Data from (Markel 2010), see project document
-    set energy-price 0.16 ; 
-    set installed-cost 6 ; $1000
-  ]
-  create-charger-types 1 [  ; 
-    set level 3
-    set charge-rate 30 ; Charger rate is the charger power in kW. Data from (Markel 2010), see project document
-                       ; Charger rate may be anywhere from 20-250kW (Markel 2010)
-    set energy-price 0.17 ;
-    set installed-cost 50 ; $1000
+  ifelse (file-exists? charger-type-input-file) [
+    file-close
+    file-open charger-type-input-file
+    while [file-at-end? = false] [
+      create-charger-types 1 [
+        set level file-read
+        set charge-rate file-read
+        set energy-price file-read
+        set installed-cost file-read
+      ]
+    ]
+    file-close
+  ][ 
+    user-message (word "Input file '" charger-type-input-file "' not found!") 
   ]
 end 
 
@@ -372,8 +364,6 @@ to setup-chargers
     set color red
     set size 1
     set current-driver nobody
-    ;set xcor [xcor] of location
-    ;set ycor [ycor] of location
     let #level [level] of this-charger-type
   ]
 end ;setup-chargers
@@ -398,7 +388,7 @@ end
 ;;;;;;;;;;;;;;;;;;;;
 to open-logfile [logfile]
   file-close
-  file-open word logfile "-out.csv" 
+  file-open (word outputs-directory logfile "-out.csv" )
 end
 
 ;;;;;;;;;;;;;;;;;;;;
@@ -406,7 +396,7 @@ end
 ;;;;;;;;;;;;;;;;;;;;
 to reset-logfile [logfile]
   file-close
-  if file-exists? word logfile "-out.csv" [ file-delete word logfile "-out.csv" ]
+  if file-exists? (word outputs-directory logfile "-out.csv") [ file-delete word logfile "-out.csv" ]
 end
 
 to log-driver [event-name]

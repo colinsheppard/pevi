@@ -8,3 +8,4 @@ netlogo/summary.txt
 netlogo/dynamic-scheduler
 netlogo/*-out.csv
 postgis
+headless/bin

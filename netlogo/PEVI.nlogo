@@ -170,7 +170,7 @@ to setup
   reset-logfile "need-to-charge"
   log-data "need-to-charge" (sentence "time" "driver" "vehicle.type" "soc" "trip.distance" "journey.distance" "time.until.depart" "calling.event" "remaining.range" "charging.on.a.whim?" "need.to.charge?")
   reset-logfile "trip-journey-timeuntildepart"
-  log-data "trip-journey-timeuntildepart" (sentence "time" "driver" "vehicle.type" "soc" "event" "trip.distance" "journey.distance" "time.until.depart" "remaining.range")
+  log-data "trip-journey-timeuntildepart" (sentence "time" "driver" "vehicle.type" "soc" "from.taz" "to.taz" "trip.distance" "journey.distance" "time.until.depart" "next.event" "remaining.range")
 
 end 
 
@@ -571,20 +571,7 @@ to add-trip-to-itinerary [new-destination-taz]
   ; rewind current-itin-row by one and use update-itinerary to take care of setting state var's
   set current-itin-row current-itin-row - 1
 
-  let #completed-journey journey-distance
-  let #completed-trip trip-distance
-
   update-itinerary
-  log-data "trip-journey-timeuntildepart" (sentence 
-    ticks 
-    id 
-    [name] of this-vehicle-type 
-    state-of-charge 
-    "add-trip"
-    #completed-trip 
-    #completed-journey
-    time-until-depart 
-    remaining-range)
 
   ; update-itinerary does not update journey-distance, do so here by adding the difference between the previous trip and the current trip)
   set journey-distance journey-distance + 
@@ -746,23 +733,66 @@ to arrive
   ; output here
   let #completed-journey journey-distance
   let #completed-trip trip-distance
+  let #from-taz current-taz
   set journey-distance journey-distance - trip-distance
   log-driver "arriving"
 ;  file-flush
   update-itinerary 
+  let #to-taz current-taz
+  
   
   ;; moved ' set time-until-depart departure-time - ticks ' here from SEEK-CHARGER
       
   ifelse not itin-complete? [
     set time-until-depart departure-time - ticks
     ifelse need-to-charge "arrive" [   
+      log-data "trip-journey-timeuntildepart" (sentence 
+        ticks 
+        id 
+        [name] of this-vehicle-type 
+        state-of-charge 
+        #from-taz
+        #to-taz
+        #completed-trip 
+        #completed-journey 
+        time-until-depart 
+        "seeking-charger"
+        remaining-range)
+
       seek-charger
     ][
+      log-data "trip-journey-timeuntildepart" (sentence 
+        ticks 
+        id 
+        [name] of this-vehicle-type 
+        state-of-charge 
+        #from-taz
+        #to-taz
+        #completed-trip 
+        #completed-journey 
+        time-until-depart 
+        "scheduling-itinerary"
+        remaining-range)
+
       itinerary-event-scheduler
     ]
   ][
+    set time-until-depart 0  ;; only for use in logging  ac 12.20
     ;; itin is complete and at home? plug-in immediately and charge till full
-    if current-taz = home-taz [
+    ifelse current-taz = home-taz [
+      log-data "trip-journey-timeuntildepart" (sentence 
+        ticks 
+        id 
+        [name] of this-vehicle-type 
+        state-of-charge 
+        #from-taz
+        #to-taz
+        #completed-trip 
+        #completed-journey 
+        time-until-depart 
+        "home"
+        remaining-range)
+
       set current-charger (one-of item 0 [chargers-by-type] of current-taz)
       set full-charge-time-need (1 - state-of-charge) * battery-capacity / charge-rate-of current-charger
       dynamic-scheduler:add schedule self task end-charge ticks + full-charge-time-need 
@@ -777,19 +807,21 @@ to arrive
         (state-of-charge + (full-charge-time-need * charge-rate-of current-charger) / battery-capacity )
         "stop"
         false)
+    ][
+      log-data "trip-journey-timeuntildepart" (sentence 
+        ticks 
+        id 
+        [name] of this-vehicle-type 
+        state-of-charge 
+        #from-taz
+        #to-taz
+        #completed-trip 
+        #completed-journey 
+        time-until-depart 
+        "stranded"
+        remaining-range)
     ]
   ]
-  
-  log-data "trip-journey-timeuntildepart" (sentence 
-    ticks 
-    id 
-    [name] of this-vehicle-type 
-    state-of-charge 
-    "arrive"
-    #completed-trip 
-    #completed-journey 
-    time-until-depart 
-    remaining-range)
 
   
 end

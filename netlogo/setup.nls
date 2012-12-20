@@ -257,6 +257,8 @@ end
 ;;;;;;;;;;;;;;;;;;;;
 to setup-itinerary
   print "setup-itinerary"
+  random-seed 100
+  show random 100
   ifelse (file-exists? driver-input-file) [ ; ../inputs/p1r1_5.txt  
     file-close
     file-open driver-input-file

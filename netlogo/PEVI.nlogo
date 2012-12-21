@@ -145,6 +145,9 @@ vehicle-types-own[
 ;;;;;;;;;;;;;;;;;;;;
 to setup
   print "setting up"
+  random-seed 100
+  show random 100
+
   __clear-all-and-reset-ticks
  
   set schedule dynamic-scheduler:create
@@ -425,11 +428,11 @@ to wait-time-event-scheduler
         id 
         [name] of this-vehicle-type 
         state-of-charge 
-        [id] of current-taz
-        [id] of destination-taz
+        current-taz
+        destination-taz
         true 
         false 
-        departure-time - ticks
+        (departure-time - ticks)
         "stranded"
         remaining-range)
     ][
@@ -799,7 +802,7 @@ to arrive
     ifelse current-taz = home-taz [
       log-data "trip-journey-timeuntildepart" (sentence 
         ticks 
-        departure-time
+        ticks
         id 
         [name] of this-vehicle-type 
         state-of-charge 
@@ -828,7 +831,7 @@ to arrive
     ][
       log-data "trip-journey-timeuntildepart" (sentence 
         ticks 
-        departure-time
+        ticks
         id 
         [name] of this-vehicle-type 
         state-of-charge 
@@ -837,7 +840,7 @@ to arrive
         #completed-trip 
         #completed-journey 
         #time-until-depart 
-        "stop"
+        "journey-complete"
         remaining-range)
     ]
   ]

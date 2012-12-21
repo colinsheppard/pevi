@@ -419,6 +419,19 @@ to wait-time-event-scheduler
     ifelse ticks > 24 [
       set state "stranded"
       log-data "wait-time" (sentence ticks id [name] of this-vehicle-type state-of-charge trip-distance journey-distance time-until-depart "stranded" -1)
+      log-data "trip-journey-timeuntildepart" (sentence 
+        ticks 
+        departure-time
+        id 
+        [name] of this-vehicle-type 
+        state-of-charge 
+        [id] of current-taz
+        [id] of destination-taz
+        true 
+        false 
+        departure-time - ticks
+        "stranded"
+        remaining-range)
     ][
       let event-time-from-now random-exponential wait-time-mean
       dynamic-scheduler:add schedule self task retry-seek ticks + event-time-from-now
@@ -824,7 +837,7 @@ to arrive
         #completed-trip 
         #completed-journey 
         #time-until-depart 
-        "stranded"
+        "stop"
         remaining-range)
     ]
   ]

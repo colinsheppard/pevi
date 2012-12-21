@@ -142,20 +142,24 @@ vehicle-types-own[
   is-bev?
 ]
 
+to setup-from-gui
+    __clear-all-and-reset-ticks
+    setup
+end
+
 ;;;;;;;;;;;;;;;;;;;;
 ;; SETUP
 ;;;;;;;;;;;;;;;;;;;;
 to setup
   print "setting up"
-  __clear-all-and-reset-ticks
- 
+
   set schedule dynamic-scheduler:create
    
   create-turtles 1 [ setxy 0 0 set color black] ;This invisible turtle makes sure we start at taz 1 not taz 0
   
   if parameter-file = 0 [ set parameter-file "params.txt" ]
   read-parameter-file
-  
+
   setup-od-data
   setup-tazs
   convert-enroute-ids
@@ -784,8 +788,7 @@ to summarize
     ]
   ]
 
-
- 
+  reset-logfile "summary" 
   log-data "summary" (sentence "metric" "value")
   log-data "summary" (sentence "num.drivers" count drivers)
   log-data "summary" (sentence "num.trips" sum [ length itin-change-flag - sum itin-change-flag ] of drivers)
@@ -804,10 +807,10 @@ to summarize
 end
 @#$#@#$#@
 GRAPHICS-WINDOW
-130
-10
-375
-228
+195
+14
+440
+232
 -1
 -1
 7.5
@@ -833,10 +836,10 @@ ticks
 BUTTON
 9
 10
-75
+138
 43
 NIL
-setup
+setup-from-gui
 NIL
 1
 T
@@ -865,15 +868,15 @@ NIL
 1
 
 SLIDER
-362
-16
-534
-49
+473
+10
+645
+43
 go-until-time
 go-until-time
 0
 36
-36
+35.5
 0.5
 1
 NIL
@@ -914,7 +917,7 @@ SWITCH
 285
 log-charging
 log-charging
-1
+0
 1
 -1000
 
@@ -936,7 +939,7 @@ SWITCH
 410
 log-seek-charger
 log-seek-charger
-0
+1
 1
 -1000
 

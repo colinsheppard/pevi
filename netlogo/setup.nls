@@ -31,7 +31,7 @@ to read-parameter-file
     ]
     file-close
   ][ 
-    user-message (word "Input file '" od-input-file "' not found!") 
+    user-message (word "Input file '" parameter-file "' not found!") 
   ]
 end
 
@@ -47,7 +47,7 @@ to setup-od-data
   set od-time   n-values (n-tazs * n-tazs) [0] 
   set od-enroute n-values (n-tazs * n-tazs) [n-values (0) [0]] 
   
-  ifelse (file-exists? od-input-file) [ ; ../inputs/OD_Matrix_5.txt
+  ifelse (file-exists? od-input-file) [
     file-close
     file-open od-input-file
     foreach n-values (n-tazs * n-tazs) [?] [
@@ -90,10 +90,10 @@ to setup-tazs
     set shape "star"
     set color yellow
     set size 0.5
-    set n-levels n-values 4 [-99]  ; 10.17 ac - 4 levels of chargers, 0,1,2,3, 0=home
+    set n-levels n-values 4 [-99] 
     set chargers-by-type n-values n-charger-types [0]
   ]
-  ifelse (file-exists? charger-input-file) [ ; ../inputs/alternative_4_5.txt
+  ifelse (file-exists? charger-input-file) [
     file-close
     file-open charger-input-file
     foreach sort tazs [  ; we want the who value to match the id, so we sort them, this assumes the text file has sequential ids starting from 1
@@ -376,7 +376,7 @@ to log-data [logfile data-list]
      (logfile = "charging" and log-charging) or
      (logfile = "charge-time" and log-charge-time) or
      (logfile = "seek-charger" and log-seek-charger) or
-     (logfile = "summary" and log-charge-time)
+     (logfile = "summary")
   [
     open-logfile logfile
     file-print reduce [(word ?1 "," ?2)] data-list
@@ -396,7 +396,7 @@ end
 ;;;;;;;;;;;;;;;;;;;;
 to reset-logfile [logfile]
   file-close
-  if file-exists? (word outputs-directory logfile "-out.csv") [ file-delete word logfile "-out.csv" ]
+  if file-exists? (word outputs-directory logfile "-out.csv") [ file-delete (word outputs-directory logfile "-out.csv") ]
 end
 
 to log-driver [event-name]

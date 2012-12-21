@@ -264,6 +264,21 @@ for(pev.penetration in pev.pens){
   }
 }
 
+# look into why some drivers have trips seemingly out of order
+for(pev.penetration in pev.pens){
+  pev.pen.char <- roundC(pev.penetration,3)
+  for(replicate in 1:num.replicates){
+    if(!is.null(schedule.reps[[pev.pen.char]][[as.character(replicate)]])){
+      print(paste('Penetration ',pev.penetration," rep ",replicate,sep=''))
+      schedule <- schedule.reps[[pev.pen.char]][[as.character(replicate)]]
+      print(unique(schedule$driver)[which(!ddply(schedule,.(driver),function(df){
+        df <- df[order(df$depart),]
+        nrow(df)==1 | all(df$from[2:nrow(df)] == df$to[1:(nrow(df)-1)])
+      })$V1)])
+    }
+  }
+}
+
 # analyze and plot the schedules, compare them to NHTS and GEATM
 
 ks.tests <- data.frame(penetration=pev.pens,test='tours.per.driver',factor=NA,level=NA,stat=NA,p.value=NA)

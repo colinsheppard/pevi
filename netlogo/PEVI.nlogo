@@ -170,7 +170,7 @@ to setup
   reset-logfile "need-to-charge"
   log-data "need-to-charge" (sentence "time" "driver" "vehicle.type" "soc" "trip.distance" "journey.distance" "time.until.depart" "calling.event" "remaining.range" "charging.on.a.whim?" "need.to.charge?")
   reset-logfile "trip-journey-timeuntildepart"
-  log-data "trip-journey-timeuntildepart" (sentence "time" "driver" "vehicle.type" "soc" "from.taz" "to.taz" "trip.distance" "journey.distance" "time.until.depart" "next.event" "remaining.range")
+  log-data "trip-journey-timeuntildepart" (sentence "time" "departure.time" "driver" "vehicle.type" "soc" "from.taz" "to.taz" "trip.distance" "journey.distance" "time.until.depart" "next.event" "remaining.range")
 
 end 
 
@@ -737,6 +737,8 @@ to arrive
   set journey-distance journey-distance - trip-distance
   log-driver "arriving"
 ;  file-flush
+
+
   update-itinerary 
   let #to-taz current-taz
   
@@ -744,10 +746,11 @@ to arrive
   ;; moved ' set time-until-depart departure-time - ticks ' here from SEEK-CHARGER
       
   ifelse not itin-complete? [
-    set time-until-depart departure-time - ticks
+    let #time-until-depart departure-time - ticks
     ifelse need-to-charge "arrive" [   
       log-data "trip-journey-timeuntildepart" (sentence 
         ticks 
+        departure-time
         id 
         [name] of this-vehicle-type 
         state-of-charge 
@@ -755,7 +758,7 @@ to arrive
         #to-taz
         #completed-trip 
         #completed-journey 
-        time-until-depart 
+        #time-until-depart 
         "seeking-charger"
         remaining-range)
 
@@ -763,6 +766,7 @@ to arrive
     ][
       log-data "trip-journey-timeuntildepart" (sentence 
         ticks 
+        departure-time
         id 
         [name] of this-vehicle-type 
         state-of-charge 
@@ -770,18 +774,19 @@ to arrive
         #to-taz
         #completed-trip 
         #completed-journey 
-        time-until-depart 
+        #time-until-depart 
         "scheduling-itinerary"
         remaining-range)
 
       itinerary-event-scheduler
     ]
   ][
-    set time-until-depart 0  ;; only for use in logging  ac 12.20
+    let #time-until-depart 0  ;; only for use in logging  ac 12.20
     ;; itin is complete and at home? plug-in immediately and charge till full
     ifelse current-taz = home-taz [
       log-data "trip-journey-timeuntildepart" (sentence 
         ticks 
+        departure-time
         id 
         [name] of this-vehicle-type 
         state-of-charge 
@@ -789,7 +794,7 @@ to arrive
         #to-taz
         #completed-trip 
         #completed-journey 
-        time-until-depart 
+        #time-until-depart 
         "home"
         remaining-range)
 
@@ -810,6 +815,7 @@ to arrive
     ][
       log-data "trip-journey-timeuntildepart" (sentence 
         ticks 
+        departure-time
         id 
         [name] of this-vehicle-type 
         state-of-charge 
@@ -817,7 +823,7 @@ to arrive
         #to-taz
         #completed-trip 
         #completed-journey 
-        time-until-depart 
+        #time-until-depart 
         "stranded"
         remaining-range)
     ]
@@ -842,6 +848,7 @@ to update-itinerary
     set trip-distance item my-od-index od-dist
     set trip-time item my-od-index od-time
   ][
+    set current-taz destination-taz  ;; ac 12.20
     set itin-complete? true
   ]
 end

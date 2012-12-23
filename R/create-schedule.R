@@ -2,7 +2,7 @@ create.schedule <- function(pev.penetration,scale.dist.thresh=1,frac.end.at.home
   environment(pick.driver) <- sys.frame(sys.nframe())
   environment(find.consistent.journey) <- sys.frame(sys.nframe())
    #for testing
-   #pev.penetration <- .001
+   #pev.penetration <- 0.00135
    #scale.dist.thresh <- 1
    #frac.end.at.home <- 0.922
    #set.seed(1)
@@ -125,9 +125,9 @@ create.schedule <- function(pev.penetration,scale.dist.thresh=1,frac.end.at.home
         journey <- rur.tours[rur.tours.i:(rur.tours.i+rur.tours$tours.left.in.journey[rur.tours.i]), c('begin','end','TOT_DWEL4','journey.id','TOT_MILS','TOURTYPE','home.start','home.end','geatm.type')] 
         depart <- od.counts$hour[od.i]+runif(1)
         arrive <- depart + dists$time
-        if(arrive >= 24){
-          arrive <- arrive - 24
-        }
+        #if(arrive >= 24){
+          #arrive <- arrive - 24
+        #}
         cand.schedule[1,] <- data.frame(driver.i,from.i,to.i,depart,arrive,journey$TOURTYPE[1],as.character(journey$geatm.type[1]),driver.home,stringsAsFactors=F)
         if(arrive >= depart & nrow(journey) > 1){
           new.cand.schedule <- find.consistent.journey(2,cand.schedule,journey,dists,dist.thresh)
@@ -236,9 +236,9 @@ find.consistent.journey <- function(journey.i,cand.schedule,journey,dists,dist.t
     for(new.to in new.to.cands){
       new.dists <- dist[dist$to == new.to & dist$from == new.from,c('miles','time')]
       arrive <- depart + dists$time
-      if(arrive >= 24){
-        arrive <- arrive - 24
-      }
+      #if(arrive >= 24){
+        #arrive <- arrive - 24
+      #}
       cand.schedule[journey.i,] <- data.frame(driver.i,new.from,new.to,depart,arrive,journey$TOURTYPE[journey.i],new.type,driver.home,stringsAsFactors=F)
       new.cand.schedule <- find.consistent.journey(journey.i+1,cand.schedule,journey,dists,dist.thresh)
       if(!is.logical(new.cand.schedule))return(new.cand.schedule)

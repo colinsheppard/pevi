@@ -237,14 +237,14 @@ for(pev.penetration in pev.pens){
   for(replicate in 1:num.replicates){
     print(paste('Penetration ',pev.penetration,' replicate ',replicate,sep=''))
     schedule.reps[[pev.pen.char]][[as.character(replicate)]] <- create.schedule(pev.penetration,1)
-    write.table(schedule.reps[[pev.pen.char]][[as.character(replicate)]][,c('driver','from','to','depart','home')],file=paste(path.to.shared.inputs,"driver-schedule-pen",pev.penetration*100,"-rep",replicate,"-20121220.txt",sep=''),sep='\t',row.names=F,quote=F)
-    save(schedule.reps,file=paste(path.to.outputs,'schedule-replicates-20121220.Rdata',sep=''))
+    write.table(schedule.reps[[pev.pen.char]][[as.character(replicate)]][,c('driver','from','to','depart','home')],file=paste(path.to.shared.inputs,"driver-schedule-pen",pev.penetration*100,"-rep",replicate,"-20121222.txt",sep=''),sep='\t',row.names=F,quote=F)
+    save(schedule.reps,file=paste(path.to.outputs,'schedule-replicates-20121222.Rdata',sep=''))
   }
 }
-save(schedule.reps,file=paste(path.to.outputs,'schedule-replicates-20121220.Rdata',sep=''))
+save(schedule.reps,file=paste(path.to.outputs,'schedule-replicates-20121222.Rdata',sep=''))
 
 # summarize the results
-load(file=paste(path.to.outputs,'schedule-replicates-20121220.Rdata',sep=''))
+load(file=paste(path.to.outputs,'schedule-replicates-20121222.Rdata',sep=''))
 n.scheds <- num.replicates * length(pev.pens)
 sum.sched <- data.frame(pen=rep(pev.pens,num.replicates),rep=rep(1:num.replicates,each=length(pev.pens)),n.drivers=rep(NA,n.scheds),n.trips=rep(NA,n.scheds),trips.per.driver=rep(NA,n.scheds),home.rmse=rep(NA,n.scheds),home.maxe=rep(NA,n.scheds),home.max.taz=rep(NA,n.scheds))
 for(pev.penetration in pev.pens){
@@ -278,6 +278,19 @@ for(pev.penetration in pev.pens){
     }
   }
 }
+# find a repeatable case where a funky driver appears, pen 0.00135
+set.seed(1)
+schedule <- create.schedule(0.001,1,0.922)
+for(pen in seq(0.00105,0.005,by=0.00005)){
+  set.seed(1)
+  schedule <- create.schedule(pen,1,0.922)
+  print(unique(schedule$driver)[which(!ddply(schedule,.(driver),function(df){
+    df <- df[order(df$depart),]
+    nrow(df)==1 | all(df$from[2:nrow(df)] == df$to[1:(nrow(df)-1)])
+  })$V1)])
+}
+
+
 
 # analyze and plot the schedules, compare them to NHTS and GEATM
 

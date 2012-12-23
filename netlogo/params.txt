@@ -3,11 +3,6 @@
 "charge-safety-factor"	1.1
 "charger-search-distance"	5
 "wait-time-mean"	0.5
-"batt-cap-mean"	24
-"batt-cap-stdv"	1
-"batt-cap-range"	5
-"fuel-economy-stdv"	0.05
-"fuel-economy-range"	0.1
 "time-opportunity-cost"	12.50
 "willing-to-roam-time-threshold"	1
 "probability-of-unneeded-charge"	0.01

@@ -14,6 +14,7 @@ globals [
   schedule  ;; this global variable holds the dynamic schedule for the PEVI program, appended by the drivers from their itineraries
   
 ;; FILE PATHS
+  model-directory
   parameter-file
   charger-input-file
   charger-type-input-file
@@ -143,8 +144,18 @@ vehicle-types-own[
 ]
 
 to setup-from-gui
-    __clear-all-and-reset-ticks
+    clear-all-and-initialize
+    if parameter-file = 0 [ set parameter-file "params.txt" ]
+    if model-directory = 0 [ set model-directory "./" ]
+    read-parameter-file
     setup
+end
+
+to clear-all-and-initialize
+  print "clear all"
+  __clear-all-and-reset-ticks
+  set schedule dynamic-scheduler:create
+  create-turtles 1 [ setxy 0 0 set color black] ;This invisible turtle makes sure we start at taz 1 not taz 0
 end
 
 ;;;;;;;;;;;;;;;;;;;;
@@ -152,14 +163,6 @@ end
 ;;;;;;;;;;;;;;;;;;;;
 to setup
   print "setting up"
-
-  set schedule dynamic-scheduler:create
-   
-  create-turtles 1 [ setxy 0 0 set color black] ;This invisible turtle makes sure we start at taz 1 not taz 0
-  
-  if parameter-file = 0 [ set parameter-file "params.txt" ]
-  read-parameter-file
-
   setup-od-data
   setup-tazs
   convert-enroute-ids

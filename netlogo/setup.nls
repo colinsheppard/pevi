@@ -2,6 +2,7 @@
 ;; READ PARAMETER FILE
 ;;;;;;;;;;;;;;;;;;;;;;;
 to read-parameter-file
+  print "read-parameter-file"
   ifelse (file-exists? parameter-file) [ 
     file-close
     file-open parameter-file
@@ -12,22 +13,17 @@ to read-parameter-file
       ifelse param-name = "charge-safety-factor" [ set charge-safety-factor file-read ][
       ifelse param-name = "charger-search-distance" [ set charger-search-distance file-read ][
       ifelse param-name = "wait-time-mean" [ set wait-time-mean file-read ][
-      ifelse param-name = "batt-cap-mean" [ set batt-cap-mean file-read ][
-      ifelse param-name = "batt-cap-stdv" [ set batt-cap-stdv file-read ][
-      ifelse param-name = "batt-cap-range" [set batt-cap-range file-read ][
-      ifelse param-name = "fuel-economy-stdv" [ set fuel-economy-stdv file-read ][
-      ifelse param-name = "fuel-economy-range" [ set fuel-economy-range file-read ][
       ifelse param-name = "time-opportunity-cost" [ set time-opportunity-cost file-read ][
       ifelse param-name = "willing-to-roam-time-threshold" [ set willing-to-roam-time-threshold file-read ][
       ifelse param-name = "frac-phev" [ set frac-phev file-read ][
-      ifelse param-name = "charger-input-file" [ set charger-input-file file-read ][
-      ifelse param-name = "charger-type-input-file" [ set charger-type-input-file file-read ][
-      ifelse param-name = "driver-input-file" [ set driver-input-file file-read ][
-      ifelse param-name = "od-input-file" [ set od-input-file file-read ][
-      ifelse param-name = "vehicle-type-input-file" [ set vehicle-type-input-file file-read ][
-      ifelse param-name = "outputs-directory" [ set outputs-directory file-read ][
+      ifelse param-name = "charger-input-file" [ set charger-input-file word model-directory file-read ][
+      ifelse param-name = "charger-type-input-file" [ set charger-type-input-file word model-directory file-read ][
+      ifelse param-name = "driver-input-file" [ set driver-input-file word model-directory file-read ][
+      ifelse param-name = "od-input-file" [ set od-input-file word model-directory file-read ][
+      ifelse param-name = "vehicle-type-input-file" [ set vehicle-type-input-file word model-directory file-read ][
+      ifelse param-name = "outputs-directory" [ set outputs-directory word model-directory file-read ][
       ifelse param-name = "probability-of-unneeded-charge" [ set probability-of-unneeded-charge file-read ][
-      ]]]]]]]]]]]]]]]]]]]]
+      ]]]]]]]]]]]]]]]
     ]
     file-close
   ][ 
@@ -259,7 +255,7 @@ end
 ;;;;;;;;;;;;;;;;;;;;
 to setup-itinerary
   print "setup-itinerary"
-  ifelse (file-exists? driver-input-file) [ ; ../inputs/p1r1_5.txt  
+  ifelse (file-exists? driver-input-file) [
     file-close
     file-open driver-input-file
    

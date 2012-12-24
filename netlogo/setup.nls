@@ -2,7 +2,7 @@
 ;; READ PARAMETER FILE
 ;;;;;;;;;;;;;;;;;;;;;;;
 to read-parameter-file
-  print "read-parameter-file"
+  ;print "read-parameter-file"
   ifelse (file-exists? parameter-file) [ 
     file-close
     file-open parameter-file
@@ -35,7 +35,7 @@ end
 ;; SETUP OD DATA
 ;;;;;;;;;;;;;;;;;;;;
 to setup-od-data
-  print "setup-od-data"
+  ;print "setup-od-data"
   ; Reads in main driver input file: Origin, destination, # of trips, distance, time
   set od-from   n-values (n-tazs * n-tazs) [0] 
   set od-to     n-values (n-tazs * n-tazs) [0] 
@@ -80,7 +80,7 @@ end
 ;; SETUP TAZS
 ;;;;;;;;;;;;;;;;;;;;
 to setup-tazs
-  print "setup-tazs"
+  ;print "setup-tazs"
   create-tazs n-tazs
   ask tazs [
     set shape "star"
@@ -105,7 +105,7 @@ to setup-tazs
           ]
         ]
       ]
-    ]    
+    ]
   ]
   [ user-message (word "Input file '" charger-input-file "' not found!")]
    
@@ -128,7 +128,7 @@ end
 ;; SETUP DRIVERS
 ;;;;;;;;;;;;;;;;;;;;
 to setup-drivers
-  print "setup-drivers"
+  ;print "setup-drivers"
 
   setup-vehicle-types
   setup-itinerary
@@ -223,7 +223,7 @@ end ;setup-drivers
 ;; SETUP VEHICLE TYPES
 ;;;;;;;;;;;;;;;;;;;;
 to setup-vehicle-types
-  print "setup-vehicle-types"
+  ;print "setup-vehicle-types"
   
   ifelse (file-exists? vehicle-type-input-file) [
     file-close
@@ -254,7 +254,7 @@ end
 ;; SETUP INTINERARY
 ;;;;;;;;;;;;;;;;;;;;
 to setup-itinerary
-  print "setup-itinerary"
+  ;print "setup-itinerary"
   ifelse (file-exists? driver-input-file) [
     file-close
     file-open driver-input-file
@@ -301,7 +301,7 @@ end ;setup-itinerary
 ;; SETUP CHARGER-TYPES
 ;;;;;;;;;;;;;;;;;;;;
 to setup-charger-types
-  print "setup-charger-types"
+  ;print "setup-charger-types"
   
   ifelse (file-exists? charger-type-input-file) [
     file-close
@@ -324,7 +324,7 @@ end
 ;; SETUP CHARGERS
 ;;;;;;;;;;;;;;;;;;;;
 to setup-chargers
-  print "setup-chargers"
+  ;print "setup-chargers"
   ; The charger level, location, and quantity of chargers was read in during setup-tazs.
   ; Now chargers of each level are created at the appropriate taz.
   ; Charger-rate is currently a separate state variable from charger level. We may want to combine the two later, if

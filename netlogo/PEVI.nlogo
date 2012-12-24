@@ -1,5 +1,5 @@
 extensions [dynamic-scheduler]
-__includes["setup.nls"]
+__includes["setup.nls"] 
 
 globals [    
   od-from
@@ -152,7 +152,7 @@ to setup-from-gui
 end
 
 to clear-all-and-initialize
-  print "clear all"
+  ;print "clear all"
   __clear-all-and-reset-ticks
   set schedule dynamic-scheduler:create
   create-turtles 1 [ setxy 0 0 set color black] ;This invisible turtle makes sure we start at taz 1 not taz 0
@@ -162,7 +162,7 @@ end
 ;; SETUP
 ;;;;;;;;;;;;;;;;;;;;
 to setup
-  print "setting up"
+  ;print "setting up"
   setup-od-data
   setup-tazs
   convert-enroute-ids
@@ -577,7 +577,7 @@ end
 to depart
 ;  log-data "drivers" (sentence precision ticks 3 [id] of self "departing" state-of-charge)
   ifelse need-to-charge "depart" [  
-    ifelse state-of-charge = 1 [  ;; random decision to charge prevents BEVs from leaving sometimes. ac 11.07
+    ifelse state-of-charge = 1 or (( count (existing-chargers current-taz 1)  = 0) and (count (existing-chargers current-taz 2)  = 0) and state-of-charge >= 0.8)[  ;; random decision to charge prevents BEVs from leaving sometimes. ac 11.07
 ;      file-print (word precision ticks 3 " " self " cannot make trip with full battery -- breaking it up")
       break-up-trip
     ][
@@ -740,6 +740,14 @@ to-report available-chargers [#taz #level]
   let #found-chargers 0
   ask #taz[
     set #found-chargers ((item #level chargers-by-type) with [current-driver = nobody])
+  ]
+  report #found-chargers
+end
+
+to-report existing-chargers [#taz #level]
+  let #found-chargers 0
+  ask #taz[
+    set #found-chargers (item #level chargers-by-type)
   ]
   report #found-chargers
 end
@@ -920,7 +928,7 @@ SWITCH
 285
 log-charging
 log-charging
-0
+1
 1
 -1000
 

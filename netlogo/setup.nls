@@ -2,6 +2,7 @@
 ;; READ PARAMETER FILE
 ;;;;;;;;;;;;;;;;;;;;;;;
 to read-parameter-file
+  ;print "read-parameter-file"
   ifelse (file-exists? parameter-file) [ 
     file-close
     file-open parameter-file
@@ -12,24 +13,21 @@ to read-parameter-file
       ifelse param-name = "charge-safety-factor" [ set charge-safety-factor file-read ][
       ifelse param-name = "charger-search-distance" [ set charger-search-distance file-read ][
       ifelse param-name = "wait-time-mean" [ set wait-time-mean file-read ][
-      ifelse param-name = "batt-cap-mean" [ set batt-cap-mean file-read ][
-      ifelse param-name = "batt-cap-stdv" [ set batt-cap-stdv file-read ][
-      ifelse param-name = "batt-cap-range" [set batt-cap-range file-read ][
-      ifelse param-name = "fuel-economy-stdv" [ set fuel-economy-stdv file-read ][
-      ifelse param-name = "fuel-economy-range" [ set fuel-economy-range file-read ][
       ifelse param-name = "time-opportunity-cost" [ set time-opportunity-cost file-read ][
       ifelse param-name = "willing-to-roam-time-threshold" [ set willing-to-roam-time-threshold file-read ][
       ifelse param-name = "frac-phev" [ set frac-phev file-read ][
-      ifelse param-name = "charger-input-file" [ set charger-input-file file-read ][
-      ifelse param-name = "driver-input-file" [ set driver-input-file file-read ][
-      ifelse param-name = "od-input-file" [ set od-input-file file-read ][
-      ifelse param-name = "vehicle-type-input-file" [ set vehicle-type-input-file file-read ][
+      ifelse param-name = "charger-input-file" [ set charger-input-file word model-directory file-read ][
+      ifelse param-name = "charger-type-input-file" [ set charger-type-input-file word model-directory file-read ][
+      ifelse param-name = "driver-input-file" [ set driver-input-file word model-directory file-read ][
+      ifelse param-name = "od-input-file" [ set od-input-file word model-directory file-read ][
+      ifelse param-name = "vehicle-type-input-file" [ set vehicle-type-input-file word model-directory file-read ][
+      ifelse param-name = "outputs-directory" [ set outputs-directory word model-directory file-read ][
       ifelse param-name = "probability-of-unneeded-charge" [ set probability-of-unneeded-charge file-read ][
-      ]]]]]]]]]]]]]]]]]]
+      ]]]]]]]]]]]]]]]
     ]
     file-close
   ][ 
-    user-message (word "Input file '" od-input-file "' not found!") 
+    user-message (word "Input file '" parameter-file "' not found!") 
   ]
 end
 
@@ -37,7 +35,7 @@ end
 ;; SETUP OD DATA
 ;;;;;;;;;;;;;;;;;;;;
 to setup-od-data
-  print "setup-od-data"
+  ;print "setup-od-data"
   ; Reads in main driver input file: Origin, destination, # of trips, distance, time
   set od-from   n-values (n-tazs * n-tazs) [0] 
   set od-to     n-values (n-tazs * n-tazs) [0] 
@@ -45,7 +43,7 @@ to setup-od-data
   set od-time   n-values (n-tazs * n-tazs) [0] 
   set od-enroute n-values (n-tazs * n-tazs) [n-values (0) [0]] 
   
-  ifelse (file-exists? od-input-file) [ ; ../inputs/OD_Matrix_5.txt
+  ifelse (file-exists? od-input-file) [
     file-close
     file-open od-input-file
     foreach n-values (n-tazs * n-tazs) [?] [
@@ -82,16 +80,16 @@ end
 ;; SETUP TAZS
 ;;;;;;;;;;;;;;;;;;;;
 to setup-tazs
-  print "setup-tazs"
+  ;print "setup-tazs"
   create-tazs n-tazs
   ask tazs [
     set shape "star"
     set color yellow
     set size 0.5
-    set n-levels n-values 4 [-99]  ; 10.17 ac - 4 levels of chargers, 0,1,2,3, 0=home
+    set n-levels n-values 4 [-99] 
     set chargers-by-type n-values n-charger-types [0]
   ]
-  ifelse (file-exists? charger-input-file) [ ; ../inputs/alternative_4_5.txt
+  ifelse (file-exists? charger-input-file) [
     file-close
     file-open charger-input-file
     foreach sort tazs [  ; we want the who value to match the id, so we sort them, this assumes the text file has sequential ids starting from 1
@@ -107,7 +105,7 @@ to setup-tazs
           ]
         ]
       ]
-    ]    
+    ]
   ]
   [ user-message (word "Input file '" charger-input-file "' not found!")]
    
@@ -130,7 +128,7 @@ end
 ;; SETUP DRIVERS
 ;;;;;;;;;;;;;;;;;;;;
 to setup-drivers
-  print "setup-drivers"
+  ;print "setup-drivers"
 
   setup-vehicle-types
   setup-itinerary
@@ -225,7 +223,7 @@ end ;setup-drivers
 ;; SETUP VEHICLE TYPES
 ;;;;;;;;;;;;;;;;;;;;
 to setup-vehicle-types
-  print "setup-vehicle-types"
+  ;print "setup-vehicle-types"
   
   ifelse (file-exists? vehicle-type-input-file) [
     file-close
@@ -256,8 +254,8 @@ end
 ;; SETUP INTINERARY
 ;;;;;;;;;;;;;;;;;;;;
 to setup-itinerary
-  print "setup-itinerary"
-  ifelse (file-exists? driver-input-file) [ ; ../inputs/p1r1_5.txt  
+  ;print "setup-itinerary"
+  ifelse (file-exists? driver-input-file) [
     file-close
     file-open driver-input-file
    
@@ -303,32 +301,22 @@ end ;setup-itinerary
 ;; SETUP CHARGER-TYPES
 ;;;;;;;;;;;;;;;;;;;;
 to setup-charger-types
-  print "setup-charger-types"
+  ;print "setup-charger-types"
   
-  create-charger-types 1 [
-    set level 0          ; dedicated home charger
-    set charge-rate 19.2 ; kW. 120V x 16A peak current, single phase: http://www.sae.org/mags/AEI/7479
-    set energy-price 0.14 ; 
-    set installed-cost 2 ; $1000
-  ]
-  create-charger-types 1 [  ; 
-    set level 1
-    set charge-rate 2.4 ; Charger rate is the charger power in kW. Data from (Markel 2010), see project document
-    set energy-price 0.15 ;
-    set installed-cost 2 ; $1000
-  ]
-  create-charger-types 1 [  ; 
-    set level 2
-    set charge-rate 19.2 ; Charger rate is the charger power in kW. Data from (Markel 2010), see project document
-    set energy-price 0.16 ; 
-    set installed-cost 6 ; $1000
-  ]
-  create-charger-types 1 [  ; 
-    set level 3
-    set charge-rate 30 ; Charger rate is the charger power in kW. Data from (Markel 2010), see project document
-                       ; Charger rate may be anywhere from 20-250kW (Markel 2010)
-    set energy-price 0.17 ;
-    set installed-cost 50 ; $1000
+  ifelse (file-exists? charger-type-input-file) [
+    file-close
+    file-open charger-type-input-file
+    while [file-at-end? = false] [
+      create-charger-types 1 [
+        set level file-read
+        set charge-rate file-read
+        set energy-price file-read
+        set installed-cost file-read
+      ]
+    ]
+    file-close
+  ][ 
+    user-message (word "Input file '" charger-type-input-file "' not found!") 
   ]
 end 
 
@@ -336,7 +324,7 @@ end
 ;; SETUP CHARGERS
 ;;;;;;;;;;;;;;;;;;;;
 to setup-chargers
-  print "setup-chargers"
+  ;print "setup-chargers"
   ; The charger level, location, and quantity of chargers was read in during setup-tazs.
   ; Now chargers of each level are created at the appropriate taz.
   ; Charger-rate is currently a separate state variable from charger level. We may want to combine the two later, if
@@ -372,8 +360,6 @@ to setup-chargers
     set color red
     set size 1
     set current-driver nobody
-    ;set xcor [xcor] of location
-    ;set ycor [ycor] of location
     let #level [level] of this-charger-type
   ]
 end ;setup-chargers
@@ -399,7 +385,7 @@ end
 ;;;;;;;;;;;;;;;;;;;;
 to open-logfile [logfile]
   file-close
-  file-open word logfile "-out.csv" 
+  file-open (word outputs-directory logfile "-out.csv" )
 end
 
 ;;;;;;;;;;;;;;;;;;;;
@@ -407,7 +393,7 @@ end
 ;;;;;;;;;;;;;;;;;;;;
 to reset-logfile [logfile]
   file-close
-  if file-exists? word logfile "-out.csv" [ file-delete word logfile "-out.csv" ]
+  if file-exists? (word outputs-directory logfile "-out.csv") [ file-delete (word outputs-directory logfile "-out.csv") ]
 end
 
 to log-driver [event-name]

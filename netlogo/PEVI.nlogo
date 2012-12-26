@@ -14,11 +14,14 @@ globals [
   schedule  ;; this global variable holds the dynamic schedule for the PEVI program, appended by the drivers from their itineraries
   
 ;; FILE PATHS
+  model-directory
   parameter-file
   charger-input-file
+  charger-type-input-file
   driver-input-file
   od-input-file
   vehicle-type-input-file
+  outputs-directory
   
 ;; PARAMETERS
   charge-safety-factor
@@ -36,6 +39,7 @@ globals [
   
   ;; globals needed for testing
   test-driver
+  seek-charger-index
 ]
 
 breed [drivers driver]
@@ -127,7 +131,6 @@ charger-types-own[
   charge-rate      ; kWh / hr  
   energy-price     ; $0.14/kWh
   installed-cost   ; $
-  charge-time-need
 ]
 
 vehicle-types-own[
@@ -140,23 +143,26 @@ vehicle-types-own[
   is-bev?
 ]
 
+to setup-from-gui
+    clear-all-and-initialize
+    if parameter-file = 0 [ set parameter-file "params.txt" ]
+    if model-directory = 0 [ set model-directory "./" ]
+    read-parameter-file
+    setup
+end
+
+to clear-all-and-initialize
+  ;print "clear all"
+  __clear-all-and-reset-ticks
+  set schedule dynamic-scheduler:create
+  create-turtles 1 [ setxy 0 0 set color black] ;This invisible turtle makes sure we start at taz 1 not taz 0
+end
+
 ;;;;;;;;;;;;;;;;;;;;
 ;; SETUP
 ;;;;;;;;;;;;;;;;;;;;
 to setup
-  print "setting up"
-  random-seed 100
-  show random 100
-
-  __clear-all-and-reset-ticks
- 
-  set schedule dynamic-scheduler:create
-   
-  create-turtles 1 [ setxy 0 0 set color black] ;This invisible turtle makes sure we start at taz 1 not taz 0
-  
-  set parameter-file "params.txt"
-  read-parameter-file
-  
+  ;print "setting up"
   setup-od-data
   setup-tazs
   convert-enroute-ids
@@ -283,11 +289,9 @@ end
 ;; trip-distance set by update-itinerary
 ;;;;;;;;;;;;;;;;;;;;
 to seek-charger
+  set seek-charger-index seek-charger-index + 1
   ;print (word precision ticks 3 " " self " seek-charger ")
-  
-  ;; leave 'set time-until-depart' here, or move to ARRIVE?
-  
-  set time-until-depart departure-time - ticks  ;; when the driver is supposed to depart -- not yet scheduled in itinerary
+  set time-until-depart departure-time - ticks
   let #extra-time-until-end-charge 0
   let #extra-time-for-travel 0
   let #extra-distance-for-travel 0
@@ -377,6 +381,7 @@ to seek-charger
               set #min-taz #this-taz
               set #min-charger-type #this-charger-type 
             ]
+            log-data "seek-charger" (sentence ticks seek-charger-index id #charger-in-origin-or-destination #level state-of-charge trip-distance journey-distance time-until-depart #this-cost)
           ]
           ;print (word precision ticks 3 " " self " seek-charger checking taz:" #this-taz " in-orig-dest? " #charger-in-origin-or-destination " level:" #level " this-cost:" #this-cost " rate:" ([charge-rate] of #this-charger-type) " energyprice:" ([energy-price] of #this-charger-type) " trip-or-journey-energy-need:" #trip-or-journey-energy-need)
         ]
@@ -388,6 +393,7 @@ to seek-charger
     set num-denials (num-denials + 1)
     wait-time-event-scheduler  
   ][
+;     log-data "seek-charger-result" (sentence ticks seek-charger-index id #charger-in-origin-or-destination #level state-of-charge trip-distance journey-distance time-until-depart #this-cost)
 ;    file-print (word precision ticks 3 " " self " least cost option is taz:" #min-taz " level:" ([level] of #min-charger-type) " cost:" #min-cost)
     ifelse #min-taz = current-taz [
       set current-charger one-of available-chargers #min-taz [level] of #min-charger-type
@@ -475,19 +481,15 @@ to charge-time-event-scheduler
                                                     charger-in-origin-or-destination 
                                                     [this-charger-type] of current-charger) + 0.001  ; .001 or 3.6 sec is a fudge factor to deal with roundoff error causing drivers to have 1e-15 too little charge 
   let next-event-scheduled-at 0 
-  ifelse (time-until-depart > 0.5) and (level-of current-charger < 3) and (time-until-end-charge < trip-charge-time-need) [                                                                                                    
+  ifelse (time-until-depart > 0.5) and (level-of current-charger < 3) and (time-until-end-charge > time-until-depart or time-until-end-charge < journey-charge-time-need) [                                                                                                    
     set next-event-scheduled-at ticks + min (sentence (random-exponential wait-time-mean) (time-until-depart - 0.5)) 
     dynamic-scheduler:add schedule self task end-charge-then-retry next-event-scheduled-at
   ][
-    ifelse (time-until-depart > 0.5) and (level-of current-charger < 2) and (time-until-end-charge < journey-charge-time-need) [
-      set next-event-scheduled-at ticks + min (sentence (random-exponential wait-time-mean) (time-until-depart - 0.5))  
-      dynamic-scheduler:add schedule self task end-charge-then-retry next-event-scheduled-at
-    ][
-      set next-event-scheduled-at ticks + time-until-end-charge
-      dynamic-scheduler:add schedule self task end-charge-then-itin next-event-scheduled-at
-      set after-end-charge "depart"
-    ]
+    set next-event-scheduled-at ticks + time-until-end-charge
+    dynamic-scheduler:add schedule self task end-charge-then-itin next-event-scheduled-at
+    set after-end-charge "depart"
   ]
+  log-data "charge-time" (sentence ticks id charger-in-origin-or-destination (level-of current-charger) state-of-charge trip-distance journey-distance time-until-depart after-end-charge (next-event-scheduled-at - ticks))
   if next-event-scheduled-at > departure-time[
     change-depart-time next-event-scheduled-at
   ]
@@ -637,7 +639,7 @@ end
 to depart
 ;  log-data "drivers" (sentence precision ticks 3 [id] of self "departing" state-of-charge)
   ifelse need-to-charge "depart" [  
-    ifelse state-of-charge = 1 [  ;; random decision to charge prevents BEVs from leaving sometimes. ac 11.07
+    ifelse state-of-charge = 1 or (( count (existing-chargers current-taz 1)  = 0) and (count (existing-chargers current-taz 2)  = 0) and state-of-charge >= 0.8)[  ;; random decision to charge prevents BEVs from leaving sometimes. ac 11.07
 ;      file-print (word precision ticks 3 " " self " cannot make trip with full battery -- breaking it up")
       break-up-trip
     ][
@@ -647,7 +649,6 @@ to depart
   ][  
     travel-time-event-scheduler
   ]
-  
 end
 
 ;;;;;;;;;;;;;;;;;;;;
@@ -762,7 +763,6 @@ to arrive
   ;; moved ' set time-until-depart departure-time - ticks ' here from SEEK-CHARGER
       
   ifelse not itin-complete? [
-    let #time-until-depart departure-time - ticks
     ifelse need-to-charge "arrive" [   
       log-data "trip-journey-timeuntildepart" (sentence 
         ticks 
@@ -877,6 +877,14 @@ to-report available-chargers [#taz #level]
   report #found-chargers
 end
 
+to-report existing-chargers [#taz #level]
+  let #found-chargers 0
+  ask #taz[
+    set #found-chargers (item #level chargers-by-type)
+  ]
+  report #found-chargers
+end
+
 to-report charge-rate-of [#charger]
   report [charge-rate] of ([this-charger-type] of #charger)
 end
@@ -924,8 +932,7 @@ to summarize
     ]
   ]
 
-
-  reset-logfile "summary"
+  reset-logfile "summary" 
   log-data "summary" (sentence "metric" "value")
   log-data "summary" (sentence "num.drivers" count drivers)
   log-data "summary" (sentence "num.trips" sum [ length itin-change-flag - sum itin-change-flag ] of drivers)
@@ -944,10 +951,10 @@ to summarize
 end
 @#$#@#$#@
 GRAPHICS-WINDOW
-130
-10
-375
-228
+195
+14
+440
+232
 -1
 -1
 7.5
@@ -973,10 +980,10 @@ ticks
 BUTTON
 9
 10
-75
+138
 43
 NIL
-setup
+setup-from-gui
 NIL
 1
 T
@@ -1005,15 +1012,15 @@ NIL
 1
 
 SLIDER
-362
-16
-534
-49
+473
+10
+645
+43
 go-until-time
 go-until-time
 0
 36
-36
+35.5
 0.5
 1
 NIL

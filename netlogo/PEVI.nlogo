@@ -180,7 +180,9 @@ to setup
   log-data "need-to-charge" (sentence "time" "driver" "vehicle.type" "soc" "trip.distance" "journey.distance" "time.until.depart" "calling.event" "remaining.range" "charging.on.a.whim?" "need.to.charge?")
   reset-logfile "trip-journey-timeuntildepart"
   log-data "trip-journey-timeuntildepart" (sentence "time" "departure.time" "driver" "vehicle.type" "soc" "from.taz" "to.taz" "trip.distance" "journey.distance" "time.until.depart" "next.event" "remaining.range")
-
+  reset-logfile "seek-charger"
+  log-data "seek-charger" (sentence "time" "seek-charger-index" "driver" "charger.in.origin.dest" "level" "soc" "trip.distance" "journey.distance" "time.until.depart" "cost")
+  set seek-charger-index 0
 end 
 
 to go
@@ -774,7 +776,7 @@ to arrive
         #to-taz
         #completed-trip 
         #completed-journey 
-        #time-until-depart 
+        time-until-depart 
         "seeking-charger"
         remaining-range)
 
@@ -790,7 +792,7 @@ to arrive
         #to-taz
         #completed-trip 
         #completed-journey 
-        #time-until-depart 
+        time-until-depart 
         "scheduling-itinerary"
         remaining-range)
 
@@ -810,7 +812,7 @@ to arrive
         #to-taz
         #completed-trip 
         #completed-journey 
-        #time-until-depart 
+        0 
         "home"
         remaining-range)
 
@@ -839,7 +841,7 @@ to arrive
         #to-taz
         #completed-trip 
         #completed-journey 
-        #time-until-depart 
+        0 
         "journey-complete"
         remaining-range)
     ]
@@ -1044,10 +1046,10 @@ NIL
 0
 
 SWITCH
-558
-58
-699
-91
+476
+143
+617
+176
 log-wait-time
 log-wait-time
 1
@@ -1055,10 +1057,10 @@ log-wait-time
 -1000
 
 SWITCH
-558
-104
-697
-137
+476
+189
+615
+222
 log-charging
 log-charging
 1
@@ -1066,21 +1068,21 @@ log-charging
 -1000
 
 SWITCH
-560
-153
-719
-186
-log-charge-time
-log-charge-time
-1
-1
--1000
-
-SWITCH
-570
-202
-752
+476
 235
+635
+268
+log-charge-time
+log-charge-time
+1
+1
+-1000
+
+SWITCH
+476
+280
+658
+313
 log-need-to-charge
 log-need-to-charge
 1
@@ -1088,13 +1090,24 @@ log-need-to-charge
 -1000
 
 SWITCH
-561
-11
-822
-44
+475
+97
+736
+130
 log-trip-journey-timeuntildepart
 log-trip-journey-timeuntildepart
 0
+1
+-1000
+
+SWITCH
+476
+326
+642
+359
+log-seek-charger
+log-seek-charger
+1
 1
 -1000
 
@@ -1427,7 +1440,7 @@ Polygon -7500403 true true 270 75 225 30 30 225 75 270
 Polygon -7500403 true true 30 75 75 30 270 225 225 270
 
 @#$#@#$#@
-NetLogo 5.0.1
+NetLogo 5.0
 @#$#@#$#@
 @#$#@#$#@
 @#$#@#$#@

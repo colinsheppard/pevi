@@ -371,7 +371,8 @@ to log-data [logfile data-list]
   if (logfile = "wait-time" and log-wait-time) or
      (logfile = "charging" and log-charging) or
      (logfile = "charge-time" and log-charge-time) or
-     (logfile = "summary" and log-charge-time) or
+     (logfile = "seek-charger" and log-seek-charger) or
+     (logfile = "summary") or
      (logfile = "need-to-charge" and log-need-to-charge) or
      (logfile = "trip-journey-timeuntildepart" and log-trip-journey-timeuntildepart)  ;; logs at ARRIVE
   [

@@ -1,11 +1,11 @@
 Sys.setenv(NOAWT=1)
 library(colinmisc)
-load.libraries(c('plyr','yaml','RNetLogo'))
+load.libraries(c('ggplot2','yaml','RNetLogo'))
 
 path.to.pevi <- '/Users/critter/Dropbox/serc/pev-colin/pevi/'
 path.to.inputs <- '/Users/critter/Dropbox/serc/pev-colin/pev-shared/data/inputs/sensitivity/charge-safety-factor/'
 
-.jinit(parameters="-Xmx1024m")
+#.jinit(parameters="-Xmx1024m")
 
 # read the parameters and values to vary in the experiment
 vary <- yaml.load(readChar(paste(path.to.inputs,'vary.yaml',sep=''),file.info(paste(path.to.inputs,'vary.yaml',sep=''))$size))
@@ -47,8 +47,8 @@ NLCommand('set log-wait-time false','set log-charging false','set log-charge-tim
 
 # for every combination of parameters, run the model and capture the summary statistics
 for(results.i in 1:nrow(results)){
-  print(results.i)
-  #if(results.i%%25 == 0)cat(paste(results.i,""))
+  #print(results.i)
+  if(results.i%%10 == 0)cat(paste(results.i,""))
   NLCommand('clear-all-and-initialize')
   NLCommand(paste('set parameter-file "',path.to.inputs,'params.txt"',sep=''))
   NLCommand(paste('set model-directory "',path.to.pevi,'netlogo/"',sep=''))
@@ -62,8 +62,11 @@ for(results.i in 1:nrow(results)){
   }
   NLCommand('setup')
   NLCommand('go')
+  results[results.i,names(reporters)] <- tryCatch(NLDoReport(1,"",reporter = paste("(sentence",paste(reporters,collapse=' '),")"),as.data.frame=T,df.col.names=names(reporters)),error=function(e){ NA })
+}
 
-  results[results.i,names(reporters)] <- NLDoReport(1,"",reporter = paste("(sentence",paste(reporters,collapse=' '),")"),as.data.frame=T,df.col.names=names(reporters))
+for(res in names(reporters)){
+  results[,res] <- as.numeric(results[,res])
 }
 
 NLQuit()

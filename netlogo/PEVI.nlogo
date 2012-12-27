@@ -181,12 +181,14 @@ to setup
   reset-logfile "trip-journey-timeuntildepart"
   log-data "trip-journey-timeuntildepart" (sentence "time" "departure.time" "driver" "vehicle.type" "soc" "from.taz" "to.taz" "trip.distance" "journey.distance" "time.until.depart" "next.event" "remaining.range" "delay.sum")
   reset-logfile "seek-charger"
-  log-data "seek-charger" (sentence "time" "seek-charger-index" "driver" "charger.in.origin.dest" "level" "soc" "trip.distance" "journey.distance" "time.until.depart" "cost")
+  log-data "seek-charger" (sentence "time" "seek.charger.index" "driver" "charger.in.origin.dest" "level" "soc" "trip.distance" "journey.distance" "time.until.depart" "cost")
   set seek-charger-index 0
   reset-logfile "break-up-trip"  
-  log-data "break-up-trip" (sentence "time" "driver" "state-of-charge" "current-taz" "destination-taz" "remaining-range" "charging.on.a.whim?" "result-action")
+  log-data "break-up-trip" (sentence "time" "driver" "state.of.charge" "current.taz" "destination.taz" "remaining.range" "charging.on.a.whim?" "result.action")
   reset-logfile "break-up-trip-choice"  
-  log-data "break-up-trip-choice" (sentence "time" "driver" "current-taz" "destination-taz" "result-action" "new-destination" "max-score-or-distance")
+  log-data "break-up-trip-choice" (sentence "time" "driver" "current.taz" "destination.taz" "result.action" "new.destination" "max.score.or.distance")
+  reset-logfile "available-chargers"
+  log-data "available-chargers" (sentence "time" "driver" "current.taz" "home.taz" "taz" "level" "num.available.chargers")
   print "setup complete"
 end 
 
@@ -619,19 +621,22 @@ end
 ;; BREAK UP TRIP
 ;;;;;;;;;;;;;;;;;;;;
 to break-up-trip
-  let #taz-list item my-od-index od-enroute
-  let #this-taz current-taz
+  let #cand-taz-list (remove current-taz (remove destination-taz (item my-od-index od-enroute)))
+  let #this-taz 0
   let #max-score 0
-  let #max-taz current-taz
+  let #max-taz 0
   let #max-dist 0
-  let #max-dist-taz current-taz
-  foreach #taz-list [
+  let #max-dist-only 0
+  let #max-dist-taz 0
+  let #result-action "-from-subset"
+  foreach #cand-taz-list [
     set #this-taz ?
     let #this-score 0
-    if #this-taz != current-taz and 
-      (distance-from-to [id] of current-taz [id] of #this-taz) <= remaining-range and 
-      distance-from-to [id] of #this-taz [id] of destination-taz <= battery-capacity / electric-fuel-consumption / charge-safety-factor [
-
+    let #this-dist distance-from-to [id] of current-taz [id] of #this-taz
+    let #only-level-3 (count (existing-chargers #this-taz 1)  = 0) and (count (existing-chargers #this-taz 2)  = 0)
+    if #this-dist <= remaining-range / charge-safety-factor and 
+      ( (#only-level-3 and distance-from-to [id] of #this-taz [id] of destination-taz <= 0.8 * battery-capacity / electric-fuel-consumption / charge-safety-factor)
+        or (not #only-level-3 and distance-from-to [id] of #this-taz [id] of destination-taz <= battery-capacity / electric-fuel-consumption / charge-safety-factor) ) [
       foreach [level] of charger-types [
         let #level ?
         if (count (available-chargers #this-taz #level) > 0) [
@@ -643,17 +648,31 @@ to break-up-trip
         ]
       ]
     ]
-    if #this-score > #max-score [ 
+    if #this-score > #max-score or (#this-score = #max-score and #this-dist > #max-dist) [ 
       set #max-score #this-score
       set #max-taz #this-taz
+      set #max-dist #this-dist
     ]
   ]
+  ; log available chargers for verification
+  if log-break-up-trip-choice[
+      foreach #cand-taz-list [
+        set #this-taz ?
+        foreach [level] of charger-types [
+          log-data "available-chargers" (sentence ticks id [id] of current-taz [id] of home-taz [id] of #this-taz ? count (available-chargers #this-taz ?))
+        ]
+      ]
+  ]
   if #max-score = 0 [  ; do it again but don't restrict to taz's that get us there on the second trip
-    foreach #taz-list [
+    set #result-action "-from-all"
+    set #max-taz 0
+    set #max-dist 0
+    set #max-dist-taz 0
+    foreach #cand-taz-list [
       set #this-taz ?
       let #this-score 0
       let #this-dist distance-from-to [id] of current-taz [id] of #this-taz
-      if #this-taz != current-taz and #this-dist <= remaining-range [
+      if #this-dist <= remaining-range / charge-safety-factor [
         foreach [level] of charger-types [
           let #level ?
           if (count (available-chargers #this-taz #level) > 0) [
@@ -665,23 +684,29 @@ to break-up-trip
           ]
         ]
       ]
-      if #this-score > #max-score [ 
+      if #this-score > #max-score or (#this-score = #max-score and #this-dist > #max-dist) [ 
         set #max-score #this-score
         set #max-taz #this-taz
-      ]
-      if #this-dist > #max-dist [ 
         set #max-dist #this-dist
+      ]
+      if #this-dist > #max-dist-only [ 
+        set #max-dist-only #this-dist
         set #max-dist-taz #this-taz
       ]
     ]
   ]
   ifelse #max-score = 0 [
-    ; choose the furthest along and hope
-    add-trip-to-itinerary #max-dist-taz
-    log-data "break-up-trip-choice" (sentence ticks 3 id ([id] of current-taz) ([id] of destination-taz) "max-distance" ([id] of #max-dist-taz) #max-dist)
+    ifelse #max-dist-taz = 0 [
+      log-data "break-up-trip-choice" (sentence ticks id ([id] of current-taz) ([id] of destination-taz) "none-found" 0 0)
+      print "ERROR: this situation shouldn't arise, in break-up-trip and no enroute tazs found other than origin and destination which is too far, perhaps battery-capacity is too low or TAZs too big?"
+    ][ 
+      ; choose the furthest along and hope
+      log-data "break-up-trip-choice" (sentence ticks id ([id] of current-taz) ([id] of destination-taz) "max-distance" ([id] of #max-dist-taz) #max-dist-only)
+      add-trip-to-itinerary #max-dist-taz
+    ]
   ][
+    log-data "break-up-trip-choice" (sentence ticks id ([id] of current-taz) ([id] of destination-taz) (word "max-score" #result-action) ([id] of #max-taz) #max-score)
     add-trip-to-itinerary #max-taz
-    log-data "break-up-trip-choice" (sentence ticks 3 id ([id] of current-taz) ([id] of destination-taz) "max-score" ([id] of #max-taz) #max-score)
   ]
   travel-time-event-scheduler
 end
@@ -864,7 +889,7 @@ to-report od-index [destination source]
 end
 
 to-report my-od-index
-  report (([id] of destination-taz - 1) * n-tazs + [id] of current-taz - 1)
+  report (([id] of current-taz - 1) * n-tazs + [id] of destination-taz - 1)
 end
 
 to-report driver-soc [the-driver]
@@ -979,7 +1004,7 @@ go-until-time
 go-until-time
 0
 36
-35.5
+13.5
 0.5
 1
 NIL
@@ -1042,7 +1067,7 @@ SWITCH
 313
 log-need-to-charge
 log-need-to-charge
-0
+1
 1
 -1000
 

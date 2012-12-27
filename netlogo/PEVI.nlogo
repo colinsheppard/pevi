@@ -179,7 +179,7 @@ to setup
   reset-logfile "need-to-charge"
   log-data "need-to-charge" (sentence "time" "driver" "vehicle.type" "soc" "trip.distance" "journey.distance" "time.until.depart" "calling.event" "remaining.range" "charging.on.a.whim?" "need.to.charge?")
   reset-logfile "trip-journey-timeuntildepart"
-  log-data "trip-journey-timeuntildepart" (sentence "time" "departure.time" "driver" "vehicle.type" "soc" "from.taz" "to.taz" "trip.distance" "journey.distance" "time.until.depart" "next.event" "remaining.range")
+  log-data "trip-journey-timeuntildepart" (sentence "time" "departure.time" "driver" "vehicle.type" "soc" "from.taz" "to.taz" "trip.distance" "journey.distance" "time.until.depart" "next.event" "remaining.range" "delay.sum")
   reset-logfile "seek-charger"
   log-data "seek-charger" (sentence "time" "seek-charger-index" "driver" "charger.in.origin.dest" "level" "soc" "trip.distance" "journey.distance" "time.until.depart" "cost")
   set seek-charger-index 0
@@ -215,7 +215,7 @@ to-report need-to-charge [calling-event]
       [name] of this-vehicle-type 
       state-of-charge trip-distance 
       journey-distance 
-      time-until-depart 
+      (departure-time - ticks)
       calling-event 
       remaining-range 
       charging-on-a-whim?
@@ -232,7 +232,7 @@ to-report need-to-charge [calling-event]
           [name] of this-vehicle-type 
           state-of-charge trip-distance 
           journey-distance 
-          time-until-depart 
+          (departure-time - ticks)
           calling-event 
           remaining-range 
           charging-on-a-whim?
@@ -245,7 +245,7 @@ to-report need-to-charge [calling-event]
           [name] of this-vehicle-type 
           state-of-charge trip-distance 
           journey-distance 
-          time-until-depart 
+          (departure-time - ticks)
           calling-event 
           remaining-range 
           charging-on-a-whim?
@@ -259,7 +259,7 @@ to-report need-to-charge [calling-event]
         [name] of this-vehicle-type 
         state-of-charge trip-distance 
         journey-distance 
-        time-until-depart 
+        (departure-time - ticks)
         calling-event 
         remaining-range 
         charging-on-a-whim?
@@ -437,13 +437,14 @@ to wait-time-event-scheduler
         id 
         [name] of this-vehicle-type 
         state-of-charge 
-        current-taz
-        destination-taz
+        [id] of current-taz
+        [id] of destination-taz
         true 
         false 
         (departure-time - ticks)
         "stranded"
-        remaining-range)
+        remaining-range
+        sum itin-delay-amount)
     ][
       let event-time-from-now random-exponential wait-time-mean
       dynamic-scheduler:add schedule self task retry-seek ticks + event-time-from-now
@@ -750,39 +751,35 @@ to arrive
     set energy-used energy-used + #charge-used * battery-capacity
   ]
   
-  ; output here
   let #completed-journey journey-distance
   let #completed-trip trip-distance
-  let #from-taz current-taz
+  let #from-taz [id] of current-taz
   set journey-distance journey-distance - trip-distance
   log-driver "arriving"
-;  file-flush
-
 
   update-itinerary 
-  let #to-taz current-taz
-  
-  
-  ;; moved ' set time-until-depart departure-time - ticks ' here from SEEK-CHARGER
+  let #to-taz [id] of current-taz
       
   ifelse not itin-complete? [
     ifelse need-to-charge "arrive" [   
-      log-data "trip-journey-timeuntildepart" (sentence 
-        ticks 
-        departure-time
-        id 
-        [name] of this-vehicle-type 
-        state-of-charge 
-        #from-taz
-        #to-taz
-        #completed-trip 
-        #completed-journey 
-        time-until-depart 
-        "seeking-charger"
-        remaining-range)
-
       seek-charger
+      log-data "trip-journey-timeuntildepart" (sentence 
+        ticks 
+        departure-time
+        id 
+        [name] of this-vehicle-type 
+        state-of-charge 
+        #from-taz
+        #to-taz
+        #completed-trip 
+        #completed-journey
+        (departure-time - ticks)
+        "seeking-charger"
+        remaining-range
+        sum itin-delay-amount)
     ][
+      itinerary-event-scheduler
+  
       log-data "trip-journey-timeuntildepart" (sentence 
         ticks 
         departure-time
@@ -793,30 +790,14 @@ to arrive
         #to-taz
         #completed-trip 
         #completed-journey 
-        time-until-depart 
+        (departure-time - ticks) 
         "scheduling-itinerary"
-        remaining-range)
-
-      itinerary-event-scheduler
+        remaining-range
+        sum itin-delay-amount)
     ]
   ][
-    let #time-until-depart 0  ;; only for use in logging  ac 12.20
     ;; itin is complete and at home? plug-in immediately and charge till full
     ifelse current-taz = home-taz [
-      log-data "trip-journey-timeuntildepart" (sentence 
-        ticks 
-        ticks
-        id 
-        [name] of this-vehicle-type 
-        state-of-charge 
-        #from-taz
-        #to-taz
-        #completed-trip 
-        #completed-journey 
-        0 
-        "home"
-        remaining-range)
-
       set current-charger (one-of item 0 [chargers-by-type] of current-taz)
       set full-charge-time-need (1 - state-of-charge) * battery-capacity / charge-rate-of current-charger
       dynamic-scheduler:add schedule self task end-charge ticks + full-charge-time-need 
@@ -831,6 +812,20 @@ to arrive
         (state-of-charge + (full-charge-time-need * charge-rate-of current-charger) / battery-capacity )
         "stop"
         false)
+      log-data "trip-journey-timeuntildepart" (sentence 
+        ticks 
+        ticks
+        id 
+        [name] of this-vehicle-type 
+        state-of-charge 
+        #from-taz
+        #to-taz
+        #completed-trip 
+        #completed-journey 
+        0
+        "home"
+        remaining-range
+        sum itin-delay-amount)
     ][
       log-data "trip-journey-timeuntildepart" (sentence 
         ticks 
@@ -842,9 +837,10 @@ to arrive
         #to-taz
         #completed-trip 
         #completed-journey 
-        0 
+        0
         "journey-complete"
-        remaining-range)
+        remaining-range
+        sum itin-delay-amount)
     ]
   ]
 
@@ -1086,7 +1082,7 @@ SWITCH
 313
 log-need-to-charge
 log-need-to-charge
-0
+1
 1
 -1000
 
@@ -1097,7 +1093,7 @@ SWITCH
 130
 log-trip-journey-timeuntildepart
 log-trip-journey-timeuntildepart
-1
+0
 1
 -1000
 

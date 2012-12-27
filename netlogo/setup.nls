@@ -81,6 +81,7 @@ end
 ;;;;;;;;;;;;;;;;;;;;
 to setup-tazs
   ;print "setup-tazs"
+  let #prev-taz-id 0
   create-tazs n-tazs
   ask tazs [
     set shape "star"
@@ -95,6 +96,8 @@ to setup-tazs
     foreach sort tazs [  ; we want the who value to match the id, so we sort them, this assumes the text file has sequential ids starting from 1
       ask ? [
         set id file-read
+        if id != #prev-taz-id + 1 [ error (word "In setup-tazs, was expecting to read taz #" (#prev-taz-id + 1) " from file but found #" id " instead.") ]
+        set #prev-taz-id id
         foreach [0 1 2 3] [
           set n-levels replace-item ? n-levels file-read ; sets the number of level X chargers in each TAZ
         ]
@@ -376,6 +379,7 @@ to log-data [logfile data-list]
      (logfile = "trip-journey-timeuntildepart" and log-trip-journey-timeuntildepart) or
      (logfile = "break-up-trip" and log-break-up-trip) or
      (logfile = "break-up-trip-choice" and log-break-up-trip-choice) or
+     (logfile = "available-chargers" and log-break-up-trip-choice) or     
      (logfile = "summary")
   [
     open-logfile logfile

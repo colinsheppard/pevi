@@ -162,7 +162,7 @@ end
 ;; SETUP
 ;;;;;;;;;;;;;;;;;;;;
 to setup
-  ;print "setting up"
+  print "setting up...."
   setup-od-data
   setup-tazs
   convert-enroute-ids
@@ -183,6 +183,7 @@ to setup
   reset-logfile "seek-charger"
   log-data "seek-charger" (sentence "time" "seek-charger-index" "driver" "charger.in.origin.dest" "level" "soc" "trip.distance" "journey.distance" "time.until.depart" "cost")
   set seek-charger-index 0
+  print "setup complete"
 end 
 
 to go
@@ -1085,7 +1086,7 @@ SWITCH
 313
 log-need-to-charge
 log-need-to-charge
-1
+0
 1
 -1000
 
@@ -1096,7 +1097,7 @@ SWITCH
 130
 log-trip-journey-timeuntildepart
 log-trip-journey-timeuntildepart
-0
+1
 1
 -1000
 

@@ -5,10 +5,10 @@
 "wait-time-mean"	0.5
 "time-opportunity-cost"	12.50
 "willing-to-roam-time-threshold"	1
-"probability-of-unneeded-charge"	0.01
-"charger-input-file"	"../../../pev-shared/data/inputs/chargers.txt"
-"charger-type-input-file"	"../../../pev-shared/data/inputs/charger-types.txt"
-"driver-input-file"	"../../../pev-shared/data/inputs/driver-schedule-pen2-rep1-20121220.txt"
+"probability-of-unneeded-charge"	0.1
+"charger-input-file"	"../../../pev-shared/data/inputs/charger-input-file/chargers-scen3.txt"
+"charger-type-input-file"	"../../../pev-shared/data/inputs/charger-type-input-file/charger-types-scen1.txt"
+"driver-input-file"	"../../../pev-shared/data/inputs/driver-input-file/driver-schedule-pen4-rep1-20121222.txt"
 "od-input-file"	"../../../pev-shared/data/inputs/taz-dist-time.txt"
 "outputs-directory"	"../outputs/"
-"vehicle-type-input-file"	"../../../pev-shared/data/inputs/vehicle-types.txt"
+"vehicle-type-input-file"	"../../../pev-shared/data/inputs/vehicle-type-input-file/vehicle-types-scen1.txt"

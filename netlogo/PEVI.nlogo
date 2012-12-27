@@ -183,6 +183,10 @@ to setup
   reset-logfile "seek-charger"
   log-data "seek-charger" (sentence "time" "seek-charger-index" "driver" "charger.in.origin.dest" "level" "soc" "trip.distance" "journey.distance" "time.until.depart" "cost")
   set seek-charger-index 0
+  reset-logfile "break-up-trip"  
+  log-data "break-up-trip" (sentence "time" "driver" "state-of-charge" "current-taz" "destination-taz" "remaining-range" "charging.on.a.whim?" "result-action")
+  reset-logfile "break-up-trip-choice"  
+  log-data "break-up-trip-choice" (sentence "time" "driver" "current-taz" "destination-taz" "result-action" "new-destination" "max-score-or-distance")
   print "setup complete"
 end 
 
@@ -196,6 +200,9 @@ end
 ;;;;;;;;;;;;;;;;;;;;
 to-report need-to-charge [calling-event]
   set charging-on-a-whim? false
+  set trip-distance item my-od-index od-dist
+  set time-until-depart departure-time - ticks
+  set departure-time item current-itin-row itin-depart
   ifelse is-bev? [
     set remaining-range (state-of-charge * battery-capacity / electric-fuel-consumption )
   ][
@@ -203,67 +210,20 @@ to-report need-to-charge [calling-event]
   ]
   ifelse ( (calling-event = "arrive" and remaining-range < journey-distance * charge-safety-factor) or 
            (calling-event = "depart" and remaining-range < trip-distance * charge-safety-factor) )[
-    if (calling-event = "arrive" and remaining-range < journey-distance * charge-safety-factor)[
-     ;print (word precision ticks 3 " " self " remaining range is less than journey distance: " (journey-distance * charge-safety-factor))
-    ]
-    if (calling-event = "depart" and remaining-range < trip-distance * charge-safety-factor)[
-      ;print (word precision ticks 3 " " self " remaining range is less than trip distance: " (trip-distance * charge-safety-factor))
-    ]
-    log-data "need-to-charge" (sentence 
-      ticks 
-      id 
-      [name] of this-vehicle-type 
-      state-of-charge trip-distance 
-      journey-distance 
-      (departure-time - ticks)
-      calling-event 
-      remaining-range 
-      charging-on-a-whim?
-      "true")
+    log-data "need-to-charge" (sentence ticks id [name] of this-vehicle-type state-of-charge trip-distance journey-distance (departure-time - ticks) calling-event remaining-range charging-on-a-whim? "true")
     report true
   ][
-    ifelse (state-of-charge < 1) [  ;; drivers only consider unneeded charge if their vehicle does not have a full state of charge
+    ifelse (calling-event = "arrive" and state-of-charge < 1) [  ;; drivers only consider unneeded charge if they just arrived and the vehicle does not have a full state of charge
       ifelse time-until-depart >= 0.5 and random-float 1 < probability-of-unneeded-charge [
-;        print (word precision ticks 3 " " self " need-to-charge on a whim, SOC: " state-of-charge)
         set charging-on-a-whim? true
-        log-data "need-to-charge" (sentence 
-          ticks 
-          id 
-          [name] of this-vehicle-type 
-          state-of-charge trip-distance 
-          journey-distance 
-          (departure-time - ticks)
-          calling-event 
-          remaining-range 
-          charging-on-a-whim?
-          "true")
+        log-data "need-to-charge" (sentence ticks id [name] of this-vehicle-type state-of-charge trip-distance journey-distance (departure-time - ticks) calling-event remaining-range charging-on-a-whim? "true")
         report true
       ][
-        log-data "need-to-charge" (sentence 
-          ticks 
-          id 
-          [name] of this-vehicle-type 
-          state-of-charge trip-distance 
-          journey-distance 
-          (departure-time - ticks)
-          calling-event 
-          remaining-range 
-          charging-on-a-whim?
-          "false")
+        log-data "need-to-charge" (sentence ticks id [name] of this-vehicle-type state-of-charge trip-distance journey-distance (departure-time - ticks) calling-event remaining-range charging-on-a-whim? "false")
         report false
       ]
     ][
-      log-data "need-to-charge" (sentence 
-        ticks 
-        id 
-        [name] of this-vehicle-type 
-        state-of-charge trip-distance 
-        journey-distance 
-        (departure-time - ticks)
-        calling-event 
-        remaining-range 
-        charging-on-a-whim?
-        "false")
+      log-data "need-to-charge" (sentence ticks id [name] of this-vehicle-type state-of-charge trip-distance journey-distance (departure-time - ticks) calling-event remaining-range charging-on-a-whim? "false")
       report false
     ]
   ]
@@ -644,11 +604,11 @@ to depart
 ;  log-data "drivers" (sentence precision ticks 3 [id] of self "departing" state-of-charge)
   ifelse need-to-charge "depart" [  
     ifelse state-of-charge = 1 or (( count (existing-chargers current-taz 1)  = 0) and (count (existing-chargers current-taz 2)  = 0) and state-of-charge >= 0.8)[  ;; random decision to charge prevents BEVs from leaving sometimes. ac 11.07
-;      file-print (word precision ticks 3 " " self " cannot make trip with full battery -- breaking it up")
+      log-data "break-up-trip" (sentence ticks id state-of-charge ([id] of current-taz) ([id] of destination-taz) remaining-range charging-on-a-whim? "break-up-trip")
       break-up-trip
     ][
-      ;print (word precision ticks 3 " " self " cannot make TRIP with current charge. Seeking charger.")
-      seek-charger   
+      log-data "break-up-trip" (sentence ticks id state-of-charge ([id] of current-taz) ([id] of destination-taz) remaining-range charging-on-a-whim? "seek-charger")
+      seek-charger
     ]
   ][  
     travel-time-event-scheduler
@@ -718,10 +678,10 @@ to break-up-trip
   ifelse #max-score = 0 [
     ; choose the furthest along and hope
     add-trip-to-itinerary #max-dist-taz
-;    log-data "break-up-trip" (sentence precision ticks 3 " " [id] of self "distance" #max-dist-taz #max-dist)
+    log-data "break-up-trip-choice" (sentence ticks 3 id ([id] of current-taz) ([id] of destination-taz) "max-distance" ([id] of #max-dist-taz) #max-dist)
   ][
     add-trip-to-itinerary #max-taz
-;    log-data "break-up-trip" (sentence precision ticks 3 " " [id] of self "score" #max-taz #max-score)
+    log-data "break-up-trip-choice" (sentence ticks 3 id ([id] of current-taz) ([id] of destination-taz) "max-score" ([id] of #max-taz) #max-score)
   ]
   travel-time-event-scheduler
 end
@@ -1082,7 +1042,7 @@ SWITCH
 313
 log-need-to-charge
 log-need-to-charge
-1
+0
 1
 -1000
 
@@ -1093,7 +1053,7 @@ SWITCH
 130
 log-trip-journey-timeuntildepart
 log-trip-journey-timeuntildepart
-0
+1
 1
 -1000
 
@@ -1105,6 +1065,28 @@ SWITCH
 log-seek-charger
 log-seek-charger
 1
+1
+-1000
+
+SWITCH
+476
+370
+646
+403
+log-break-up-trip
+log-break-up-trip
+0
+1
+-1000
+
+SWITCH
+477
+416
+694
+449
+log-break-up-trip-choice
+log-break-up-trip-choice
+0
 1
 -1000
 

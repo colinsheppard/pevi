@@ -375,6 +375,7 @@ to log-data [logfile data-list]
      (logfile = "charging" and log-charging) or
      (logfile = "charge-time" and log-charge-time) or
      (logfile = "seek-charger" and log-seek-charger) or
+     (logfile = "seek-charger-result" and log-seek-charger-result) or
      (logfile = "need-to-charge" and log-need-to-charge) or
      (logfile = "trip-journey-timeuntildepart" and log-trip-journey-timeuntildepart) or
      (logfile = "break-up-trip" and log-break-up-trip) or

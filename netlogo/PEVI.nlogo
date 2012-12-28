@@ -181,7 +181,9 @@ to setup
   reset-logfile "trip-journey-timeuntildepart"
   log-data "trip-journey-timeuntildepart" (sentence "time" "departure.time" "driver" "vehicle.type" "soc" "from.taz" "to.taz" "trip.distance" "journey.distance" "time.until.depart" "next.event" "remaining.range" "delay.sum")
   reset-logfile "seek-charger"
-  log-data "seek-charger" (sentence "time" "seek.charger.index" "driver" "charger.in.origin.dest" "level" "soc" "trip.distance" "journey.distance" "time.until.depart" "cost")
+  log-data "seek-charger" (sentence "time" "seek.charger.index" "driver" "taz" "charger.in.origin.dest" "level" "soc" "trip.distance" "journey.distance" "time.until.depart" "cost")
+  reset-logfile "seek-charger-result"
+  log-data "seek-charger-result" (sentence "time" "seek.charger.index" "driver" "chosen.taz" "charger.in.origin.dest" "chosen.level" "cost")
   set seek-charger-index 0
   reset-logfile "break-up-trip"  
   log-data "break-up-trip" (sentence "time" "driver" "state.of.charge" "current.taz" "destination.taz" "remaining.range" "charging.on.a.whim?" "result.action")
@@ -348,20 +350,18 @@ to seek-charger
               set #min-taz #this-taz
               set #min-charger-type #this-charger-type 
             ]
-            log-data "seek-charger" (sentence ticks seek-charger-index id #charger-in-origin-or-destination #level state-of-charge trip-distance journey-distance time-until-depart #this-cost)
+            log-data "seek-charger" (sentence ticks seek-charger-index id ([id] of #this-taz) #charger-in-origin-or-destination #level state-of-charge trip-distance journey-distance time-until-depart #this-cost)
           ]
-          ;print (word precision ticks 3 " " self " seek-charger checking taz:" #this-taz " in-orig-dest? " #charger-in-origin-or-destination " level:" #level " this-cost:" #this-cost " rate:" ([charge-rate] of #this-charger-type) " energyprice:" ([energy-price] of #this-charger-type) " trip-or-journey-energy-need:" #trip-or-journey-energy-need)
         ]
       ]
     ]
   ]
-  ifelse #min-taz = -99 [  
-;    file-print (word precision ticks 3 " " self " seek charger - none available") 
+  ifelse #min-taz = -99 [
+    log-data "seek-charger-result" (sentence ticks seek-charger-index id -1 "" -1 -1)  
     set num-denials (num-denials + 1)
     wait-time-event-scheduler  
   ][
-;     log-data "seek-charger-result" (sentence ticks seek-charger-index id #charger-in-origin-or-destination #level state-of-charge trip-distance journey-distance time-until-depart #this-cost)
-;    file-print (word precision ticks 3 " " self " least cost option is taz:" #min-taz " level:" ([level] of #min-charger-type) " cost:" #min-cost)
+    log-data "seek-charger-result" (sentence ticks seek-charger-index id ([id] of #min-taz) (#min-taz = current-taz or #min-taz = destination-taz) ([level] of #min-charger-type) #min-cost)
     ifelse #min-taz = current-taz [
       set current-charger one-of available-chargers #min-taz [level] of #min-charger-type
       if [level] of #min-charger-type > 0 [
@@ -1136,15 +1136,15 @@ SWITCH
 359
 log-seek-charger
 log-seek-charger
-1
+0
 1
 -1000
 
 SWITCH
-476
-370
-646
-403
+474
+410
+644
+443
 log-break-up-trip
 log-break-up-trip
 1
@@ -1152,10 +1152,10 @@ log-break-up-trip
 -1000
 
 SWITCH
-477
-416
-694
-449
+475
+456
+692
+489
 log-break-up-trip-choice
 log-break-up-trip-choice
 1
@@ -1163,12 +1163,23 @@ log-break-up-trip-choice
 -1000
 
 SWITCH
-476
-459
-699
-492
+474
+499
+697
+532
 log-charge-limiting-factor
 log-charge-limiting-factor
+0
+1
+-1000
+
+SWITCH
+475
+367
+684
+400
+log-seek-charger-result
+log-seek-charger-result
 0
 1
 -1000

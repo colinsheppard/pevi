@@ -14,11 +14,14 @@ globals [
   schedule  ;; this global variable holds the dynamic schedule for the PEVI program, appended by the drivers from their itineraries
   
 ;; FILE PATHS
+  model-directory
   parameter-file
   charger-input-file
+  charger-type-input-file
   driver-input-file
   od-input-file
   vehicle-type-input-file
+  outputs-directory
   
 ;; PARAMETERS
   charge-safety-factor
@@ -36,6 +39,7 @@ globals [
   
   ;; globals needed for testing
   test-driver
+  seek-charger-index
 ]
 
 breed [drivers driver]
@@ -127,7 +131,6 @@ charger-types-own[
   charge-rate      ; kWh / hr  
   energy-price     ; $0.14/kWh
   installed-cost   ; $
-  charge-time-need
 ]
 
 vehicle-types-own[
@@ -140,20 +143,26 @@ vehicle-types-own[
   is-bev?
 ]
 
+to setup-from-gui
+    clear-all-and-initialize
+    if parameter-file = 0 [ set parameter-file "params.txt" ]
+    if model-directory = 0 [ set model-directory "./" ]
+    read-parameter-file
+    setup
+end
+
+to clear-all-and-initialize
+  ;print "clear all"
+  __clear-all-and-reset-ticks
+  set schedule dynamic-scheduler:create
+  create-turtles 1 [ setxy 0 0 set color black] ;This invisible turtle makes sure we start at taz 1 not taz 0
+end
+
 ;;;;;;;;;;;;;;;;;;;;
 ;; SETUP
 ;;;;;;;;;;;;;;;;;;;;
 to setup
-  print "setting up"
-  __clear-all-and-reset-ticks
- 
-  set schedule dynamic-scheduler:create
-   
-  create-turtles 1 [ setxy 0 0 set color black] ;This invisible turtle makes sure we start at taz 1 not taz 0
-  
-  set parameter-file "params.txt"
-  read-parameter-file
-  
+  print "setting up...."
   setup-od-data
   setup-tazs
   convert-enroute-ids
@@ -167,9 +176,23 @@ to setup
   log-data "wait-time" (sentence "time" "driver" "vehicle.type" "soc" "trip.distance" "journey.distance" "time.until.depart" "result.action" "time.from.now")
   reset-logfile "charge-time"
   log-data "charge-time" (sentence "time" "driver" "charger.in.origin.dest" "level" "soc" "trip.distance" "journey.distance" "time.until.depart" "result.action" "time.from.now")
+  reset-logfile "need-to-charge"
+  log-data "need-to-charge" (sentence "time" "driver" "vehicle.type" "soc" "trip.distance" "journey.distance" "time.until.depart" "calling.event" "remaining.range" "charging.on.a.whim?" "need.to.charge?")
+  reset-logfile "trip-journey-timeuntildepart"
+  log-data "trip-journey-timeuntildepart" (sentence "time" "departure.time" "driver" "vehicle.type" "soc" "from.taz" "to.taz" "trip.distance" "journey.distance" "time.until.depart" "next.event" "remaining.range" "delay.sum")
+  reset-logfile "seek-charger"
+  log-data "seek-charger" (sentence "time" "seek.charger.index" "driver" "charger.in.origin.dest" "level" "soc" "trip.distance" "journey.distance" "time.until.depart" "cost")
+  set seek-charger-index 0
+  reset-logfile "break-up-trip"  
+  log-data "break-up-trip" (sentence "time" "driver" "state.of.charge" "current.taz" "destination.taz" "remaining.range" "charging.on.a.whim?" "result.action")
+  reset-logfile "break-up-trip-choice"  
+  log-data "break-up-trip-choice" (sentence "time" "driver" "current.taz" "destination.taz" "result.action" "new.destination" "max.score.or.distance")
+  reset-logfile "available-chargers"
+  log-data "available-chargers" (sentence "time" "driver" "current.taz" "home.taz" "taz" "level" "num.available.chargers")
   reset-logfile "charge-limiting-factor"
   log-data "charge-limiting-factor" (sentence "time" "driver" "result.action" "full-charge-time-need" "trip-charge-time-need" "journey-charge-time-need" "time-until-depart" "charger-in-origin-or-destination" "this-charger-type")
-end
+  print "setup complete"
+end 
 
 to go
   dynamic-scheduler:go schedule
@@ -181,6 +204,9 @@ end
 ;;;;;;;;;;;;;;;;;;;;
 to-report need-to-charge [calling-event]
   set charging-on-a-whim? false
+  set trip-distance item my-od-index od-dist
+  set time-until-depart departure-time - ticks
+  set departure-time item current-itin-row itin-depart
   ifelse is-bev? [
     set remaining-range (state-of-charge * battery-capacity / electric-fuel-consumption )
   ][
@@ -188,23 +214,20 @@ to-report need-to-charge [calling-event]
   ]
   ifelse ( (calling-event = "arrive" and remaining-range < journey-distance * charge-safety-factor) or 
            (calling-event = "depart" and remaining-range < trip-distance * charge-safety-factor) )[
-    if (calling-event = "arrive" and remaining-range < journey-distance * charge-safety-factor)[
-     ;print (word precision ticks 3 " " self " remaining range is less than journey distance: " (journey-distance * charge-safety-factor))
-    ]
-    if (calling-event = "depart" and remaining-range < trip-distance * charge-safety-factor)[
-      ;print (word precision ticks 3 " " self " remaining range is less than trip distance: " (trip-distance * charge-safety-factor))
-    ]
+    log-data "need-to-charge" (sentence ticks id [name] of this-vehicle-type state-of-charge trip-distance journey-distance (departure-time - ticks) calling-event remaining-range charging-on-a-whim? "true")
     report true
   ][
-    ifelse (state-of-charge < 1) [  ;; drivers only consider unneeded charge if their vehicle does not have a full state of charge
+    ifelse (calling-event = "arrive" and state-of-charge < 1) [  ;; drivers only consider unneeded charge if they just arrived and the vehicle does not have a full state of charge
       ifelse time-until-depart >= 0.5 and random-float 1 < probability-of-unneeded-charge [
-;        print (word precision ticks 3 " " self " need-to-charge on a whim, SOC: " state-of-charge)
         set charging-on-a-whim? true
+        log-data "need-to-charge" (sentence ticks id [name] of this-vehicle-type state-of-charge trip-distance journey-distance (departure-time - ticks) calling-event remaining-range charging-on-a-whim? "true")
         report true
       ][
+        log-data "need-to-charge" (sentence ticks id [name] of this-vehicle-type state-of-charge trip-distance journey-distance (departure-time - ticks) calling-event remaining-range charging-on-a-whim? "false")
         report false
       ]
     ][
+      log-data "need-to-charge" (sentence ticks id [name] of this-vehicle-type state-of-charge trip-distance journey-distance (departure-time - ticks) calling-event remaining-range charging-on-a-whim? "false")
       report false
     ]
   ]
@@ -233,6 +256,7 @@ end
 ;; trip-distance set by update-itinerary
 ;;;;;;;;;;;;;;;;;;;;
 to seek-charger
+  set seek-charger-index seek-charger-index + 1
   ;print (word precision ticks 3 " " self " seek-charger ")
   set time-until-depart departure-time - ticks
   let #extra-time-until-end-charge 0
@@ -324,6 +348,7 @@ to seek-charger
               set #min-taz #this-taz
               set #min-charger-type #this-charger-type 
             ]
+            log-data "seek-charger" (sentence ticks seek-charger-index id #charger-in-origin-or-destination #level state-of-charge trip-distance journey-distance time-until-depart #this-cost)
           ]
           ;print (word precision ticks 3 " " self " seek-charger checking taz:" #this-taz " in-orig-dest? " #charger-in-origin-or-destination " level:" #level " this-cost:" #this-cost " rate:" ([charge-rate] of #this-charger-type) " energyprice:" ([energy-price] of #this-charger-type) " trip-or-journey-energy-need:" #trip-or-journey-energy-need)
         ]
@@ -335,6 +360,7 @@ to seek-charger
     set num-denials (num-denials + 1)
     wait-time-event-scheduler  
   ][
+;     log-data "seek-charger-result" (sentence ticks seek-charger-index id #charger-in-origin-or-destination #level state-of-charge trip-distance journey-distance time-until-depart #this-cost)
 ;    file-print (word precision ticks 3 " " self " least cost option is taz:" #min-taz " level:" ([level] of #min-charger-type) " cost:" #min-cost)
     ifelse #min-taz = current-taz [
       set current-charger one-of available-chargers #min-taz [level] of #min-charger-type
@@ -361,6 +387,7 @@ end
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; wait-time-mean set in params.txt
 ;; remaining-range set in need-to-charge and retry-seek
+;; time-until-depart set in seek-charger
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 to wait-time-event-scheduler
   set state "not charging"
@@ -368,6 +395,20 @@ to wait-time-event-scheduler
     ifelse ticks > 24 [
       set state "stranded"
       log-data "wait-time" (sentence ticks id [name] of this-vehicle-type state-of-charge trip-distance journey-distance time-until-depart "stranded" -1)
+      log-data "trip-journey-timeuntildepart" (sentence 
+        ticks 
+        departure-time
+        id 
+        [name] of this-vehicle-type 
+        state-of-charge 
+        [id] of current-taz
+        [id] of destination-taz
+        true 
+        false 
+        (departure-time - ticks)
+        "stranded"
+        remaining-range
+        sum itin-delay-amount)
     ][
       let event-time-from-now random-exponential wait-time-mean
       dynamic-scheduler:add schedule self task retry-seek ticks + event-time-from-now
@@ -560,7 +601,9 @@ to add-trip-to-itinerary [new-destination-taz]
   
   ; rewind current-itin-row by one and use update-itinerary to take care of setting state var's
   set current-itin-row current-itin-row - 1
+
   update-itinerary
+
   ; update-itinerary does not update journey-distance, do so here by adding the difference between the previous trip and the current trip)
   set journey-distance journey-distance + 
     (distance-from-to (item current-itin-row itin-from) (item current-itin-row itin-to) + 
@@ -609,12 +652,12 @@ end
 to depart
 ;  log-data "drivers" (sentence precision ticks 3 [id] of self "departing" state-of-charge)
   ifelse need-to-charge "depart" [  
-    ifelse state-of-charge = 1 [  ;; random decision to charge prevents BEVs from leaving sometimes. ac 11.07
-;      file-print (word precision ticks 3 " " self " cannot make trip with full battery -- breaking it up")
+    ifelse state-of-charge = 1 or (( count (existing-chargers current-taz 1)  = 0) and (count (existing-chargers current-taz 2)  = 0) and state-of-charge >= 0.8)[  ;; random decision to charge prevents BEVs from leaving sometimes. ac 11.07
+      log-data "break-up-trip" (sentence ticks id state-of-charge ([id] of current-taz) ([id] of destination-taz) remaining-range charging-on-a-whim? "break-up-trip")
       break-up-trip
     ][
-      ;print (word precision ticks 3 " " self " cannot make TRIP with current charge. Seeking charger.")
-      seek-charger   
+      log-data "break-up-trip" (sentence ticks id state-of-charge ([id] of current-taz) ([id] of destination-taz) remaining-range charging-on-a-whim? "seek-charger")
+      seek-charger
     ]
   ][  
     travel-time-event-scheduler
@@ -625,19 +668,22 @@ end
 ;; BREAK UP TRIP
 ;;;;;;;;;;;;;;;;;;;;
 to break-up-trip
-  let #taz-list item my-od-index od-enroute
-  let #this-taz current-taz
+  let #cand-taz-list (remove current-taz (remove destination-taz (item my-od-index od-enroute)))
+  let #this-taz 0
   let #max-score 0
-  let #max-taz current-taz
+  let #max-taz 0
   let #max-dist 0
-  let #max-dist-taz current-taz
-  foreach #taz-list [
+  let #max-dist-only 0
+  let #max-dist-taz 0
+  let #result-action "-from-subset"
+  foreach #cand-taz-list [
     set #this-taz ?
     let #this-score 0
-    if #this-taz != current-taz and 
-      (distance-from-to [id] of current-taz [id] of #this-taz) <= remaining-range and 
-      distance-from-to [id] of #this-taz [id] of destination-taz <= battery-capacity / electric-fuel-consumption / charge-safety-factor [
-
+    let #this-dist distance-from-to [id] of current-taz [id] of #this-taz
+    let #only-level-3 (count (existing-chargers #this-taz 1)  = 0) and (count (existing-chargers #this-taz 2)  = 0)
+    if #this-dist <= remaining-range / charge-safety-factor and 
+      ( (#only-level-3 and distance-from-to [id] of #this-taz [id] of destination-taz <= 0.8 * battery-capacity / electric-fuel-consumption / charge-safety-factor)
+        or (not #only-level-3 and distance-from-to [id] of #this-taz [id] of destination-taz <= battery-capacity / electric-fuel-consumption / charge-safety-factor) ) [
       foreach [level] of charger-types [
         let #level ?
         if (count (available-chargers #this-taz #level) > 0) [
@@ -649,17 +695,31 @@ to break-up-trip
         ]
       ]
     ]
-    if #this-score > #max-score [ 
+    if #this-score > #max-score or (#this-score = #max-score and #this-dist > #max-dist) [ 
       set #max-score #this-score
       set #max-taz #this-taz
+      set #max-dist #this-dist
     ]
   ]
+  ; log available chargers for verification
+  if log-break-up-trip-choice[
+      foreach #cand-taz-list [
+        set #this-taz ?
+        foreach [level] of charger-types [
+          log-data "available-chargers" (sentence ticks id [id] of current-taz [id] of home-taz [id] of #this-taz ? count (available-chargers #this-taz ?))
+        ]
+      ]
+  ]
   if #max-score = 0 [  ; do it again but don't restrict to taz's that get us there on the second trip
-    foreach #taz-list [
+    set #result-action "-from-all"
+    set #max-taz 0
+    set #max-dist 0
+    set #max-dist-taz 0
+    foreach #cand-taz-list [
       set #this-taz ?
       let #this-score 0
       let #this-dist distance-from-to [id] of current-taz [id] of #this-taz
-      if #this-taz != current-taz and #this-dist <= remaining-range [
+      if #this-dist <= remaining-range / charge-safety-factor [
         foreach [level] of charger-types [
           let #level ?
           if (count (available-chargers #this-taz #level) > 0) [
@@ -671,23 +731,29 @@ to break-up-trip
           ]
         ]
       ]
-      if #this-score > #max-score [ 
+      if #this-score > #max-score or (#this-score = #max-score and #this-dist > #max-dist) [ 
         set #max-score #this-score
         set #max-taz #this-taz
-      ]
-      if #this-dist > #max-dist [ 
         set #max-dist #this-dist
+      ]
+      if #this-dist > #max-dist-only [ 
+        set #max-dist-only #this-dist
         set #max-dist-taz #this-taz
       ]
     ]
   ]
   ifelse #max-score = 0 [
-    ; choose the furthest along and hope
-    add-trip-to-itinerary #max-dist-taz
-;    log-data "break-up-trip" (sentence precision ticks 3 " " [id] of self "distance" #max-dist-taz #max-dist)
+    ifelse #max-dist-taz = 0 [
+      log-data "break-up-trip-choice" (sentence ticks id ([id] of current-taz) ([id] of destination-taz) "none-found" 0 0)
+      print "ERROR: this situation shouldn't arise, in break-up-trip and no enroute tazs found other than origin and destination which is too far, perhaps battery-capacity is too low or TAZs too big?"
+    ][ 
+      ; choose the furthest along and hope
+      log-data "break-up-trip-choice" (sentence ticks id ([id] of current-taz) ([id] of destination-taz) "max-distance" ([id] of #max-dist-taz) #max-dist-only)
+      add-trip-to-itinerary #max-dist-taz
+    ]
   ][
+    log-data "break-up-trip-choice" (sentence ticks id ([id] of current-taz) ([id] of destination-taz) (word "max-score" #result-action) ([id] of #max-taz) #max-score)
     add-trip-to-itinerary #max-taz
-;    log-data "break-up-trip" (sentence precision ticks 3 " " [id] of self "score" #max-taz #max-score)
   ]
   travel-time-event-scheduler
 end
@@ -716,20 +782,54 @@ to arrive
     set state-of-charge state-of-charge - #charge-used
     set energy-used energy-used + #charge-used * battery-capacity
   ]
+  
+  let #completed-journey journey-distance
+  let #completed-trip trip-distance
+  let #from-taz [id] of current-taz
   set journey-distance journey-distance - trip-distance
   log-driver "arriving"
-;  file-flush
+
   update-itinerary 
+  let #to-taz [id] of current-taz
       
   ifelse not itin-complete? [
     ifelse need-to-charge "arrive" [   
       seek-charger
+      log-data "trip-journey-timeuntildepart" (sentence 
+        ticks 
+        departure-time
+        id 
+        [name] of this-vehicle-type 
+        state-of-charge 
+        #from-taz
+        #to-taz
+        #completed-trip 
+        #completed-journey
+        (departure-time - ticks)
+        "seeking-charger"
+        remaining-range
+        sum itin-delay-amount)
     ][
       itinerary-event-scheduler
+  
+      log-data "trip-journey-timeuntildepart" (sentence 
+        ticks 
+        departure-time
+        id 
+        [name] of this-vehicle-type 
+        state-of-charge 
+        #from-taz
+        #to-taz
+        #completed-trip 
+        #completed-journey 
+        (departure-time - ticks) 
+        "scheduling-itinerary"
+        remaining-range
+        sum itin-delay-amount)
     ]
   ][
     ;; itin is complete and at home? plug-in immediately and charge till full
-    if current-taz = home-taz [
+    ifelse current-taz = home-taz [
       set current-charger (one-of item 0 [chargers-by-type] of current-taz)
       set full-charge-time-need (1 - state-of-charge) * battery-capacity / charge-rate-of current-charger
       dynamic-scheduler:add schedule self task end-charge ticks + full-charge-time-need 
@@ -744,8 +844,39 @@ to arrive
         (state-of-charge + (full-charge-time-need * charge-rate-of current-charger) / battery-capacity )
         "stop"
         false)
+      log-data "trip-journey-timeuntildepart" (sentence 
+        ticks 
+        ticks
+        id 
+        [name] of this-vehicle-type 
+        state-of-charge 
+        #from-taz
+        #to-taz
+        #completed-trip 
+        #completed-journey 
+        0
+        "home"
+        remaining-range
+        sum itin-delay-amount)
+    ][
+      log-data "trip-journey-timeuntildepart" (sentence 
+        ticks 
+        ticks
+        id 
+        [name] of this-vehicle-type 
+        state-of-charge 
+        #from-taz
+        #to-taz
+        #completed-trip 
+        #completed-journey 
+        0
+        "journey-complete"
+        remaining-range
+        sum itin-delay-amount)
     ]
   ]
+
+  
 end
 
 ;;;;;;;;;;;;;;;;;;;;
@@ -764,6 +895,7 @@ to update-itinerary
     set trip-distance item my-od-index od-dist
     set trip-time item my-od-index od-time
   ][
+    set current-taz destination-taz  ;; ac 12.20
     set itin-complete? true
   ]
 end
@@ -772,6 +904,14 @@ to-report available-chargers [#taz #level]
   let #found-chargers 0
   ask #taz[
     set #found-chargers ((item #level chargers-by-type) with [current-driver = nobody])
+  ]
+  report #found-chargers
+end
+
+to-report existing-chargers [#taz #level]
+  let #found-chargers 0
+  ask #taz[
+    set #found-chargers (item #level chargers-by-type)
   ]
   report #found-chargers
 end
@@ -796,7 +936,7 @@ to-report od-index [destination source]
 end
 
 to-report my-od-index
-  report (([id] of destination-taz - 1) * n-tazs + [id] of current-taz - 1)
+  report (([id] of current-taz - 1) * n-tazs + [id] of destination-taz - 1)
 end
 
 to-report driver-soc [the-driver]
@@ -823,8 +963,7 @@ to summarize
     ]
   ]
 
-
- 
+  reset-logfile "summary" 
   log-data "summary" (sentence "metric" "value")
   log-data "summary" (sentence "num.drivers" count drivers)
   log-data "summary" (sentence "num.trips" sum [ length itin-change-flag - sum itin-change-flag ] of drivers)
@@ -843,10 +982,10 @@ to summarize
 end
 @#$#@#$#@
 GRAPHICS-WINDOW
-130
-10
-375
-228
+195
+14
+440
+232
 -1
 -1
 7.5
@@ -872,10 +1011,10 @@ ticks
 BUTTON
 9
 10
-75
+138
 43
 NIL
-setup
+setup-from-gui
 NIL
 1
 T
@@ -904,15 +1043,15 @@ NIL
 1
 
 SLIDER
-362
-16
-534
-49
+473
+10
+645
+43
 go-until-time
 go-until-time
 0
 36
-36
+13.5
 0.5
 1
 NIL
@@ -936,10 +1075,10 @@ NIL
 0
 
 SWITCH
-481
-206
-622
-239
+476
+143
+617
+176
 log-wait-time
 log-wait-time
 1
@@ -947,10 +1086,10 @@ log-wait-time
 -1000
 
 SWITCH
-481
-252
-620
-285
+476
+189
+615
+222
 log-charging
 log-charging
 0
@@ -958,10 +1097,10 @@ log-charging
 -1000
 
 SWITCH
-483
-301
-642
-334
+476
+235
+635
+268
 log-charge-time
 log-charge-time
 1
@@ -969,10 +1108,65 @@ log-charge-time
 -1000
 
 SWITCH
-488
-361
-711
-394
+476
+280
+658
+313
+log-need-to-charge
+log-need-to-charge
+1
+1
+-1000
+
+SWITCH
+475
+97
+736
+130
+log-trip-journey-timeuntildepart
+log-trip-journey-timeuntildepart
+1
+1
+-1000
+
+SWITCH
+476
+326
+642
+359
+log-seek-charger
+log-seek-charger
+1
+1
+-1000
+
+SWITCH
+476
+370
+646
+403
+log-break-up-trip
+log-break-up-trip
+1
+1
+-1000
+
+SWITCH
+477
+416
+694
+449
+log-break-up-trip-choice
+log-break-up-trip-choice
+1
+1
+-1000
+
+SWITCH
+476
+459
+699
+492
 log-charge-limiting-factor
 log-charge-limiting-factor
 0
@@ -1308,7 +1502,7 @@ Polygon -7500403 true true 270 75 225 30 30 225 75 270
 Polygon -7500403 true true 30 75 75 30 270 225 225 270
 
 @#$#@#$#@
-NetLogo 5.0.1
+NetLogo 5.0
 @#$#@#$#@
 @#$#@#$#@
 @#$#@#$#@

@@ -1100,7 +1100,7 @@ SWITCH
 403
 log-break-up-trip
 log-break-up-trip
-0
+1
 1
 -1000
 
@@ -1111,7 +1111,7 @@ SWITCH
 449
 log-break-up-trip-choice
 log-break-up-trip-choice
-0
+1
 1
 -1000
 

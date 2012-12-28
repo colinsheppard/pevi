@@ -181,7 +181,9 @@ to setup
   reset-logfile "trip-journey-timeuntildepart"
   log-data "trip-journey-timeuntildepart" (sentence "time" "departure.time" "driver" "vehicle.type" "soc" "from.taz" "to.taz" "trip.distance" "journey.distance" "time.until.depart" "next.event" "remaining.range" "delay.sum")
   reset-logfile "seek-charger"
-  log-data "seek-charger" (sentence "time" "seek.charger.index" "driver" "charger.in.origin.dest" "level" "soc" "trip.distance" "journey.distance" "time.until.depart" "cost")
+  log-data "seek-charger" (sentence "time" "seek.charger.index" "driver" "taz" "charger.in.origin.dest" "level" "soc" "trip.distance" "journey.distance" "time.until.depart" "cost")
+  reset-logfile "seek-charger-result"
+  log-data "seek-charger-result" (sentence "time" "seek.charger.index" "driver" "chosen.taz" "charger.in.origin.dest" "chosen.level" "cost")
   set seek-charger-index 0
   reset-logfile "break-up-trip"  
   log-data "break-up-trip" (sentence "time" "driver" "state.of.charge" "current.taz" "destination.taz" "remaining.range" "charging.on.a.whim?" "result.action")
@@ -189,6 +191,8 @@ to setup
   log-data "break-up-trip-choice" (sentence "time" "driver" "current.taz" "destination.taz" "result.action" "new.destination" "max.score.or.distance")
   reset-logfile "available-chargers"
   log-data "available-chargers" (sentence "time" "driver" "current.taz" "home.taz" "taz" "level" "num.available.chargers")
+  reset-logfile "charge-limiting-factor"
+  log-data "charge-limiting-factor" (sentence "time" "driver" "result.action" "full-charge-time-need" "trip-charge-time-need" "journey-charge-time-need" "time-until-depart" "charger-in-origin-or-destination" "this-charger-type")
   print "setup complete"
 end 
 
@@ -346,20 +350,18 @@ to seek-charger
               set #min-taz #this-taz
               set #min-charger-type #this-charger-type 
             ]
-            log-data "seek-charger" (sentence ticks seek-charger-index id #charger-in-origin-or-destination #level state-of-charge trip-distance journey-distance time-until-depart #this-cost)
+            log-data "seek-charger" (sentence ticks seek-charger-index id ([id] of #this-taz) #charger-in-origin-or-destination #level state-of-charge trip-distance journey-distance time-until-depart #this-cost)
           ]
-          ;print (word precision ticks 3 " " self " seek-charger checking taz:" #this-taz " in-orig-dest? " #charger-in-origin-or-destination " level:" #level " this-cost:" #this-cost " rate:" ([charge-rate] of #this-charger-type) " energyprice:" ([energy-price] of #this-charger-type) " trip-or-journey-energy-need:" #trip-or-journey-energy-need)
         ]
       ]
     ]
   ]
-  ifelse #min-taz = -99 [  
-;    file-print (word precision ticks 3 " " self " seek charger - none available") 
+  ifelse #min-taz = -99 [
+    log-data "seek-charger-result" (sentence ticks seek-charger-index id -1 "" -1 -1)  
     set num-denials (num-denials + 1)
     wait-time-event-scheduler  
   ][
-;     log-data "seek-charger-result" (sentence ticks seek-charger-index id #charger-in-origin-or-destination #level state-of-charge trip-distance journey-distance time-until-depart #this-cost)
-;    file-print (word precision ticks 3 " " self " least cost option is taz:" #min-taz " level:" ([level] of #min-charger-type) " cost:" #min-cost)
+    log-data "seek-charger-result" (sentence ticks seek-charger-index id ([id] of #min-taz) (#min-taz = current-taz or #min-taz = destination-taz) ([level] of #min-charger-type) #min-cost)
     ifelse #min-taz = current-taz [
       set current-charger one-of available-chargers #min-taz [level] of #min-charger-type
       if [level] of #min-charger-type > 0 [
@@ -440,7 +442,7 @@ to charge-time-event-scheduler
   ][
     set full-charge-time-need (1 - state-of-charge) * battery-capacity / charge-rate-of current-charger
   ]
-  set time-until-end-charge (calc-time-until-end-charge full-charge-time-need 
+  set time-until-end-charge (calc-time-until-end-charge-with-logging full-charge-time-need 
                                                     trip-charge-time-need 
                                                     journey-charge-time-need 
                                                     time-until-depart 
@@ -472,6 +474,51 @@ to charge-time-event-scheduler
         charging-on-a-whim?)
 end
 
+to-report calc-time-until-end-charge-with-logging [#full-charge-time-need #trip-charge-time-need #journey-charge-time-need #time-until-depart #charger-in-origin-or-destination #this-charger-type]
+  ifelse #full-charge-time-need <= #trip-charge-time-need [  ;; if sufficent time to charge to full
+    log-data "charge-limiting-factor" (sentence ticks id "full-charge-less-than-trip-need" #full-charge-time-need #trip-charge-time-need #journey-charge-time-need #time-until-depart #charger-in-origin-or-destination [level] of #this-charger-type)
+    report #full-charge-time-need
+  ][                                                      
+    ifelse #time-until-depart < #trip-charge-time-need [
+      log-data "charge-limiting-factor" (sentence ticks id "not-enough-time-for-trip-need" #full-charge-time-need #trip-charge-time-need #journey-charge-time-need #time-until-depart #charger-in-origin-or-destination [level] of #this-charger-type)
+      ;; NOT SUFFICIENT TIME FOR NEXT TRIP - will cause delay in schedule
+      report #trip-charge-time-need    
+    ][                                                    
+      ;; SUFFICIENT TIME - 
+      ifelse #charger-in-origin-or-destination [
+        ifelse #time-until-depart < #full-charge-time-need [
+          log-data "charge-limiting-factor" (sentence ticks id "in-od-depart-limiting" #full-charge-time-need #trip-charge-time-need #journey-charge-time-need #time-until-depart #charger-in-origin-or-destination [level] of #this-charger-type)
+        ][
+          log-data "charge-limiting-factor" (sentence ticks id "in-od-full-limiting" #full-charge-time-need #trip-charge-time-need #journey-charge-time-need #time-until-depart #charger-in-origin-or-destination [level] of #this-charger-type)
+        ]
+        ;; charge to full if enough time @ home/work
+        report min sentence #time-until-depart #full-charge-time-need 
+      ][                                                  
+        ifelse [level] of #this-charger-type = 3 [
+          ifelse min (sentence #time-until-depart #journey-charge-time-need #full-charge-time-need) = #time-until-depart [
+            log-data "charge-limiting-factor" (sentence ticks id "enroute-level3-depart-limiting" #full-charge-time-need #trip-charge-time-need #journey-charge-time-need #time-until-depart #charger-in-origin-or-destination [level] of #this-charger-type)
+          ][
+            ifelse min (sentence #time-until-depart #journey-charge-time-need #full-charge-time-need) = #journey-charge-time-need [
+              log-data "charge-limiting-factor" (sentence ticks id "enroute-level3-journey-limiting" #full-charge-time-need #trip-charge-time-need #journey-charge-time-need #time-until-depart #charger-in-origin-or-destination [level] of #this-charger-type)
+            ][
+              log-data "charge-limiting-factor" (sentence ticks id "enroute-level3-full-limiting" #full-charge-time-need #trip-charge-time-need #journey-charge-time-need #time-until-depart #charger-in-origin-or-destination [level] of #this-charger-type)
+            ]
+          ]
+          ;; charge until departure or journey charge time, whichever comes first 
+          report min (sentence #time-until-depart #journey-charge-time-need #full-charge-time-need)
+        ][
+          ifelse #time-until-depart < #trip-charge-time-need [
+            log-data "charge-limiting-factor" (sentence ticks id "enroute-level1-2-depart-limiting" #full-charge-time-need #trip-charge-time-need #journey-charge-time-need #time-until-depart #charger-in-origin-or-destination [level] of #this-charger-type)
+          ][
+            log-data "charge-limiting-factor" (sentence ticks id "enroute-level1-2-trip-limiting" #full-charge-time-need #trip-charge-time-need #journey-charge-time-need #time-until-depart #charger-in-origin-or-destination [level] of #this-charger-type)
+          ]
+          ;; charge until departure or trip charge time, whichever comes first
+          report min sentence #time-until-depart #trip-charge-time-need
+        ]
+      ]
+    ]
+  ]
+end
 to-report calc-time-until-end-charge [#full-charge-time-need #trip-charge-time-need #journey-charge-time-need #time-until-depart #charger-in-origin-or-destination #this-charger-type]
   ifelse #full-charge-time-need <= #trip-charge-time-need [  ;; if sufficent time to charge to full
     report #full-charge-time-need
@@ -1045,7 +1092,7 @@ SWITCH
 222
 log-charging
 log-charging
-1
+0
 1
 -1000
 
@@ -1089,15 +1136,15 @@ SWITCH
 359
 log-seek-charger
 log-seek-charger
-1
+0
 1
 -1000
 
 SWITCH
-476
-370
-646
-403
+474
+410
+644
+443
 log-break-up-trip
 log-break-up-trip
 1
@@ -1105,13 +1152,35 @@ log-break-up-trip
 -1000
 
 SWITCH
-477
-416
-694
-449
+475
+456
+692
+489
 log-break-up-trip-choice
 log-break-up-trip-choice
 1
+1
+-1000
+
+SWITCH
+474
+499
+697
+532
+log-charge-limiting-factor
+log-charge-limiting-factor
+0
+1
+-1000
+
+SWITCH
+475
+367
+684
+400
+log-seek-charger-result
+log-seek-charger-result
+0
 1
 -1000
 

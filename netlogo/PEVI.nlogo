@@ -190,7 +190,7 @@ to setup
   reset-logfile "trip-journey-timeuntildepart"
   log-data "trip-journey-timeuntildepart" (sentence "time" "departure.time" "driver" "vehicle.type" "soc" "from.taz" "to.taz" "trip.distance" "journey.distance" "time.until.depart" "next.event" "remaining.range" "delay.sum")
   reset-logfile "seek-charger"
-  log-data "seek-charger" (sentence "time" "seek.charger.index" "driver" "taz" "charger.in.origin.dest" "level" "soc" "trip.distance" "journey.distance" "time.until.depart" "cost")
+  log-data "seek-charger" (sentence "time" "seek-charger-index" "charger.taz" "driver" "vehicle.type" "is.BEV" "charger.in.origin.dest" "level" "soc" "distance.o.to.c" "distance.c.to.d" "time.o.to.c" "time.c.to.d" "trip.time" "trip.distance" "journey.distance" "charging.on.a.whim." "time.until.depart" "trip.charge.time.need" "cost")
   reset-logfile "seek-charger-result"
   log-data "seek-charger-result" (sentence "time" "seek.charger.index" "driver" "chosen.taz" "charger.in.origin.dest" "chosen.level" "cost")
   set seek-charger-index 0
@@ -370,7 +370,7 @@ to seek-charger
               set #min-taz #this-taz
               set #min-charger-type #this-charger-type 
             ]
-            log-data "seek-charger" (sentence ticks seek-charger-index id ([id] of #this-taz) #charger-in-origin-or-destination #level state-of-charge trip-distance journey-distance time-until-depart #this-cost)
+            log-data "seek-charger" (sentence ticks seek-charger-index ([id] of #this-taz) id ([name] of this-vehicle-type) is-BEV? #charger-in-origin-or-destination #level state-of-charge (distance-from-to [id] of current-taz [id] of #this-taz) (distance-from-to [id] of #this-taz [id] of destination-taz) (time-from-to [id] of current-taz [id] of #this-taz) (time-from-to [id] of #this-taz [id] of destination-taz) trip-time trip-distance journey-distance charging-on-a-whim? time-until-depart (item #level #trip-or-journey-energy-need-by-type) #this-cost)
           ]
         ]
       ]
@@ -472,7 +472,7 @@ to charge-time-event-scheduler
                                                     journey-charge-time-need 
                                                     time-until-depart 
                                                     charger-in-origin-or-destination 
-                                                    [this-charger-type] of current-charger) ; + 0.001  ; .001 or 3.6 sec is a fudge factor to deal with roundoff error causing drivers to have 1e-15 too little charge 
+                                                    [this-charger-type] of current-charger)
   let next-event-scheduled-at 0 
   ifelse (time-until-end-charge > 0) and (time-until-end-charge < full-charge-time-need) and 
          (time-until-depart > 0.5) and (level-of current-charger < 3) and 

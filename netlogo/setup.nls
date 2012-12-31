@@ -382,7 +382,9 @@ to log-data [logfile data-list]
      (logfile = "break-up-trip-choice" and log-break-up-trip-choice) or
      (logfile = "available-chargers" and log-break-up-trip-choice) or     
      (logfile = "charge-limiting-factor" and log-charge-limiting-factor) or
-     (logfile = "summary")
+     (logfile = "drivers" and log-drivers) or
+     (logfile = "summary") or 
+     (logfile = "driver-summary")
   [
     open-logfile logfile
     file-print reduce [(word ?1 "," ?2)] data-list

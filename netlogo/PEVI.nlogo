@@ -151,6 +151,15 @@ to setup-from-gui
     setup
 end
 
+to setup-and-fix-seed
+    clear-all-and-initialize
+    random-seed 1
+    if parameter-file = 0 [ set parameter-file "params.txt" ]
+    if model-directory = 0 [ set model-directory "./" ]
+    read-parameter-file
+    setup
+end
+
 to clear-all-and-initialize
   ;print "clear all"
   __clear-all-and-reset-ticks
@@ -171,7 +180,7 @@ to setup
   setup-chargers
   reset-logfile "drivers"
   reset-logfile "charging"
-  log-data "charging" (sentence "time" "charger.level" "location" "driver" "vehicle.type" "duration" "energy" "begin.soc" "end.soc" "after.end.charge" "charging.on.whim")
+  log-data "charging" (sentence "time" "charger.id" "charger.level" "location" "driver" "vehicle.type" "duration" "energy" "begin.soc" "end.soc" "after.end.charge" "charging.on.whim")
   reset-logfile "wait-time"
   log-data "wait-time" (sentence "time" "driver" "vehicle.type" "soc" "trip.distance" "journey.distance" "time.until.depart" "result.action" "time.from.now")
   reset-logfile "charge-time"
@@ -198,7 +207,9 @@ end
 
 to go
   dynamic-scheduler:go schedule
-;  dynamic-scheduler:go-until schedule go-until-time
+end
+to go-until
+  dynamic-scheduler:go-until schedule go-until-time
 end
 
 ;;;;;;;;;;;;;;;;;;;;
@@ -296,7 +307,6 @@ to seek-charger
     ]
     set #trip-charge-time-need-by-type replace-item (item 0 ?) #trip-charge-time-need-by-type (#trip-or-journey-energy-need / (item 1 ?))
   ]
-
   foreach #taz-list [
     if distance-from-to [id] of current-taz [id] of ? <= remaining-range [
       let #this-taz ?
@@ -342,7 +352,7 @@ to seek-charger
             ]                                                       
           ]
           ;; the following condition avoids the case when driver would have over 0.8 soc and attempt to charge at level III
-          if #extra-time-until-end-charge > 0 [
+          if #extra-time-until-end-charge >= 0 [
             let #this-cost (time-opportunity-cost * (#extra-time-for-travel + #extra-time-until-end-charge) + 
               ([energy-price] of #this-charger-type) * (#trip-or-journey-energy-need + #extra-energy-for-travel))
             if #this-cost < #min-cost or (#this-cost = #min-cost and [level] of #this-charger-type > [level] of #min-charger-type) [
@@ -462,6 +472,7 @@ to charge-time-event-scheduler
     change-depart-time next-event-scheduled-at
   ]
   log-data "charging" (sentence ticks 
+        [who] of current-charger
         level-of current-charger 
         [id] of current-taz 
         [id] of self 
@@ -834,6 +845,7 @@ to arrive
       set full-charge-time-need (1 - state-of-charge) * battery-capacity / charge-rate-of current-charger
       dynamic-scheduler:add schedule self task end-charge ticks + full-charge-time-need 
       log-data "charging" (sentence ticks 
+        [who] of current-charger
         level-of current-charger 
         [id] of current-taz 
         [id] of self 
@@ -1051,7 +1063,7 @@ go-until-time
 go-until-time
 0
 36
-13.5
+0.5
 0.5
 1
 NIL
@@ -1183,6 +1195,40 @@ log-seek-charger-result
 0
 1
 -1000
+
+BUTTON
+9
+276
+164
+309
+NIL
+setup-and-fix-seed
+NIL
+1
+T
+OBSERVER
+NIL
+NIL
+NIL
+NIL
+1
+
+BUTTON
+10
+319
+92
+352
+NIL
+go-until
+NIL
+1
+T
+OBSERVER
+NIL
+NIL
+NIL
+NIL
+1
 
 @#$#@#$#@
 ## ## WHAT IS IT?

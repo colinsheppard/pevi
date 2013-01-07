@@ -194,7 +194,8 @@ to setup
   log-data "trip-journey-timeuntildepart" (sentence "time" "departure.time" "driver" "vehicle.type" "soc" "from.taz" "to.taz" "trip.distance" "journey.distance" "time.until.depart" "next.event" "remaining.range" "delay.sum")
   reset-logfile "seek-charger"
   log-data "seek-charger" (sentence "time" "seek-charger-index" "current.taz" "charger.taz" "driver" "vehicle.type" "is.BEV" "charger.in.origin.dest" "level" "soc" "trip.or.journey.energy.need" "distance.o.to.c" 
-    "distance.c.to.d" "time.o.to.c" "time.c.to.d" "trip.time" "trip.distance" "journey.distance" "charging.on.a.whim." "time.until.depart" "trip.charge.time.need" "cost" "extra.time.until.end.charge")
+    "distance.c.to.d" "time.o.to.c" "time.c.to.d" "trip.time" "trip.distance" "journey.distance" "charging.on.a.whim." "time.until.depart" "trip.charge.time.need" "cost" "extra.time.until.end.charge" 
+    "full.charge.time.need" "trip.charge.time.need" "mid.journey.charge.time.need" "mid.state.of.charge")
   reset-logfile "seek-charger-result"
   log-data "seek-charger-result" (sentence "time" "seek.charger.index" "driver" "chosen.taz" "charger.in.origin.dest" "chosen.level" "cost")
   set seek-charger-index 0
@@ -286,6 +287,10 @@ to seek-charger
   let #trip-charge-time-need-by-type n-values count charger-types [-99]
   let #trip-or-journey-energy-need-by-type n-values count charger-types [-99]
   let #level-3-and-too-full false
+  let #full-charge-time-need 0
+  let #trip-charge-time-need 0
+  let #mid-journey-charge-time-need 0
+  let #mid-state-of-charge 0
   
   ifelse not charging-on-a-whim? and is-bev? and time-until-depart < willing-to-roam-time-threshold [  
     set willing-to-roam? true  
@@ -347,11 +352,11 @@ to seek-charger
             let #leg-one-trip-distance distance-from-to [id] of current-taz [id] of #this-taz
             let #leg-two-trip-distance distance-from-to [id] of #this-taz [id] of destination-taz
             let #mid-journey-distance journey-distance - #leg-one-trip-distance
-            let #mid-state-of-charge ((1 - state-of-charge) * battery-capacity - #leg-one-trip-distance * electric-fuel-consumption) / battery-capacity
+            set #mid-state-of-charge state-of-charge - #leg-one-trip-distance * electric-fuel-consumption / battery-capacity
             set #level-3-and-too-full #level = 3 and #mid-state-of-charge >= 0.8 
-            let #trip-charge-time-need max sentence 0 ((#leg-two-trip-distance * charge-safety-factor * electric-fuel-consumption - #mid-state-of-charge * battery-capacity) / #this-charge-rate)
-            let #mid-journey-charge-time-need max sentence 0 ((#mid-journey-distance * charge-safety-factor * electric-fuel-consumption - #mid-state-of-charge * battery-capacity) / #this-charge-rate)
-            let #full-charge-time-need 0
+            set #trip-charge-time-need max sentence 0 ((#leg-two-trip-distance * charge-safety-factor * electric-fuel-consumption - #mid-state-of-charge * battery-capacity) / #this-charge-rate)
+            set #mid-journey-charge-time-need max sentence 0 ((#mid-journey-distance * charge-safety-factor * electric-fuel-consumption - #mid-state-of-charge * battery-capacity) / #this-charge-rate)
+            set #full-charge-time-need 0
             ifelse #level = 3[
               set #full-charge-time-need (0.8 - #mid-state-of-charge) * battery-capacity / #this-charge-rate
             ][
@@ -376,7 +381,7 @@ to seek-charger
             log-data "seek-charger" (sentence ticks seek-charger-index ([id] of current-taz) ([id] of #this-taz) id ([name] of this-vehicle-type) is-BEV? #charger-in-origin-or-destination #level state-of-charge 
               (item #level #trip-or-journey-energy-need-by-type) (distance-from-to [id] of current-taz [id] of #this-taz) (distance-from-to [id] of #this-taz [id] of destination-taz) 
               (time-from-to [id] of current-taz [id] of #this-taz) (time-from-to [id] of #this-taz [id] of destination-taz) trip-time trip-distance journey-distance charging-on-a-whim? time-until-depart 
-              (item #level #trip-charge-time-need-by-type) #this-cost #extra-time-until-end-charge)
+              (item #level #trip-charge-time-need-by-type) #this-cost #extra-time-until-end-charge #full-charge-time-need #trip-charge-time-need #mid-journey-charge-time-need #mid-state-of-charge)
           ]
         ]
       ]
@@ -1089,7 +1094,7 @@ go-until-time
 go-until-time
 0
 36
-2
+7
 0.5
 1
 NIL

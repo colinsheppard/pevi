@@ -1,5 +1,5 @@
 extensions [dynamic-scheduler]
-__includes["setup.nls"]
+__includes["setup.nls" "reporters.nls"]
 
 globals [    
   od-from
@@ -148,16 +148,20 @@ to setup-from-gui
     if parameter-file = 0 [ set parameter-file "params.txt" ]
     if model-directory = 0 [ set model-directory "./" ]
     read-parameter-file
+    print "setting up...."
     setup
+    print "setup complete"
 end
 
 to setup-and-fix-seed
     clear-all-and-initialize
-    random-seed 1
+    random-seed 2
     if parameter-file = 0 [ set parameter-file "params.txt" ]
     if model-directory = 0 [ set model-directory "./" ]
     read-parameter-file
+    print "setting up...."
     setup
+    print "setup complete"
 end
 
 to clear-all-and-initialize
@@ -168,10 +172,9 @@ to clear-all-and-initialize
 end
 
 ;;;;;;;;;;;;;;;;;;;;
-;; SETUP
+;; SETUP 
 ;;;;;;;;;;;;;;;;;;;;
 to setup
-  print "setting up...."
   setup-od-data
   setup-tazs
   convert-enroute-ids
@@ -202,7 +205,6 @@ to setup
   log-data "available-chargers" (sentence "time" "driver" "current.taz" "home.taz" "taz" "level" "num.available.chargers")
   reset-logfile "charge-limiting-factor"
   log-data "charge-limiting-factor" (sentence "time" "driver" "vehicle.type" "state.of.charge" "result.action" "full-charge-time-need" "trip-charge-time-need" "journey-charge-time-need" "time-until-depart" "charger-in-origin-or-destination" "this-charger-type")
-  print "setup complete"
 end 
 
 to go
@@ -221,7 +223,7 @@ to-report need-to-charge [calling-event]
   set time-until-depart departure-time - ticks
   set departure-time item current-itin-row itin-depart
   ifelse is-bev? [
-    set remaining-range (state-of-charge * battery-capacity / electric-fuel-consumption )
+    set remaining-range (state-of-charge * battery-capacity / electric-fuel-consumption ) + 1e-14
   ][
     set remaining-range 9999999
   ]
@@ -247,7 +249,7 @@ to-report need-to-charge [calling-event]
 end
 
 ;;;;;;;;;;;;;;;;;;;;
-;; RETRY SEEK
+;; RETRY SEEK 
 ;;;;;;;;;;;;;;;;;;;;
 to retry-seek
   ;print (word precision ticks 3 " " self " retry-seek ")
@@ -255,7 +257,7 @@ to retry-seek
     change-depart-time ticks
   ]  
   ifelse is-bev? [
-    set remaining-range (state-of-charge * battery-capacity / electric-fuel-consumption )
+    set remaining-range (state-of-charge * battery-capacity / electric-fuel-consumption ) + 1e-14
   ][
     set remaining-range 9999999
   ]
@@ -661,7 +663,10 @@ to end-charge
   set expenses expenses + energy-charged * energy-price-of current-charger
   set state-of-charge min (sentence 1 (state-of-charge + energy-charged / battery-capacity))
   log-driver "end charge"
-  ask current-charger [ set current-driver nobody ]
+  ask current-charger [ 
+    set energy-delivered energy-delivered + energy-charged
+    set current-driver nobody 
+  ]
   set current-charger nobody
 end
 
@@ -1080,7 +1085,7 @@ go-until-time
 go-until-time
 0
 36
-0.5
+36
 0.5
 1
 NIL
@@ -1121,7 +1126,7 @@ SWITCH
 222
 log-charging
 log-charging
-0
+1
 1
 -1000
 
@@ -1198,7 +1203,7 @@ SWITCH
 532
 log-charge-limiting-factor
 log-charge-limiting-factor
-0
+1
 1
 -1000
 
@@ -1587,7 +1592,7 @@ Polygon -7500403 true true 270 75 225 30 30 225 75 270
 Polygon -7500403 true true 30 75 75 30 270 225 225 270
 
 @#$#@#$#@
-NetLogo 5.0
+NetLogo 5.0.1
 @#$#@#$#@
 @#$#@#$#@
 @#$#@#$#@

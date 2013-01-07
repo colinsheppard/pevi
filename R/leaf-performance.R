@@ -6,6 +6,7 @@ path.to.leaf   <- '~/Dropbox/serc/pev-colin/data/leaf-performance/'
 path.to.google <- '~/Dropbox/serc/pev-colin/data/google-earth/'
 path.to.plots  <- '~/Dropbox/serc/pev-colin/plots/'
 path.to.pevi   <- '~/Dropbox/serc/pev-colin/pevi/'
+path.to.geatm  <- '~/Dropbox/serc/pev-colin/data/GEATM-2020/'
 
 source(paste(path.to.pevi,'R/gis-functions.R',sep=''))
 
@@ -216,11 +217,27 @@ save(dr,dr.hists,file=paste(path.to.leaf,'data/all-trips-cleaned.Rdata',sep=''))
 write.csv(dr,paste(path.to.leaf,'data/leaf-trips-cleaned.csv',sep=''))
 
 load(file=paste(path.to.leaf,'data/all-trips-cleaned.Rdata',sep=''))
+print(weighted.mean(dr$perf,dr$dist))
 
 ggplot(dr,aes(x=gradient*100,y=perf,size=dist,colour=dist))+geom_point()+facet_wrap(~speed.binned)
-print(summary(lm('perf ~ gradient',dr)))
-print(summary(lm('perf ~ gradient*speed',dr)))
-print(summary(lm('perf ~ gradient*speed - speed',dr)))
-print(summary(lm('perf ~ gradient*speed + I(gradient^2) + I(speed^2)',dr)))
-print(summary(lm('perf ~ gradient*speed + I(speed^2)',dr)))
+ggplot(subset(dr,abs(perf)<1),aes(x=speed,y=perf))+geom_point()+facet_wrap(~gradient.binned)
 
+print(summary(lm('perf ~ gradient',subset(dr,abs(perf)<1))))
+print(summary(lm('perf ~ gradient + speed',subset(dr,abs(perf)<1))))
+print(summary(lm('perf ~ gradient*speed',subset(dr,abs(perf)<1))))
+print(summary(lm('perf ~ gradient*speed - speed',subset(dr,abs(perf)<1))))
+print(summary(lm('perf ~ gradient*speed + I(gradient^2) + I(speed^2)',subset(dr,abs(perf)<1))))
+print(summary(lm('perf ~ gradient*speed + I(speed^2)',subset(dr,abs(perf)<1))))
+
+# apply a couple models to the data and look at the observed performance
+fit <- lm('perf ~ gradient',subset(dr,abs(perf)<1))
+fit2 <- lm('perf ~ gradient*speed',subset(dr,abs(perf)<1))
+route.ordered$perf1 <- predict(fit,newdata=data.frame(gradient=route.ordered$gradient,speed=route.ordered$ab_speed,speed.binned=route.ordered$speed.binned))
+route.ordered$perf2 <- predict(fit2,newdata=data.frame(gradient=route.ordered$gradient,speed=route.ordered$ab_speed,speed.binned=route.ordered$speed.binned))
+perf <- ddply(route.ordered,.(from_taz,to_taz),function(df){ data.frame(perf1=weighted.mean(df$perf1,df$length),perf2=weighted.mean(df$perf2,df$length)) })
+names(perf) <- c('from','to','perf1','perf2')
+
+# choose perf 2 and scale by perf at 0 gradient and weighted mean of speed (55mph)
+perf$perf <- perf$perf2 / predict(fit2,newdata=data.frame(gradient=0,speed=weighted.mean(route.ordered$ab_speed,route.ordered$length)))
+
+save(dr,dr.hists,perf,file=paste(path.to.leaf,'data/all-trips-cleaned.Rdata',sep=''))

@@ -364,6 +364,7 @@ to setup-chargers
     set size 1
     set current-driver nobody
     let #level [level] of this-charger-type
+    set energy-delivered 0
   ]
 end ;setup-chargers
 

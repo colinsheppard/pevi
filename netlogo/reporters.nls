@@ -1,0 +1,11 @@
+to-report mean-duty-factor
+  ifelse count chargers with [ [level] of this-charger-type > 0 ] > 0 [
+    report mean [ energy-delivered / (24 * [charge-rate] of this-charger-type) ] of chargers with [ [level] of this-charger-type > 0 ]
+  ][
+    report 0
+  ]
+end
+
+to-report num-stranded
+  report count drivers with [state = "stranded"]
+end

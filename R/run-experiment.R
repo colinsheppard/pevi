@@ -2,8 +2,10 @@ Sys.setenv(NOAWT=1)
 library(colinmisc)
 load.libraries(c('ggplot2','yaml','RNetLogo'))
 
-path.to.pevi <- '/Users/critter/Dropbox/serc/pev-colin/pevi/'
-path.to.inputs <- '/Users/critter/Dropbox/serc/pev-colin/pev-shared/data/inputs/sensitivity/charge-safety-factor/'
+#path.to.pevi <- '/Users/critter/Dropbox/serc/pev-colin/pevi/'
+#path.to.inputs <- '/Users/critter/Dropbox/serc/pev-colin/pev-shared/data/inputs/sensitivity/charge-safety-factor/'
+path.to.pevi <- '/Users/sheppardc/Dropbox/serc/pev-colin/pevi/'
+path.to.inputs <- '/Users/sheppardc/Dropbox/serc/pev-colin/pev-shared/data/inputs/sensitivity/charge-safety-factor/'
 
 #.jinit(parameters="-Xmx1024m")
 
@@ -21,7 +23,7 @@ vary.tab <- expand.grid(vary,stringsAsFactors=F)
 reporters <- data.frame(num.drivers="(count drivers)",
   num.trips="(sum [ length itin-change-flag - sum itin-change-flag ] of drivers)",
   total.delay="(sum [ sum itin-delay-amount  ] of drivers)",
-  mean.delay="(sum [ sum itin-delay-amount  ] of drivers) / (sum [length (filter [? > 0] itin-delay-amount)] of drivers)",
+  mean.delay="((sum [ sum itin-delay-amount  ] of drivers) / (sum [length (filter [? > 0] itin-delay-amount)] of drivers))",
   frac.drivers.delayed="(count drivers with [ sum itin-delay-amount > 0 ] / count drivers)",
   num.unscheduled.trips="(sum [ sum itin-change-flag ] of drivers)",
   energy.charged="(sum [ energy-received ] of drivers)",
@@ -30,7 +32,12 @@ reporters <- data.frame(num.drivers="(count drivers)",
   gasoline.used="(sum [ gasoline-used ] of drivers)",
   miles.driven="(sum [ miles-driven ] of drivers)",
   num.denials="(sum [ num-denials ] of drivers)",
+  num.stranded='(num-stranded)',
+  mean.duty.factor="(mean-duty-factor)",
   frac.denied="(count drivers with [num-denials > 0] / count drivers)",stringsAsFactors=F)
+
+# log files, these all get set to false so logging is deactivated
+logfiles<-c("wait-time","charging","charge-time","seek-charger","seek-charger-result","need-to-charge","trip-journey-timeuntildepart","break-up-trip","break-up-trip-choice","charge-limiting-factor","drivers")
 
 results <- data.frame(vary.tab,reporters)
 results$penetration <- as.numeric(unlist(lapply(strsplit(as.character(results$driver.input.file),'-pen',fixed=T),function(x){ unlist(strsplit(x[2],"-rep",fixed=T)[[1]][1]) })))
@@ -52,12 +59,15 @@ NLStart(nl.path, gui=F)
 model.path <- paste(path.to.pevi,"netlogo/PEVI.nlogo",sep='')
 NLLoadModel(model.path)
 
-NLCommand('set log-wait-time false','set log-charging false','set log-charge-time false','set log-seek-charger false')
+for(cmd in paste('set log-',logfiles,' false',sep='')){ NLCommand(cmd) }
 
 # for every combination of parameters, run the model and capture the summary statistics
 for(results.i in 1:nrow(results)){
   #print(results.i)
-  if(results.i%%10 == 0)cat(paste(results.i,""))
+  if(results.i%%10 == 0){
+    cat(paste(results.i,""))
+    save(results,file=paste(path.to.inputs,'results.Rdata',sep=''))
+  }
   NLCommand('clear-all-and-initialize')
   NLCommand(paste('set parameter-file "',path.to.inputs,'params.txt"',sep=''))
   NLCommand(paste('set model-directory "',path.to.pevi,'netlogo/"',sep=''))
@@ -70,7 +80,7 @@ for(results.i in 1:nrow(results)){
     }
   }
   NLCommand('setup')
-  NLCommand('go')
+  NLCommand('dynamic-scheduler:go-until schedule 500')
   results[results.i,names(reporters)] <- tryCatch(NLDoReport(1,"",reporter = paste("(sentence",paste(reporters,collapse=' '),")"),as.data.frame=T,df.col.names=names(reporters)),error=function(e){ NA })
 }
 

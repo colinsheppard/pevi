@@ -218,9 +218,10 @@ for(from.name in dimnames(route.hists)$from.name){
 
 # finally, summarize the routes to get the distance/time/performance/enroute for each pairing
 load(file=paste(path.to.pevi,'inputs/routing-corrected.Rdata',sep=''))
-disttime <- ddply(route.ordered,.(from_taz,to_taz),function(df){ data.frame(miles=sum(df$length),time=sum(df$length/df$ab_speed),enroute=paste(unique(df$end.taz),collapse=","))})
-names(disttime) <- c('from','to','miles','time','enroute')
-disttime <- rbind(disttime,data.frame(from=unique(disttime$from),to=unique(disttime$from),miles=sqrt(taz$ACRES[match(unique(disttime$from),taz$id)]*0.001563)/2,time=sqrt(taz$ACRES[match(unique(disttime$from),taz$id)]*0.001563)/30/2,enroute=''))
+load(file=paste(path.to.leaf,'data/all-trips-cleaned.Rdata',sep=''))
+disttime <- ddply(route.ordered,.(from_taz,to_taz),function(df){ data.frame(miles=sum(df$length),time=sum(df$length/df$ab_speed),enroute=paste(unique(df$end.taz),collapse=","),perf=subset(perf,from==df$from_taz[1] & to==df$to_taz[1])$perf)})
+names(disttime) <- c(';from','to','miles','time','enroute','perf')
+disttime <- rbind(disttime,data.frame(from=unique(disttime$from),to=unique(disttime$from),miles=sqrt(taz$ACRES[match(unique(disttime$from),taz$id)]*0.001563)/2,time=sqrt(taz$ACRES[match(unique(disttime$from),taz$id)]*0.001563)/30/2,enroute='',perf=1))
 disttime <- ddply(disttime[order(disttime$from),],.(from),function(df){ df[order(df$to),] })
 write.csv(disttime,file=paste(path.to.geatm,'taz-dist-time.csv',sep=''),row.names=F)
 write.table(disttime,file=paste(path.to.pevi,'inputs/taz-dist-time.txt',sep=''),row.names=F,sep="\t")

@@ -92,18 +92,17 @@ save(results,file=paste(path.to.inputs,'results.Rdata',sep=''))
 
 NLQuit()
 
-ggplot(results,aes(x=as.factor(penetration),y=frac.drivers.delayed))+geom_boxplot()+facet_grid(infrastructure.scenario.named~vehicle.scenario.named)
-
 # HOW MANY DRIVERS ARE DELAYED
-ggplot(results,aes(x=as.factor(penetration),y=frac.drivers.delayed))+geom_boxplot()+facet_grid(vehicle.scenario.named~infrastructure.scenario.named)
-# DELAY VS SCENARIO
-ggplot(results,aes(x=infrastructure.scenario.named,y=mean.delay))+geom_boxplot()+facet_grid(penetration~vehicle.scenario.named)
+ggplot(results,aes(x=infrastructure.scenario.named,y=frac.drivers.delayed))+geom_boxplot(aes(fill=as.factor(penetration)))+facet_wrap(~vehicle.scenario.named)
 
 # UNSCHEDULED TRIPS / DRIVER
-ggplot(results,aes(x=as.factor(penetration),y=num.unscheduled.trips/num.drivers))+geom_boxplot()+facet_grid(vehicle.scenario.named~infrastructure.scenario.named)
+ggplot(results,aes(x=infrastructure.scenario.named,y=num.unscheduled.trips/num.drivers))+geom_boxplot(aes(fill=as.factor(penetration)))+facet_wrap(~vehicle.scenario.named)
 
 # GASOLINE USED
-ggplot(results,aes(x=infrastructure.scenario.named,y=gasoline.used))+geom_boxplot()+facet_grid(penetration~vehicle.scenario.named)
+ggplot(results,aes(x=infrastructure.scenario.named,y=gasoline.used))+geom_boxplot(aes(fill=as.factor(penetration)))+facet_wrap(~vehicle.scenario.named)
+
+# DUTY FACTOR
+ggplot(results,aes(x=infrastructure.scenario.named,y=mean.duty.factor))+geom_boxplot(aes(fill=as.factor(penetration)))+facet_wrap(~vehicle.scenario.named)
 
 # CHARGE-SAFETY-FACTOR
 ggplot(results,aes(x=factor(charge.safety.factor),y=total.delay))+geom_boxplot(aes(fill=factor(penetration)))+facet_grid(infrastructure.scenario.named~vehicle.scenario.named)
@@ -111,3 +110,10 @@ ggplot(results,aes(x=factor(charge.safety.factor),y=num.unscheduled.trips/num.dr
 ggplot(results,aes(x=factor(charge.safety.factor),y=num.stranded/num.drivers))+geom_boxplot(aes(fill=factor(penetration)))+facet_grid(infrastructure.scenario.named~vehicle.scenario.named) + scale_y_log10()
 ggplot(results,aes(x=factor(charge.safety.factor),y=frac.denied))+geom_boxplot(aes(fill=factor(penetration)))+facet_grid(infrastructure.scenario.named~vehicle.scenario.named) + scale_y_log10()
 ggplot(results,aes(x=factor(charge.safety.factor),y=frac.denied))+geom_boxplot(aes(fill=factor(penetration)))+facet_grid(infrastructure.scenario.named~vehicle.scenario.named) + scale_y_log10()
+
+# WILLING TO ROAM TIME THRESHOLD 
+ggplot(results,aes(x=factor(willing.to.roam.time.threshold),y=total.delay/num.drivers))+geom_boxplot(aes(fill=factor(penetration)))+facet_grid(infrastructure.scenario.named~vehicle.scenario.named) + scale_y_log10()
+ggplot(results,aes(x=factor(willing.to.roam.time.threshold),y=frac.denied))+geom_boxplot(aes(fill=factor(penetration)))+facet_grid(infrastructure.scenario.named~vehicle.scenario.named) + scale_y_log10()
+ggplot(results,aes(x=factor(willing.to.roam.time.threshold),y=num.stranded/num.drivers))+geom_boxplot(aes(fill=factor(penetration)))+facet_grid(infrastructure.scenario.named~vehicle.scenario.named) + scale_y_log10()
+ggplot(results,aes(x=factor(willing.to.roam.time.threshold),y=num.unscheduled.trips/num.drivers))+geom_boxplot(aes(fill=factor(penetration)))+facet_grid(infrastructure.scenario.named~vehicle.scenario.named) + scale_y_log10()
+ggplot(results,aes(x=factor(willing.to.roam.time.threshold),y=mean.duty.factor))+geom_boxplot(aes(fill=factor(penetration)))+facet_grid(infrastructure.scenario.named~vehicle.scenario.named) + scale_y_log10()

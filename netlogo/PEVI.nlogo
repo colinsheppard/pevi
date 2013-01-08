@@ -36,6 +36,8 @@ globals [
   willing-to-roam-time-threshold
   frac-phev
   probability-of-unneeded-charge
+  electric-fuel-consumption-sd
+  electric-fuel-consumption-range
   
   ;; globals needed for testing
   test-driver
@@ -193,7 +195,7 @@ to setup
   reset-logfile "trip-journey-timeuntildepart"
   log-data "trip-journey-timeuntildepart" (sentence "time" "departure.time" "driver" "vehicle.type" "soc" "from.taz" "to.taz" "trip.distance" "journey.distance" "time.until.depart" "next.event" "remaining.range" "delay.sum")
   reset-logfile "seek-charger"
-  log-data "seek-charger" (sentence "time" "seek-charger-index" "current.taz" "charger.taz" "driver" "vehicle.type" "is.BEV" "charger.in.origin.dest" "level" "soc" "trip.or.journey.energy.need" "distance.o.to.c" 
+  log-data "seek-charger" (sentence "time" "seek-charger-index" "current.taz" "charger.taz" "driver" "vehicle.type" "electric.fuel.consumption" "is.BEV" "charger.in.origin.dest" "level" "soc" "trip.or.journey.energy.need" "distance.o.to.c" 
     "distance.c.to.d" "time.o.to.c" "time.c.to.d" "trip.time" "trip.distance" "journey.distance" "charging.on.a.whim." "time.until.depart" "trip.charge.time.need" "cost" "extra.time.until.end.charge" 
     "full.charge.time.need" "trip.charge.time.need" "mid.journey.charge.time.need" "mid.state.of.charge")
   reset-logfile "seek-charger-result"
@@ -293,7 +295,7 @@ to seek-charger
   let #mid-state-of-charge 0
   let #level-3-time-penalty 0
   let #level-3-time-penalty-for-origin-or-destination 0
-  if trip-distance * charge-safety-factor > 0.8 * battery-capacity / electric-fuel-consumption and trip-distance * charge-safety-factor <= battery-capacity / electric-fuel-consumption[
+  if trip-distance * charge-safety-factor > 0.8 * battery-capacity / electric-fuel-consumption [
     set #level-3-time-penalty-for-origin-or-destination 1
   ]
   
@@ -369,7 +371,7 @@ to seek-charger
             set #full-charge-time-need 0
             ifelse #level = 3[
               set #full-charge-time-need (0.8 - #mid-state-of-charge) * battery-capacity / #this-charge-rate
-              ifelse #leg-two-trip-distance * charge-safety-factor > 0.8 * battery-capacity / electric-fuel-consumption and #leg-two-trip-distance * charge-safety-factor <= battery-capacity / electric-fuel-consumption [
+              ifelse #leg-two-trip-distance * charge-safety-factor > 0.8 * battery-capacity / electric-fuel-consumption [
                   set #level-3-time-penalty 1 
               ][
                 set #level-3-time-penalty 0
@@ -394,7 +396,7 @@ to seek-charger
               set #min-taz #this-taz
               set #min-charger-type #this-charger-type 
             ]
-            log-data "seek-charger" (sentence ticks seek-charger-index ([id] of current-taz) ([id] of #this-taz) id ([name] of this-vehicle-type) is-BEV? #charger-in-origin-or-destination #level state-of-charge 
+            log-data "seek-charger" (sentence ticks seek-charger-index ([id] of current-taz) ([id] of #this-taz) id ([name] of this-vehicle-type) electric-fuel-consumption is-BEV? #charger-in-origin-or-destination #level state-of-charge 
               (item #level #trip-or-journey-energy-need-by-type) (distance-from-to [id] of current-taz [id] of #this-taz) (distance-from-to [id] of #this-taz [id] of destination-taz) 
               (time-from-to [id] of current-taz [id] of #this-taz) (time-from-to [id] of #this-taz [id] of destination-taz) trip-time trip-distance journey-distance charging-on-a-whim? time-until-depart 
               (item #level #trip-charge-time-need-by-type) #this-cost #extra-time-until-end-charge #full-charge-time-need #trip-charge-time-need #mid-journey-charge-time-need #mid-state-of-charge)
@@ -1110,7 +1112,7 @@ go-until-time
 go-until-time
 0
 100
-34.5
+11
 0.5
 1
 NIL
@@ -1151,7 +1153,7 @@ SWITCH
 222
 log-charging
 log-charging
-0
+1
 1
 -1000
 
@@ -1195,7 +1197,7 @@ SWITCH
 359
 log-seek-charger
 log-seek-charger
-1
+0
 1
 -1000
 

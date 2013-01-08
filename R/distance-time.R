@@ -1,5 +1,6 @@
 library(colinmisc)
-load.libraries(c('maptools','plotrix','stats','gpclib','plyr','png','RgoogleMaps','lattice','stringr','ggplot2','RPostgreSQL','colorRamps','reshape'))
+load.libraries(c('maptools','plotrix','stats','gpclib','plyr','png','RgoogleMaps','lattice','stringr','ggplot2','RPostgreSQL','colorRamps','reshape','doMC'))
+registerDoMC(10)
 gpclibPermit()
 
 path.to.geatm  <- '~/Dropbox/serc/pev-colin/data/GEATM-2020/'
@@ -101,35 +102,14 @@ for(net.id in net.ids$network_id){
         ST_Distance_Sphere(points.geom1,points.geom2)*0.000621371 AS dist,
         ((ST_Value(img.rast,points.geom2) - ST_Value(img.rast,points.geom1))/(ST_Distance_Sphere(points.geom1,points.geom2))) AS gradient
       FROM north_coast AS img, 
-        (SELECT gid,length,CASE WHEN endpoint = ST_Pointn(dumpedgeom,1) THEN ST_Pointn(dumpedgeom,generate_series(1,ST_NPoints(dumpedgeom)-1)) ELSE ST_Pointn(dumpedgeom,generate_series(ST_NPoints(dumpedgeom),2,-1)) END AS geom1, CASE WHEN endpoint = ST_Pointn(dumpedgeom,1) THEN ST_Pointn(dumpedgeom,generate_series(2,ST_NPoints(dumpedgeom))) ELSE ST_Pointn(dumpedgeom,generate_series(ST_NPoints(dumpedgeom)-1,1,-1)) END AS geom2 FROM network WHERE gid=',net.id,') AS points',sep=''))
+        (SELECT gid,length,CASE WHEN startpoint = ST_Pointn(dumpedgeom,1) THEN ST_Pointn(dumpedgeom,generate_series(1,ST_NPoints(dumpedgeom)-1)) ELSE ST_Pointn(dumpedgeom,generate_series(ST_NPoints(dumpedgeom),2,-1)) END AS geom1, CASE WHEN startpoint = ST_Pointn(dumpedgeom,1) THEN ST_Pointn(dumpedgeom,generate_series(2,ST_NPoints(dumpedgeom))) ELSE ST_Pointn(dumpedgeom,generate_series(ST_NPoints(dumpedgeom)-1,1,-1)) END AS geom2 FROM network WHERE gid=',net.id,') AS points',sep=''))
   res <- dbGetQuery(con,paste("UPDATE taz_route SET gradient=",weighted.mean(elevs$gradient,elevs$dist)," WHERE network_id=",net.id,sep=''))
-}
-
-# look at the routes from GHD
-eka.waterfront.id <- 27 
-route <- dbGetQuery(con,paste("SELECT r.to_taz,r.gradient,n.length FROM taz_route AS r LEFT JOIN network AS n ON r.network_id=n.gid WHERE r.from_taz=",eka.waterfront.id,sep=''))
-route <- route[route$gradient > -90,]
-gradient.summary <- ddply(route,.(to_taz),function(df){ weighted.mean(df$gradient,df$length) })
-taz@data$gradient.from.waterfront <- gradient.summary$V1[match(taz@data$id,gradient.summary$to_taz)]
-c.map <- paste(map.color(taz@data$gradient.from.waterfront,blue2red(50)),'7F',sep='')
-shp.to.kml(taz,paste(path.to.pevi,'inputs/development/gradients-from-eka-waterfront.kml',sep=''),'Average Gradient','','white',1.5,c.map,id.col='shp.id',name.col='name',description.cols=c('id','gradient.from.waterfront'))
-route$name <- taz@data$name[match(route$to_taz,taz@data$id)]
-#ggplot(route,aes(x=gradient))+geom_histogram(binwidth=0.01)+facet_wrap(~name)
-route$vert.feet <- route$gradient*route$length*5280
-ggplot(route,aes(x=vert.feet))+geom_histogram(binwidth=10)+facet_wrap(~name)
-
-for(taz.i in 1:(n-1)){
-  taz.i.id <- taz@data$id[which(taz@data$name==pts@data$Name[taz.i])]
-  cat(paste(taz.i,",",sep=''))
-  for(taz.j in (taz.i+1):n){
-    taz.j.id <- taz@data$id[which(taz@data$name==pts@data$Name[taz.j])]
-    route <- dbGetQuery(con,paste("SELECT * FROM taz_route WHERE from_taz=",taz.i.id," AND to_taz=",taz.j.id,sep=''))
-  }
 }
 
 # define a function to do the ordering for use in ddply
 order.route <- function(df){
-  st.id <- as.numeric(names(which(table(c(df$start_id,df$end_id))==1)[1]))
+  end.pts <- as.numeric(names(which(table(c(df$start_id,df$end_id))==1)))
+  st.id <- end.pts[pts$taz.id[match(end.pts,pts$nn.id)] == df$from_taz[1]]
   ordered.inds <- c()
   for(i in 1:nrow(df)){
     found.i <-  which(df$start_id %in% st.id | df$end_id %in% st.id)
@@ -140,8 +120,8 @@ order.route <- function(df){
   # save this new data frame
   ndf<-data.frame(df[ordered.inds,],order=1:nrow(df))
   # now reverse rows that are arranged in the wrong direction
-  while(any(diff(ndf$start_id)==0)){
-    i <- which(diff(ndf$start_id)==0)+1
+  while(any(diff(ndf$end_id)==0)){
+    i <- which(diff(ndf$end_id)==0)+1
     st.id <- ndf$start_id[i]
     ndf$start_id[i] <- ndf$end_id[i]
     ndf$end_id[i] <- st.id
@@ -165,9 +145,9 @@ x.bins <- c(-0.6,seq(-0.05,0.05,by=0.01),0.6)
 x.labs <- c("[-0.6,-0.05)","[-0.05,-0.04)","[-0.04,-0.03)","[-0.03,-0.02)","[-0.02,-0.01)","[-0.01,0.00)","[0.00,0.01)","[0.01,0.02)","[0.02,0.03)","[0.03,0.04)","[0.04,0.05)","[0.05,0.6)")
 y.bins <- c(0,25,40,50,60,70)
 y.labs <- c("[0,25)","[25,40)","[40,50)","[50,60)","[60,70)")
-route <- dbGetQuery(con,paste("SELECT r.from_taz,r.to_taz,r.gradient,n.length,n.start_id,n.end_id,n.ab_speed FROM taz_route AS r LEFT JOIN network AS n ON r.network_id=n.gid",sep=''))
+route <- dbGetQuery(con,paste("SELECT r.from_taz,r.to_taz,r.gradient,n.length,n.start_id,n.end_id,n.ab_speed,ST_X(n.startpoint) AS start_lon,ST_Y(n.startpoint) AS start_lat,ST_X(n.endpoint) AS end_lon,ST_Y(n.endpoint) AS end_lat FROM taz_route AS r LEFT JOIN network AS n ON r.network_id=n.gid",sep=''))
 #route <- dbGetQuery(con,paste("SELECT r.from_taz,r.to_taz,r.gradient,n.length,n.start_id,n.end_id,n.ab_speed,ST_X(startpoint) AS startx,ST_Y(startpoint) AS starty,ST_X(endpoint) AS endx,ST_Y(endpoint) AS endy FROM taz_route AS r LEFT JOIN network AS n ON r.network_id=n.gid",sep=''))
-route.ordered <- ddply(route,.(from_taz,to_taz),order.route)
+route.ordered <- ddply(route,.(from_taz,to_taz),order.route,.parallel=T)
 route.ordered$to.name <- taz@data$name[match(route.ordered$to_taz,taz@data$id)]
 route.ordered$from.name <- taz@data$name[match(route.ordered$from_taz,taz@data$id)]
 route.ordered$gradient.binned <- factor(x.labs[findInterval(route.ordered$gradient,x.bins)],levels=x.labs)
@@ -176,30 +156,31 @@ route.hists <- cast(melt(route.ordered,id.vars=c('to.name','from.name','gradient
 save(route.ordered,route.hists,file=paste(path.to.pevi,'inputs/routing.Rdata',sep=''))
 load(paste(path.to.pevi,'inputs/routing.Rdata',sep=''))
 
-pts$name <- as.character(pts$Name)
-for(from.id in 1:52){
-  for(to.id in 1:52){
-    if(from.id == to.id)next
-    row.i <- which(route.ordered$from_taz==from.id & route.ordered$to_taz==to.id & route.ordered$order==1)
-    if(any(pts$nn.id == route.ordered$end_id[row.i])){
-      sub.inds <- which(route.ordered$from_taz==from.id & route.ordered$to_taz==to.id)
-      route.ordered$gradient[sub.inds] <- -route.ordered$gradient[sub.inds]
-      temp.start <- route.ordered$start_id[sub.inds]
-      route.ordered$start_id[sub.inds] <- route.ordered$end_id[sub.inds]
-      route.ordered$end_id[sub.inds] <- temp.start
-    }
-    if(! pts$Name[pts$nn.id==route.ordered$start_id[row.i]] == route.ordered$from.name[row.i]){
-      sub.inds <- which(route.ordered$from_taz==from.id & route.ordered$to_taz==to.id)
-      route.ordered$gradient[sub.inds] <- -route.ordered$gradient[sub.inds]
-      temp.start <- route.ordered$start_id[sub.inds]
-      route.ordered$start_id[sub.inds] <- route.ordered$end_id[sub.inds]
-      route.ordered$end_id[sub.inds] <- temp.start
-      route.ordered$order[sub.inds] <- max(route.ordered$order[sub.inds]) - route.ordered$order[sub.inds] + 1
-    }
-  }
-}
-route.hists <- cast(melt(route.ordered,id.vars=c('to.name','from.name','gradient.binned','speed.binned'),measure.vars=c('length')),gradient.binned ~ speed.binned ~ variable ~ to.name ~ from.name,fun.aggregate=sum)
-save(route.ordered,route.hists,file=paste(path.to.pevi,'inputs/routing-corrected.Rdata',sep=''))
+#pts$name <- as.character(pts$Name)
+#pts$taz.id <- taz$id[match(pts$name,taz$name)]
+#for(from.id in 1:52){
+  #for(to.id in 1:52){
+    #if(from.id == to.id)next
+    #row.i <- which(route.ordered$from_taz==from.id & route.ordered$to_taz==to.id & route.ordered$order==1)
+    #if(any(pts$nn.id == route.ordered$end_id[row.i])){
+      #sub.inds <- which(route.ordered$from_taz==from.id & route.ordered$to_taz==to.id)
+      #route.ordered$gradient[sub.inds] <- -route.ordered$gradient[sub.inds]
+      #temp.start <- route.ordered$start_id[sub.inds]
+      #route.ordered$start_id[sub.inds] <- route.ordered$end_id[sub.inds]
+      #route.ordered$end_id[sub.inds] <- temp.start
+    #}
+    #if(! pts$Name[pts$nn.id==route.ordered$start_id[row.i]] == route.ordered$from.name[row.i]){
+      #sub.inds <- which(route.ordered$from_taz==from.id & route.ordered$to_taz==to.id)
+      #route.ordered$gradient[sub.inds] <- -route.ordered$gradient[sub.inds]
+      #temp.start <- route.ordered$start_id[sub.inds]
+      #route.ordered$start_id[sub.inds] <- route.ordered$end_id[sub.inds]
+      #route.ordered$end_id[sub.inds] <- temp.start
+      #route.ordered$order[sub.inds] <- max(route.ordered$order[sub.inds]) - route.ordered$order[sub.inds] + 1
+    #}
+  #}
+#}
+#route.hists <- cast(melt(route.ordered,id.vars=c('to.name','from.name','gradient.binned','speed.binned'),measure.vars=c('length')),gradient.binned ~ speed.binned ~ variable ~ to.name ~ from.name,fun.aggregate=sum)
+#save(route.ordered,route.hists,file=paste(path.to.pevi,'inputs/routing-corrected.Rdata',sep=''))
 
 # finally find enroute
 taz.nodes <- data.frame(node.id=sort(unique(route.ordered$end_id)),taz=NA)
@@ -236,7 +217,7 @@ for(from.name in dimnames(route.hists)$from.name){
 }
 
 # finally, summarize the routes to get the distance/time/performance/enroute for each pairing
-load(file=paste(path.to.pevi,'inputs/routing.Rdata',sep=''))
+load(file=paste(path.to.pevi,'inputs/routing-corrected.Rdata',sep=''))
 disttime <- ddply(route.ordered,.(from_taz,to_taz),function(df){ data.frame(miles=sum(df$length),time=sum(df$length/df$ab_speed),enroute=paste(unique(df$end.taz),collapse=","))})
 names(disttime) <- c('from','to','miles','time','enroute')
 disttime <- rbind(disttime,data.frame(from=unique(disttime$from),to=unique(disttime$from),miles=sqrt(taz$ACRES[match(unique(disttime$from),taz$id)]*0.001563)/2,time=sqrt(taz$ACRES[match(unique(disttime$from),taz$id)]*0.001563)/30/2,enroute=''))

@@ -7,6 +7,7 @@ globals [
   od-dist
   od-time
   od-enroute
+  od-performance  ;; not yet in use
   
   n-tazs
   n-charger-types
@@ -1112,7 +1113,7 @@ go-until-time
 go-until-time
 0
 100
-11
+100
 0.5
 1
 NIL
@@ -1153,7 +1154,7 @@ SWITCH
 222
 log-charging
 log-charging
-1
+0
 1
 -1000
 
@@ -1197,7 +1198,7 @@ SWITCH
 359
 log-seek-charger
 log-seek-charger
-0
+1
 1
 -1000
 

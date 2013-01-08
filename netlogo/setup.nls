@@ -44,6 +44,7 @@ to setup-od-data
   set od-dist   n-values (n-tazs * n-tazs) [0] 
   set od-time   n-values (n-tazs * n-tazs) [0] 
   set od-enroute n-values (n-tazs * n-tazs) [n-values (0) [0]] 
+  set od-performance   n-values (n-tazs * n-tazs) [0]
   
   ifelse (file-exists? od-input-file) [
     file-close
@@ -54,6 +55,7 @@ to setup-od-data
      set od-dist   replace-item ? od-dist file-read 
      set od-time   replace-item ? od-time file-read
      set od-enroute replace-item ? od-enroute split file-read ","
+     set od-performance replace-item ? od-performance file-read
     ]
     file-close
   ][ 

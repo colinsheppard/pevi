@@ -16,6 +16,8 @@ to read-parameter-file
       ifelse param-name = "time-opportunity-cost" [ set time-opportunity-cost file-read ][
       ifelse param-name = "willing-to-roam-time-threshold" [ set willing-to-roam-time-threshold file-read ][
       ifelse param-name = "frac-phev" [ set frac-phev file-read ][
+      ifelse param-name = "electric-fuel-consumption-sd" [ set electric-fuel-consumption-sd file-read ][
+      ifelse param-name = "electric-fuel-consumption-range" [ set electric-fuel-consumption-range file-read ][
       ifelse param-name = "charger-input-file" [ set charger-input-file word model-directory file-read ][
       ifelse param-name = "charger-type-input-file" [ set charger-type-input-file word model-directory file-read ][
       ifelse param-name = "driver-input-file" [ set driver-input-file word model-directory file-read ][
@@ -23,7 +25,7 @@ to read-parameter-file
       ifelse param-name = "vehicle-type-input-file" [ set vehicle-type-input-file word model-directory file-read ][
       ifelse param-name = "outputs-directory" [ set outputs-directory word model-directory file-read ][
       ifelse param-name = "probability-of-unneeded-charge" [ set probability-of-unneeded-charge file-read ][
-      ]]]]]]]]]]]]]]]
+      ]]]]]]]]]]]]]]]]]
     ]
     file-close
   ][ 
@@ -200,8 +202,13 @@ to setup-drivers
     
     set is-bev? [is-bev?] of this-vehicle-type
     set battery-capacity [battery-capacity] of this-vehicle-type
-    set electric-fuel-consumption [electric-fuel-consumption] of this-vehicle-type
     set hybrid-fuel-consumption [hybrid-fuel-consumption] of this-vehicle-type
+
+    let electric-fuel-consumption-mean [electric-fuel-consumption] of this-vehicle-type
+    set electric-fuel-consumption random-normal electric-fuel-consumption-mean electric-fuel-consumption-sd
+    while [abs (electric-fuel-consumption - electric-fuel-consumption-mean) > electric-fuel-consumption-range / 2][
+      set electric-fuel-consumption random-normal electric-fuel-consumption-mean electric-fuel-consumption-sd
+    ]
 
     set state-of-charge 1
     set state "not-charging"

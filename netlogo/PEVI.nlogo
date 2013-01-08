@@ -235,7 +235,7 @@ to-report need-to-charge [calling-event]
     report true
   ][
     ifelse (calling-event = "arrive" and state-of-charge < 1) [  ;; drivers only consider unneeded charge if they just arrived and the vehicle does not have a full state of charge
-      ifelse time-until-depart >= 0.5 and random-float 1 < probability-of-unneeded-charge [
+      ifelse time-until-depart >= willing-to-roam-time-threshold and random-float 1 < probability-of-unneeded-charge [
         set charging-on-a-whim? true
         log-data "need-to-charge" (sentence ticks id [name] of this-vehicle-type state-of-charge trip-distance journey-distance (departure-time - ticks) calling-event remaining-range charging-on-a-whim? "true")
         report true
@@ -291,6 +291,11 @@ to seek-charger
   let #trip-charge-time-need 0
   let #mid-journey-charge-time-need 0
   let #mid-state-of-charge 0
+  let #level-3-time-penalty 0
+  let #level-3-time-penalty-for-origin-or-destination 0
+  if trip-distance * charge-safety-factor > 0.8 * battery-capacity / electric-fuel-consumption and trip-distance * charge-safety-factor <= battery-capacity / electric-fuel-consumption[
+    set #level-3-time-penalty-for-origin-or-destination 1
+  ]
   
   ifelse not charging-on-a-whim? and is-bev? and time-until-depart < willing-to-roam-time-threshold [  
     set willing-to-roam? true  
@@ -347,20 +352,31 @@ to seek-charger
             ][
               set #extra-time-until-end-charge 0
             ]
-            set #level-3-and-too-full #level = 3 and state-of-charge >= 0.8 
+            set #level-3-and-too-full #level = 3 and state-of-charge >= 0.8
+            ifelse #level = 3 [
+              set #level-3-time-penalty #level-3-time-penalty-for-origin-or-destination 
+            ][
+              set #level-3-time-penalty 0
+            ]
           ][
             let #leg-one-trip-distance distance-from-to [id] of current-taz [id] of #this-taz
             let #leg-two-trip-distance distance-from-to [id] of #this-taz [id] of destination-taz
             let #mid-journey-distance journey-distance - #leg-one-trip-distance
             set #mid-state-of-charge state-of-charge - #leg-one-trip-distance * electric-fuel-consumption / battery-capacity
-            set #level-3-and-too-full #level = 3 and #mid-state-of-charge >= 0.8 
+            set #level-3-and-too-full #level = 3 and #mid-state-of-charge >= 0.8
             set #trip-charge-time-need max sentence 0 ((#leg-two-trip-distance * charge-safety-factor * electric-fuel-consumption - #mid-state-of-charge * battery-capacity) / #this-charge-rate)
             set #mid-journey-charge-time-need max sentence 0 ((#mid-journey-distance * charge-safety-factor * electric-fuel-consumption - #mid-state-of-charge * battery-capacity) / #this-charge-rate)
             set #full-charge-time-need 0
             ifelse #level = 3[
               set #full-charge-time-need (0.8 - #mid-state-of-charge) * battery-capacity / #this-charge-rate
+              ifelse #leg-two-trip-distance * charge-safety-factor > 0.8 * battery-capacity / electric-fuel-consumption and #leg-two-trip-distance * charge-safety-factor <= battery-capacity / electric-fuel-consumption [
+                  set #level-3-time-penalty 1 
+              ][
+                set #level-3-time-penalty 0
+              ]
             ][
               set #full-charge-time-need (1 - #mid-state-of-charge) * battery-capacity / #this-charge-rate
+              set #level-3-time-penalty 0
             ]
             set #extra-time-until-end-charge calc-time-until-end-charge #full-charge-time-need 
                                                                         #trip-charge-time-need 
@@ -370,7 +386,7 @@ to seek-charger
                                                                         #this-charger-type                                                    
           ]
           if not #level-3-and-too-full [ 
-            let #this-cost (time-opportunity-cost * (#extra-time-for-travel + #extra-time-until-end-charge) + 
+            let #this-cost (time-opportunity-cost * (#extra-time-for-travel + #extra-time-until-end-charge + #level-3-time-penalty) + 
               ([energy-price] of #this-charger-type) * (item #level #trip-or-journey-energy-need-by-type + #extra-energy-for-travel))
             
             if #this-cost < #min-cost or (#this-cost = #min-cost and [level] of #this-charger-type > [level] of #min-charger-type) [
@@ -446,11 +462,11 @@ to wait-time-event-scheduler
       log-data "wait-time" (sentence ticks id [name] of this-vehicle-type state-of-charge trip-distance journey-distance time-until-depart "retry-seek" event-time-from-now)
     ]
   ][
-    ifelse remaining-range / charge-safety-factor >= journey-distance or time-until-depart <= 1 [
+    ifelse remaining-range / charge-safety-factor >= journey-distance or time-until-depart <= willing-to-roam-time-threshold [
       dynamic-scheduler:add schedule self task depart departure-time
       log-data "wait-time" (sentence ticks id [name] of this-vehicle-type state-of-charge trip-distance journey-distance time-until-depart "depart" departure-time)
     ][
-      let event-time-from-now min(sentence (random-exponential wait-time-mean) (time-until-depart - 0.5))
+      let event-time-from-now min(sentence (random-exponential wait-time-mean) (time-until-depart - willing-to-roam-time-threshold))
       if event-time-from-now < 0 [ set event-time-from-now 0 ]
       dynamic-scheduler:add schedule self task retry-seek ticks + event-time-from-now
       log-data "wait-time" (sentence ticks id [name] of this-vehicle-type state-of-charge trip-distance journey-distance time-until-depart "retry-seek" event-time-from-now)
@@ -486,9 +502,9 @@ to charge-time-event-scheduler
                                                     [this-charger-type] of current-charger)
   let next-event-scheduled-at 0 
   ifelse (time-until-end-charge > 0) and (time-until-end-charge < full-charge-time-need) and 
-         (time-until-depart > 0.5) and (level-of current-charger < 3) and 
+         (time-until-depart > willing-to-roam-time-threshold) and (level-of current-charger < 3) and 
          (time-until-end-charge > time-until-depart or time-until-end-charge < journey-charge-time-need) [                                                                                                    
-    set next-event-scheduled-at ticks + min (sentence (random-exponential wait-time-mean) (time-until-depart - 0.5))
+    set next-event-scheduled-at ticks + min (sentence (random-exponential wait-time-mean) (time-until-depart - willing-to-roam-time-threshold))
     dynamic-scheduler:add schedule self task end-charge-then-retry next-event-scheduled-at
   ][
     set next-event-scheduled-at ticks + time-until-end-charge
@@ -1093,8 +1109,8 @@ SLIDER
 go-until-time
 go-until-time
 0
-36
-7
+100
+34.5
 0.5
 1
 NIL
@@ -1135,7 +1151,7 @@ SWITCH
 222
 log-charging
 log-charging
-1
+0
 1
 -1000
 
@@ -1179,7 +1195,7 @@ SWITCH
 359
 log-seek-charger
 log-seek-charger
-0
+1
 1
 -1000
 
@@ -1223,7 +1239,7 @@ SWITCH
 400
 log-seek-charger-result
 log-seek-charger-result
-0
+1
 1
 -1000
 

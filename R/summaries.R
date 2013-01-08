@@ -29,7 +29,7 @@ ggplot(ch,aes(x=time,y=end.soc,colour=factor(event.num),shape=factor(charger.lev
 ggplot(ch,aes(x=time,xend=time+duration,y=begin.soc,yend=end.soc,colour=energy))+geom_segment()+facet_grid(charger.level~vehicle.type)
 
 # DRIVERS WHO DONT CHARGE UNTIL FULL
-ggplot(subset(ch,end.soc<1),aes(x=time,xend=time+duration,y=begin.soc,yend=end.soc,colour=factor(charger.level),shape=factor(charger.level),size=2))+geom_segment()+facet_wrap(~vehicle.type)
+ggplot(subset(ch,end.soc<0.999),aes(x=time,xend=time+duration,y=begin.soc,yend=end.soc,colour=factor(charger.level),shape=factor(charger.level),size=2))+geom_segment()+facet_wrap(~vehicle.type)
 
 # DUTY FACTOR OF INDIVIDUAL CHARGERS
 chs <- ddply(ch,.(charger.id),function(df){

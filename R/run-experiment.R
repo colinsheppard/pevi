@@ -6,6 +6,7 @@ load.libraries(c('ggplot2','yaml','RNetLogo'))
 #path.to.inputs <- '/Users/critter/Dropbox/serc/pev-colin/pev-shared/data/inputs/sensitivity/charge-safety-factor/'
 path.to.pevi <- '/Users/sheppardc/Dropbox/serc/pev-colin/pevi/'
 path.to.inputs <- '/Users/sheppardc/Dropbox/serc/pev-colin/pev-shared/data/inputs/sensitivity/charge-safety-factor/'
+path.to.inputs <- '/Users/sheppardc/Dropbox/serc/pev-colin/pev-shared/data/inputs/sensitivity/willing-to-roam-time-threshold/'
 
 #.jinit(parameters="-Xmx1024m")
 
@@ -91,7 +92,7 @@ save(results,file=paste(path.to.inputs,'results.Rdata',sep=''))
 
 NLQuit()
 
-ggplot(results,aes(x=penetration,y=frac.drivers.delayed))+geom_boxplot()+facet_grid(infrastructure.scenario.named~vehicle.scenario.named)
+ggplot(results,aes(x=as.factor(penetration),y=frac.drivers.delayed))+geom_boxplot()+facet_grid(infrastructure.scenario.named~vehicle.scenario.named)
 
 # HOW MANY DRIVERS ARE DELAYED
 ggplot(results,aes(x=as.factor(penetration),y=frac.drivers.delayed))+geom_boxplot()+facet_grid(vehicle.scenario.named~infrastructure.scenario.named)
@@ -107,7 +108,6 @@ ggplot(results,aes(x=infrastructure.scenario.named,y=gasoline.used))+geom_boxplo
 # CHARGE-SAFETY-FACTOR
 ggplot(results,aes(x=factor(charge.safety.factor),y=total.delay))+geom_boxplot(aes(fill=factor(penetration)))+facet_grid(infrastructure.scenario.named~vehicle.scenario.named)
 ggplot(results,aes(x=factor(charge.safety.factor),y=num.unscheduled.trips/num.drivers))+geom_boxplot(aes(fill=factor(penetration)))+facet_grid(infrastructure.scenario.named~vehicle.scenario.named)
-
-
-ggplot(data = sensitivity_pool_m, aes(x = variable, y = value)) + geom_boxplot(aes( fill= group), width = 0.8)
-
+ggplot(results,aes(x=factor(charge.safety.factor),y=num.stranded/num.drivers))+geom_boxplot(aes(fill=factor(penetration)))+facet_grid(infrastructure.scenario.named~vehicle.scenario.named) + scale_y_log10()
+ggplot(results,aes(x=factor(charge.safety.factor),y=frac.denied))+geom_boxplot(aes(fill=factor(penetration)))+facet_grid(infrastructure.scenario.named~vehicle.scenario.named) + scale_y_log10()
+ggplot(results,aes(x=factor(charge.safety.factor),y=frac.denied))+geom_boxplot(aes(fill=factor(penetration)))+facet_grid(infrastructure.scenario.named~vehicle.scenario.named) + scale_y_log10()

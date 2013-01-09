@@ -2,12 +2,15 @@ Sys.setenv(NOAWT=1)
 library(colinmisc)
 load.libraries(c('ggplot2','yaml','RNetLogo'))
 
-base.path <- '/Users/sheppardc/Dropbox/serc/pev-colin/'
+base.path <- '/Users/Raskolnikovbot3001/Dropbox/'
 
+# Andy: Be sure to adjust the input path to test for new variables.
 path.to.pevi <- paste(base.path,'pevi/',sep='')
-path.to.inputs <- paste(base.path,'pev-shared/data/inputs/sensitivity/charge-safety-factor/',sep='')
-path.to.inputs <- paste(base.path,'pev-shared/data/inputs/sensitivity/willing-to-roam-time-threshold/',sep='')
-path.to.inputs <- paste(base.path,'pev-shared/data/inputs/sensitivity/chargers/',sep='')
+path.to.inputs <- paste(base.path,'pevi/inputs/sensitivity/charger-search-distance/',sep='')
+path.to.inputs <- paste(base.path,'pevi/inputs/sensitivity/electric-fuel-consumption/',sep='')
+path.to.inputs <- paste(base.path,'pevi/inputs/sensitivity/probability-of-unneeded-charge/',sep='')
+path.to.inputs <- paste(base.path,'pevi/inputs/sensitivity/time-opportunity-cost/',sep='')
+path.to.inputs <- paste(base.path,'pevi/inputs/sensitivity/wait-time-mean/',sep='')
 
 #.jinit(parameters="-Xmx1024m")
 
@@ -93,6 +96,8 @@ save(results,file=paste(path.to.inputs,'results.Rdata',sep=''))
 
 NLQuit()
 
+# Andy: You will need to adjust these so that they test YOUR variables
+
 # HOW MANY DRIVERS ARE DELAYED
 p <- ggplot(results,aes(x=infrastructure.scenario.named,y=frac.drivers.delayed))+geom_boxplot(aes(fill=as.factor(penetration)))+facet_wrap(~vehicle.scenario.named)
 ggsave(paste(path.to.inputs,"plots/num-drivers-delayed.pdf",sep=''),p,width=15,height=11)
@@ -109,8 +114,8 @@ ggsave(paste(path.to.inputs,"plots/num-drivers-delayed.pdf",sep=''),p,width=15,h
 p <- ggplot(results,aes(x=infrastructure.scenario.named,y=mean.duty.factor))+geom_boxplot(aes(fill=as.factor(penetration)))+facet_wrap(~vehicle.scenario.named)
 ggsave(paste(path.to.inputs,"plots/num-drivers-delayed.pdf",sep=''),p,width=15,height=11)
 
-# CHARGE-SAFETY-FACTOR
-p <- ggplot(results,aes(x=factor(charge.safety.factor),y=total.delay))+geom_boxplot(aes(fill=factor(penetration)))+facet_grid(infrastructure.scenario.named~vehicle.scenario.named)
+# CHARGER-SEARCH-DISTANCE
+p <- ggplot(results,aes(x=factor(charger.search.distance),y=total.delay))+geom_boxplot(aes(fill=factor(penetration)))+facet_grid(infrastructure.scenario.named~vehicle.scenario.named)
 ggsave(paste(path.to.inputs,"plots/num-drivers-delayed.pdf",sep=''),p,width=15,height=11)
 p <- ggplot(results,aes(x=factor(charge.safety.factor),y=num.unscheduled.trips/num.drivers))+geom_boxplot(aes(fill=factor(penetration)))+facet_grid(infrastructure.scenario.named~vehicle.scenario.named)
 ggsave(paste(path.to.inputs,"plots/num-drivers-delayed.pdf",sep=''),p,width=15,height=11)
@@ -121,14 +126,50 @@ ggsave(paste(path.to.inputs,"plots/num-drivers-delayed.pdf",sep=''),p,width=15,h
 p <- ggplot(results,aes(x=factor(charge.safety.factor),y=frac.denied))+geom_boxplot(aes(fill=factor(penetration)))+facet_grid(infrastructure.scenario.named~vehicle.scenario.named) + scale_y_log10()
 ggsave(paste(path.to.inputs,"plots/num-drivers-delayed.pdf",sep=''),p,width=15,height=11)
 
-# WILLING TO ROAM TIME THRESHOLD 
-p <- ggplot(results,aes(x=factor(willing.to.roam.time.threshold),y=total.delay/num.drivers))+geom_boxplot(aes(fill=factor(penetration)))+facet_grid(infrastructure.scenario.named~vehicle.scenario.named) + scale_y_log10()
+# ELECTRIC-FUEL-CONSUMPTION
+p <- ggplot(results,aes(x=factor(electric.fuel.consumption),y=total.delay))+geom_boxplot(aes(fill=factor(penetration)))+facet_grid(infrastructure.scenario.named~vehicle.scenario.named)
 ggsave(paste(path.to.inputs,"plots/num-drivers-delayed.pdf",sep=''),p,width=15,height=11)
-p <- ggplot(results,aes(x=factor(willing.to.roam.time.threshold),y=frac.denied))+geom_boxplot(aes(fill=factor(penetration)))+facet_grid(infrastructure.scenario.named~vehicle.scenario.named) + scale_y_log10()
+p <- ggplot(results,aes(x=factor(charge.safety.factor),y=num.unscheduled.trips/num.drivers))+geom_boxplot(aes(fill=factor(penetration)))+facet_grid(infrastructure.scenario.named~vehicle.scenario.named)
 ggsave(paste(path.to.inputs,"plots/num-drivers-delayed.pdf",sep=''),p,width=15,height=11)
-p <- ggplot(results,aes(x=factor(willing.to.roam.time.threshold),y=num.stranded/num.drivers))+geom_boxplot(aes(fill=factor(penetration)))+facet_grid(infrastructure.scenario.named~vehicle.scenario.named) + scale_y_log10()
+p <- ggplot(results,aes(x=factor(charge.safety.factor),y=num.stranded/num.drivers))+geom_boxplot(aes(fill=factor(penetration)))+facet_grid(infrastructure.scenario.named~vehicle.scenario.named) + scale_y_log10()
 ggsave(paste(path.to.inputs,"plots/num-drivers-delayed.pdf",sep=''),p,width=15,height=11)
-p <- ggplot(results,aes(x=factor(willing.to.roam.time.threshold),y=num.unscheduled.trips/num.drivers))+geom_boxplot(aes(fill=factor(penetration)))+facet_grid(infrastructure.scenario.named~vehicle.scenario.named) + scale_y_log10()
+p <- ggplot(results,aes(x=factor(charge.safety.factor),y=frac.denied))+geom_boxplot(aes(fill=factor(penetration)))+facet_grid(infrastructure.scenario.named~vehicle.scenario.named) + scale_y_log10()
 ggsave(paste(path.to.inputs,"plots/num-drivers-delayed.pdf",sep=''),p,width=15,height=11)
-p <- ggplot(results,aes(x=factor(willing.to.roam.time.threshold),y=mean.duty.factor))+geom_boxplot(aes(fill=factor(penetration)))+facet_grid(infrastructure.scenario.named~vehicle.scenario.named) + scale_y_log10()
+p <- ggplot(results,aes(x=factor(charge.safety.factor),y=frac.denied))+geom_boxplot(aes(fill=factor(penetration)))+facet_grid(infrastructure.scenario.named~vehicle.scenario.named) + scale_y_log10()
+ggsave(paste(path.to.inputs,"plots/num-drivers-delayed.pdf",sep=''),p,width=15,height=11)
+
+# PROBABILITY-OF-UNNEEDED-CHARGE
+p <- ggplot(results,aes(x=factor(probability.of.unneeded.charge),y=total.delay))+geom_boxplot(aes(fill=factor(penetration)))+facet_grid(infrastructure.scenario.named~vehicle.scenario.named)
+ggsave(paste(path.to.inputs,"plots/num-drivers-delayed.pdf",sep=''),p,width=15,height=11)
+p <- ggplot(results,aes(x=factor(charge.safety.factor),y=num.unscheduled.trips/num.drivers))+geom_boxplot(aes(fill=factor(penetration)))+facet_grid(infrastructure.scenario.named~vehicle.scenario.named)
+ggsave(paste(path.to.inputs,"plots/num-drivers-delayed.pdf",sep=''),p,width=15,height=11)
+p <- ggplot(results,aes(x=factor(charge.safety.factor),y=num.stranded/num.drivers))+geom_boxplot(aes(fill=factor(penetration)))+facet_grid(infrastructure.scenario.named~vehicle.scenario.named) + scale_y_log10()
+ggsave(paste(path.to.inputs,"plots/num-drivers-delayed.pdf",sep=''),p,width=15,height=11)
+p <- ggplot(results,aes(x=factor(charge.safety.factor),y=frac.denied))+geom_boxplot(aes(fill=factor(penetration)))+facet_grid(infrastructure.scenario.named~vehicle.scenario.named) + scale_y_log10()
+ggsave(paste(path.to.inputs,"plots/num-drivers-delayed.pdf",sep=''),p,width=15,height=11)
+p <- ggplot(results,aes(x=factor(charge.safety.factor),y=frac.denied))+geom_boxplot(aes(fill=factor(penetration)))+facet_grid(infrastructure.scenario.named~vehicle.scenario.named) + scale_y_log10()
+ggsave(paste(path.to.inputs,"plots/num-drivers-delayed.pdf",sep=''),p,width=15,height=11)
+
+# TIME-OPPORTUNITY-COST
+p <- ggplot(results,aes(x=factor(time.opportunity.cost),y=total.delay))+geom_boxplot(aes(fill=factor(penetration)))+facet_grid(infrastructure.scenario.named~vehicle.scenario.named)
+ggsave(paste(path.to.inputs,"plots/num-drivers-delayed.pdf",sep=''),p,width=15,height=11)
+p <- ggplot(results,aes(x=factor(charge.safety.factor),y=num.unscheduled.trips/num.drivers))+geom_boxplot(aes(fill=factor(penetration)))+facet_grid(infrastructure.scenario.named~vehicle.scenario.named)
+ggsave(paste(path.to.inputs,"plots/num-drivers-delayed.pdf",sep=''),p,width=15,height=11)
+p <- ggplot(results,aes(x=factor(charge.safety.factor),y=num.stranded/num.drivers))+geom_boxplot(aes(fill=factor(penetration)))+facet_grid(infrastructure.scenario.named~vehicle.scenario.named) + scale_y_log10()
+ggsave(paste(path.to.inputs,"plots/num-drivers-delayed.pdf",sep=''),p,width=15,height=11)
+p <- ggplot(results,aes(x=factor(charge.safety.factor),y=frac.denied))+geom_boxplot(aes(fill=factor(penetration)))+facet_grid(infrastructure.scenario.named~vehicle.scenario.named) + scale_y_log10()
+ggsave(paste(path.to.inputs,"plots/num-drivers-delayed.pdf",sep=''),p,width=15,height=11)
+p <- ggplot(results,aes(x=factor(charge.safety.factor),y=frac.denied))+geom_boxplot(aes(fill=factor(penetration)))+facet_grid(infrastructure.scenario.named~vehicle.scenario.named) + scale_y_log10()
+ggsave(paste(path.to.inputs,"plots/num-drivers-delayed.pdf",sep=''),p,width=15,height=11)
+
+# WAIT-TIME-MEAN
+p <- ggplot(results,aes(x=factor(wait.time.mean),y=total.delay))+geom_boxplot(aes(fill=factor(penetration)))+facet_grid(infrastructure.scenario.named~vehicle.scenario.named)
+ggsave(paste(path.to.inputs,"plots/num-drivers-delayed.pdf",sep=''),p,width=15,height=11)
+p <- ggplot(results,aes(x=factor(charge.safety.factor),y=num.unscheduled.trips/num.drivers))+geom_boxplot(aes(fill=factor(penetration)))+facet_grid(infrastructure.scenario.named~vehicle.scenario.named)
+ggsave(paste(path.to.inputs,"plots/num-drivers-delayed.pdf",sep=''),p,width=15,height=11)
+p <- ggplot(results,aes(x=factor(charge.safety.factor),y=num.stranded/num.drivers))+geom_boxplot(aes(fill=factor(penetration)))+facet_grid(infrastructure.scenario.named~vehicle.scenario.named) + scale_y_log10()
+ggsave(paste(path.to.inputs,"plots/num-drivers-delayed.pdf",sep=''),p,width=15,height=11)
+p <- ggplot(results,aes(x=factor(charge.safety.factor),y=frac.denied))+geom_boxplot(aes(fill=factor(penetration)))+facet_grid(infrastructure.scenario.named~vehicle.scenario.named) + scale_y_log10()
+ggsave(paste(path.to.inputs,"plots/num-drivers-delayed.pdf",sep=''),p,width=15,height=11)
+p <- ggplot(results,aes(x=factor(charge.safety.factor),y=frac.denied))+geom_boxplot(aes(fill=factor(penetration)))+facet_grid(infrastructure.scenario.named~vehicle.scenario.named) + scale_y_log10()
 ggsave(paste(path.to.inputs,"plots/num-drivers-delayed.pdf",sep=''),p,width=15,height=11)

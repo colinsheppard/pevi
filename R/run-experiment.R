@@ -1,6 +1,6 @@
 Sys.setenv(NOAWT=1)
 library(colinmisc)
-load.libraries(c('ggplot2','yaml','RNetLogo'))
+load.libraries(c('ggplot2','yaml','RNetLogo','plyr','melt'))
 
 base.path <- '/Users/sheppardc/Dropbox/serc/pev-colin/'
 
@@ -21,43 +21,31 @@ naming <- yaml.load(readChar(paste(path.to.inputs,'naming.yaml',sep=''),file.inf
 # setup the data frame containing all combinations of those parameter values
 vary.tab <- expand.grid(vary,stringsAsFactors=F)
 
-# specify the reporters used to summarize an experiment and setup results data frame
-reporters <- data.frame(num.drivers="(count drivers)",
-  num.trips="(sum [ length itin-change-flag - sum itin-change-flag ] of drivers)",
-  total.delay="(sum [ sum itin-delay-amount  ] of drivers)",
-  mean.delay="((sum [ sum itin-delay-amount  ] of drivers) / (sum [length (filter [? > 0] itin-delay-amount)] of drivers))",
-  frac.drivers.delayed="(count drivers with [ sum itin-delay-amount > 0 ] / count drivers)",
-  num.unscheduled.trips="(sum [ sum itin-change-flag ] of drivers)",
-  energy.charged="(sum [ energy-received ] of drivers)",
-  driver.expenses="(sum [ expenses ] of drivers)",
-  infrastructure.cost="(sum [ [installed-cost] of this-charger-type ] of chargers)",
-  gasoline.used="(sum [ gasoline-used ] of drivers)",
-  miles.driven="(sum [ miles-driven ] of drivers)",
-  num.denials="(sum [ num-denials ] of drivers)",
-  num.stranded='(num-stranded)',
-  mean.duty.factor="(mean-duty-factor)",
-  frac.denied="(count drivers with [num-denials > 0] / count drivers)",stringsAsFactors=F)
-
-# log files, these all get set to false so logging is deactivated
-logfiles<-c("wait-time","charging","charge-time","seek-charger","seek-charger-result","need-to-charge","trip-journey-timeuntildepart","break-up-trip","break-up-trip-choice","charge-limiting-factor","drivers")
+# load the reporters and loggers needed to summarize runs and disable logging
+source(paste(path.to.pevi,"R/reporters-loggers.R",sep=''))
 
 results <- data.frame(vary.tab,reporters)
 results$penetration <- as.numeric(unlist(lapply(strsplit(as.character(results$driver.input.file),'-pen',fixed=T),function(x){ unlist(strsplit(x[2],"-rep",fixed=T)[[1]][1]) })))
 results$replicate <- as.numeric(unlist(lapply(strsplit(as.character(results$driver.input.file),'-rep',fixed=T),function(x){ unlist(strsplit(x[2],"-",fixed=T)[[1]][1]) })))
 results$infrastructure.scenario <- as.numeric(unlist(lapply(strsplit(as.character(results$charger.input.file),'-scen',fixed=T),function(x){ unlist(strsplit(x[2],".txt",fixed=T)) })))
 results$infrastructure.scenario.named <- results$infrastructure.scenario
+results$infrastructure.scenario.order <- results$infrastructure.scenario
 for(scen.i in as.numeric(names(naming$`charger-input-file`))){
-  results$infrastructure.scenario.named[results$infrastructure.scenario == scen.i] <- naming$`charger-input-file`[[as.character(scen.i)]]
+  results$infrastructure.scenario.named[results$infrastructure.scenario == scen.i] <- naming$`charger-input-file`[[as.character(scen.i)]][[1]]
+  results$infrastructure.scenario.order[results$infrastructure.scenario == scen.i] <- as.numeric(naming$`charger-input-file`[[as.character(scen.i)]][[2]])
 }
+results$infrastructure.scenario.named  <- reorder(factor(results$infrastructure.scenario.named),results$infrastructure.scenario.order)
 results$vehicle.scenario <- as.numeric(unlist(lapply(strsplit(as.character(results$vehicle.type.input.file),'-scen',fixed=T),function(x){ unlist(strsplit(x[2],".txt",fixed=T)) })))
 results$vehicle.scenario.named <- results$vehicle.scenario
+results$vehicle.scenario.order <- results$vehicle.scenario
 for(scen.i in as.numeric(names(naming$`vehicle-type-input-file`))){
-  results$vehicle.scenario.named[results$vehicle.scenario == scen.i] <- naming$`vehicle-type-input-file`[[as.character(scen.i)]]
+  results$vehicle.scenario.named[results$vehicle.scenario == scen.i] <- naming$`vehicle-type-input-file`[[as.character(scen.i)]][[1]]
+  results$vehicle.scenario.order[results$vehicle.scenario == scen.i] <- as.numeric(naming$`vehicle-type-input-file`[[as.character(scen.i)]][[2]])
 }
 
 # start NL
 nl.path <- "/Applications/NetLogo\ 5.0.3"
-NLStart(nl.path, gui=F)
+tryCatch(NLStart(nl.path, gui=F),error=function(err){ NA })
 model.path <- paste(path.to.pevi,"netlogo/PEVI.nlogo",sep='')
 NLLoadModel(model.path)
 
@@ -109,6 +97,13 @@ ggsave(paste(path.to.inputs,"plots/num-drivers-delayed.pdf",sep=''),p,width=15,h
 p <- ggplot(results,aes(x=infrastructure.scenario.named,y=mean.duty.factor))+geom_boxplot(aes(fill=as.factor(penetration)))+facet_wrap(~vehicle.scenario.named)
 ggsave(paste(path.to.inputs,"plots/num-drivers-delayed.pdf",sep=''),p,width=15,height=11)
 
+# NUM DENAILS
+p <- ggplot(results,aes(x=infrastructure.scenario.named,y=num.denials))+geom_boxplot(aes(fill=as.factor(penetration)))+facet_wrap(~vehicle.scenario.named)
+ggsave(paste(path.to.inputs,"plots/num-drivers-delayed.pdf",sep=''),p,width=15,height=11)
+
+# ALL METRICS, JUST ONE VEHICLE SCENARIO
+p <- ggplot(melt(subset(results,vehicle.scenario.named=="BEV/PHEV (90/10)"),id.vars=c('infrastructure.scenario.named','penetration'),measure.vars=c('mean.delay','frac.drivers.delayed','num.unscheduled.trips','energy.charged','driver.expenses','infrastructure.cost','gasoline.used','miles.driven','num.denials','num.stranded','mean.duty.factor','frac.denied')),aes(x=infrastructure.scenario.named,y=value))+geom_boxplot(aes(fill=as.factor(penetration)))+facet_wrap(~variable,scales="free_y")
+
 # CHARGE-SAFETY-FACTOR
 p <- ggplot(results,aes(x=factor(charge.safety.factor),y=total.delay))+geom_boxplot(aes(fill=factor(penetration)))+facet_grid(infrastructure.scenario.named~vehicle.scenario.named)
 ggsave(paste(path.to.inputs,"plots/num-drivers-delayed.pdf",sep=''),p,width=15,height=11)
@@ -132,3 +127,15 @@ p <- ggplot(results,aes(x=factor(willing.to.roam.time.threshold),y=num.unschedul
 ggsave(paste(path.to.inputs,"plots/num-drivers-delayed.pdf",sep=''),p,width=15,height=11)
 p <- ggplot(results,aes(x=factor(willing.to.roam.time.threshold),y=mean.duty.factor))+geom_boxplot(aes(fill=factor(penetration)))+facet_grid(infrastructure.scenario.named~vehicle.scenario.named) + scale_y_log10()
 ggsave(paste(path.to.inputs,"plots/num-drivers-delayed.pdf",sep=''),p,width=15,height=11)
+
+# ANALYZE VARIANCE
+stat.cvs <- ddply(results,.(penetration,vehicle.scenario.named,infrastructure.scenario.named),function(df){ data.frame(
+  frac.drivers.delayed.cv=sd(df$frac.drivers.delayed,na.rm=T)/mean(df$frac.drivers.delayed,na.rm=T),
+  mean.delay.cv=sd(df$mean.delay,na.rm=T)/mean(df$mean.delay,na.rm=T),
+  frac.denials.cv=sd(df$num.denials/df$num.drivers,na.rm=T)/mean(df$num.denials/df$num.drivers,na.rm=T),
+  frac.denied.cv=sd(df$frac.denied,na.rm=T)/mean(df$frac.denied,na.rm=T),
+  mean.duty.factor.cv=sd(df$mean.duty.factor,na.rm=T)/mean(df$mean.duty.factor,na.rm=T),
+  frac.stranded.cv=sd(df$num.stranded/df$num.drivers,na.rm=T)/mean(df$num.stranded/df$num.drivers,na.rm=T))})
+ggplot( melt(stat.cvs,id.vars=c('penetration','vehicle.scenario.named','infrastructure.scenario.named')),aes(x=infrastructure.scenario.named,y=value,colour=as.factor(penetration)))+geom_point()+facet_grid(vehicle.scenario.named~variable)
+ggplot( melt(subset(stat.cvs,vehicle.scenario.named=="BEV/PHEV (90/10)"),id.vars=c('penetration','vehicle.scenario.named','infrastructure.scenario.named')),aes(x=infrastructure.scenario.named,y=value,colour=as.factor(penetration)))+geom_point()+facet_wrap(variable~)
+

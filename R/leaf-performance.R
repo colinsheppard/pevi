@@ -237,7 +237,10 @@ route.ordered$perf2 <- predict(fit2,newdata=data.frame(gradient=route.ordered$gr
 perf <- ddply(route.ordered,.(from_taz,to_taz),function(df){ data.frame(perf1=weighted.mean(df$perf1,df$length),perf2=weighted.mean(df$perf2,df$length)) })
 names(perf) <- c('from','to','perf1','perf2')
 
-# choose perf 2 and scale by perf at 0 gradient and weighted mean of speed (55mph)
+# choose perf 2 and scale by perf at 0 gradient and weighted mean of speed (55.8mph)
 perf$perf <- perf$perf2 / predict(fit2,newdata=data.frame(gradient=0,speed=weighted.mean(route.ordered$ab_speed,route.ordered$length)))
+
+# finally, there is one route (Lost Coast -> Ferndale) with negative performance, but this might break the model, since it's so close to 0, make it zero
+perf$perf[perf$perf<0] <- 0
 
 save(dr,dr.hists,perf,file=paste(path.to.leaf,'data/all-trips-cleaned.Rdata',sep=''))

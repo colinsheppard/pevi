@@ -1,0 +1,20 @@
+
+# specify the reporters used to summarize an experiment and setup results data frame
+reporters <- data.frame(num.drivers="(count drivers)",
+  num.trips="(sum [ length itin-change-flag - sum itin-change-flag ] of drivers)",
+  total.delay="(sum [ sum itin-delay-amount  ] of drivers)",
+  mean.delay="((sum [ sum itin-delay-amount  ] of drivers) / (sum [length (filter [? > 0] itin-delay-amount)] of drivers))",
+  frac.drivers.delayed="(count drivers with [ sum itin-delay-amount > 0 ] / count drivers)",
+  num.unscheduled.trips="(sum [ sum itin-change-flag ] of drivers)",
+  energy.charged="(sum [ energy-received ] of drivers)",
+  driver.expenses="(sum [ expenses ] of drivers)",
+  infrastructure.cost="(sum [ [installed-cost] of this-charger-type ] of chargers)",
+  gasoline.used="(sum [ gasoline-used ] of drivers)",
+  miles.driven="(sum [ miles-driven ] of drivers)",
+  num.denials="(sum [ num-denials ] of drivers)",
+  num.stranded='(num-stranded)',
+  mean.duty.factor="(mean-duty-factor)",
+  frac.denied="(count drivers with [num-denials > 0] / count drivers)",stringsAsFactors=F)
+
+# log files, these all get set to false so logging is deactivated
+logfiles<-c("wait-time","charging","charge-time","seek-charger","seek-charger-result","need-to-charge","trip-journey-timeuntildepart","break-up-trip","break-up-trip-choice","charge-limiting-factor","drivers")

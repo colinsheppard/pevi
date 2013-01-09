@@ -29,7 +29,7 @@ to read-parameter-file
     ]
     file-close
   ][ 
-    user-message (word "Input file '" parameter-file "' not found!") 
+    error (word "Input file '" parameter-file "' not found!") 
   ]
 end
 
@@ -59,7 +59,7 @@ to setup-od-data
     ]
     file-close
   ][ 
-    user-message (word "Input file '" od-input-file "' not found!") 
+    error (word "Input file '" od-input-file "' not found!") 
   ]
 end 
 
@@ -114,7 +114,7 @@ to setup-tazs
       ]
     ]
   ]
-  [ user-message (word "Input file '" charger-input-file "' not found!")]
+  [ error (word "Input file '" charger-input-file "' not found!")]
    
 end ;setup-tazs
 
@@ -255,10 +255,10 @@ to setup-vehicle-types
     ]
     file-close
     if #cumul-frac-pevs != 1 [
-       user-message (word "Vehicle type fractions do not sum to 1.")
+       error (word "Vehicle type fractions do not sum to 1.")
     ]
   ][ 
-    user-message (word "Input file '" vehicle-type-input-file "' not found!") 
+    error (word "Input file '" vehicle-type-input-file "' not found!") 
   ]
 end 
 
@@ -296,7 +296,7 @@ to setup-itinerary
             if max-trip-distance < (distance-from-to item itin-row itin-to item itin-row itin-from)[
               set max-trip-distance (distance-from-to item itin-row itin-to item itin-row itin-from)
             ]
-            if not (home-taz = taz file-read) [ user-message (word "Inconsistent home taz specified for driver " id ) ]
+            if not (home-taz = taz file-read) [ error (word "Inconsistent home taz specified for driver " id ) ]
             ifelse file-at-end? [ set next-driver -1][ set next-driver file-read ]
           ] ; end while this-itin
         ]
@@ -305,7 +305,7 @@ to setup-itinerary
       ] ; end create-drivers
     ] ; end while file-at-end
   ] ; end ifelse
-  [ user-message (word "Input file '" driver-input-file "' not found!") ]
+  [ error (word "Input file '" driver-input-file "' not found!") ]
   file-close
 end ;setup-itinerary
 
@@ -328,7 +328,7 @@ to setup-charger-types
     ]
     file-close
   ][ 
-    user-message (word "Input file '" charger-type-input-file "' not found!") 
+    error (word "Input file '" charger-type-input-file "' not found!") 
   ]
 end 
 

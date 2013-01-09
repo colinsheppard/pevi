@@ -2,7 +2,7 @@
 evaluate.fitness <- function(ptx){
   if(!exists('cl')){
     print('starting new cluster')
-    cl <- makeSOCKcluster(rep("localhost",num.cpu))
+    cl <- makeCluster(c(rep(list(list(host="localhost",outfile=paste(path.to.outputs,"/cluster-out.txt",sep=''))),num.cpu)),type="SOCK")
   }
   numrows <- nrow(ptx)
   breaks <- seq(1,numrows,by=ceiling(numrows/length(cl)))
@@ -14,7 +14,8 @@ evaluate.fitness <- function(ptx){
 
   results<-clusterEvalQ(cl,rm(list=ls()))
   clusterExport(cl,c( 'run.pevi.batch','pev.penetration','path.to.inputs','path.to.outputs','nl.path','model.path',
-                      'write.charger.file','reporters','logfiles','results','fitness.params','path.to.pevi','vary.tab'))
+                      'write.charger.file','reporters','logfiles','results','path.to.pevi','vary.tab',
+                      constraint.names,objective.name,'constraint.names','constraint.params','objective.name','objective','all.or.nothing'))
   clusterEvalQ(cl,Sys.setenv(NOAWT=1))
   clusterEvalQ(cl,library('RNetLogo'))
   clusterEvalQ(cl,library('colinmisc'))
@@ -36,9 +37,9 @@ if(exists('objective'))rm('objective')
 objective <- function(){
   constr <- 0
   for(constraint.name in constraint.names){
-    constr <- constr + streval(paste(constraint.name,"()",sep=''))
+    constr <- constr + streval(paste(constraint.name,"(results)",sep=''))
   }
-  return( streval(paste(objective.name,"()",sep='')) + constr )
+  return( streval(paste(objective.name,"(results)",sep='')) + constr )
 }
 
 run.pevi.batch <- function(break.pair,ptx){
@@ -52,8 +53,11 @@ run.pevi.batch <- function(break.pair,ptx){
   NLLoadModel(model.path)
   for(cmd in paste('set log-',logfiles,' false',sep='')){ NLCommand(cmd) }
 
+  results.orig <- results
+
   for(ptx.i in ll:ul){
     write.charger.file(ptx[ptx.i,],ptx.i)
+    results <- results.orig
     for(results.i in 1:nrow(results)){
       NLCommand('clear-all-and-initialize')
       NLCommand(paste('set parameter-file "',path.to.inputs,'params.txt"',sep=''))
@@ -66,11 +70,17 @@ run.pevi.batch <- function(break.pair,ptx){
           NLCommand(paste('set ',param,' ',vary.tab[results.i,param],'',sep=''))
         }
       }
+      NLCommand(paste('set charger-input-file "',path.to.inputs,'chargers-ptx',ptx.i,'.txt"',sep=''))
       NLCommand('setup')
       NLCommand('dynamic-scheduler:go-until schedule 500')
       results[results.i,names(reporters)] <- tryCatch(NLDoReport(1,"",reporter = paste("(sentence",paste(reporters,collapse=' '),")"),as.data.frame=T,df.col.names=names(reporters)),error=function(e){ NA })
+      cat(paste('frac delayed: ',paste(results$frac.drivers.delayed[results.i],sep=","),sep=''),file=paste(path.to.outputs,"/logfile.txt",sep=''),append=T,fill=T,labels=break.pair.code) 
+      cat(paste('cost: ',paste(results$infrastructure.cost[results.i],sep=","),sep=''),file=paste(path.to.outputs,"/logfile.txt",sep=''),append=T,fill=T,labels=break.pair.code) 
     }
-    batch.results[i] <- streval(paste(fitness.params[['aggregation.function']],"(c(",paste(results[,fitness.params[['summary.stat']]],collapse=","),"),na.rm=T)",sep=''))
+    for(res in names(reporters)){
+      results[,res] <- as.numeric(results[,res])
+    }
+    batch.results[i] <- objective()
     i <- i+1
   }
   cat(paste('batch results: ',paste(batch.results,collpase=","),sep=''),file=paste(path.to.outputs,"/logfile.txt",sep=''),append=T,fill=T,labels=break.pair.code) 

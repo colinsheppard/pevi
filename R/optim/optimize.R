@@ -9,23 +9,23 @@ path.to.outputs <- paste(base.path,'pev-shared/data/outputs/optim/',sep='')
 nl.path <- "/Applications/NetLogo\ 5.0.3"
 model.path <- paste(path.to.pevi,"netlogo/PEVI.nlogo",sep='')
 
-source(paste(path.to.pevi,"R/optim-functions.R",sep=''))
+source(paste(path.to.pevi,"R/optim/optim-functions.R",sep=''))
+source(paste(path.to.pevi,"R/optim/optim-config.R",sep=''))
+source(paste(path.to.pevi,"R/optim/constraints.R",sep=''))
+source(paste(path.to.pevi,"R/optim/objectives.R",sep=''))
 source(paste(path.to.pevi,"R/reporters-loggers.R",sep=''))
-
-
-pev.penetration <- 0.005
-location <- 'colin-serc'
-num.cpu <- 22
 
 # read the parameters and values to vary in the experiment
 vary <- yaml.load(readChar(paste(path.to.inputs,'vary.yaml',sep=''),file.info(paste(path.to.inputs,'vary.yaml',sep=''))$size))
 for(file.param in names(vary)[grep("-file",names(vary))]){
   vary[[file.param]] <- paste(path.to.pevi,'netlogo/',vary[[file.param]],sep='')
 }
-
 # setup the data frame containing all combinations of those parameter values
 vary.tab.original <- expand.grid(vary,stringsAsFactors=F)
 
+pev.penetration <- 0.005
+location <- 'colin-serc'
+num.cpu <- 22
 
 for(pev.penetration in c(0.005,0.01,0.02,0.04)){
   print(paste("pen",pev.penetration))
@@ -40,7 +40,7 @@ for(pev.penetration in c(0.005,0.01,0.02,0.04)){
   # get a snow cluster started
   if(!exists('cl')){
     print('starting new cluster')
-    cl <- makeSOCKcluster(rep("localhost",num.cpu))
+    cl <- makeCluster(c(rep(list(list(host="localhost",outfile=paste(path.to.outputs,"/cluster-out.txt",sep=''))),num.cpu)),type="SOCK")
   }
 
   # initialize the particles (also called "agents" in DE)
@@ -66,13 +66,18 @@ for(pev.penetration in c(0.005,0.01,0.02,0.04)){
     # evaluate the fitness of the initial particle population
     res <- evaluate.fitness(all.ptx[,1:n,gen.num])
     all.ptx[,c('fitness'),gen.num] <- res
+
+    # save the fitness for future use
+    for(i in 1:np){
+      fit.history[[paste(all.ptx[,1:n,gen.num],collapse=",")]] <- all.ptx[,'fitness',gen.num]
+    }
   }
   save.image(paste(path.to.outputs,"0saved-state-pen",pev.penetration*100,".Rdata",sep=''))
 
   # enter the loop
   while(!stop.criteria(all.ptx[,'fitness',gen.num],gen.num)){
     print(paste("gen:",gen.num))
-    source(paste(path.to.pevi,"R/optim-functions.R",sep='')) # allows hot-swapping code
+    source(paste(path.to.pevi,"R/optim/optim-functions.R",sep='')) # allows hot-swapping code
 
     # initialize the candidate particles from the list of working particles
     cand <- all.ptx[,,gen.num]

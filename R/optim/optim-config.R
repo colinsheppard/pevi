@@ -17,8 +17,8 @@ decision.vars$name <-  c(paste("T",1:52,"-L2",sep=""),paste("T",1:52,"-L3",sep="
 # the name of the function that will serve as the objective of the optimization.  the objective
 # will be executed at the end of a batch of model runs and it must return a scalar value to be minimized.
 ###################################################################################################
-#objective.name <- 'frac.drivers.delayed'
-objective.name <- 'infrastructure.cost'
+objective.name <- 'frac.drivers.delayed'
+#objective.name <- 'infrastructure.cost'
 
 ###################################################################################################
 # constraint.names
@@ -32,7 +32,7 @@ objective.name <- 'infrastructure.cost'
 # contains any parameters needed by constraints specified in constraint.names
 ###################################################################################################
 constraint.names <- c(
-  'frac.drivers.delayed.below.thresh'
+  #'frac.drivers.delayed.below.thresh'
 )
 constraint.params <- list()
 constraint.params[['max.frac.drivers.delayed']] <- 0.005
@@ -42,7 +42,7 @@ constraint.params[['max.frac.drivers.delayed']] <- 0.005
 # contains the parameters of the differential evolution optimization scheme
 ###################################################################################################
 de.params <- list()
-de.params[['np']] <- 44           # number of particles
+de.params[['np']] <- 2            # number of particles
 de.params[['f']] <- 0.58          # 0-2, scales the difference vector, higher means faster rate of
                                   # convergence, lower means more robust
 de.params[['cr']] <- 0.96         # 0-1, cross-over, indicates probability of using any 'gene' (or value for a 

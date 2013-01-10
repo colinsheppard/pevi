@@ -12,18 +12,18 @@ evaluate.fitness <- function(ptx){
   }
   break.pairs[[i+1]] <- c(breaks[i+1],numrows)
 
-  results<-clusterEvalQ(cl,rm(list=ls()))
+  clusterEvalQ(cl,rm(list=ls()))
   clusterExport(cl,c( 'run.pevi.batch','pev.penetration','path.to.inputs','path.to.outputs','nl.path','model.path',
-                      'write.charger.file','reporters','logfiles','results','path.to.pevi','vary.tab',
-                      constraint.names,objective.name,'constraint.names','constraint.params','objective.name','objective','all.or.nothing'))
+                      'write.charger.file','reporters','logfiles','results','path.to.pevi','vary.tab','streval',
+                      objective.name,'constraint.names','constraint.params','objective.name','objective','all.or.nothing',constraint.names))
   clusterEvalQ(cl,Sys.setenv(NOAWT=1))
   clusterEvalQ(cl,library('RNetLogo'))
-  clusterEvalQ(cl,library('colinmisc'))
-  rm('results')
-  results<-clusterApply(cl,break.pairs,fun='run.pevi.batch',ptx=ptx)
-  results<-unlist(results)
+  #clusterEvalQ(cl,library('colinmisc'))
+  if(exists('batch.results'))rm('batch.results')
+  batch.results<-clusterApply(cl,break.pairs,fun='run.pevi.batch',ptx=ptx)
+  batch.results<-unlist(batch.results)
 
-  return(results)
+  return(batch.results)
 }
 
 stop.criteria <- function(fit,gen.num){
@@ -34,7 +34,8 @@ stop.criteria <- function(fit,gen.num){
 
 # combine the objective and constrainst into the "objective" function called within the model
 if(exists('objective'))rm('objective')
-objective <- function(){
+objective <- function(results){
+  #cat(paste('frac delayed in obj: ',paste(results$frac.drivers.delayed,collapse=','),sep=''),file=paste(path.to.outputs,"/logfile.txt",sep=''),append=T,fill=T,labels=break.pair.code) 
   constr <- 0
   for(constraint.name in constraint.names){
     constr <- constr + streval(paste(constraint.name,"(results)",sep=''))
@@ -74,13 +75,12 @@ run.pevi.batch <- function(break.pair,ptx){
       NLCommand('setup')
       NLCommand('dynamic-scheduler:go-until schedule 500')
       results[results.i,names(reporters)] <- tryCatch(NLDoReport(1,"",reporter = paste("(sentence",paste(reporters,collapse=' '),")"),as.data.frame=T,df.col.names=names(reporters)),error=function(e){ NA })
-      cat(paste('frac delayed: ',paste(results$frac.drivers.delayed[results.i],sep=","),sep=''),file=paste(path.to.outputs,"/logfile.txt",sep=''),append=T,fill=T,labels=break.pair.code) 
-      cat(paste('cost: ',paste(results$infrastructure.cost[results.i],sep=","),sep=''),file=paste(path.to.outputs,"/logfile.txt",sep=''),append=T,fill=T,labels=break.pair.code) 
+      #cat(paste('cost: ',paste(results$infrastructure.cost[results.i],sep=","),sep=''),file=paste(path.to.outputs,"/logfile.txt",sep=''),append=T,fill=T,labels=break.pair.code) 
     }
     for(res in names(reporters)){
       results[,res] <- as.numeric(results[,res])
     }
-    batch.results[i] <- objective()
+    batch.results[i] <- objective(results)
     i <- i+1
   }
   cat(paste('batch results: ',paste(batch.results,collpase=","),sep=''),file=paste(path.to.outputs,"/logfile.txt",sep=''),append=T,fill=T,labels=break.pair.code) 

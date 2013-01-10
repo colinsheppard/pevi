@@ -3,6 +3,7 @@ Sys.setenv(NOAWT=1)
 load.libraries(c('snow','yaml','stringr','RNetLogo'))
 
 base.path <- '/Users/sheppardc/Dropbox/serc/pev-colin/'
+base.path <- '/Users/critter/Dropbox/serc/pev-colin/'
 path.to.pevi <- paste(base.path,'pevi/',sep='')
 path.to.inputs <- paste(base.path,'pev-shared/data/inputs/optim/',sep='')
 path.to.outputs <- paste(base.path,'pev-shared/data/outputs/optim/',sep='')
@@ -25,6 +26,7 @@ vary.tab.original <- expand.grid(vary,stringsAsFactors=F)
 
 pev.penetration <- 0.005
 location <- 'colin-serc'
+location <- 'colin-home'
 num.cpu <- 22
 
 for(pev.penetration in c(0.005,0.01,0.02,0.04)){
@@ -71,11 +73,17 @@ for(pev.penetration in c(0.005,0.01,0.02,0.04)){
     for(i in 1:np){
       fit.history[[paste(all.ptx[,1:n,gen.num],collapse=",")]] <- all.ptx[,'fitness',gen.num]
     }
+
+    # allow for a break of the loop by creation of a file titled "BREAK" in the dropbox run directory
+    if(file.exists(paste(path.to.outputs,"BREAK",sep='')))break
   }
   save.image(paste(path.to.outputs,"0saved-state-pen",pev.penetration*100,".Rdata",sep=''))
 
   # enter the loop
   while(!stop.criteria(all.ptx[,'fitness',gen.num],gen.num)){
+    # allow for a break of the loop by creation of a file titled "BREAK" in the dropbox run directory
+    if(file.exists(paste(path.to.outputs,"BREAK",sep='')))break
+
     print(paste("gen:",gen.num))
     source(paste(path.to.pevi,"R/optim/optim-functions.R",sep='')) # allows hot-swapping code
 
@@ -147,29 +155,7 @@ for(pev.penetration in c(0.005,0.01,0.02,0.04)){
       cat('.')
       system('sleep 0.25')
     }
-    # allow for a break of the loop by creation of a file titled "BREAK" in the dropbox run directory
-    if(file.exists(paste(path.to.outputs,"BREAK",sep='')))break
   }
 }
-
-# analyze the results
-dist.thresh <- data.frame(under=c(3,seq(5,40,by=5),seq(50,100,by=25),seq(150,300,by=50)),
-                          miles=c(3,rep(5,8),10,rep(25,2),rep(50,4))) # miles
-for(pev.penetration in c(0.01,0.02,0.04,0.03,0.05,0.1,0.15,0.2,0.25)){
-  load(paste(path.to.outputs,"0saved-state-pen",pev.penetration*100,".Rdata",sep=''))
-  
-  if(pev.penetration == 0.01){
-    ptx.pen <- data.frame(all.ptx[,,gen.num],pen=pev.penetration)
-    dist.thresh.all <- data.frame(under=dist.thresh$under,miles=dist.thresh$miles*mean(all.ptx[,'scale.dist.thresh',gen.num]),pen=pev.penetration)
-  }else{
-    ptx.pen <- rbind(ptx.pen,data.frame(all.ptx[,,gen.num],pen=pev.penetration))
-    dist.thresh.all <- rbind(dist.thresh.all,data.frame(under=dist.thresh$under,miles=dist.thresh$miles*mean(all.ptx[,'scale.dist.thresh',gen.num]),pen=pev.penetration))
-  }
-}
-#ptx.pen$pen <- factor(ptx.pen$pen)
-library(ggplot2)
-
-ggplot(ptx.pen,aes(x=pen,y=scale.dist.thresh))+geom_box()+stat_summary(fun.y=mean,geom='point',colour='red')
-ggplot(dist.thresh.all,aes(x=under,y=miles))+geom_point()+geom_line()+facet_wrap(~pen)
 
 

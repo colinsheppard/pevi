@@ -6,11 +6,11 @@ base.path <- '/Users/sheppardc/Dropbox/serc/pev-colin/'
 base.path <- '/Users/Raskolnikovbot3001/Dropbox/'
 
 path.to.pevi <- paste(base.path,'pevi/',sep='')
-path.to.inputs <- paste(base.path,'pevi/inputs/sensitivity/charger-search-distance/',sep='')
-path.to.inputs <- paste(base.path,'pevi/inputs/sensitivity/electric-fuel-consumption/',sep='')
-path.to.inputs <- paste(base.path,'pevi/inputs/sensitivity/probability-of-unneeded-charge/',sep='')
-path.to.inputs <- paste(base.path,'pevi/inputs/sensitivity/time-opportunity-cost/',sep='')
-path.to.inputs <- paste(base.path,'pevi/inputs/sensitivity/wait-time-mean/',sep='')
+path.to.inputs <- paste(base.path,'pev-shared/data/inputs/sensitivity/charger-search-distance/',sep='')
+path.to.inputs <- paste(base.path,'pev-shared/data/inputs/sensitivity/electric-fuel-consumption/',sep='')
+path.to.inputs <- paste(base.path,'pev-shared/data/inputs/sensitivity/probability-of-unneeded-charge/',sep='')
+path.to.inputs <- paste(base.path,'pev-shared/data/inputs/sensitivity/time-opportunity-cost/',sep='')
+path.to.inputs <- paste(base.path,'pev-shared/data/inputs/sensitivity/wait-time-mean/',sep='')
 path.to.inputs <- paste(base.path,'pev-shared/data/inputs/sensitivity/chargers/',sep='')
 path.to.inputs <- paste(base.path,'pev-shared/data/inputs/sensitivity/charge-safety-factor/',sep='')
 

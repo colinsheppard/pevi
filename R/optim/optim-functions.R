@@ -88,8 +88,8 @@ run.pevi.batch <- function(break.pair,ptx){
 }
 
 write.charger.file <- function(num.chargers,ptx.i){
-  chargers <- data.frame(TAZ=1:52,L1=num.chargers[1:52],L2=num.chargers[1:52],L3=num.chargers[53:104])
-  names(chargers) <- c(";TAZ","L1","L2","L3")
+  chargers <- data.frame(TAZ=1:52,L0=rep(1,52),L1=num.chargers[1:52],L2=num.chargers[1:52],L3=num.chargers[53:104])
+  names(chargers) <- c(";TAZ","L0","L1","L2","L3")
   write.table(chargers,file=paste(path.to.inputs,'chargers-ptx',ptx.i,'.txt',sep=''),sep="\t",row.names=F,quote=F)
 }
 

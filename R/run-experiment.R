@@ -12,6 +12,7 @@ path.to.inputs <- paste(base.path,'pevi/inputs/sensitivity/probability-of-unneed
 path.to.inputs <- paste(base.path,'pevi/inputs/sensitivity/time-opportunity-cost/',sep='')
 path.to.inputs <- paste(base.path,'pevi/inputs/sensitivity/wait-time-mean/',sep='')
 path.to.inputs <- paste(base.path,'pev-shared/data/inputs/sensitivity/chargers/',sep='')
+path.to.inputs <- paste(base.path,'pev-shared/data/inputs/sensitivity/charge-safety-factor/',sep='')
 
 #.jinit(parameters="-Xmx1024m")
 

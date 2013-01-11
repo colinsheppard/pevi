@@ -3,7 +3,7 @@ library(colinmisc)
 load.libraries(c('ggplot2','yaml','RNetLogo','plyr','melt'))
 
 base.path <- '/Users/sheppardc/Dropbox/serc/pev-colin/'
-base.path <- '/Users/Raskolnikovbot3001/Dropbox/'
+base.path <- '/Users/Raskolnikovbot3001/Dropbox/serc/pev-andy/'
 
 path.to.pevi <- paste(base.path,'pevi/',sep='')
 path.to.inputs <- paste(base.path,'pev-shared/data/inputs/sensitivity/charger-search-distance/',sep='')

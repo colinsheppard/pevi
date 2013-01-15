@@ -383,6 +383,8 @@ end ;setup-chargers
 to log-data [logfile data-list]
   if (logfile = "wait-time" and log-wait-time) or
      (logfile = "charging" and log-charging) or
+     (logfile = "pain" and log-pain) or
+     (logfile = "tazs" and log-tazs) or
      (logfile = "charge-time" and log-charge-time) or
      (logfile = "seek-charger" and log-seek-charger) or
      (logfile = "seek-charger-result" and log-seek-charger-result) or

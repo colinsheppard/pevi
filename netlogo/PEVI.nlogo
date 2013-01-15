@@ -158,7 +158,9 @@ end
 
 to setup-and-fix-seed
     clear-all-and-initialize
-    random-seed 2
+    let seed new-seed
+    print seed
+    random-seed seed
     if parameter-file = 0 [ set parameter-file "params.txt" ]
     if model-directory = 0 [ set model-directory "./" ]
     read-parameter-file
@@ -228,7 +230,7 @@ to-report need-to-charge [calling-event]
   set time-until-depart departure-time - ticks
   set departure-time item current-itin-row itin-depart
   ifelse is-bev? [
-    set remaining-range (state-of-charge * battery-capacity / electric-fuel-consumption ) + 1e-14
+    set remaining-range (state-of-charge * battery-capacity / electric-fuel-consumption ) + 1e-11
   ][
     set remaining-range 9999999
   ]
@@ -1156,7 +1158,7 @@ SWITCH
 222
 log-charging
 log-charging
-0
+1
 1
 -1000
 

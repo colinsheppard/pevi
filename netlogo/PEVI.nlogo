@@ -530,6 +530,7 @@ to charge-time-event-scheduler
         (state-of-charge + ((next-event-scheduled-at - ticks) * charge-rate-of current-charger) / battery-capacity )
         after-end-charge
         charging-on-a-whim?)
+  set time-until-end-charge (next-event-scheduled-at - ticks)
 end
 
 to-report calc-time-until-end-charge-with-logging [#full-charge-time-need #trip-charge-time-need #journey-charge-time-need #time-until-depart #charger-in-origin-or-destination #this-charger-type]
@@ -894,6 +895,7 @@ to arrive
       set current-charger (one-of item 0 [chargers-by-type] of current-taz)
       set full-charge-time-need (1 - state-of-charge) * battery-capacity / charge-rate-of current-charger
       dynamic-scheduler:add schedule self task end-charge ticks + full-charge-time-need 
+      set time-until-end-charge full-charge-time-need
       log-data "charging" (sentence ticks 
         [who] of current-charger
         level-of current-charger 

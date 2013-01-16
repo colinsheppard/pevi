@@ -692,11 +692,12 @@ to add-trip-to-itinerary [new-destination-taz]
   update-itinerary
 
   ; update-itinerary does not update journey-distance, do so here by adding the difference between the previous trip and the current trip)
-  set journey-distance journey-distance + 
-    (distance-from-to (item current-itin-row itin-from) (item current-itin-row itin-to) + 
+  let #added-journey-distance (distance-from-to (item current-itin-row itin-from) (item current-itin-row itin-to) + 
     distance-from-to (item (current-itin-row + 1) itin-from) (item (current-itin-row + 1) itin-to) - 
     distance-from-to (item current-itin-row itin-from) (item (current-itin-row + 1) itin-to) )
+  set journey-distance journey-distance + #added-journey-distance
   
+  log-data "pain" (sentence ticks id [id] of current-taz [name] of this-vehicle-type "unscheduled-trip" #added-journey-distance state-of-charge)
 ;  file-print (word precision ticks 3 " " self " add-trip-to-itinerary new-taz: " new-destination-taz " for row: " current-itin-row " itin-depart: " itin-depart " itin-from: " itin-from " itin-to: " itin-to)      
 end
 
@@ -1228,7 +1229,7 @@ SWITCH
 359
 log-seek-charger
 log-seek-charger
-0
+1
 1
 -1000
 

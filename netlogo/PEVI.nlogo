@@ -1,4 +1,4 @@
-extensions [dynamic-scheduler]
+extensions [dynamic-scheduler] 
 __includes["setup.nls" "reporters.nls"]
 
 globals [    
@@ -233,16 +233,7 @@ end
 
 to log-taz-data
   let #num-0 count drivers with [home-taz = myself]
-  log-data "tazs" (sentence ticks id (count drivers with [current-taz = myself and is-bev?])
-      (count drivers with [current-taz = myself and not is-bev?])
-      #num-0
-      (count item 1 chargers-by-type)
-      (count item 2 chargers-by-type)
-      (count item 3 chargers-by-type)
-      (#num-0 - count drivers with [current-taz = myself and current-charger = (one-of item 0 [chargers-by-type] of myself)])
-      (count (item 1 chargers-by-type) with [current-driver = nobody])
-      (count (item 2 chargers-by-type) with [current-driver = nobody])
-      (count (item 3 chargers-by-type) with [current-driver = nobody]) )
+  log-data "tazs" (sentence ticks id (count drivers with [current-taz = myself and is-bev?]) (count drivers with [current-taz = myself and not is-bev?]) #num-0 (count item 1 chargers-by-type) (count item 2 chargers-by-type) (count item 3 chargers-by-type) (#num-0 - count drivers with [current-taz = myself and current-charger = (one-of item 0 [chargers-by-type] of myself)]) (count (item 1 chargers-by-type) with [current-driver = nobody]) (count (item 2 chargers-by-type) with [current-driver = nobody]) (count (item 3 chargers-by-type) with [current-driver = nobody]) )
 end
 ;;;;;;;;;;;;;;;;;;;;
 ;; NEED TO CHARGE
@@ -471,20 +462,7 @@ to wait-time-event-scheduler
     ifelse ticks > 24 [
       set state "stranded"
       log-data "wait-time" (sentence ticks id [name] of this-vehicle-type state-of-charge trip-distance journey-distance time-until-depart "stranded" -1)
-      log-data "trip-journey-timeuntildepart" (sentence 
-        ticks 
-        departure-time
-        id 
-        [name] of this-vehicle-type 
-        state-of-charge 
-        [id] of current-taz
-        [id] of destination-taz
-        true 
-        false 
-        (departure-time - ticks)
-        "stranded"
-        remaining-range
-        sum itin-delay-amount)
+      log-data "trip-journey-timeuntildepart" (sentence ticks departure-time id [name] of this-vehicle-type state-of-charge [id] of current-taz [id] of destination-taz true false (departure-time - ticks) "stranded" remaining-range sum itin-delay-amount)
       log-data "pain" (sentence ticks id [id] of current-taz [name] of this-vehicle-type "stranded" "" state-of-charge)
     ][
       let event-time-from-now random-exponential wait-time-mean
@@ -545,18 +523,7 @@ to charge-time-event-scheduler
   if next-event-scheduled-at > departure-time[
     change-depart-time next-event-scheduled-at
   ]
-  log-data "charging" (sentence ticks 
-        [who] of current-charger
-        level-of current-charger 
-        [id] of current-taz 
-        [id] of self 
-        [name] of this-vehicle-type 
-        (next-event-scheduled-at - ticks) 
-        ((next-event-scheduled-at - ticks) * charge-rate-of current-charger) 
-        state-of-charge 
-        (state-of-charge + ((next-event-scheduled-at - ticks) * charge-rate-of current-charger) / battery-capacity )
-        after-end-charge
-        charging-on-a-whim?)
+  log-data "charging" (sentence ticks [who] of current-charger level-of current-charger [id] of current-taz [id] of self [name] of this-vehicle-type (next-event-scheduled-at - ticks) ((next-event-scheduled-at - ticks) * charge-rate-of current-charger) state-of-charge (state-of-charge + ((next-event-scheduled-at - ticks) * charge-rate-of current-charger) / battery-capacity ) after-end-charge charging-on-a-whim?)
   set time-until-end-charge (next-event-scheduled-at - ticks)
 end
 
@@ -886,37 +853,10 @@ to arrive
   ifelse not itin-complete? [
     ifelse need-to-charge "arrive" [   
       seek-charger
-      log-data "trip-journey-timeuntildepart" (sentence 
-        ticks 
-        departure-time
-        id 
-        [name] of this-vehicle-type 
-        state-of-charge 
-        #from-taz
-        #to-taz
-        #completed-trip 
-        #completed-journey
-        (departure-time - ticks)
-        "seeking-charger"
-        remaining-range
-        sum itin-delay-amount)
+      log-data "trip-journey-timeuntildepart" (sentence ticks departure-time id [name] of this-vehicle-type state-of-charge #from-taz #to-taz #completed-trip #completed-journey (departure-time - ticks) "seeking-charger" remaining-range sum itin-delay-amount)
     ][
-      itinerary-event-scheduler
-  
-      log-data "trip-journey-timeuntildepart" (sentence 
-        ticks 
-        departure-time
-        id 
-        [name] of this-vehicle-type 
-        state-of-charge 
-        #from-taz
-        #to-taz
-        #completed-trip 
-        #completed-journey 
-        (departure-time - ticks) 
-        "scheduling-itinerary"
-        remaining-range
-        sum itin-delay-amount)
+      itinerary-event-scheduler  
+      log-data "trip-journey-timeuntildepart" (sentence ticks departure-time id [name] of this-vehicle-type state-of-charge #from-taz #to-taz #completed-trip #completed-journey (departure-time - ticks) "scheduling-itinerary" remaining-range sum itin-delay-amount)
     ]
   ][
     ;; itin is complete and at home? plug-in immediately and charge till full
@@ -925,47 +865,10 @@ to arrive
       set full-charge-time-need (1 - state-of-charge) * battery-capacity / charge-rate-of current-charger
       dynamic-scheduler:add schedule self task end-charge ticks + full-charge-time-need 
       set time-until-end-charge full-charge-time-need
-      log-data "charging" (sentence ticks 
-        [who] of current-charger
-        level-of current-charger 
-        [id] of current-taz 
-        [id] of self 
-        [name] of this-vehicle-type 
-        full-charge-time-need 
-        (full-charge-time-need * charge-rate-of current-charger) 
-        state-of-charge 
-        (state-of-charge + (full-charge-time-need * charge-rate-of current-charger) / battery-capacity )
-        "stop"
-        false)
-      log-data "trip-journey-timeuntildepart" (sentence 
-        ticks 
-        ticks
-        id 
-        [name] of this-vehicle-type 
-        state-of-charge 
-        #from-taz
-        #to-taz
-        #completed-trip 
-        #completed-journey 
-        0
-        "home"
-        remaining-range
-        sum itin-delay-amount)
+      log-data "charging" (sentence ticks [who] of current-charger level-of current-charger [id] of current-taz [id] of self [name] of this-vehicle-type full-charge-time-need (full-charge-time-need * charge-rate-of current-charger) state-of-charge (state-of-charge + (full-charge-time-need * charge-rate-of current-charger) / battery-capacity ) "stop" false)
+      log-data "trip-journey-timeuntildepart" (sentence ticks ticks id [name] of this-vehicle-type state-of-charge #from-taz #to-taz #completed-trip #completed-journey 0 "home" remaining-range sum itin-delay-amount)
     ][
-      log-data "trip-journey-timeuntildepart" (sentence 
-        ticks 
-        ticks
-        id 
-        [name] of this-vehicle-type 
-        state-of-charge 
-        #from-taz
-        #to-taz
-        #completed-trip 
-        #completed-journey 
-        0
-        "journey-complete"
-        remaining-range
-        sum itin-delay-amount)
+      log-data "trip-journey-timeuntildepart" (sentence ticks ticks id [name] of this-vehicle-type state-of-charge #from-taz #to-taz #completed-trip #completed-journey 0 "journey-complete" remaining-range sum itin-delay-amount)
     ]
   ]
 

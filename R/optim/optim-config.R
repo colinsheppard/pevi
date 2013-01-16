@@ -4,7 +4,8 @@
 # Optimization used for exploring everything all together.
 ###################################################################################################
 
-optim.code <- 'min-cost-constrained-by-num-stranded'
+optim.code <- 'min-cost-constrained-by-frac-delayed'
+#optim.code <- 'min-cost-constrained-by-num-stranded'
 
 ###################################################################################################
 # decision.vars       data.frame containing the names and bounds of the variables to alter in the 
@@ -34,8 +35,8 @@ objective.name <- 'infrastructure.cost'
 # contains any parameters needed by constraints specified in constraint.names
 ###################################################################################################
 constraint.names <- c(
-  #'frac.drivers.delayed.below.thresh'
-  'frac.stranded.below.thresh'
+  'frac.drivers.delayed.below.thresh'
+  #'frac.stranded.below.thresh'
 )
 constraint.params <- list()
 constraint.params[['max.frac.drivers.delayed']] <- 0.01
@@ -46,8 +47,7 @@ constraint.params[['max.frac.stranded']] <- 0.003
 # contains the parameters of the differential evolution optimization scheme
 ###################################################################################################
 de.params <- list()
-de.params[['np']] <- 44           # number of particles
-#de.params[['np']] <- 42           # number of particles
+de.params[['np']] <- 48           # number of particles
 de.params[['f']] <- 0.8          # 0-2, scales the difference vector, higher means faster rate of
                                   # convergence, lower means more robust
 de.params[['cr']] <- 0.96         # 0-1, cross-over, indicates probability of using any 'gene' (or value for a 
@@ -62,5 +62,5 @@ de.params[['max.iter']] <- 200   # max iterations
 # contains any parameters needed by the stop.criteria function
 ###################################################################################################
 stop.params <- list()
-stop.params[['diff.from.best.threshold']]     <- .05   # stopping threshold, when all ptx are 
+stop.params[['diff.from.best.threshold']]     <- .02   # stopping threshold, when all ptx are 
                                                        # within this fraction of the best return T

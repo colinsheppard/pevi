@@ -1,7 +1,7 @@
 
-source(paste(path.to.pevi,"R/optim/optim-config.R",sep=''))
-source(paste(path.to.pevi,"R/optim/objectives.R",sep=''))
-source(paste(path.to.pevi,"R/optim/constraints.R",sep=''))
+#source(paste(path.to.pevi,"R/optim/optim-config.R",sep=''))
+#source(paste(path.to.pevi,"R/optim/objectives.R",sep=''))
+#source(paste(path.to.pevi,"R/optim/constraints.R",sep=''))
 
 evaluate.fitness <- function(ptx){
   if(!exists('cl')){
@@ -59,16 +59,21 @@ run.pevi.batch <- function(break.pair,ptx){
   #cat(paste('starting'),file=paste(path.to.outputs,optim.code,"/logfile.txt",sep=''),append=T,fill=T,labels=break.pair.code) 
 
   tryCatch(NLStart(nl.path, gui=F),error=function(err){ NA })
-  .jinit(parameters=c("-Xmx2048m","-Xms512m"),force.init = T)
+  #.jinit(parameters=c("-Xmx2048m","-Xms512m"),force.init = T)
   NLLoadModel(model.path)
   for(cmd in paste('set log-',logfiles,' false',sep='')){ NLCommand(cmd) }
 
   results.orig <- results
 
   for(ptx.i in ll:ul){
+    print(ptx.i)
+    system('sleep 0.25')
+
     write.charger.file(ptx[ptx.i,],ptx.i)
     results <- results.orig
     for(results.i in 1:nrow(results)){
+      print(paste("-",results.i))
+      system('sleep 0.25')
       try.nl('clear-all-and-initialize',break.pair.code)
       try.nl(paste('set parameter-file "',path.to.inputs,'params.txt"',sep=''),break.pair.code)
       try.nl(paste('set model-directory "',path.to.pevi,'netlogo/"',sep=''),break.pair.code)
@@ -81,7 +86,11 @@ run.pevi.batch <- function(break.pair,ptx){
         }
       }
       try.nl(paste('set charger-input-file "',path.to.inputs,'chargers-ptx',ptx.i,'.txt"',sep=''),break.pair.code)
+      print("before setup")
+      system('sleep 0.25')
       try.nl('setup',break.pair.code)
+      print("before go-until")
+      system('sleep 0.25')
       try.nl('dynamic-scheduler:go-until schedule 500',break.pair.code)
       results[results.i,names(reporters)] <- tryCatch(NLDoReport(1,"",reporter = paste("(sentence",paste(reporters,collapse=' '),")"),as.data.frame=T,df.col.names=names(reporters)),error=function(e){ NA })
       #cat(paste('cost: ',paste(results$infrastructure.cost[results.i],collapse=","),sep=''),file=paste(path.to.outputs,optim.code,"/logfile.txt",sep=''),append=T,fill=T,labels=break.pair.code) 

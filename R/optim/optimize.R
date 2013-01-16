@@ -8,9 +8,12 @@ path.to.pevi <- paste(base.path,'pevi/',sep='')
 path.to.inputs <- paste(base.path,'pev-shared/data/inputs/optim/',sep='')
 path.to.outputs <- paste(base.path,'pev-shared/data/outputs/optim/',sep='')
 nl.path <- "/Applications/NetLogo\ 5.0.3"
-model.path <- paste(path.to.pevi,"netlogo/PEVI.nlogo",sep='')
+model.path <- paste(path.to.pevi,"netlogo/PEVI-nolog.nlogo",sep='')
 
 source(paste(path.to.pevi,"R/optim/optim-functions.R",sep='')) # note this will in turn call optim-config, objectives, and constraints
+source(paste(path.to.pevi,"R/optim/optim-config.R",sep=''))
+source(paste(path.to.pevi,"R/optim/objectives.R",sep=''))
+source(paste(path.to.pevi,"R/optim/constraints.R",sep=''))
 source(paste(path.to.pevi,"R/reporters-loggers.R",sep=''))
 
 # read the parameters and values to vary in the experiment
@@ -24,8 +27,8 @@ vary.tab.original <- expand.grid(vary,stringsAsFactors=F)
 pev.penetration <- 0.04
 location <- 'colin-serc'
 #location <- 'colin-home'
-num.cpu <- 11
-#num.cpu <- 7
+num.cpu <- 12
+#num.cpu <- 8
 
 for(pev.penetration in c(0.005,0.01,0.02,0.04)){
   print(paste("pen",pev.penetration))

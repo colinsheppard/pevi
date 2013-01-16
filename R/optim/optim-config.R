@@ -4,6 +4,8 @@
 # Optimization used for exploring everything all together.
 ###################################################################################################
 
+optim.code <- 'min-cost-constrained-by-num-stranded'
+
 ###################################################################################################
 # decision.vars       data.frame containing the names and bounds of the variables to alter in the 
 #                     optimization, the variables are assumed to exist inside module.settings, the
@@ -17,8 +19,8 @@ decision.vars$name <-  c(paste("T",1:52,"-L2",sep=""),paste("T",1:52,"-L3",sep="
 # the name of the function that will serve as the objective of the optimization.  the objective
 # will be executed at the end of a batch of model runs and it must return a scalar value to be minimized.
 ###################################################################################################
-objective.name <- 'frac.drivers.delayed'
-#objective.name <- 'infrastructure.cost'
+#objective.name <- 'frac.drivers.delayed'
+objective.name <- 'infrastructure.cost'
 
 ###################################################################################################
 # constraint.names
@@ -33,21 +35,24 @@ objective.name <- 'frac.drivers.delayed'
 ###################################################################################################
 constraint.names <- c(
   #'frac.drivers.delayed.below.thresh'
+  'frac.stranded.below.thresh'
 )
 constraint.params <- list()
-constraint.params[['max.frac.drivers.delayed']] <- 0.005
+constraint.params[['max.frac.drivers.delayed']] <- 0.01
+constraint.params[['max.frac.stranded']] <- 0.003
 
 ###################################################################################################
 # de.params           
 # contains the parameters of the differential evolution optimization scheme
 ###################################################################################################
 de.params <- list()
-de.params[['np']] <- 2            # number of particles
-de.params[['f']] <- 0.58          # 0-2, scales the difference vector, higher means faster rate of
+de.params[['np']] <- 44           # number of particles
+#de.params[['np']] <- 42           # number of particles
+de.params[['f']] <- 0.8          # 0-2, scales the difference vector, higher means faster rate of
                                   # convergence, lower means more robust
 de.params[['cr']] <- 0.96         # 0-1, cross-over, indicates probability of using any 'gene' (or value for a 
                                   # decision variable) of the candidate particle rather than the previous particle
-de.params[['max.iter']] <- 5000   # max iterations
+de.params[['max.iter']] <- 200   # max iterations
 
 ###################################################################################################
 # stop.criteria       will act on an array representing the fitness of all the particles, it returns 
@@ -57,5 +62,5 @@ de.params[['max.iter']] <- 5000   # max iterations
 # contains any parameters needed by the stop.criteria function
 ###################################################################################################
 stop.params <- list()
-stop.params[['diff.from.best.threshold']]     <- .01   # stopping threshold, when all ptx are 
+stop.params[['diff.from.best.threshold']]     <- .05   # stopping threshold, when all ptx are 
                                                        # within this fraction of the best return T

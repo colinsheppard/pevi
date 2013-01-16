@@ -398,6 +398,7 @@ to log-data [logfile data-list]
   [
     open-logfile logfile
     file-print reduce [(word ?1 "," ?2)] data-list
+    file-flush
   ]
 end
 

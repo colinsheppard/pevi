@@ -18,3 +18,21 @@ reporters <- data.frame(num.drivers="(count drivers)",
 
 # log files, these all get set to false so logging is deactivated
 logfiles<-c("wait-time","charging","charge-time","seek-charger","seek-charger-result","need-to-charge","trip-journey-timeuntildepart","break-up-trip","break-up-trip-choice","charge-limiting-factor","drivers")
+
+debug.reporters <- data.frame(
+  n.tazs="(count tazs)",
+  n.charger.types="(count charger-types)",
+  n.drivers="(count drivers)",
+  charge.safety.factor="(charge-safety-factor)",
+  charger.search.distance="(charger-search-distance)",
+  wait.time.mean="(wait-time-mean)",
+  time.opportunity.cost="(time-opportunity-cost)",
+  willing.to.roam.time.threshold="(willing-to-roam-time-threshold)",
+  probability.of.unneeded.charge="(probability-of-unneeded-charge)",
+  electric.fuel.consumption.sd="(electric-fuel-consumption-sd)",
+  electric.fuel.consumption.range="(electric-fuel-consumption-range)",
+  charger.input.file="(charger-input-file)",
+  charger.type.input.file="(charger-type-input-file)",
+  driver.input.file="(driver-input-file)",
+  vehicle.type.input.file="(vehicle-type-input-file)",
+  stringsAsFactors=F)

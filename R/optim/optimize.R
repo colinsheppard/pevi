@@ -3,17 +3,14 @@ Sys.setenv(NOAWT=1)
 load.libraries(c('snow','yaml','stringr','RNetLogo'))
 
 base.path <- '/Users/sheppardc/Dropbox/serc/pev-colin/'
-base.path <- '/Users/critter/Dropbox/serc/pev-colin/'
+#base.path <- '/Users/critter/Dropbox/serc/pev-colin/'
 path.to.pevi <- paste(base.path,'pevi/',sep='')
 path.to.inputs <- paste(base.path,'pev-shared/data/inputs/optim/',sep='')
 path.to.outputs <- paste(base.path,'pev-shared/data/outputs/optim/',sep='')
 nl.path <- "/Applications/NetLogo\ 5.0.3"
 model.path <- paste(path.to.pevi,"netlogo/PEVI.nlogo",sep='')
 
-source(paste(path.to.pevi,"R/optim/optim-functions.R",sep=''))
-source(paste(path.to.pevi,"R/optim/optim-config.R",sep=''))
-source(paste(path.to.pevi,"R/optim/constraints.R",sep=''))
-source(paste(path.to.pevi,"R/optim/objectives.R",sep=''))
+source(paste(path.to.pevi,"R/optim/optim-functions.R",sep='')) # note this will in turn call optim-config, objectives, and constraints
 source(paste(path.to.pevi,"R/reporters-loggers.R",sep=''))
 
 # read the parameters and values to vary in the experiment
@@ -24,10 +21,11 @@ for(file.param in names(vary)[grep("-file",names(vary))]){
 # setup the data frame containing all combinations of those parameter values
 vary.tab.original <- expand.grid(vary,stringsAsFactors=F)
 
-pev.penetration <- 0.005
+pev.penetration <- 0.04
 location <- 'colin-serc'
-location <- 'colin-home'
-num.cpu <- 22
+#location <- 'colin-home'
+num.cpu <- 11
+#num.cpu <- 7
 
 for(pev.penetration in c(0.005,0.01,0.02,0.04)){
   print(paste("pen",pev.penetration))
@@ -42,7 +40,8 @@ for(pev.penetration in c(0.005,0.01,0.02,0.04)){
   # get a snow cluster started
   if(!exists('cl')){
     print('starting new cluster')
-    cl <- makeCluster(c(rep(list(list(host="localhost",outfile=paste(path.to.outputs,"/cluster-out.txt",sep=''))),num.cpu)),type="SOCK")
+    #cl <- makeCluster(c(rep(list(list(host="localhost",outfile=paste(path.to.outputs,optim.code,"/cluster-out.txt",sep=''))),num.cpu)),type="SOCK")
+    cl <- makeCluster(c(rep(list(list(host="localhost")),num.cpu)),type="SOCK")
   }
 
   # initialize the particles (also called "agents" in DE)
@@ -62,6 +61,12 @@ for(pev.penetration in c(0.005,0.01,0.02,0.04)){
       cat('.')
       system('sleep 0.25')
     }
+    # allow for a break of the loop by creation of a file titled "BREAK" in the dropbox run directory
+    if(file.exists(paste(path.to.outputs,optim.code,"/BREAK",sep=''))){
+      file.remove(paste(path.to.outputs,optim.code,"/BREAK",sep=''))
+      break
+    }
+
     for(i in 1:n){
       all.ptx[,i,gen.num] <- sample(seq(decision.vars$lbound[i],decision.vars$ubound[i]),np,replace=T)
     }
@@ -73,16 +78,11 @@ for(pev.penetration in c(0.005,0.01,0.02,0.04)){
     for(i in 1:np){
       fit.history[[paste(all.ptx[,1:n,gen.num],collapse=",")]] <- all.ptx[,'fitness',gen.num]
     }
-
-    # allow for a break of the loop by creation of a file titled "BREAK" in the dropbox run directory
-    if(file.exists(paste(path.to.outputs,"BREAK",sep='')))break
   }
-  save.image(paste(path.to.outputs,"0saved-state-pen",pev.penetration*100,".Rdata",sep=''))
+  save.image(paste(path.to.outputs,optim.code,"/0saved-state-pen",pev.penetration*100,".Rdata",sep=''))
 
   # enter the loop
   while(!stop.criteria(all.ptx[,'fitness',gen.num],gen.num)){
-    # allow for a break of the loop by creation of a file titled "BREAK" in the dropbox run directory
-    if(file.exists(paste(path.to.outputs,"BREAK",sep='')))break
 
     print(paste("gen:",gen.num))
     source(paste(path.to.pevi,"R/optim/optim-functions.R",sep='')) # allows hot-swapping code
@@ -139,21 +139,23 @@ for(pev.penetration in c(0.005,0.01,0.02,0.04)){
     all.ptx[improved.ptx,,gen.num+1] <- cand[improved.ptx,]
 
     print(all.ptx[,'fitness',gen.num])
-    notice.file <- paste(path.to.outputs,location,'-pen',pev.penetration*100,'-gen',gen.num,'-fit',roundC(mean(all.ptx[,'fitness',gen.num]),4),'-',format(Sys.time(),"%Y-%m-%d_%H%M%S"),'.csv',sep='')
+    notice.file <- paste(path.to.outputs,optim.code,"/",location,'-pen',pev.penetration*100,'-gen',gen.num,'-fit',roundC(mean(all.ptx[,'fitness',gen.num],na.rm=T),4),'-',format(Sys.time(),"%Y-%m-%d_%H%M%S"),'.csv',sep='')
     write.csv(all.ptx[,,gen.num],file=notice.file)
 
     gen.num <- gen.num + 1
 
     # save the state of the optmization in case of crash
-    save.image(paste(path.to.outputs,"0saved-state-pen",pev.penetration*100,".Rdata",sep=''))
+    save.image(paste(path.to.outputs,optim.code,"/0saved-state-pen",pev.penetration*100,".Rdata",sep=''))
 
-    # give myself notice 
-    #system(paste("touch ",path.to.outputs,location,'-pen',pev.penetration*100,'-gen',gen.num-1,'-fit',roundC(mean(all.ptx[,'fitness',gen.num]),4),'-',format(Sys.time(),"%Y-%m-%d_%H%M%S"),sep=''))
-    
     # create a 5 second pause to allow for interruption
     for(i in 1:20){
       cat('.')
       system('sleep 0.25')
+    }
+    # allow for a break of the loop by creation of a file titled "BREAK" in the dropbox run directory
+    if(file.exists(paste(path.to.outputs,optim.code,"/BREAK",sep=''))){
+      file.remove(paste(path.to.outputs,optim.code,"/BREAK",sep=''))
+      break
     }
   }
 }

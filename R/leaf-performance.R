@@ -244,3 +244,6 @@ perf$perf <- perf$perf2 / predict(fit2,newdata=data.frame(gradient=0,speed=weigh
 perf$perf[perf$perf<0] <- 0
 
 save(dr,dr.hists,perf,file=paste(path.to.leaf,'data/all-trips-cleaned.Rdata',sep=''))
+
+
+

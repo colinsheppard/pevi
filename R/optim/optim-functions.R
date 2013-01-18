@@ -85,7 +85,7 @@ run.pevi.batch <- function(break.pair,ptx){
           try.nl(paste('set ',param,' ',vary.tab[results.i,param],'',sep=''),break.pair.code)
         }
       }
-      try.nl(paste('set charger-input-file "',path.to.inputs,'chargers-ptx',ptx.i,'.txt"',sep=''),break.pair.code)
+      try.nl(paste('set charger-input-file "',path.to.inputs,optim.code,'/chargers-ptx',ptx.i,'.txt"',sep=''),break.pair.code)
       print("before setup")
       system('sleep 0.25')
       try.nl('setup',break.pair.code)
@@ -118,7 +118,7 @@ try.nl <- function(cmd,break.pair.code=""){
 write.charger.file <- function(num.chargers,ptx.i){
   chargers <- data.frame(TAZ=1:52,L0=rep(1,52),L1=num.chargers[1:52],L2=num.chargers[1:52],L3=num.chargers[53:104])
   names(chargers) <- c(";TAZ","L0","L1","L2","L3")
-  write.table(chargers,file=paste(path.to.inputs,'chargers-ptx',ptx.i,'.txt',sep=''),sep="\t",row.names=F,quote=F)
+  write.table(chargers,file=paste(path.to.inputs,optim.code,'/chargers-ptx',ptx.i,'.txt',sep=''),sep="\t",row.names=F,quote=F)
 }
 
 ### plot.ptx(ptx,dimensions=1:2)

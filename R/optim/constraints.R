@@ -30,6 +30,15 @@ frac.stranded.below.thresh <- function(results){
 }
 
 ###################################################################################################
+# num.stranded.below.thresh
+#
+# the number of drivers stranded cannot exceed the threshold give by max.num.stranded
+###################################################################################################
+num.stranded.below.thresh <- function(results){
+  return(all.or.nothing(mean(results$num.stranded,na.rm=T) < constraint.params$max.num.stranded))
+}
+
+###################################################################################################
 # all.or.nothing
 # 
 # helper function that returns 0 if TRUE and Inf of FALSE

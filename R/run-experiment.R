@@ -2,8 +2,8 @@ Sys.setenv(NOAWT=1)
 library(colinmisc)
 load.libraries(c('ggplot2','yaml','RNetLogo','plyr','reshape'))
 
-#base.path <- '/Users/critter/Dropbox/serc/pev-colin/'
-base.path <- '/Users/sheppardc/Dropbox/serc/pev-colin/'
+base.path <- '/Users/critter/Dropbox/serc/pev-colin/'
+#base.path <- '/Users/sheppardc/Dropbox/serc/pev-colin/'
 #base.path <- '/Users/Raskolnikovbot3001/Dropbox/'
 
 exp.name <- commandArgs(trailingOnly=T)[1]
@@ -13,6 +13,8 @@ exp.name <- "probability-of-unneeded-charge"
 exp.name <- "wait-time-mean"
 exp.name <- "willing-to-roam-time-threshold"
 exp.name <- "time-opportunity-cost"
+exp.name <- "electric-fuel-consumption"
+exp.name <- "electric-fuel-consumption-mean"
 
 path.to.pevi <- paste(base.path,'pevi/',sep='')
 path.to.inputs <- paste(base.path,'pev-shared/data/inputs/sensitivity/',exp.name,'/',sep='')
@@ -44,12 +46,12 @@ if("charger-input-file" %in% names(vary)){
   results$infrastructure.scenario.named  <- reorder(factor(results$infrastructure.scenario.named),results$infrastructure.scenario.order)
 }
 if("vehicle-type-input-file" %in% names(vary)){
-  results$vehicle.scenario <- as.numeric(unlist(lapply(strsplit(as.character(results$vehicle.type.input.file),'-scen',fixed=T),function(x){ unlist(strsplit(x[2],".txt",fixed=T)) })))
+  results$vehicle.scenario <- unlist(lapply(strsplit(as.character(results$vehicle.type.input.file),'-scen',fixed=T),function(x){ unlist(strsplit(x[2],".txt",fixed=T)) }))
   results$vehicle.scenario.named <- results$vehicle.scenario
   results$vehicle.scenario.order <- results$vehicle.scenario
-  for(scen.i in as.numeric(names(naming$`vehicle-type-input-file`))){
-    results$vehicle.scenario.named[results$vehicle.scenario == scen.i] <- naming$`vehicle-type-input-file`[[as.character(scen.i)]][[1]]
-    results$vehicle.scenario.order[results$vehicle.scenario == scen.i] <- as.numeric(naming$`vehicle-type-input-file`[[as.character(scen.i)]][[2]])
+  for(scen.i in names(naming$`vehicle-type-input-file`)){
+    results$vehicle.scenario.named[results$vehicle.scenario == scen.i] <- naming$`vehicle-type-input-file`[[scen.i]][[1]]
+    results$vehicle.scenario.order[results$vehicle.scenario == scen.i] <- as.numeric(naming$`vehicle-type-input-file`[[scen.i]][[2]])
   }
 }
 

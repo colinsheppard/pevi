@@ -207,3 +207,14 @@ shp.to.kml(agg.taz,paste(path.to.google,'penetration-weighting.kml',sep=''),'Pen
 
 c.map <- paste(map.color(taz@data$frac.homes,blue2red(50)),'7F',sep='')
 shp.to.kml(taz,paste(path.to.pevi,'inputs/development/frac-driver-homes.kml',sep=''),'Home Distribution','Color denotes fraction of drivers with home in each TAZ.','green',1.5,c.map,id.col='ID',name.col='name',description.cols=c('id','name','population','penetration.weights.unscaled','frac.homes'))
+
+# use overall traffic density of the weighted data to assign up to three chargers to each TAZ
+traffic.density <- ddply(od.24.weighted,.(from),function(df){ data.frame(demand=sum(df$demand)) })
+traffic.density$num.chargers <- round(2 * traffic.density$demand/max(traffic.density$demand))
+traffic.density$num.chargers.L3 <- round(0.85 * traffic.density$demand/max(traffic.density$demand))
+chargers <- data.frame(TAZ=1:52,L0=rep(1,52),L1=0,L2=traffic.density$num.chargers,L3=traffic.density$num.chargers.L3)
+names(chargers) <- c(";TAZ","L0","L1","L2","L3")
+base.path <- '/Users/sheppardc/Dropbox/serc/pev-colin/'
+path.to.inputs <- paste(base.path,'pev-shared/data/inputs/charger-input-file/',sep='')
+write.table(chargers,file=paste(path.to.inputs,'/chargers-scen9.txt',sep=''),sep="\t",row.names=F,quote=F)
+

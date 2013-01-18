@@ -193,7 +193,9 @@ to setup
   reset-logfile "charging"
   log-data "charging" (sentence "time" "charger.id" "charger.level" "location" "driver" "vehicle.type" "duration" "energy" "begin.soc" "end.soc" "after.end.charge" "charging.on.whim")
   reset-logfile "pain"
-  log-data "pain" (sentence "time" "driver" "location" "vehicle.type" "pain-type" "pain-value" "state-of-charge")
+  log-data "pain" (sentence "time" "driver" "location" "vehicle.type" "pain.type" "pain.value" "state.of.charge")
+  reset-logfile "trip"
+  log-data "trip" (sentence "time" "driver" "vehicle.type" "origin" "destination" "distance" "scheduled" "begin.soc" "end.soc" "elec.used" "gas.used" "end.time")
   reset-logfile "tazs"
   log-data "tazs" (sentence "time" "taz" "num-bevs" "num-phevs" "num-L0" "num-L1" "num-L2" "num-L3" "num-avail-L0"  "num-avail-L1" "num-avail-L2" "num-avail-L3")
   if log-tazs [
@@ -462,7 +464,7 @@ to wait-time-event-scheduler
     ifelse ticks > 24 [
       set state "stranded"
       log-data "wait-time" (sentence ticks id [name] of this-vehicle-type state-of-charge trip-distance journey-distance time-until-depart "stranded" -1)
-      log-data "trip-journey-timeuntildepart" (sentence ticks departure-time id [name] of this-vehicle-type state-of-charge [id] of current-taz [id] of destination-taz true false (departure-time - ticks) "stranded" remaining-range sum itin-delay-amount)
+      log-data "trip-journey-timeuntildepart" (sentence ticks departure-time id [name] of this-vehicle-type state-of-charge [id] of current-taz [id] of destination-taz true false (departure-time - ticks) "stranded" remaining-range sum map weight-delay itin-delay-amount)
       log-data "pain" (sentence ticks id [id] of current-taz [name] of this-vehicle-type "stranded" "" state-of-charge)
     ][
       let event-time-from-now random-exponential wait-time-mean
@@ -829,14 +831,20 @@ end
 ;; ARRIVE
 ;;;;;;;;;;;;;;;;;;;;
 to arrive
+  ; for logging trip
+  let #is-scheduled true
+  if item current-itin-row itin-change-flag = 1 [ set #is-scheduled false ]
+  
   ; account for energy / gas used in the trip
   let #charge-used trip-distance * electric-fuel-consumption / battery-capacity
   set miles-driven miles-driven + trip-distance
   ifelse not is-bev? and state-of-charge - #charge-used < 0 [
+    log-data "trip" (sentence (ticks - trip-time) id ([name] of this-vehicle-type) ([id] of current-taz) ([id] of destination-taz) (distance-from-to [id] of current-taz [id] of destination-taz) #is-scheduled state-of-charge 0 (state-of-charge * battery-capacity) ((#charge-used - state-of-charge) * battery-capacity / electric-fuel-consumption * hybrid-fuel-consumption) ticks)
     set energy-used energy-used + state-of-charge * battery-capacity
     set gasoline-used gasoline-used + (#charge-used - state-of-charge) * battery-capacity / electric-fuel-consumption * hybrid-fuel-consumption
     set state-of-charge 0
   ][
+    log-data "trip" (sentence (ticks - trip-time) id ([name] of this-vehicle-type) ([id] of current-taz) ([id] of destination-taz) (distance-from-to [id] of current-taz [id] of destination-taz) #is-scheduled state-of-charge (max (sentence 0 (state-of-charge - #charge-used))) (#charge-used * battery-capacity) 0 ticks)
     set state-of-charge max (sentence 0 (state-of-charge - #charge-used))
     set energy-used energy-used + #charge-used * battery-capacity
   ]
@@ -846,17 +854,17 @@ to arrive
   let #from-taz [id] of current-taz
   set journey-distance journey-distance - trip-distance
   log-driver "arriving"
-
+  
   update-itinerary 
   let #to-taz [id] of current-taz
       
   ifelse not itin-complete? [
     ifelse need-to-charge "arrive" [   
       seek-charger
-      log-data "trip-journey-timeuntildepart" (sentence ticks departure-time id [name] of this-vehicle-type state-of-charge #from-taz #to-taz #completed-trip #completed-journey (departure-time - ticks) "seeking-charger" remaining-range sum itin-delay-amount)
+      log-data "trip-journey-timeuntildepart" (sentence ticks departure-time id [name] of this-vehicle-type state-of-charge #from-taz #to-taz #completed-trip #completed-journey (departure-time - ticks) "seeking-charger" remaining-range sum map weight-delay itin-delay-amount)
     ][
       itinerary-event-scheduler  
-      log-data "trip-journey-timeuntildepart" (sentence ticks departure-time id [name] of this-vehicle-type state-of-charge #from-taz #to-taz #completed-trip #completed-journey (departure-time - ticks) "scheduling-itinerary" remaining-range sum itin-delay-amount)
+      log-data "trip-journey-timeuntildepart" (sentence ticks departure-time id [name] of this-vehicle-type state-of-charge #from-taz #to-taz #completed-trip #completed-journey (departure-time - ticks) "scheduling-itinerary" remaining-range sum map weight-delay itin-delay-amount)
     ]
   ][
     ;; itin is complete and at home? plug-in immediately and charge till full
@@ -866,9 +874,9 @@ to arrive
       dynamic-scheduler:add schedule self task end-charge ticks + full-charge-time-need 
       set time-until-end-charge full-charge-time-need
       log-data "charging" (sentence ticks [who] of current-charger level-of current-charger [id] of current-taz [id] of self [name] of this-vehicle-type full-charge-time-need (full-charge-time-need * charge-rate-of current-charger) state-of-charge (state-of-charge + (full-charge-time-need * charge-rate-of current-charger) / battery-capacity ) "stop" false)
-      log-data "trip-journey-timeuntildepart" (sentence ticks ticks id [name] of this-vehicle-type state-of-charge #from-taz #to-taz #completed-trip #completed-journey 0 "home" remaining-range sum itin-delay-amount)
+      log-data "trip-journey-timeuntildepart" (sentence ticks ticks id [name] of this-vehicle-type state-of-charge #from-taz #to-taz #completed-trip #completed-journey 0 "home" remaining-range sum map weight-delay itin-delay-amount)
     ][
-      log-data "trip-journey-timeuntildepart" (sentence ticks ticks id [name] of this-vehicle-type state-of-charge #from-taz #to-taz #completed-trip #completed-journey 0 "journey-complete" remaining-range sum itin-delay-amount)
+      log-data "trip-journey-timeuntildepart" (sentence ticks ticks id [name] of this-vehicle-type state-of-charge #from-taz #to-taz #completed-trip #completed-journey 0 "journey-complete" remaining-range sum map weight-delay itin-delay-amount)
     ]
   ]
 
@@ -939,6 +947,10 @@ to-report driver-soc [the-driver]
   report [state-of-charge] of the-driver
 end
 
+to-report weight-delay [delay]
+  ifelse delay >= 0 [report delay][report -0.5 * delay]
+end
+
 to summarize
   reset-logfile "driver-summary"
   log-data "driver-summary" (sentence "metric" "vehicle-type" "home" "value")
@@ -948,8 +960,8 @@ to summarize
       let subset drivers with [home-taz = #home-taz and this-vehicle-type = myself]
       log-data "driver-summary" (sentence "num.drivers" name [id] of #home-taz (count subset))
       log-data "driver-summary" (sentence "num.trips" name [id] of #home-taz (sum [ length itin-change-flag - sum itin-change-flag ] of subset))
-      log-data "driver-summary" (sentence "total.delay" name [id] of #home-taz sum [ sum itin-delay-amount  ] of subset)
-      log-data "driver-summary" (sentence "num.delayed" name [id] of #home-taz count subset with [ sum itin-delay-amount > 0 ])
+      log-data "driver-summary" (sentence "total.delay" name [id] of #home-taz sum [ sum map weight-delay itin-delay-amount  ] of subset)
+      log-data "driver-summary" (sentence "num.delayed" name [id] of #home-taz count subset with [ sum map weight-delay itin-delay-amount > 0 ])
       log-data "driver-summary" (sentence "num.unscheduled.trips" name [id] of #home-taz sum [ sum itin-change-flag ] of subset)
       log-data "driver-summary" (sentence "energy.charged" name [id] of #home-taz sum [ energy-received ] of subset)
       log-data "driver-summary" (sentence "driver.expenses" name [id] of #home-taz sum [ expenses ] of subset)
@@ -963,9 +975,9 @@ to summarize
   log-data "summary" (sentence "metric" "value")
   log-data "summary" (sentence "num.drivers" count drivers)
   log-data "summary" (sentence "num.trips" sum [ length itin-change-flag - sum itin-change-flag ] of drivers)
-  log-data "summary" (sentence "total.delay" sum [ sum itin-delay-amount  ] of drivers)
-  log-data "summary" (sentence "mean.delay" mean [ sum itin-delay-amount  ] of drivers)
-  log-data "summary" (sentence "frac.drivers.delayed" (count drivers with [ sum itin-delay-amount > 0 ] / count drivers))
+  log-data "summary" (sentence "total.delay" sum [ sum map weight-delay itin-delay-amount  ] of drivers)
+  log-data "summary" (sentence "mean.delay" mean [ sum map weight-delay itin-delay-amount  ] of drivers)
+  log-data "summary" (sentence "frac.drivers.delayed" (count drivers with [ sum map weight-delay itin-delay-amount > 0 ] / count drivers))
   log-data "summary" (sentence "num.unscheduled.trips" sum [ sum itin-change-flag ] of drivers)
   log-data "summary" (sentence "energy.charged" sum [ energy-received ] of drivers)
   log-data "summary" (sentence "driver.expenses" sum [ expenses ] of drivers)
@@ -1261,6 +1273,17 @@ log-taz-time-interval
 1
 minutes
 HORIZONTAL
+
+SWITCH
+674
+61
+779
+94
+log-trip
+log-trip
+0
+1
+-1000
 
 @#$#@#$#@
 ## ## WHAT IS IT?

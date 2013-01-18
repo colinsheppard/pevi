@@ -2,8 +2,8 @@ library(colinmisc)
 Sys.setenv(NOAWT=1)
 load.libraries(c('snow','yaml','stringr','RNetLogo'))
 
-base.path <- '/Users/sheppardc/Dropbox/serc/pev-colin/'
-#base.path <- '/Users/critter/Dropbox/serc/pev-colin/'
+#base.path <- '/Users/sheppardc/Dropbox/serc/pev-colin/'
+base.path <- '/Users/critter/Dropbox/serc/pev-colin/'
 path.to.pevi <- paste(base.path,'pevi/',sep='')
 path.to.inputs <- paste(base.path,'pev-shared/data/inputs/optim/',sep='')
 path.to.outputs <- paste(base.path,'pev-shared/data/outputs/optim/',sep='')
@@ -15,6 +15,7 @@ source(paste(path.to.pevi,"R/optim/optim-config.R",sep=''))
 source(paste(path.to.pevi,"R/optim/objectives.R",sep=''))
 source(paste(path.to.pevi,"R/optim/constraints.R",sep=''))
 source(paste(path.to.pevi,"R/reporters-loggers.R",sep=''))
+make.dir(paste(path.to.inputs,optim.code,sep=''))
 
 # read the parameters and values to vary in the experiment
 vary <- yaml.load(readChar(paste(path.to.inputs,'vary.yaml',sep=''),file.info(paste(path.to.inputs,'vary.yaml',sep=''))$size))
@@ -25,10 +26,10 @@ for(file.param in names(vary)[grep("-file",names(vary))]){
 vary.tab.original <- expand.grid(vary,stringsAsFactors=F)
 
 pev.penetration <- 0.04
-location <- 'colin-serc'
-#location <- 'colin-home'
-num.cpu <- 12
-#num.cpu <- 8
+#location <- 'colin-serc'
+location <- 'colin-home'
+#num.cpu <- 12
+num.cpu <- 8
 
 for(pev.penetration in c(0.005,0.01,0.02,0.04)){
   print(paste("pen",pev.penetration))

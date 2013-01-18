@@ -36,11 +36,13 @@ objective.name <- 'infrastructure.cost'
 ###################################################################################################
 constraint.names <- c(
   'frac.drivers.delayed.below.thresh'
+  #'num.stranded.below.thresh'
   #'frac.stranded.below.thresh'
 )
 constraint.params <- list()
 constraint.params[['max.frac.drivers.delayed']] <- 0.01
 constraint.params[['max.frac.stranded']] <- 0.003
+constraint.params[['max.num.stranded']] <- 1
 
 ###################################################################################################
 # de.params           

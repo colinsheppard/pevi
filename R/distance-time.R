@@ -219,10 +219,21 @@ for(from.name in dimnames(route.hists)$from.name){
 # finally, summarize the routes to get the distance/time/performance/enroute for each pairing
 load(file=paste(path.to.pevi,'inputs/routing-corrected.Rdata',sep=''))
 load(file=paste(path.to.leaf,'data/all-trips-cleaned.Rdata',sep=''))
-disttime <- ddply(route.ordered,.(from_taz,to_taz),function(df){ data.frame(miles=sum(df$length),time=sum(df$length/df$ab_speed),enroute=paste(unique(df$end.taz),collapse=","),perf=subset(perf,from==df$from_taz[1] & to==df$to_taz[1])$perf)})
-names(disttime) <- c(';from','to','miles','time','enroute','perf')
-disttime <- rbind(disttime,data.frame(from=unique(disttime$from),to=unique(disttime$from),miles=sqrt(taz$ACRES[match(unique(disttime$from),taz$id)]*0.001563)/2,time=sqrt(taz$ACRES[match(unique(disttime$from),taz$id)]*0.001563)/30/2,enroute='',perf=1))
+disttime <- ddply(route.ordered,.(from_taz,to_taz),function(df){ data.frame(miles=sum(df$length),time=sum(df$length/df$ab_speed),enroute=paste(unique(df$end.taz),collapse=","),perf1=subset(perf,from==df$from_taz[1] & to==df$to_taz[1])$per1,perf=subset(perf,from==df$from_taz[1] & to==df$to_taz[1])$perf)})
+names(disttime) <- c('from','to','miles','time','enroute','perf1','perf')
+disttime <- rbind(disttime,data.frame(from=unique(disttime$from),to=unique(disttime$from),miles=sqrt(taz$ACRES[match(unique(disttime$from),taz$id)]*0.001563)/2,time=sqrt(taz$ACRES[match(unique(disttime$from),taz$id)]*0.001563)/30/2,enroute='',perf1=1,perf=1))
 disttime <- ddply(disttime[order(disttime$from),],.(from),function(df){ df[order(df$to),] })
+names(disttime) <- c(';from','to','miles','time','enroute','perf1','perf')
 write.csv(disttime,file=paste(path.to.geatm,'taz-dist-time.csv',sep=''),row.names=F)
 write.table(disttime,file=paste(path.to.pevi,'inputs/taz-dist-time.txt',sep=''),row.names=F,sep="\t")
+
+# pull in an itinerary and use it to assess the difference in energy needed to make all of the trips
+base.path <- '/Users/critter/Dropbox/serc/pev-colin/'
+path.to.inputs <- paste(base.path,'pev-shared/data/inputs/',sep='')
+itin <- read.table(paste(path.to.inputs,'driver-input-file/driver-schedule-pen1-rep1-20121222.txt',sep=''),sep='\t',header=T,stringsAsFactors=F)
+itin$from.to <- paste(itin$from,itin$to,sep='--')
+disttime$from.to <- paste(disttime$from,disttime$to,sep='--')
+itin <- join(itin,disttime[,c('from.to','miles','time','perf','perf1')],by="from.to")
+sum(itin$miles)/sum(itin$miles*itin$perf)
+
 

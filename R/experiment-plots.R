@@ -41,6 +41,10 @@ ggsave(paste(path.to.inputs,"plots/num-drivers-delayed.pdf",sep=''),p,width=15,h
 # Look at both fuel consumption params for one scenario
 p <- ggplot(subset(results,vehicle.scenario==1 & infrastructure.scenario==1),aes(x=factor(electric.fuel.consumption.range),y=total.delay))+geom_boxplot(aes(fill=factor(electric.fuel.consumption.sd)))+facet_wrap(~penetration)
 
+# ELECTRIC-FUEL-CONSUMPTION-MEAN
+ggplot(results,aes(x=vehicle.scenario.named,y=frac.drivers.delayed))+geom_boxplot(aes(fill=factor(penetration)))+facet_wrap(~infrastructure.scenario.named)
+ggplot(results,aes(x=vehicle.scenario.named,y=frac.denied))+geom_boxplot(aes(fill=factor(penetration)))+facet_wrap(~infrastructure.scenario.named,scales="free_y")
+ggplot(results,aes(x=vehicle.scenario.named,y=num.stranded))+geom_boxplot(aes(fill=factor(penetration)))+facet_wrap(~infrastructure.scenario.named,scales="free_y")
 
 # PROBABILITY-OF-UNNEEDED-CHARGE
 p <- ggplot(results,aes(x=factor(probability.of.unneeded.charge),y=total.delay))+geom_boxplot(aes(fill=factor(penetration)))+facet_grid(infrastructure.scenario.named~vehicle.scenario.named)
@@ -85,6 +89,8 @@ ggsave(paste(path.to.inputs,"plots/num-drivers-delayed.pdf",sep=''),p,width=15,h
 
 # ALL METRICS, JUST ONE VEHICLE SCENARIO
 p <- ggplot(melt(subset(results,vehicle.scenario.named=="BEV/PHEV (90/10)"),id.vars=c('infrastructure.scenario.named','penetration'),measure.vars=c('mean.delay','frac.drivers.delayed','num.unscheduled.trips','energy.charged','driver.expenses','infrastructure.cost','gasoline.used','miles.driven','num.denials','num.stranded','mean.duty.factor','frac.denied')),aes(x=infrastructure.scenario.named,y=value))+geom_boxplot(aes(fill=as.factor(penetration)))+facet_wrap(~variable,scales="free_y")
+p <- ggplot(melt(results,id.vars=c('infrastructure.scenario.named','penetration'),measure.vars=c('mean.delay','frac.drivers.delayed','num.unscheduled.trips','energy.charged','driver.expenses','infrastructure.cost','gasoline.used','miles.driven','num.denials','num.stranded','mean.duty.factor','frac.denied')),aes(x=infrastructure.scenario.named,y=value))+geom_boxplot(aes(fill=as.factor(penetration)))+facet_wrap(~variable,scales="free_y")
+p <- ggplot(melt(subset(results,infrastructure.scenario==2),id.vars=c('vehicle.scenario.named','penetration'),measure.vars=c('mean.delay','frac.drivers.delayed','num.unscheduled.trips','energy.charged','driver.expenses','infrastructure.cost','gasoline.used','miles.driven','num.denials','num.stranded','mean.duty.factor','frac.denied')),aes(x=vehicle.scenario.named,y=value))+geom_boxplot(aes(fill=as.factor(penetration)))+facet_wrap(~variable,scales="free_y")
 
 # CHARGE-SAFETY-FACTOR
 p <- ggplot(results,aes(x=factor(charge.safety.factor),y=total.delay))+geom_boxplot(aes(fill=factor(penetration)))+facet_grid(infrastructure.scenario.named~vehicle.scenario.named)

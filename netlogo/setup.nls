@@ -197,7 +197,7 @@ to setup-drivers
   ; finally initialize driver state variables
   ask drivers [
     set current-itin-row -1
-    update-itinerary
+    update-itinerary "setup"
     set shape "car"
     set color green
     set size 2

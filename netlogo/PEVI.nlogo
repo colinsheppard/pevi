@@ -660,7 +660,7 @@ to add-trip-to-itinerary [new-destination-taz]
   ; rewind current-itin-row by one and use update-itinerary to take care of setting state var's
   set current-itin-row current-itin-row - 1
 
-  update-itinerary
+  update-itinerary "add-trip-to-itinerary"
 
   ; update-itinerary does not update journey-distance, do so here by adding the difference between the previous trip and the current trip)
   let #added-journey-distance (distance-from-to (item current-itin-row itin-from) (item current-itin-row itin-to) + 
@@ -851,7 +851,7 @@ to arrive
   set journey-distance journey-distance - trip-distance
   log-driver "arriving"
 
-  update-itinerary 
+  update-itinerary "arrive"
   let #to-taz [id] of current-taz
       
   ifelse not itin-complete? [
@@ -882,14 +882,14 @@ end
 ;;;;;;;;;;;;;;;;;;;;
 ;; UPDATE ITINERARY
 ;;;;;;;;;;;;;;;;;;;;
-to update-itinerary
+to update-itinerary [#callingprocedure]
   ifelse (current-itin-row + 1 < length itin-from) [
     set current-itin-row current-itin-row + 1
     set current-taz taz item current-itin-row itin-from
     set destination-taz taz item current-itin-row itin-to
     ifelse ((item current-itin-row itin-depart) < ticks)[     
       change-depart-time ticks
-      print (word precision ticks 3 id [id] of current-taz [name] of this-vehicle-type "delay in UPDATE-ITINERARY")
+      print (word precision ticks 3 " " id " " [id] of current-taz " " [name] of this-vehicle-type " delay in UPDATE-ITINERARY from " #callingprocedure)
     ][
       set departure-time item current-itin-row itin-depart
     ] 

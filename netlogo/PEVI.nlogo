@@ -825,7 +825,7 @@ to travel-time-event-scheduler
   set state "traveling"
   set trip-time item my-od-index od-time
   dynamic-scheduler:add schedule self task arrive (ticks + trip-time)
- end
+end
 
 ;;;;;;;;;;;;;;;;;;;;
 ;; ARRIVE

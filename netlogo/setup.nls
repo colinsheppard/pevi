@@ -177,6 +177,7 @@ to setup-drivers
   
   ; second assign the remaining vehicle types to drivers according to the remainder
   let #unassinged-drivers sort drivers with [this-vehicle-type = nobody]
+;  print length #unassinged-drivers / count drivers 
   let #available-types vehicle-types with [(frac-of-pevs * count drivers) - num-vehicles > 0 ]
   ask #available-types [
     while[(frac-of-pevs * count drivers) - num-vehicles > 0 and length #unassinged-drivers > 0 ][
@@ -385,6 +386,7 @@ to log-data [logfile data-list]
      (logfile = "charging" and log-charging) or
      (logfile = "pain" and log-pain) or
      (logfile = "tazs" and log-tazs) or
+     (logfile = "trip" and log-trip) or
      (logfile = "charge-time" and log-charge-time) or
      (logfile = "seek-charger" and log-seek-charger) or
      (logfile = "seek-charger-result" and log-seek-charger-result) or

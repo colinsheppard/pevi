@@ -13,4 +13,4 @@
 "driver-input-file"	"../../../pev-shared/data/inputs/driver-input-file/driver-schedule-pen4-rep1-20121222.txt"
 "od-input-file"	"../../../pev-shared/data/inputs/taz-dist-time-perf.txt"
 "outputs-directory"	"../outputs/"
-"vehicle-type-input-file"	"../../../pev-shared/data/inputs/vehicle-type-input-file/vehicle-types-scen1.txt"
+"vehicle-type-input-file"	"../../../pev-shared/data/inputs/vehicle-type-input-file/vehicle-types-scen3.txt"

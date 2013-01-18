@@ -160,7 +160,7 @@ end
 
 to setup-and-fix-seed
     clear-all-and-initialize
-    let seed new-seed
+    let seed 1;new-seed
     print seed
     random-seed 1 ;seed
     if parameter-file = 0 [ set parameter-file "params.txt" ]
@@ -276,6 +276,7 @@ to retry-seek
   ;print (word precision ticks 3 " " self " retry-seek ")
   if item current-itin-row itin-depart < ticks [
     change-depart-time ticks
+    print (word precision ticks 3 id [id] of current-taz [name] of this-vehicle-type "delay in RETRY-SEEK")
   ]  
   ifelse is-bev? [
     set remaining-range (state-of-charge * battery-capacity / electric-fuel-consumption ) + small-num
@@ -441,6 +442,7 @@ to seek-charger
     ][
       ifelse #min-taz = destination-taz [
         change-depart-time ticks
+        print (word precision ticks 3 id [id] of current-taz [name] of this-vehicle-type "delay in SEEK-CHARGER")
       ][
         add-trip-to-itinerary #min-taz
         travel-time-event-scheduler
@@ -522,6 +524,7 @@ to charge-time-event-scheduler
   log-data "charge-time" (sentence ticks id charger-in-origin-or-destination (level-of current-charger) state-of-charge trip-distance journey-distance time-until-depart after-end-charge (next-event-scheduled-at - ticks))
   if next-event-scheduled-at > departure-time[
     change-depart-time next-event-scheduled-at
+    print (word precision ticks 3 id [id] of current-taz [name] of this-vehicle-type "delay in CHARGE-TIME-EVENT-SCHEDULER")
   ]
   log-data "charging" (sentence ticks [who] of current-charger level-of current-charger [id] of current-taz [id] of self [name] of this-vehicle-type (next-event-scheduled-at - ticks) ((next-event-scheduled-at - ticks) * charge-rate-of current-charger) state-of-charge (state-of-charge + ((next-event-scheduled-at - ticks) * charge-rate-of current-charger) / battery-capacity ) after-end-charge charging-on-a-whim?)
   set time-until-end-charge (next-event-scheduled-at - ticks)
@@ -613,6 +616,7 @@ to change-depart-time [new-depart-time]
   ]
   set departure-time new-depart-time
   log-data "pain" (sentence ticks id [id] of current-taz [name] of this-vehicle-type "delay" #delay-duration state-of-charge)
+  print (word precision ticks 3 id [id] of current-taz [name] of this-vehicle-type "delay" #delay-duration state-of-charge)
 end
 
 to change-depart-time-row [row-num]
@@ -885,6 +889,7 @@ to update-itinerary
     set destination-taz taz item current-itin-row itin-to
     ifelse ((item current-itin-row itin-depart) < ticks)[     
       change-depart-time ticks
+      print (word precision ticks 3 id [id] of current-taz [name] of this-vehicle-type "delay in UPDATE-ITINERARY")
     ][
       set departure-time item current-itin-row itin-depart
     ] 

@@ -17,7 +17,7 @@ reporters <- data.frame(num.drivers="(count drivers)",
   frac.denied="(count drivers with [num-denials > 0] / count drivers)",stringsAsFactors=F)
 
 # log files, these all get set to false so logging is deactivated
-logfiles<-c("wait-time","charging","charge-time","seek-charger","seek-charger-result","need-to-charge","trip-journey-timeuntildepart","break-up-trip","break-up-trip-choice","charge-limiting-factor","drivers","pain","tazs","trip")
+logfiles<-c("wait-time","charging","charge-time","seek-charger","seek-charger-result","need-to-charge","trip-journey-timeuntildepart","break-up-trip","break-up-trip-choice","charge-limiting-factor","drivers","pain","tazs","trip","summary")
 
 debug.reporters <- data.frame(
   n.tazs="(count tazs)",

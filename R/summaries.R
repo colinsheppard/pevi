@@ -4,6 +4,7 @@ load.libraries(c('ggplot2','plyr'))
 path.to.plots  <- '~/Dropbox/serc/pev-colin/plots/'
 path.to.pevi   <- '~/Dropbox/serc/pev-colin/pevi/'
 path.to.outputs <- '~/Dropbox/serc/pev-colin/pevi/outputs/'
+path.to.outputs <- '~/Documents/serc/pev/'
 
 #dr <- read.csv(paste(path.to.outputs,"driver-summary-out.csv",sep='')) #,stringsAsFactors=F
 #ggplot(dr,aes(x=vehicle.type,y=value))+geom_boxplot()+facet_wrap(~metric,scales='free_y')
@@ -40,3 +41,11 @@ chs <- ddply(ch,.(charger.id),function(df){
   }
 })
 ggplot(chs,aes(x=duty.factor*100))+geom_histogram(binwidth=1)+facet_wrap(~charger.level,scales="free_y")
+
+# trying to pattern match the distribution of begin SOC with EV Project data
+ggplot(subset(ch,T),aes(x=begin.soc,fill=factor(charger.level)))+geom_histogram()+facet_grid(charger.level~vehicle.type)
+sums <- read.csv(paste(path.to.outputs,"summary-out.csv",sep=''))
+
+# num charge events per driver
+nrow(subset(ch,vehicle.type=='leaf'))/sums$value[sums$metric=="num.bevs"]
+nrow(subset(ch,vehicle.type=='volt'))/(sums$value[sums$metric=="num.drivers"]-sums$value[sums$metric=="num.bevs"])

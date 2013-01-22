@@ -12,7 +12,7 @@ path.to.inputs <- paste(base.path,'pev-shared/data/inputs/compare/patterns/',sep
 
 #to.log <- c('pain','charging','need-to-charge')
 #to.log <- c('pain','charging','tazs','trip')
-to.log <- c('pain','charging','trip')
+
 
 # load the reporters and loggers needed to summarize runs and disable logging
 source(paste(path.to.pevi,"R/reporters-loggers.R",sep=''))
@@ -80,13 +80,14 @@ for(results.i in 1:nrow(results)){
     }
   }
   if("tazs" %in% to.log)NLCommand('set log-taz-time-interval 15')
+  NLCommand('set go-until-time 30')
   NLCommand('setup')
   #NLCommand('ask drivers [ set this-vehicle-type vehicle-type 53 ]')
   #NLCommand('ask drivers [ set is-bev? [is-bev?] of this-vehicle-type ]')
   #NLCommand('ask drivers [ set battery-capacity [battery-capacity] of this-vehicle-type ]')
   #NLCommand('ask drivers [ set hybrid-fuel-consumption [hybrid-fuel-consumption] of this-vehicle-type ]')
 
-  NLCommand('dynamic-scheduler:go-until schedule 30')
+  NLCommand('dynamic-scheduler:go-until schedule go-until-time')
   if(results.i == 1){
     outputs.dir <- NLReport('outputs-directory')
     for(logger in to.log){
@@ -156,27 +157,38 @@ miles.between.charges <- ddply(v.ch,.(driver,replicate),function(df){
 })
 ggplot(miles.between.charges,aes(x=miles))+geom_histogram()+geom_vline(data=data.frame(v=c(mean(miles.between.charges$miles),median(miles.between.charges$miles)),c=c('green','red')),aes(xintercept=v,colour=c))
 
+# charges per driver per day
+charges.per.driver <- ddply(logs[['charging']],.(replicate),function(df){ data.frame(charges.per.driver=nrow(df)/subset(logs[['summary']],replicate==df$replicate[1] & metric=="num.drivers")$value)})
+charges.per.driver$leaf <- ddply(subset(logs[['charging']],vehicle.type=='leaf'),.(replicate),function(df){ nrow(df)/subset(logs[['summary']],replicate==df$replicate[1] & metric=="num.bevs")$value})$V1
+charges.per.driver$volt <- ddply(subset(logs[['charging']],vehicle.type=='volt'),.(replicate),function(df){ nrow(df)/(subset(logs[['summary']],replicate==df$replicate[1] & metric=="num.drivers")$value - subset(logs[['summary']],replicate==df$replicate[1] & metric=="num.bevs")$value)})$V1
+ggplot(charges.per.driver,aes(x=charges.per.driver))+geom_histogram(binwidth=0.1)
+
 # Volt fraction miles on electricity
 v.frac.elec <- ddply(v.trips,.(driver),function(df){ 
-  data.frame(frac=(sum(df$elec.used)/0.3)/sum(df$distance))
+  data.frame(frac=(1 - (sum(df$gas.used)/0.027)/sum(df$distance)))
 })
 ggplot(v.frac.elec,aes(x=frac))+geom_histogram()+geom_vline(data=data.frame(v=c(mean(v.frac.elec$frac),median(v.frac.elec$frac)),c=c('green','red')),aes(xintercept=v,colour=c))
 
 # State-of-charge at start
 logs[['charging']]$at.home <- logs[['charging']]$charger.level==0
-ggplot(logs[['charging']],aes(x=begin.soc,fill=factor(at.home)))+geom_histogram(binwidth=0.1,position="dodge")+facet_wrap(~vehicle.type)+labs(fill="At Home?")
+logs[['charging']]$at.home[logs[['charging']]$at.home] <- "Residential"
+logs[['charging']]$at.home[logs[['charging']]$at.home=="FALSE"] <- "Public"
+soc.at.beg <- ddply(logs[['charging']],.(at.home,vehicle.type),function(df){ data.frame(up.to=seq(0.1,1,by=.1),percent=hist(df$begin.soc,plot=F,breaks=seq(0,1,by=0.1))$counts/nrow(df)*100) })
+ggplot(soc.at.beg,aes(x=up.to,y=percent,fill=factor(at.home)))+geom_bar(stat='identity',position="dodge")+facet_wrap(~vehicle.type)+labs(fill="Charger Type")
 
 # Home charging power demand
 caps <- c(19.2,2.4,19.2,30)
-demand <- ddply(logs[['tazs']],.(replicate,time),function(df){ colSums(logs[['tazs']][,paste('num.L',0:3,sep='')] - logs[['tazs']][,paste('num.avail.L',0:3,sep='')]) * caps })
-demand <- data.frame(logs[['tazs']][,c('replicate','time','taz')],(logs[['tazs']][,paste('num.L',0:3,sep='')] - logs[['tazs']][,paste('num.avail.L',0:3,sep='')]) * caps)
+demand <- ddply(logs[['tazs']],.(replicate,time),function(df){ colSums(df[,paste('num.L',0:3,sep='')] - df[,paste('num.avail.L',0:3,sep='')]) * caps })
+demand <- data.frame(logs[['tazs']][,c('replicate','time','taz')],t(apply(logs[['tazs']][,paste('num.L',0:3,sep='')] - logs[['tazs']][,paste('num.avail.L',0:3,sep='')],1,function(x){ x * caps })))
 names(demand) <- c('replicate','time','taz','pow.L0','pow.L1','pow.L2','pow.L3')
 
-demand.sum <- ddply(demand,.(time),function(df){ rbind( data.frame(level=0,min=min(df$pow.L0),max=max(df$pow.L0),median=median(df$pow.L0),mean=mean(df$pow.L0)),
+demand.sum <- ddply(ddply(demand,.(time,replicate),function(df){ colSums(df[,c('pow.L0','pow.L1','pow.L2','pow.L3')]) }),
+                    .(time),function(df){ rbind( data.frame(level=0,min=min(df$pow.L0),max=max(df$pow.L0),median=median(df$pow.L0),mean=mean(df$pow.L0)),
                                                         data.frame(level=1,min=min(df$pow.L1),max=max(df$pow.L1),median=median(df$pow.L1),mean=mean(df$pow.L1)),
                                                         data.frame(level=2,min=min(df$pow.L2),max=max(df$pow.L2),median=median(df$pow.L2),mean=mean(df$pow.L2)),
                                                         data.frame(level=3,min=min(df$pow.L3),max=max(df$pow.L3),median=median(df$pow.L3),mean=mean(df$pow.L3))) })
-ggplot(melt(demand.sum,id.vars=c('time','level')),aes(x=time,y=value,colour=variable))+geom_line()+facet_wrap(~level)
+ggplot(melt(subset(demand.sum,level==0),id.vars=c('time','level')),aes(x=time,y=value,colour=variable))+geom_line()+facet_wrap(~level)
+ggplot(melt(subset(demand.sum,level>0),id.vars=c('time','level')),aes(x=time,y=value,colour=variable))+geom_line()+facet_wrap(~level)
 demand.sum <- ddply(demand,.(time,taz),function(df){ rbind( data.frame(level=0,min=min(df$pow.L0),max=max(df$pow.L0),median=median(df$pow.L0),mean=mean(df$pow.L0)),
                                                         data.frame(level=1,min=min(df$pow.L1),max=max(df$pow.L1),median=median(df$pow.L1),mean=mean(df$pow.L1)),
                                                         data.frame(level=2,min=min(df$pow.L2),max=max(df$pow.L2),median=median(df$pow.L2),mean=mean(df$pow.L2)),
@@ -184,7 +196,7 @@ demand.sum <- ddply(demand,.(time,taz),function(df){ rbind( data.frame(level=0,m
 ggplot(melt(subset(demand.sum,level==0),id.vars=c('time','level','taz')),aes(x=time,y=value,colour=variable))+geom_line()+facet_wrap(~taz)
 
 # Charging length and energy distributions
-ggplot(logs[['charging']],aes(x=duration))+geom_histogram(binwidth=0.1)
+ggplot(logs[['charging']],aes(x=duration))+geom_histogram(binwidth=1)+facet_wrap(~public)
 ggplot(logs[['charging']],aes(x=energy))+geom_histogram(binwidth=0.1)
 
 

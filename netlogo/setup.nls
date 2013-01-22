@@ -198,7 +198,7 @@ to setup-drivers
   ; finally initialize driver state variables
   ask drivers [
     set current-itin-row -1
-    update-itinerary "setup"
+    update-itinerary
     set shape "car"
     set color green
     set size 2
@@ -213,7 +213,31 @@ to setup-drivers
       set electric-fuel-consumption random-normal electric-fuel-consumption-mean electric-fuel-consumption-sd
     ]
 
-    set state-of-charge 1
+    ifelse is-bev? [
+    let rand-draw random-float 1
+    ifelse rand-draw < 0.63 [
+      set state-of-charge 0.9 + random-float 0.1
+    ][
+      ifelse rand-draw < 0.68 [ 
+        set state-of-charge 0.8 + random-float 0.1
+      ][
+        ifelse rand-draw < 0.94 [ 
+          set state-of-charge 0.7 + random-float 0.1
+        ][
+          ifelse rand-draw < 0.97 [ 
+            set state-of-charge 0.6 + random-float 0.1
+          ][
+            ifelse rand-draw < 0.99 [ 
+              set state-of-charge 0.5 + random-float 0.1
+            ][
+              ifelse rand-draw < 0.995 [ 
+                set state-of-charge 0.4 + random-float 0.1
+              ][
+                set state-of-charge 0.3 + random-float 0.1
+     ]]]]]]][
+      set state-of-charge 1
+    ]
+
     set state "not-charging"
     set current-charger nobody
     set energy-used 0

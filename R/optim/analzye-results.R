@@ -1,8 +1,8 @@
 library(colinmisc)
 Sys.setenv(NOAWT=1)
-load.libraries(c('yaml','stringr','RNetLogo'))
+load.libraries(c('yaml','stringr','RNetLogo','maptools','reshape'))
 
-#base.path <- '/Users/sheppardc/Dropbox/serc/pev-colin/'
+base.path <- '/Users/sheppardc/Dropbox/serc/pev-colin/'
 base.path <- '/Users/critter/Dropbox/serc/pev-colin/'
 path.to.pevi <- paste(base.path,'pevi/',sep='')
 path.to.inputs <- paste(base.path,'pev-shared/data/inputs/optim/',sep='')
@@ -24,9 +24,19 @@ load(paste(path.to.pevi,'inputs/development/aggregated-taz-with-weights-fieldnam
 names(agg.taz@data) <- c('row',taz.shp.fieldnames)
 agg.taz@data$ID <- unlist(lapply(agg.taz@polygons,function(x){slot(x,'ID')}))
 
+optim.code <- 'min-cost-constrained-by-frac-delayed'
+#optim.code <- 'min-cost-constrained-by-num-stranded'
+
 for(pev.penetration in c(0.005,0.01,0.02,0.04)){
   #pev.penetration <- 0.01
   load(paste(path.to.outputs,optim.code,"/0saved-state-pen",pev.penetration*100,".Rdata",sep=''))
+  base.path <- '/Users/critter/Dropbox/serc/pev-colin/'
+  path.to.pevi <- paste(base.path,'pevi/',sep='')
+  path.to.inputs <- paste(base.path,'pev-shared/data/inputs/optim/',sep='')
+  path.to.outputs <- paste(base.path,'pev-shared/data/outputs/optim/',sep='')
+  path.to.google <- '~/Dropbox/serc/pev-colin/data/google-earth/'
+  nl.path <- "/Applications/NetLogo\ 5.0.3"
+  model.path <- paste(path.to.pevi,"netlogo/PEVI-nolog.nlogo",sep='')
 
   final.gen <- gen.num - 1
   ptx.m <- melt(data.frame(ptx=1:(nrow(all.ptx[,,1])),all.ptx[,1:(ncol(all.ptx[,,1])-1),final.gen]),id.vars=c("ptx"))
@@ -42,6 +52,6 @@ for(pev.penetration in c(0.005,0.01,0.02,0.04)){
   agg.taz@data$L3 <- roundC(tot.by.taz$L3[match(agg.taz$id,tot.by.taz$taz)],1)
   agg.taz@data$charger.score <- tot.by.taz$charger.score[match(agg.taz$id,tot.by.taz$taz)]
   c.map <- paste(map.color(agg.taz@data$charger.score,blue2red(50)),'7F',sep='')
-  shp.to.kml(agg.taz,paste(path.to.google,'optim/num-chargers-pen',100*pev.penetration,'.kml',sep=''),paste('Pen ',100*pev.penetration,'% Optimization Min Cost Constrained by Strandings ',sep=''),'Color denotes total chargers in each TAZ with L3 counting for 2 chargers (click to get actual # chargers).','red',1.5,c.map,id.col='ID',name.col='name',description.cols=c('id','name','L2','L3','weighted.demand','frac.homes'))
+  shp.to.kml(agg.taz,paste(path.to.google,'optim/',optim.code,'-pen',100*pev.penetration,'.kml',sep=''),paste('Pen ',100*pev.penetration,'% Optimization: ',optim.code,sep=''),'Color denotes total chargers in each TAZ with L3 counting for 2 chargers (click to get actual # chargers).','red',1.5,c.map,id.col='ID',name.col='name',description.cols=c('id','name','L2','L3','weighted.demand','frac.homes'))
 }
 

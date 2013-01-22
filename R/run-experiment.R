@@ -9,6 +9,7 @@ base.path <- '/Users/critter/Dropbox/serc/pev-colin/'
 exp.name <- commandArgs(trailingOnly=T)[1]
 exp.name <- "charge-safety-factor"
 exp.name <- "chargers"
+exp.name <- "charger-search-distance"
 exp.name <- "probability-of-unneeded-charge"
 exp.name <- "wait-time-mean"
 exp.name <- "willing-to-roam-time-threshold"
@@ -92,6 +93,3 @@ for(res in names(reporters)){
   results[,res] <- as.numeric(results[,res])
 }
 save(results,file=paste(path.to.inputs,'results.Rdata',sep=''))
-
-NLQuit()
-

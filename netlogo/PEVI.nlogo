@@ -318,7 +318,7 @@ to seek-charger
   let #level-3-time-penalty 0
   let #level-3-time-penalty-for-origin-or-destination 0
   if trip-distance * charge-safety-factor > 0.8 * battery-capacity / electric-fuel-consumption [
-    set #level-3-time-penalty-for-origin-or-destination 2
+    set #level-3-time-penalty-for-origin-or-destination 999
   ]
   
   ifelse not charging-on-a-whim? and is-bev? and time-until-depart < willing-to-roam-time-threshold [  
@@ -394,7 +394,7 @@ to seek-charger
             ifelse #level = 3[
               set #full-charge-time-need (0.8 - #mid-state-of-charge) * battery-capacity / #this-charge-rate
               ifelse #leg-two-trip-distance * charge-safety-factor > 0.8 * battery-capacity / electric-fuel-consumption [
-                  set #level-3-time-penalty 2
+                  set #level-3-time-penalty 999
               ][
                 set #level-3-time-penalty 0
               ]
@@ -410,8 +410,8 @@ to seek-charger
                                                                         #this-charger-type                                                    
           ]
           if not #level-3-and-too-full [ 
-            let #this-cost (time-opportunity-cost * (#extra-time-for-travel + #extra-time-until-end-charge + #level-3-time-penalty) + 
-              ([energy-price] of #this-charger-type) * (item #level #trip-or-journey-energy-need-by-type + #extra-energy-for-travel))
+            let #this-cost (time-opportunity-cost * (#extra-time-for-travel + #extra-time-until-end-charge) + #level-3-time-penalty +
+              ([energy-price] of #this-charger-type) * (item #level #trip-or-journey-energy-need-by-type + #extra-energy-for-travel)) 
             
             if #this-cost < #min-cost or (#this-cost = #min-cost and [level] of #this-charger-type > [level] of #min-charger-type) [
               set #min-cost #this-cost

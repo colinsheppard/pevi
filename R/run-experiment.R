@@ -1,21 +1,22 @@
 Sys.setenv(NOAWT=1)
+options(java.parameters="-Xmx2048m")
 library(colinmisc)
 load.libraries(c('ggplot2','yaml','RNetLogo','plyr','reshape'))
 
-base.path <- '/Users/critter/Dropbox/serc/pev-colin/'
-#base.path <- '/Users/sheppardc/Dropbox/serc/pev-colin/'
+#base.path <- '/Users/critter/Dropbox/serc/pev-colin/'
+base.path <- '/Users/sheppardc/Dropbox/serc/pev-colin/'
 #base.path <- '/Users/Raskolnikovbot3001/Dropbox/'
 
 exp.name <- commandArgs(trailingOnly=T)[1]
-exp.name <- "charge-safety-factor"
-exp.name <- "chargers"
-exp.name <- "charger-search-distance"
-exp.name <- "probability-of-unneeded-charge"
-exp.name <- "wait-time-mean"
-exp.name <- "willing-to-roam-time-threshold"
-exp.name <- "time-opportunity-cost"
-exp.name <- "electric-fuel-consumption"
-exp.name <- "electric-fuel-consumption-mean"
+#exp.name <- "charge-safety-factor"
+#exp.name <- "chargers"
+#exp.name <- "charger-search-distance"
+#exp.name <- "probability-of-unneeded-charge"
+#exp.name <- "wait-time-mean"
+#exp.name <- "willing-to-roam-time-threshold"
+#exp.name <- "time-opportunity-cost"
+#exp.name <- "electric-fuel-consumption"
+#exp.name <- "electric-fuel-consumption-mean"
 
 path.to.pevi <- paste(base.path,'pevi/',sep='')
 path.to.inputs <- paste(base.path,'pev-shared/data/inputs/sensitivity/',exp.name,'/',sep='')
@@ -25,7 +26,7 @@ vary <- yaml.load(readChar(paste(path.to.inputs,'vary.yaml',sep=''),file.info(pa
 for(file.param in names(vary)[grep("-file",names(vary))]){
   vary[[file.param]] <- paste(path.to.pevi,'netlogo/',vary[[file.param]],sep='')
 }
-naming <- yaml.load(readChar(paste(path.to.inputs,'naming.yaml',sep=''),file.info(paste(path.to.inputs,'naming.yaml',sep=''))$size))
+naming <- yaml.load(readChar(paste(path.to.inputs,'../naming.yaml',sep=''),file.info(paste(path.to.inputs,'../naming.yaml',sep=''))$size))
 
 # setup the data frame containing all combinations of those parameter values
 vary.tab <- expand.grid(vary,stringsAsFactors=F)

@@ -5,9 +5,7 @@
 
 evaluate.fitness <- function(ptx){
   if(!exists('cl')){
-    print('starting new cluster')
-    #cl <- makeCluster(c(rep(list(list(host="localhost",outfile=paste(path.to.outputs,optim.code,"/cluster-out.txt",sep=''))),num.cpu)),type="SOCK")
-    cl <- makeCluster(c(rep(list(list(host="localhost")),num.cpu)),type="SOCK")
+    stop('no cluster started')
   }
   numrows <- nrow(ptx)
   breaks <- seq(1,numrows,by=ceiling(numrows/length(cl)))
@@ -21,11 +19,6 @@ evaluate.fitness <- function(ptx){
   clusterExport(cl,c( 'run.pevi.batch','pev.penetration','path.to.inputs','path.to.outputs','optim.code','nl.path','model.path',
                       'write.charger.file','reporters','logfiles','results','path.to.pevi','vary.tab','streval','try.nl','debug.reporters',
                       objective.name,'constraint.names','constraint.params','objective.name','objective','all.or.nothing',constraint.names))
-  clusterEvalQ(cl,Sys.setenv(NOAWT=1))
-  #clusterEvalQ(cl,library('rJava'))
-  clusterEvalQ(cl,library('RNetLogo'))
-  #clusterEvalQ(cl,.jinit(parameters=c("-Xmx2048m","-Xms512m"),force.init = T))
-  #clusterEvalQ(cl,library('colinmisc'))
   if(exists('batch.results'))rm('batch.results')
   batch.results<-clusterApply(cl,break.pairs,fun='run.pevi.batch',ptx=ptx)
   batch.results<-unlist(batch.results)
@@ -64,7 +57,6 @@ run.pevi.batch <- function(break.pair,ptx){
   for(cmd in paste('set log-',logfiles,' false',sep='')){ NLCommand(cmd) }
 
   results.orig <- results
-
   for(ptx.i in ll:ul){
     print(ptx.i)
     system('sleep 0.25')

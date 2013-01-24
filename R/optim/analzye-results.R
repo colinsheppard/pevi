@@ -1,6 +1,6 @@
 library(colinmisc)
 Sys.setenv(NOAWT=1)
-load.libraries(c('yaml','stringr','RNetLogo','maptools','reshape'))
+load.libraries(c('yaml','stringr','RNetLogo','maptools','reshape','colorRamps'))
 
 base.path <- '/Users/sheppardc/Dropbox/serc/pev-colin/'
 base.path <- '/Users/critter/Dropbox/serc/pev-colin/'
@@ -51,6 +51,8 @@ for(pev.penetration in c(0.005,0.01,0.02,0.04)){
   agg.taz@data$L2 <- roundC(tot.by.taz$L2[match(agg.taz$id,tot.by.taz$taz)],1)
   agg.taz@data$L3 <- roundC(tot.by.taz$L3[match(agg.taz$id,tot.by.taz$taz)],1)
   agg.taz@data$charger.score <- tot.by.taz$charger.score[match(agg.taz$id,tot.by.taz$taz)]
+  agg.taz@data$weighted.demand <- roundC(agg.taz@data$weighted.demand,0)
+  agg.taz@data$frac.homes <- roundC(agg.taz@data$frac.homes,3)
   c.map <- paste(map.color(agg.taz@data$charger.score,blue2red(50)),'7F',sep='')
   shp.to.kml(agg.taz,paste(path.to.google,'optim/',optim.code,'-pen',100*pev.penetration,'.kml',sep=''),paste('Pen ',100*pev.penetration,'% Optimization: ',optim.code,sep=''),'Color denotes total chargers in each TAZ with L3 counting for 2 chargers (click to get actual # chargers).','red',1.5,c.map,id.col='ID',name.col='name',description.cols=c('id','name','L2','L3','weighted.demand','frac.homes'))
 }

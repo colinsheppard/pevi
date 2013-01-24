@@ -243,6 +243,32 @@ for(pev.penetration in pev.pens){
 }
 save(schedule.reps,file=paste(path.to.outputs,'schedule-replicates-20121222.Rdata',sep=''))
 
+# fix the bug that causes drivers to have impossible itineraries
+num.replicates <- 20
+for(pev.penetration in pev.pens){
+  pev.pen.char <- roundC(pev.penetration,3)
+  for(replicate in 1:num.replicates){
+    print(paste('Penetration ',pev.penetration,' replicate ',replicate,sep=''))
+    sched <- read.table(file=paste(path.to.shared.inputs,"driver-input-file/driver-schedule-pen",pev.penetration*100,"-rep",replicate,"-20121222.txt",sep=''),sep='\t',header=T)
+    sched$ft <- paste(sched$from,sched$to)
+    dist$ft <- paste(dist$from,dist$to)
+    sched <- join(sched,dist,by="ft")
+    sched$arrive <- sched$depart + sched$time
+    sched <- ddply(sched,.(X.driver),function(df){ 
+      if(nrow(df)>1 & any(df$depart[2:nrow(df)] < df$arrive[1:(nrow(df)-1)])){
+        while(any(df$depart[2:nrow(df)] < df$arrive[1:(nrow(df)-1)])){
+          i <- which(df$depart[2:nrow(df)] < df$arrive[1:(nrow(df)-1)])[1]
+          df$depart[(i+1):nrow(df)] <- df$depart[(i+1):nrow(df)]+1
+        }
+      }
+      df
+    })
+    sched <- sched[,c('X.driver','from','to','depart','home')]
+    names(sched) <- c(';driver','from','to','depart','home')
+    write.table(sched,paste(path.to.shared.inputs,"driver-input-file/driver-schedule-pen",pev.penetration*100,"-rep",replicate,"-20121222.txt",sep=''),sep="\t",row.names=F,quote=F)
+  }
+}
+
 # summarize the results
 load(file=paste(path.to.outputs,'schedule-replicates-20121222.Rdata',sep=''))
 n.scheds <- num.replicates * length(pev.pens)

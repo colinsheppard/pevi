@@ -162,7 +162,7 @@ to setup-and-fix-seed
     clear-all-and-initialize
     let seed new-seed
     print seed
-    random-seed 1832570836 ;seed
+    random-seed seed
     if parameter-file = 0 [ set parameter-file "params.txt" ]
     if model-directory = 0 [ set model-directory "./" ]
     read-parameter-file
@@ -498,8 +498,11 @@ to charge-time-event-scheduler
      itinerary-event-scheduler
      stop
   ]
-  
-  set trip-charge-time-need max sentence 0 ((trip-distance * charge-safety-factor * electric-fuel-consumption - state-of-charge * battery-capacity) / charge-rate-of current-charger)
+  ifelse is-bev?[
+    set trip-charge-time-need max sentence 0 ((trip-distance * charge-safety-factor * electric-fuel-consumption - state-of-charge * battery-capacity) / charge-rate-of current-charger)
+  ][
+    set trip-charge-time-need 0
+  ]
   set journey-charge-time-need max sentence 0 ((journey-distance * charge-safety-factor * electric-fuel-consumption - state-of-charge * battery-capacity) / charge-rate-of current-charger)
   let after-end-charge "retry-seek"
   ifelse level-of current-charger = 3 [
@@ -514,7 +517,7 @@ to charge-time-event-scheduler
                                                     charger-in-origin-or-destination 
                                                     [this-charger-type] of current-charger)
   let next-event-scheduled-at 0 
-  ifelse (time-until-end-charge > 0) and (time-until-end-charge < full-charge-time-need) and 
+  ifelse (not charging-on-a-whim?) and (time-until-end-charge > 0) and (time-until-end-charge < full-charge-time-need) and   
          (time-until-depart > willing-to-roam-time-threshold) and (level-of current-charger < 3) and 
          (time-until-end-charge > time-until-depart or time-until-end-charge < journey-charge-time-need) [                                                                                                    
     set next-event-scheduled-at ticks + min (sentence (random-exponential wait-time-mean) (time-until-depart - willing-to-roam-time-threshold))
@@ -1065,7 +1068,7 @@ go-until-time
 go-until-time
 0
 100
-27
+32
 0.5
 1
 NIL
@@ -1095,7 +1098,7 @@ SWITCH
 176
 log-wait-time
 log-wait-time
-1
+0
 1
 -1000
 
@@ -1117,7 +1120,7 @@ SWITCH
 268
 log-charge-time
 log-charge-time
-1
+0
 1
 -1000
 
@@ -1150,7 +1153,7 @@ SWITCH
 359
 log-seek-charger
 log-seek-charger
-0
+1
 1
 -1000
 
@@ -1250,7 +1253,7 @@ SWITCH
 92
 log-pain
 log-pain
-1
+0
 1
 -1000
 
@@ -1298,7 +1301,7 @@ SWITCH
 180
 log-summary
 log-summary
-0
+1
 1
 -1000
 

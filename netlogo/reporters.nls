@@ -9,3 +9,7 @@ end
 to-report num-stranded
   report count drivers with [state = "stranded"]
 end
+
+to-report num-stranded-by-delay
+  report count drivers with [(max itin-delay-amount) > 3] 
+end

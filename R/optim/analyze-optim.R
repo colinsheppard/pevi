@@ -7,9 +7,13 @@ base.path <- '/Users/sheppardc/Dropbox/serc/pev-colin/'
 path.to.pevi <- paste(base.path,'pevi/',sep='')
 path.to.inputs <- paste(base.path,'pev-shared/data/inputs/optim/',sep='')
 path.to.outputs <- paste(base.path,'pev-shared/data/outputs/optim/',sep='')
-path.to.google <- '~/Dropbox/serc/pev-colin/data/google-earth/'
+path.to.google <- paste(base.path,'pev-shared/data/google-earth/',sep='')
 nl.path <- "/Applications/NetLogo\ 5.0.3"
 model.path <- paste(path.to.pevi,"netlogo/PEVI-nolog.nlogo",sep='')
+
+#optim.code <- 'min-cost-constrained-by-frac-delayed'
+optim.code <- 'min-cost-constrained-by-frac-stranded'
+#optim.code <- 'min-cost-constrained-by-num-stranded'
 
 source(paste(path.to.pevi,'R/gis-functions.R',sep=''))
 source(paste(path.to.pevi,"R/optim/optim-functions.R",sep='')) # note this will in turn call optim-config, objectives, and constraints
@@ -19,25 +23,14 @@ source(paste(path.to.pevi,"R/optim/constraints.R",sep=''))
 source(paste(path.to.pevi,"R/reporters-loggers.R",sep=''))
 
 # load aggregated tazs
-agg.taz <- readShapePoly(paste(path.to.pevi,'inputs/development/aggregated-taz-with-weights',sep=''))
-load(paste(path.to.pevi,'inputs/development/aggregated-taz-with-weights-fieldnames.Rdata',sep=''))
+agg.taz <- readShapePoly(paste(path.to.google,'aggregated-taz-with-weights',sep=''))
+load(paste(path.to.google,'aggregated-taz-with-weights-fieldnames.Rdata',sep=''))
 names(agg.taz@data) <- c('row',taz.shp.fieldnames)
 agg.taz@data$ID <- unlist(lapply(agg.taz@polygons,function(x){slot(x,'ID')}))
-
-#optim.code <- 'min-cost-constrained-by-frac-delayed'
-optim.code <- 'min-cost-constrained-by-frac-stranded'
-#optim.code <- 'min-cost-constrained-by-num-stranded'
 
 for(pev.penetration in c(0.005,0.01,0.02,0.04)){
   #pev.penetration <- 0.01
   load(paste(path.to.outputs,optim.code,"/0saved-state-pen",pev.penetration*100,".Rdata",sep=''))
-  base.path <- '/Users/critter/Dropbox/serc/pev-colin/'
-  path.to.pevi <- paste(base.path,'pevi/',sep='')
-  path.to.inputs <- paste(base.path,'pev-shared/data/inputs/optim/',sep='')
-  path.to.outputs <- paste(base.path,'pev-shared/data/outputs/optim/',sep='')
-  path.to.google <- '~/Dropbox/serc/pev-colin/data/google-earth/'
-  nl.path <- "/Applications/NetLogo\ 5.0.3"
-  model.path <- paste(path.to.pevi,"netlogo/PEVI-nolog.nlogo",sep='')
 
   final.gen <- gen.num - 1
   ptx.m <- melt(data.frame(ptx=1:(nrow(all.ptx[,,1])),all.ptx[,1:(ncol(all.ptx[,,1])-1),final.gen]),id.vars=c("ptx"))

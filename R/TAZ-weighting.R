@@ -11,22 +11,23 @@ load.libraries(c('maptools','plotrix','stats','gpclib','plyr','png','RgoogleMaps
 gpclibPermit()
 registerDoMC(7)
 
-path.to.geatm  <- '~/Dropbox/serc/pev-colin/data/GEATM-2020/'
-path.to.google <- '~/Dropbox/serc/pev-colin/data/google-earth/'
+base.path <- '/Users/critter/Dropbox/serc/pev-colin/'
+path.to.geatm <- paste(base.path,'pev-shared/data/GEATM-2020/',sep='')
+path.to.google <- paste(base.path,'pev-shared/data/google-earth/',sep='')
+path.to.parcel <- paste(base.path,'pev-shared/data/HUM-PARCELS/',sep='')
 path.to.humveh <- '~/Dropbox/serc/pev-colin/data/Vehicle-Registration/'
 path.to.plots  <- '~/Dropbox/serc/pev-colin/plots/'
 path.to.pevi   <- '~/Dropbox/serc/pev-colin/pevi/'
-path.to.parcel <- '~/Dropbox/serc/pev-colin/data/HUM-PARCELS/'
 
 source(paste(path.to.pevi,'R/gis-functions.R',sep=''))
 
 # load disaggregated tazs and travel demand data
-taz <- readShapePoly(paste(path.to.geatm,'Shape_Files/taz-LATLON.shp',sep=''))
-if(names(taz@data)[1]!="id")names(taz@data) <- c('id',names(taz@data)[2:ncol(taz@data)]) # make first column of shape data 'id' instead of 'ID'
+#taz <- readShapePoly(paste(path.to.geatm,'Shape_Files/taz-LATLON.shp',sep=''))
+#if(names(taz@data)[1]!="id")names(taz@data) <- c('id',names(taz@data)[2:ncol(taz@data)]) # make first column of shape data 'id' instead of 'ID'
 
 # load aggregated tazs
-agg.taz <- readShapePoly(paste(path.to.pevi,'inputs/development/aggregated-taz',sep=''))
-load(paste(path.to.pevi,'inputs/development/aggregated-taz-fieldnames.Rdata',sep=''))
+agg.taz <- readShapePoly(paste(path.to.google,'aggregated-taz-unweighted/aggregated-taz-unweighted',sep=''))
+load(paste(path.to.google,'aggregated-taz-unweighted/aggregated-taz-unweighted-fieldnames.Rdata',sep=''))
 names(agg.taz@data) <- c('row',agg.taz.shp.fieldnames)
 agg.taz@data$ID <- unlist(lapply(agg.taz@polygons,function(x){slot(x,'ID')}))
 
@@ -57,7 +58,7 @@ hh <- read.csv(paste(path.to.geatm,'../HUM-CENSUS-TRACTS/household-size.csv',sep
 #c.map <- paste(map.color(tracts@data$population,blue2red(50)),'7F',sep='')
 #shp.to.kml(tracts,paste(path.to.google,'humboldt-census-tracts.kml',sep=''),'Population','','red',1.5,c.map,id.col='ID',name.col='name',description.cols=c('NAMELSAD10','population','NAME10'))
 
-# Join Humboldt parcel data with land use data (note: experimented with this but never actually used parcel data for anything)
+# Join Humboldt parcel data with land use data 
 if(!file.exists(paste(path.to.parcel,'apn.Rdata',sep=''))){
   land.use <- read.dbf(paste(path.to.parcel,'Hum-Land-Use.dbf',sep=''))
   apn <- readShapePoly(paste(path.to.parcel,'Hum-Parcels-LongLat.shp',sep=''))
@@ -80,9 +81,10 @@ if(!file.exists(paste(path.to.parcel,'apn.Rdata',sep=''))){
   load(file=paste(path.to.parcel,'apn.Rdata',sep=''))
 }
 
-# associate parcels with the TAZs, zips, and tracts that contain them
-apn$taz <- overlay(apn.cent,taz)
-apn$agg.taz <- overlay(apn.cent,agg.taz)
+# associate parcels with the TAZs, zips, and tracts that contain them, 
+# NOTE, that this records id's in apn that correspond to row number in the source data.frame's, not necessarily the actual agg.taz id 
+#apn$taz <- overlay(apn.cent,taz)
+apn$agg.taz.row <- overlay(apn.cent,agg.taz)
 apn$zip <- overlay(apn.cent,zips)
 apn$tract <- overlay(apn.cent,tracts)
 
@@ -121,8 +123,9 @@ ddply(res.apn,.(tract),function(df){
 })
 
 # sum the population in each taz and add to shp file
-taz.pop <- ddply(res.apn,.(agg.taz),function(df){ data.frame(pop=sum(df$pop))}) 
-agg.taz@data$population <- taz.pop$pop[order(taz.pop$agg.taz)]  # note that agg.taz is the ROW in agg.taz shp, 
+taz.pop <- ddply(res.apn,.(agg.taz.row),function(df){ data.frame(pop=sum(df$pop))}) 
+agg.taz@data$population <- taz.pop$pop[order(taz.pop$agg.taz.row)]  # note that agg.taz.row is the ROW in agg.taz shp, note the id
+agg.taz@data$frac.pop <- agg.taz@data$population/sum(agg.taz@data$population)
 
 #c.map <- paste(map.color(agg.taz@data$population,blue2red(50)),'7F',sep='')
 #shp.to.kml(agg.taz,paste(path.to.google,'population-in-tazs.kml',sep=''),'Population','Color denotes population based on parcel level analysis','red',1.5,c.map,id.col='ID',name.col='name',description.cols=c('id','name','population','total.demand.from'))
@@ -161,19 +164,19 @@ res.apn$pen.weight <- frac.est$frac.weight[match(zips$ZCTA5CE10[res.apn$zip],fra
 res.apn$pen.weight[is.na(res.apn$pen.weight)] <- 1
 
 # now aggregate the weights to the tazs using a weighted.mean to population weight the result
-taz.weights.by.penetration <- ddply(res.apn,.(agg.taz),function(df){ data.frame(pen.weight=weighted.mean(df$pen.weight,df$pop)) })
+taz.weights.by.penetration <- ddply(res.apn,.(agg.taz.row),function(df){ data.frame(pen.weight=weighted.mean(df$pen.weight,df$pop)) })
+taz.weights.by.penetration$taz.id <- agg.taz$id[taz.weights.by.penetration$agg.taz.row]
 # scale these weights evenly so that the weighted sum of od trips is equivalent before and after
 od.sums <- ddply(od.24.new,.(from),function(df){ sum(df$demand) })
-taz.weights.by.penetration$pen.weight.scaled <- taz.weights.by.penetration$pen.weight * sum(od.sums$V1) / sum(od.sums$V1 * taz.weights.by.penetration$pen.weight) 
-agg.taz$pen.weight.unscaled <- taz.weights.by.penetration$pen.weight[order(taz.weights.by.penetration$agg.taz)]
-agg.taz$pen.weight.scaled <- taz.weights.by.penetration$pen.weight.scaled[order(taz.weights.by.penetration$agg.taz)]
+taz.weights.by.penetration$pen.weight.scaled <- taz.weights.by.penetration$pen.weight * sum(od.sums$V1) / sum(od.sums$V1 * taz.weights.by.penetration$pen.weight[order(taz.weights.by.penetration$taz.id)]) 
+agg.taz$pen.weight.unscaled <- taz.weights.by.penetration$pen.weight[order(taz.weights.by.penetration$agg.taz.row)]
+agg.taz$pen.weight.scaled <- taz.weights.by.penetration$pen.weight.scaled[order(taz.weights.by.penetration$agg.taz.row)]
 
 # do the weighting
 od <- od.24.new
 od.weighted <- od
 for(taz.i in 1:nrow(taz.weights.by.penetration)){
   taz.id <- agg.taz$id[taz.i]
-  cat(taz.id)
   od.from.inds  <- which(od$from==taz.id)
   od.to.inds    <- which(od$to  ==taz.id)
   od.weighted$demand[od.from.inds] <-  od.weighted$demand[od.from.inds] * taz.weights.by.penetration$pen.weight.scaled[taz.i] 
@@ -198,15 +201,15 @@ write.csv(home.distrib,paste(path.to.geatm,'home-distribution.csv',sep=''),row.n
 # plot in g-earth the ratio 
 agg.taz@data$weighted.demand <- ddply(od.weighted,.(from),function(df){ sum(df$demand) })$V1[agg.taz$id]
 
-writePolyShape(agg.taz,paste(path.to.pevi,'inputs/development/aggregated-taz-with-weights',sep=''))
+writePolyShape(agg.taz,paste(path.to.google,'aggregated-taz-with-weights/aggregated-taz-with-weights',sep=''))
 taz.shp.fieldnames <- names(agg.taz@data)
-save(taz.shp.fieldnames,file=paste(path.to.pevi,'inputs/development/aggregated-taz-with-weights-fieldnames.Rdata',sep=''))
+save(taz.shp.fieldnames,file=paste(path.to.google,'aggregated-taz-with-weights/aggregated-taz-with-weights-fieldnames.Rdata',sep=''))
 
 c.map <- paste(map.color(agg.taz@data$pen.weight.scaled,blue2red(50)),'7F',sep='')
 shp.to.kml(agg.taz,paste(path.to.google,'penetration-weighting.kml',sep=''),'Penetration Weighting','Color denotes weighted derived from vehicle registration data.','red',1.5,c.map,id.col='ID',name.col='name',description.cols=c('id','name','total.demand.from','weighted.demand','pen.weight.scaled','pen.weight.unscaled','frac.homes'))
 
-c.map <- paste(map.color(taz@data$frac.homes,blue2red(50)),'7F',sep='')
-shp.to.kml(taz,paste(path.to.pevi,'inputs/development/frac-driver-homes.kml',sep=''),'Home Distribution','Color denotes fraction of drivers with home in each TAZ.','green',1.5,c.map,id.col='ID',name.col='name',description.cols=c('id','name','population','penetration.weights.unscaled','frac.homes'))
+#c.map <- paste(map.color(taz@data$frac.homes,blue2red(50)),'7F',sep='')
+#shp.to.kml(taz,paste(path.to.google,'frac-driver-homes.kml',sep=''),'Home Distribution','Color denotes fraction of drivers with home in each TAZ.','green',1.5,c.map,id.col='ID',name.col='name',description.cols=c('id','name','population','penetration.weights.unscaled','frac.homes'))
 
 # use overall traffic density of the weighted data to assign up to three chargers to each TAZ
 traffic.density <- ddply(od.24.weighted,.(from),function(df){ data.frame(demand=sum(df$demand)) })

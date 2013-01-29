@@ -2,17 +2,18 @@ Sys.setenv(NOAWT=1)
 library(colinmisc)
 load.libraries(c('ggplot2','yaml','RNetLogo','plyr','reshape'))
 
-base.path <- '/Users/critter/Dropbox/serc/pev-colin/'
-#base.path <- '/Users/sheppardc/Dropbox/serc/pev-colin/'
+#base.path <- '/Users/critter/Dropbox/serc/pev-colin/'
+base.path <- '/Users/sheppardc/Dropbox/serc/pev-colin/'
 #base.path <- '/Users/Raskolnikovbot3001/Dropbox/'
 
 path.to.pevi <- paste(base.path,'pevi/',sep='')
 path.to.inputs <- paste(base.path,'pev-shared/data/inputs/compare/charge-safety-factor/',sep='')
+path.to.inputs <- paste(base.path,'pev-shared/data/inputs/compare/phev-only/',sep='')
 path.to.inputs <- paste(base.path,'pev-shared/data/inputs/compare/patterns/',sep='')
 
 #to.log <- c('pain','charging','need-to-charge')
 #to.log <- c('pain','charging','tazs','trip')
-
+to.log <- c('pain','charging','trip')
 
 # load the reporters and loggers needed to summarize runs and disable logging
 source(paste(path.to.pevi,"R/reporters-loggers.R",sep=''))

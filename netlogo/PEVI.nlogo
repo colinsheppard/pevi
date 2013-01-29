@@ -79,6 +79,7 @@ drivers-own [
   itin-change-flag
   itin-delay-amount
   max-trip-distance
+  max-dwell-time
   current-itin-row          ; index of current location in the itinerary (referring to next trip or current trip if traveling)
 
 ;; CONVENIENCE VARIABLES
@@ -162,7 +163,7 @@ to setup-and-fix-seed
     clear-all-and-initialize
     let seed new-seed
     print seed
-    random-seed 1832570836 ;seed
+    random-seed seed
     if parameter-file = 0 [ set parameter-file "params.txt" ]
     if model-directory = 0 [ set model-directory "./" ]
     read-parameter-file
@@ -318,7 +319,7 @@ to seek-charger
   let #level-3-time-penalty 0
   let #level-3-time-penalty-for-origin-or-destination 0
   if trip-distance * charge-safety-factor > 0.8 * battery-capacity / electric-fuel-consumption [
-    set #level-3-time-penalty-for-origin-or-destination 2
+    set #level-3-time-penalty-for-origin-or-destination 999
   ]
   
   ifelse not charging-on-a-whim? and is-bev? and time-until-depart < willing-to-roam-time-threshold [  
@@ -394,7 +395,7 @@ to seek-charger
             ifelse #level = 3[
               set #full-charge-time-need (0.8 - #mid-state-of-charge) * battery-capacity / #this-charge-rate
               ifelse #leg-two-trip-distance * charge-safety-factor > 0.8 * battery-capacity / electric-fuel-consumption [
-                  set #level-3-time-penalty 2
+                  set #level-3-time-penalty 999
               ][
                 set #level-3-time-penalty 0
               ]
@@ -410,8 +411,8 @@ to seek-charger
                                                                         #this-charger-type                                                    
           ]
           if not #level-3-and-too-full [ 
-            let #this-cost (time-opportunity-cost * (#extra-time-for-travel + #extra-time-until-end-charge + #level-3-time-penalty) + 
-              ([energy-price] of #this-charger-type) * (item #level #trip-or-journey-energy-need-by-type + #extra-energy-for-travel))
+            let #this-cost (time-opportunity-cost * (#extra-time-for-travel + #extra-time-until-end-charge) + #level-3-time-penalty +
+              ([energy-price] of #this-charger-type) * (item #level #trip-or-journey-energy-need-by-type + #extra-energy-for-travel)) 
             
             if #this-cost < #min-cost or (#this-cost = #min-cost and [level] of #this-charger-type > [level] of #min-charger-type) [
               set #min-cost #this-cost
@@ -498,8 +499,11 @@ to charge-time-event-scheduler
      itinerary-event-scheduler
      stop
   ]
-  
-  set trip-charge-time-need max sentence 0 ((trip-distance * charge-safety-factor * electric-fuel-consumption - state-of-charge * battery-capacity) / charge-rate-of current-charger)
+  ifelse is-bev?[
+    set trip-charge-time-need max sentence 0 ((trip-distance * charge-safety-factor * electric-fuel-consumption - state-of-charge * battery-capacity) / charge-rate-of current-charger)
+  ][
+    set trip-charge-time-need 0
+  ]
   set journey-charge-time-need max sentence 0 ((journey-distance * charge-safety-factor * electric-fuel-consumption - state-of-charge * battery-capacity) / charge-rate-of current-charger)
   let after-end-charge "retry-seek"
   ifelse level-of current-charger = 3 [
@@ -514,7 +518,7 @@ to charge-time-event-scheduler
                                                     charger-in-origin-or-destination 
                                                     [this-charger-type] of current-charger)
   let next-event-scheduled-at 0 
-  ifelse (time-until-end-charge > 0) and (time-until-end-charge < full-charge-time-need) and 
+  ifelse (not charging-on-a-whim?) and (time-until-end-charge > 0) and (time-until-end-charge < full-charge-time-need) and   
          (time-until-depart > willing-to-roam-time-threshold) and (level-of current-charger < 3) and 
          (time-until-end-charge > time-until-depart or time-until-end-charge < journey-charge-time-need) [                                                                                                    
     set next-event-scheduled-at ticks + min (sentence (random-exponential wait-time-mean) (time-until-depart - willing-to-roam-time-threshold))
@@ -1065,7 +1069,7 @@ go-until-time
 go-until-time
 0
 100
-27
+32
 0.5
 1
 NIL
@@ -1095,7 +1099,7 @@ SWITCH
 176
 log-wait-time
 log-wait-time
-1
+0
 1
 -1000
 
@@ -1117,7 +1121,7 @@ SWITCH
 268
 log-charge-time
 log-charge-time
-1
+0
 1
 -1000
 
@@ -1150,7 +1154,7 @@ SWITCH
 359
 log-seek-charger
 log-seek-charger
-0
+1
 1
 -1000
 
@@ -1250,7 +1254,7 @@ SWITCH
 92
 log-pain
 log-pain
-1
+0
 1
 -1000
 
@@ -1298,7 +1302,7 @@ SWITCH
 180
 log-summary
 log-summary
-0
+1
 1
 -1000
 
@@ -1631,7 +1635,7 @@ Polygon -7500403 true true 270 75 225 30 30 225 75 270
 Polygon -7500403 true true 30 75 75 30 270 225 225 270
 
 @#$#@#$#@
-NetLogo 5.0.1
+NetLogo 5.0
 @#$#@#$#@
 @#$#@#$#@
 @#$#@#$#@

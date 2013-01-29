@@ -112,6 +112,7 @@ if(make.plots){
   opts(title = "2009 NHTS - Rural US Subset") +
   geom_histogram()+
   facet_wrap(~TOURTYPE)
+
 }
 
 # based on comparing the various subsets, use US rural as the basis for the HEVI model, exclude non POV travel and long distance travel (>300 miles)
@@ -158,6 +159,9 @@ if(!file.exists(paste(path.to.nhts,'data-preprocessed-for-scheduling.Rdata',sep=
   #opts(title = "2009 NHTS - Rural US POV") +
   #geom_histogram(binwidth=1)+
   #facet_wrap(~TOURTYPE)
+
+  # What is difference between max dwell time and total dwell time per journey, compare to total miles
+  dwell.to.len <- ddply(rur.tours,.(journey.id),function(df){ data.frame(max.dwell=max(df$TOT_DWEL4,na.rm=T),tot.dwell=sum(df$TOT_DWEL4,na.rm=T),tot.miles=sum(df$TOT_MILS)) },.parallel=T)
 
   # what is the distribution of the type of the final tour of each journey, answer 92.2% are to home
   #end.tourtype <- ddply(rur.tours,.(journey.id),function(df){ as.character(df$TOURTYPE[nrow(df)]) }) 
@@ -242,6 +246,32 @@ for(pev.penetration in pev.pens){
   }
 }
 save(schedule.reps,file=paste(path.to.outputs,'schedule-replicates-20121222.Rdata',sep=''))
+
+# fix the bug that causes drivers to have impossible itineraries
+num.replicates <- 20
+for(pev.penetration in pev.pens){
+  pev.pen.char <- roundC(pev.penetration,3)
+  for(replicate in 1:num.replicates){
+    print(paste('Penetration ',pev.penetration,' replicate ',replicate,sep=''))
+    sched <- read.table(file=paste(path.to.shared.inputs,"driver-input-file/driver-schedule-pen",pev.penetration*100,"-rep",replicate,"-20121222.txt",sep=''),sep='\t',header=T)
+    sched$ft <- paste(sched$from,sched$to)
+    dist$ft <- paste(dist$from,dist$to)
+    sched <- join(sched,dist,by="ft")
+    sched$arrive <- sched$depart + sched$time
+    sched <- ddply(sched,.(X.driver),function(df){ 
+      if(nrow(df)>1 & any(df$depart[2:nrow(df)] < df$arrive[1:(nrow(df)-1)])){
+        while(any(df$depart[2:nrow(df)] < df$arrive[1:(nrow(df)-1)])){
+          i <- which(df$depart[2:nrow(df)] < df$arrive[1:(nrow(df)-1)])[1]
+          df$depart[(i+1):nrow(df)] <- df$depart[(i+1):nrow(df)]+1
+        }
+      }
+      df
+    })
+    sched <- sched[,c('X.driver','from','to','depart','home')]
+    names(sched) <- c(';driver','from','to','depart','home')
+    write.table(sched,paste(path.to.shared.inputs,"driver-input-file/driver-schedule-pen",pev.penetration*100,"-rep",replicate,"-20121222.txt",sep=''),sep="\t",row.names=F,quote=F)
+  }
+}
 
 # summarize the results
 load(file=paste(path.to.outputs,'schedule-replicates-20121222.Rdata',sep=''))

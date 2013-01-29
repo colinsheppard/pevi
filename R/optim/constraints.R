@@ -23,10 +23,10 @@ frac.drivers.delayed.below.thresh <- function(results){
 ###################################################################################################
 # frac.stranded.below.thresh
 #
-# the fraction of drivers stranded cannot exceed the threshold give by max.frac.stranded
+# the fraction of drivers stranded by delay cannot exceed the threshold give by max.frac.stranded
 ###################################################################################################
 frac.stranded.below.thresh <- function(results){
-  return(all.or.nothing(mean(results$num.stranded/results$num.drivers,na.rm=T) < constraint.params$max.frac.stranded))
+  return(all.or.nothing(mean(results$frac.stranded.by.delay,na.rm=T) < constraint.params$max.frac.stranded))
 }
 
 ###################################################################################################

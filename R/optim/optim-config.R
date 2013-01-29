@@ -4,8 +4,8 @@
 # Optimization used for exploring everything all together.
 ###################################################################################################
 
-optim.code <- 'min-cost-constrained-by-frac-delayed'
-#optim.code <- 'min-cost-constrained-by-num-stranded'
+#optim.code <- 'min-cost-constrained-by-frac-delayed'
+optim.code <- 'min-cost-constrained-by-frac-stranded'
 
 ###################################################################################################
 # decision.vars       data.frame containing the names and bounds of the variables to alter in the 
@@ -35,13 +35,13 @@ objective.name <- 'infrastructure.cost'
 # contains any parameters needed by constraints specified in constraint.names
 ###################################################################################################
 constraint.names <- c(
-  'frac.drivers.delayed.below.thresh'
+  #'frac.drivers.delayed.below.thresh'
   #'num.stranded.below.thresh'
-  #'frac.stranded.below.thresh'
+  'frac.stranded.below.thresh'
 )
 constraint.params <- list()
-constraint.params[['max.frac.drivers.delayed']] <- 0.01
-constraint.params[['max.frac.stranded']] <- 0.003
+constraint.params[['max.frac.drivers.delayed']] <- 0.03
+constraint.params[['max.frac.stranded']] <- 0.01
 constraint.params[['max.num.stranded']] <- 1
 
 ###################################################################################################
@@ -50,11 +50,11 @@ constraint.params[['max.num.stranded']] <- 1
 ###################################################################################################
 de.params <- list()
 de.params[['np']] <- 48           # number of particles
-de.params[['f']] <- 0.8          # 0-2, scales the difference vector, higher means faster rate of
+de.params[['f']] <- 1.0          # 0-2, scales the difference vector, higher means faster rate of
                                   # convergence, lower means more robust
 de.params[['cr']] <- 0.96         # 0-1, cross-over, indicates probability of using any 'gene' (or value for a 
                                   # decision variable) of the candidate particle rather than the previous particle
-de.params[['max.iter']] <- 200   # max iterations
+de.params[['max.iter']] <- 900   # max iterations
 
 ###################################################################################################
 # stop.criteria       will act on an array representing the fitness of all the particles, it returns 

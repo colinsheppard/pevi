@@ -1,13 +1,9 @@
 
-#source(paste(path.to.pevi,"R/optim/optim-config.R",sep=''))
-#source(paste(path.to.pevi,"R/optim/objectives.R",sep=''))
-#source(paste(path.to.pevi,"R/optim/constraints.R",sep=''))
-
-evaluate.fitness <- function(ptx){
+evaluate.fitness <- function(build.result){
   if(!exists('cl')){
     stop('no cluster started')
   }
-  numrows <- nrow(ptx)
+  numrows <- nrow(build.result)-1
   breaks <- seq(1,numrows,by=ceiling(numrows/length(cl)))
   break.pairs <- list()
   for(i in 1:(length(breaks)-1)){
@@ -16,58 +12,37 @@ evaluate.fitness <- function(ptx){
   break.pairs[[i+1]] <- c(breaks[i+1],numrows)
 
   clusterEvalQ(cl,rm(list=ls()))
-  clusterExport(cl,c( 'run.pevi.batch','pev.penetration','path.to.inputs','path.to.outputs','optim.code','nl.path','model.path',
-                      'write.charger.file','reporters','logfiles','results','path.to.pevi','vary.tab','streval','try.nl','debug.reporters',
-                      objective.name,'constraint.names','constraint.params','objective.name','objective','all.or.nothing',constraint.names))
+  clusterExport(cl,c( 'run.buildout.batch','pev.penetration','path.to.inputs','optim.code','nl.path','model.path','path.to.outputs',
+                      'write.charger.file','reporters','logfiles','results','path.to.pevi','vary.tab','streval','try.nl','debug.reporters'))
   if(exists('batch.results'))rm('batch.results')
-  batch.results<-clusterApply(cl,break.pairs,fun='run.pevi.batch',ptx=ptx)
-  batch.results<-unlist(batch.results)
+  batch.results<-clusterApply(cl,break.pairs,fun='run.buildout.batch',build.result=build.result)
+  batch.results<-data.frame(matrix(unlist(batch.results),numrows,2,byrow=T))
+  build.result[1:numrows,c('cost','pain')] <- batch.results
 
-  return(batch.results)
+  return(build.result)
 }
 
-stop.criteria <- function(fit,gen.num){
-  if(all(fit==Inf))return(F)
-  # true if all deviations of fitnesses from the min are less than threshold OR if we've hit max iterations
-  return(all((fit-min(fit))/abs(min(fit))<stop.params$diff.from.best.threshold) | gen.num>=de.params$max.iter)
-}
-
-# combine the objective and constrainst into the "objective" function called within the model
-if(exists('objective'))rm('objective')
-objective <- function(results){
-  #cat(paste('frac delayed in obj: ',paste(results$frac.drivers.delayed,collapse=','),sep=''),file=paste(path.to.outputs,optim.code,"/logfile.txt",sep=''),append=T,fill=T,labels=break.pair.code) 
-  constr <- 0
-  for(constraint.name in constraint.names){
-    constr <- constr + streval(paste(constraint.name,"(results)",sep=''))
-  }
-  return( streval(paste(objective.name,"(results)",sep='')) + constr )
-}
-
-run.pevi.batch <- function(break.pair,ptx){
+run.buildout.batch <- function(break.pair,build.result){
   ll<-break.pair[1]
   ul<-break.pair[2]
   break.pair.code <- paste("node ",paste(break.pair,collapse=","),":",sep='')
   batch.results <- array(NA,length(ll:ul))
   i <- 1
-  #cat(paste('starting'),file=paste(path.to.outputs,optim.code,"/logfile.txt",sep=''),append=T,fill=T,labels=break.pair.code) 
 
   tryCatch(NLStart(nl.path, gui=F),error=function(err){ NA })
-  #.jinit(parameters=c("-Xmx2048m","-Xms512m"),force.init = T)
   NLLoadModel(model.path)
   for(cmd in paste('set log-',logfiles,' false',sep='')){ NLCommand(cmd) }
 
-  results.orig <- results
-  for(ptx.i in ll:ul){
-    print(ptx.i)
-    #system('sleep 0.25')
+  batch.results <- list()
+  batch.results.i <- 1
+  for(alt.i in ll:ul){
+    chargers.alt <- build.result$chargers[1:104]
+    chargers.alt[alt.i] <- chargers.alt[alt.i] + 1
+    write.charger.file(chargers.alt,alt.i)
 
-    write.charger.file(ptx[ptx.i,],ptx.i)
-    results <- results.orig
     for(results.i in 1:nrow(results)){
-      print(paste("-",results.i))
-      #system('sleep 0.25')
       try.nl('clear-all-and-initialize',break.pair.code)
-      try.nl(paste('set parameter-file "',path.to.inputs,'params.txt"',sep=''),break.pair.code)
+      try.nl(paste('set parameter-file "',path.to.inputs,'../params.txt"',sep=''),break.pair.code)
       try.nl(paste('set model-directory "',path.to.pevi,'netlogo/"',sep=''),break.pair.code)
       try.nl('read-parameter-file',break.pair.code)
       for(param in names(vary.tab)){
@@ -77,40 +52,30 @@ run.pevi.batch <- function(break.pair,ptx){
           try.nl(paste('set ',param,' ',vary.tab[results.i,param],'',sep=''),break.pair.code)
         }
       }
-      try.nl(paste('set charger-input-file "',path.to.inputs,optim.code,'/chargers-ptx',ptx.i,'.txt"',sep=''),break.pair.code)
-      print("before setup")
-      #system('sleep 0.25')
+      try.nl(paste('set charger-input-file "',path.to.inputs,'chargers-alt-',alt.i,'.txt"',sep=''),break.pair.code)
       try.nl('setup',break.pair.code)
-      print("before go-until")
-      #system('sleep 0.25')
       try.nl('dynamic-scheduler:go-until schedule 500',break.pair.code)
       results[results.i,names(reporters)] <- tryCatch(NLDoReport(1,"",reporter = paste("(sentence",paste(reporters,collapse=' '),")"),as.data.frame=T,df.col.names=names(reporters)),error=function(e){ NA })
-      #cat(paste('cost: ',paste(results$infrastructure.cost[results.i],collapse=","),sep=''),file=paste(path.to.outputs,optim.code,"/logfile.txt",sep=''),append=T,fill=T,labels=break.pair.code) 
-      #cat(paste('frac delayed: ',paste(results$frac.drivers.delayed,collapse=','),sep=''),file=paste(path.to.outputs,optim.code,"/logfile.txt",sep=''),append=T,fill=T,labels=break.pair.code) 
     }
-    for(res in names(reporters)){
-      results[,res] <- as.numeric(results[,res])
-    }
-    batch.results[i] <- objective(results)
-    i <- i+1
+    batch.results[[batch.results.i]] <- data.frame(cost=mean(as.numeric(results$infrastructure.cost)),pain=mean(as.numeric(results$frac.stranded.by.delay)))
+    batch.results.i <- batch.results.i + 1
   }
-  #cat(paste('batch results: ',paste(batch.results,collpase=","),sep=''),file=paste(path.to.outputs,optim.code,"/logfile.txt",sep=''),append=T,fill=T,labels=break.pair.code) 
   return(batch.results)
 }
 
 try.nl <- function(cmd,break.pair.code=""){
   err <- tryCatch(NLCommand(cmd),error=function(err){ paste("NLCommand('",cmd,"')",sep='') })
   if(!is.null(err)){
-    cat(paste('error: ',err,sep=''),file=paste(path.to.outputs,optim.code,"/logfile.txt",sep=''),append=T,fill=T,labels=break.pair.code)
-    cat(paste('error reporters: ',paste(names(debug.reporters),tryCatch(NLDoReport(1,"",reporter = paste("(sentence",paste(debug.reporters,collapse=' '),")"),as.data.frame=T,df.col.names=names(debug.reporters)),error=function(e){ NA }),collapse=","),sep=''),file=paste(path.to.outputs,optim.code,"/logfile.txt",sep=''),append=T,fill=T,labels=break.pair.code)
+    cat(paste('error: ',err,sep=''),file=paste(path.to.outputs,"/logfile.txt",sep=''),append=T,fill=T,labels=break.pair.code)
+    cat(paste('error reporters: ',paste(names(debug.reporters),tryCatch(NLDoReport(1,"",reporter = paste("(sentence",paste(debug.reporters,collapse=' '),")"),as.data.frame=T,df.col.names=names(debug.reporters)),error=function(e){ NA }),collapse=","),sep=''),file=paste(path.to.outputs,"/logfile.txt",sep=''),append=T,fill=T,labels=break.pair.code)
   }
   return(err)
 }
 
-write.charger.file <- function(num.chargers,ptx.i){
+write.charger.file <- function(num.chargers,alt.i=0){
   chargers <- data.frame(TAZ=1:52,L0=rep(1,52),L1=num.chargers[1:52],L2=num.chargers[1:52],L3=num.chargers[53:104])
   names(chargers) <- c(";TAZ","L0","L1","L2","L3")
-  write.table(chargers,file=paste(path.to.inputs,optim.code,'/chargers-ptx',ptx.i,'.txt',sep=''),sep="\t",row.names=F,quote=F)
+  write.table(chargers,file=paste(path.to.inputs,'chargers-alt-',alt.i,'.txt',sep=''),sep="\t",row.names=F,quote=F)
 }
 
 ### plot.ptx(ptx,dimensions=1:2)

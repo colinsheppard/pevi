@@ -13,6 +13,8 @@ reporters <- data.frame(num.drivers="(count drivers)",
   miles.driven="(sum [ miles-driven ] of drivers)",
   num.denials="(sum [ num-denials ] of drivers)",
   num.stranded='(num-stranded)',
+  num.stranded.by.delay='(num-stranded-by-delay)',
+  frac.stranded.by.delay='(num-stranded-by-delay / count drivers)',
   mean.duty.factor="(mean-duty-factor)",
   frac.denied="(count drivers with [num-denials > 0] / count drivers)",stringsAsFactors=F)
 

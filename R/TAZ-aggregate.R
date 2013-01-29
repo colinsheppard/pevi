@@ -9,8 +9,9 @@ library(colinmisc)
 load.libraries(c('maptools','plotrix','stats','gpclib','plyr','png','RgoogleMaps','lattice','stringr','ggplot2','rgdal','XML','plotKML'))
 gpclibPermit()
 
-path.to.geatm  <- '~/Dropbox/serc/pev-colin/data/GEATM-2020/'
-path.to.google <- '~/Dropbox/serc/pev-colin/data/google-earth/'
+base.path <- '/Users/critter/Dropbox/serc/pev-colin/'
+path.to.geatm <- paste(base.path,'pev-shared/data/GEATM-2020/',sep='')
+path.to.google <- paste(base.path,'pev-shared/data/google-earth/',sep='')
 path.to.humveh <- '~/Dropbox/serc/pev-colin/data/Vehicle-Registration/'
 path.to.plots  <- '~/Dropbox/serc/pev-colin/plots/'
 path.to.pevi   <- '~/Dropbox/serc/pev-colin/pevi/'
@@ -40,7 +41,7 @@ taz@data$total.demand.per.acre <- taz@data$total.demand / taz@data$ACRES
 #spplot(taz,'total.demand.per.acre')
 
 # Load the aggregation polygons
-agg.polys <- readShapePoly(paste(path.to.google,'ProposedAggregation.shp',sep=''))
+agg.polys <- readShapePoly(paste(path.to.google,'proposed-aggregations/ProposedAggregations.shp',sep=''))
 taz.centroids <-SpatialPointsDataFrame(coordinates(taz),data=data.frame(longitude= coordinates(taz)[,1],latitude= coordinates(taz)[,2]))
 agg.mapping <- data.frame(name=over(taz.centroids,agg.polys)$Name)
 agg.mapping$agg.id <- as.numeric(agg.mapping$name)
@@ -49,7 +50,7 @@ aggregate.data <- function(df){
  return( colSums(df[,c('AREA','ACRES','SHAPE_AREA')]) ) 
 }
 taz@data$agg.id <- agg.mapping$agg.id
-agg.taz.data <- ddply(taz@data,.(agg.id),aggregate.data)
+agg.taz.data <- ddply(taz@data[!is.na(taz@data$agg.id),],.(agg.id),aggregate.data)
 agg.taz.shp <- SpatialPolygonsDataFrame(agg.taz.shp,agg.taz.data)
 
 # add new zone numbers corresponding to old zone numbers to the dataframe
@@ -123,19 +124,19 @@ agg.taz.shp@data$name <- agg.names[agg.taz.shp@data$id]
 #spplot(agg.taz.shp,names(agg.taz.shp@data)[grep('of.total',names(agg.taz.shp@data))], names.attr= agg.taz.shp$name,colorkey=list(space="bottom"))
 
 # write the data to a shapefile, note we need to write the names of the fields separately b/c they get truncated due to ESRI format limitations
-writePolyShape(agg.taz.shp,paste(path.to.pevi,'inputs/development/aggregated-taz',sep=''))
+writePolyShape(agg.taz.shp,paste(path.to.google,'aggregated-taz-unweighted/aggregated-taz-unweighted',sep=''))
 agg.taz.shp.fieldnames <- names(agg.taz.shp@data)
-save(agg.taz.shp.fieldnames,file=paste(path.to.pevi,'inputs/development/aggregated-taz-fieldnames.Rdata',sep=''))
+save(agg.taz.shp.fieldnames,file=paste(path.to.google,'aggregated-taz-unweighted/aggregated-taz-unweighted-fieldnames.Rdata',sep=''))
 
 
 # EXTRA PLOTTING IN G-EARTH
 
 # write the data to KML file with colors related to traffic demand
 c.map <- paste(map.color(agg.taz.shp@data$total.demand.from,blue2red(50)),'7F',sep='')
-shp.to.kml(agg.taz.shp,paste(path.to.pevi,'inputs/development/aggregated-taz.kml',sep=''),'Aggregated TAZs','Color denotes total daily demand','red',1.5,c.map,name.col='name',description.cols=names(agg.taz.shp@data))
+shp.to.kml(agg.taz.shp,paste(path.to.google,'aggregated-taz-unweighted/aggregated-taz-unweighted.kml',sep=''),'Aggregated TAZs','Color denotes total daily unweighted demand','red',1.5,c.map,name.col='name',description.cols=names(agg.taz.shp@data))
 
 c.map <- paste(map.color(taz@data$total.demand,blue2red(50)),'7F',sep='')
- shp.to.kml(taz,paste(path.to.pevi,'inputs/development/disaggregated-taz.kml',sep=''),'Disaggregated TAZs','Color denotes total daily demand','white',1.5,c.map,name.col='NEWTAZ',description.cols=c('total.demand','NEWTAZ','ACRES'),id.col='ID')
+ shp.to.kml(taz,paste(path.to.google,'disaggregated-taz.kml',sep=''),'Disaggregated TAZs','Color denotes total daily demand','white',1.5,c.map,name.col='NEWTAZ',description.cols=c('total.demand','NEWTAZ','ACRES'),id.col='ID')
 
 for.c.map <- log(taz@data$total.demand.per.acre[-which(taz@data$total.demand.per.acre==Inf)])
 for.c.map[for.c.map<=0] <- 0 

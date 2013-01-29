@@ -99,6 +99,10 @@ for(pev.penetration in c(0.005,0.01,0.02,0.04)){
     cand <- all.ptx[,,gen.num]
     cand[,'fitness'] <- NA # just to avoid confusion between the update of the particles and before eval of fitness
 
+    # which dimensions are stuck on a single value
+    stuck.dimensions <- c(apply(all.ptx[,1:n,gen.num],2,sum)>0 & apply(all.ptx[,1:n,gen.num],2,sd)<0.4,F)
+    stuck.dimensions.rare <- c(apply(all.ptx[,1:n,gen.num],2,sum)==0,F)
+
     for(i in 1:np){
       # for each ptx, select 3 other mutually exclusive particles
       mutation.ptx <- sample((1:np)[-i],3)
@@ -107,12 +111,16 @@ for(pev.penetration in c(0.005,0.01,0.02,0.04)){
       #   - chose 1 dimension randomly to change
       #   - for the rest of the dimensions, test if a random draw between 0,1 is less than CR ('cross-over' parameter), 
       #     if it is, change this dimension 
-      cr.dimensions <- 1:n==sample(1:n,1) | runif(n)<de.params$cr
+      cr.dimensions <- c(1:n==sample(1:n,1) | runif(n)<de.params$cr,F)
 
       # for the chosen dimensions, create a candidate ptx using vector addition A + F(B-C) where F is the DE parameter and A,B,C
       # are the mutation particles selection above
       cand[i,cr.dimensions] <- all.ptx[mutation.ptx[1],cr.dimensions,gen.num] + 
                                 de.params$f * (all.ptx[mutation.ptx[2],cr.dimensions,gen.num] - all.ptx[mutation.ptx[3],cr.dimensions,gen.num])
+
+      # add some white noise to dimensions with 0 variation amongst the particles 
+      cand[i,cr.dimensions & stuck.dimensions] <- cand[i,cr.dimensions & stuck.dimensions] + rnorm(sum(cr.dimensions & stuck.dimensions),0,0.5)
+      cand[i,cr.dimensions & stuck.dimensions.rare] <- cand[i,cr.dimensions & stuck.dimensions.rare] + rnorm(sum(cr.dimensions & stuck.dimensions.rare),0,0.16667)
     }
     # keep the candidate particles inside the search space
     for(j in 1:n){
@@ -169,3 +177,10 @@ for(pev.penetration in c(0.005,0.01,0.02,0.04)){
 }
 
 
+
+# add noise to a previous set of ptx
+all.ptx[,1:n,gen.num] <- all.ptx[,1:n,gen.num] + round(runif(np*n,-3,3))
+for(j in 1:n){
+  all.ptx[all.ptx[,j,gen.num]<decision.vars$lbound[j],j,gen.num] <- decision.vars$lbound[j]
+  all.ptx[all.ptx[,j,gen.num]>decision.vars$ubound[j],j,gen.num] <- decision.vars$ubound[j]
+}

@@ -148,7 +148,13 @@ to setup-drivers
   while [count #bev-types > 0][
     ask max-one-of #bev-types [ battery-capacity / electric-fuel-consumption ][     
       ; find the drivers that can't make their longest trip using the current bev type
-      let #impossible-drivers drivers with [this-vehicle-type = nobody and max-trip-distance * charge-safety-factor > [battery-capacity] of myself / [electric-fuel-consumption] of myself]
+      let #impossible-drivers drivers with [
+        this-vehicle-type = nobody and 
+        (
+          max-trip-distance * charge-safety-factor > [battery-capacity] of myself / [electric-fuel-consumption] of myself or
+          journey-distance * charge-safety-factor > (min(sentence (max-dwell-time * 6.6 / charge-safety-factor) [battery-capacity] of myself) + [battery-capacity] of myself) / [electric-fuel-consumption] of myself
+        )
+      ]
       ;show (word (count #impossible-drivers) " needing more range")
       
       ; find the other vehicle types that can be assigned to this driver (must check whether their num-drivers is over quota yet)
@@ -177,7 +183,7 @@ to setup-drivers
   
   ; second assign the remaining vehicle types to drivers according to the remainder
   let #unassinged-drivers sort drivers with [this-vehicle-type = nobody]
-;  print length #unassinged-drivers / count drivers 
+  ;print length #unassinged-drivers / count drivers 
   let #available-types vehicle-types with [(frac-of-pevs * count drivers) - num-vehicles > 0 ]
   ask #available-types [
     while[(frac-of-pevs * count drivers) - num-vehicles > 0 and length #unassinged-drivers > 0 ][
@@ -246,11 +252,6 @@ to setup-drivers
     set miles-driven 0
     set num-denials 0
   
-    set journey-distance 0
-    foreach n-values length itin-from [?] [
-      let #this-trip-distance distance-from-to (item ? itin-from) (item ? itin-to)
-      set journey-distance (journey-distance + #this-trip-distance)
-    ]
     set itin-complete? false
     itinerary-event-scheduler
   ]
@@ -308,7 +309,9 @@ to setup-itinerary
         set itin-depart n-values 1 [file-read]
         set home-taz taz file-read
         let itin-row 0
+        set journey-distance 0
         set max-trip-distance (distance-from-to item itin-row itin-to item itin-row itin-from)
+        set max-dwell-time 0
         set this-vehicle-type nobody
         if file-at-end? = false [
           set next-driver file-read
@@ -318,8 +321,13 @@ to setup-itinerary
             set itin-to  lput file-read itin-to
             set itin-depart lput file-read itin-depart
             set itin-row itin-row + 1
-            if max-trip-distance < (distance-from-to item itin-row itin-to item itin-row itin-from)[
-              set max-trip-distance (distance-from-to item itin-row itin-to item itin-row itin-from)
+            let #this-trip-distance (distance-from-to item itin-row itin-to item itin-row itin-from)
+            set journey-distance (journey-distance + #this-trip-distance)
+            if max-trip-distance < #this-trip-distance [
+              set max-trip-distance #this-trip-distance
+            ]
+            if max-dwell-time < (item itin-row itin-depart - ((item (itin-row - 1) itin-depart) + (item (od-index item itin-row itin-to item itin-row itin-from) od-time))) [
+              set max-dwell-time (item itin-row itin-depart - ((item (itin-row - 1) itin-depart) + (item (od-index item itin-row itin-to item itin-row itin-from) od-time)))
             ]
             if not (home-taz = taz file-read) [ error (word "Inconsistent home taz specified for driver " id ) ]
             ifelse file-at-end? [ set next-driver -1][ set next-driver file-read ]

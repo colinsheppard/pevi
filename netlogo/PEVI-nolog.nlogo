@@ -79,6 +79,7 @@ drivers-own [
   itin-change-flag
   itin-delay-amount
   max-trip-distance
+  max-dwell-time
   current-itin-row          ; index of current location in the itinerary (referring to next trip or current trip if traveling)
 
 ;; CONVENIENCE VARIABLES
@@ -214,8 +215,8 @@ to setup
   ;;log-data "trip-journey-timeuntildepart" (sentence "time" "departure.time" "driver" "vehicle.type" "soc" "from.taz" "to.taz" "trip.distance" "journey.distance" "time.until.depart" "next.event" "remaining.range" "delay.sum")
   reset-logfile "seek-charger"
   ;;log-data "seek-charger" (sentence "time" "seek-charger-index" "current.taz" "charger.taz" "driver" "vehicle.type" "electric.fuel.consumption" "is.BEV" "charger.in.origin.dest" "level" "soc" "trip.or.journey.energy.need" "distance.o.to.c" 
-    ;;"distance.c.to.d" "time.o.to.c" "time.c.to.d" "trip.time" "trip.distance" "journey.distance" "charging.on.a.whim." "time.until.depart" "trip.charge.time.need" "cost" "extra.time.until.end.charge" 
-    ;;"full.charge.time.need" "trip.charge.time.need" "mid.journey.charge.time.need" "mid.state.of.charge")
+  ;;  "distance.c.to.d" "time.o.to.c" "time.c.to.d" "trip.time" "trip.distance" "journey.distance" "charging.on.a.whim." "time.until.depart" "trip.charge.time.need" "cost" "extra.time.until.end.charge" 
+  ;;  "full.charge.time.need" "trip.charge.time.need" "mid.journey.charge.time.need" "mid.state.of.charge")
   reset-logfile "seek-charger-result"
   ;;log-data "seek-charger-result" (sentence "time" "seek.charger.index" "driver" "chosen.taz" "charger.in.origin.dest" "chosen.level" "cost")
   set seek-charger-index 0
@@ -419,9 +420,9 @@ to seek-charger
               set #min-charger-type #this-charger-type 
             ]
             ;;log-data "seek-charger" (sentence ticks seek-charger-index ([id] of current-taz) ([id] of #this-taz) id ([name] of this-vehicle-type) electric-fuel-consumption is-BEV? #charger-in-origin-or-destination #level state-of-charge 
-              ;;(item #level #trip-or-journey-energy-need-by-type) (distance-from-to [id] of current-taz [id] of #this-taz) (distance-from-to [id] of #this-taz [id] of destination-taz) 
-              ;;(time-from-to [id] of current-taz [id] of #this-taz) (time-from-to [id] of #this-taz [id] of destination-taz) trip-time trip-distance journey-distance charging-on-a-whim? time-until-depart 
-              ;;(item #level #trip-charge-time-need-by-type) #this-cost #extra-time-until-end-charge #full-charge-time-need #trip-charge-time-need #mid-journey-charge-time-need #mid-state-of-charge)
+            ;;  (item #level #trip-or-journey-energy-need-by-type) (distance-from-to [id] of current-taz [id] of #this-taz) (distance-from-to [id] of #this-taz [id] of destination-taz) 
+            ;;  (time-from-to [id] of current-taz [id] of #this-taz) (time-from-to [id] of #this-taz [id] of destination-taz) trip-time trip-distance journey-distance charging-on-a-whim? time-until-depart 
+            ;;  (item #level #trip-charge-time-need-by-type) #this-cost #extra-time-until-end-charge #full-charge-time-need #trip-charge-time-need #mid-journey-charge-time-need #mid-state-of-charge)
           ]
         ]
       ]
@@ -1634,7 +1635,7 @@ Polygon -7500403 true true 270 75 225 30 30 225 75 270
 Polygon -7500403 true true 30 75 75 30 270 225 225 270
 
 @#$#@#$#@
-NetLogo 5.0.1
+NetLogo 5.0
 @#$#@#$#@
 @#$#@#$#@
 @#$#@#$#@

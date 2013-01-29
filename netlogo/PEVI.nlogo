@@ -79,6 +79,7 @@ drivers-own [
   itin-change-flag
   itin-delay-amount
   max-trip-distance
+  max-dwell-time
   current-itin-row          ; index of current location in the itinerary (referring to next trip or current trip if traveling)
 
 ;; CONVENIENCE VARIABLES
@@ -1634,7 +1635,7 @@ Polygon -7500403 true true 270 75 225 30 30 225 75 270
 Polygon -7500403 true true 30 75 75 30 270 225 225 270
 
 @#$#@#$#@
-NetLogo 5.0.1
+NetLogo 5.0
 @#$#@#$#@
 @#$#@#$#@
 @#$#@#$#@

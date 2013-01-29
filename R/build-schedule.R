@@ -112,6 +112,7 @@ if(make.plots){
   opts(title = "2009 NHTS - Rural US Subset") +
   geom_histogram()+
   facet_wrap(~TOURTYPE)
+
 }
 
 # based on comparing the various subsets, use US rural as the basis for the HEVI model, exclude non POV travel and long distance travel (>300 miles)
@@ -158,6 +159,9 @@ if(!file.exists(paste(path.to.nhts,'data-preprocessed-for-scheduling.Rdata',sep=
   #opts(title = "2009 NHTS - Rural US POV") +
   #geom_histogram(binwidth=1)+
   #facet_wrap(~TOURTYPE)
+
+  # What is difference between max dwell time and total dwell time per journey, compare to total miles
+  dwell.to.len <- ddply(rur.tours,.(journey.id),function(df){ data.frame(max.dwell=max(df$TOT_DWEL4,na.rm=T),tot.dwell=sum(df$TOT_DWEL4,na.rm=T),tot.miles=sum(df$TOT_MILS)) },.parallel=T)
 
   # what is the distribution of the type of the final tour of each journey, answer 92.2% are to home
   #end.tourtype <- ddply(rur.tours,.(journey.id),function(df){ as.character(df$TOURTYPE[nrow(df)]) }) 

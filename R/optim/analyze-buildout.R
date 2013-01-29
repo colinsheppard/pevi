@@ -2,8 +2,8 @@ library(colinmisc)
 Sys.setenv(NOAWT=1)
 load.libraries(c('ggplot2','yaml','stringr','RNetLogo','maptools','reshape','colorRamps'))
 
-#base.path <- '/Users/critter/Dropbox/serc/pev-colin/'
-base.path <- '/Users/sheppardc/Dropbox/serc/pev-colin/'
+base.path <- '/Users/critter/Dropbox/serc/pev-colin/'
+#base.path <- '/Users/sheppardc/Dropbox/serc/pev-colin/'
 #base.path <- '/Users/Raskolnikovbot3001/Dropbox/'
 
 optim.code <- 'min-cost-constrained-by-frac-stranded'
@@ -11,7 +11,7 @@ optim.code <- 'min-cost-constrained-by-frac-stranded'
 path.to.pevi <- paste(base.path,'pevi/',sep='')
 path.to.inputs <- paste(base.path,'pev-shared/data/inputs/buildout/',optim.code,'/',sep='')
 path.to.outputs <- paste(base.path,'pev-shared/data/outputs/buildout/',optim.code,'/',sep='')
-path.to.google <- '~/Dropbox/serc/pev-colin/data/google-earth/'
+path.to.google <- paste(base.path,'pev-shared/data/google-earth/',sep='')
 
 nl.path <- "/Applications/NetLogo\ 5.0.3"
 model.path <- paste(path.to.pevi,"netlogo/PEVI-nolog.nlogo",sep='')
@@ -20,8 +20,8 @@ source(paste(path.to.pevi,'R/gis-functions.R',sep=''))
 source(paste(path.to.pevi,"R/optim/buildout-functions.R",sep='')) 
 
 # load aggregated tazs
-agg.taz <- readShapePoly(paste(path.to.pevi,'inputs/development/aggregated-taz-with-weights',sep=''))
-load(paste(path.to.pevi,'inputs/development/aggregated-taz-with-weights-fieldnames.Rdata',sep=''))
+agg.taz <- readShapePoly(paste(path.to.google,'aggregated-taz-with-weights',sep=''))
+load(paste(path.to.google,'aggregated-taz-with-weights-fieldnames.Rdata',sep=''))
 names(agg.taz@data) <- c('row',taz.shp.fieldnames)
 agg.taz@data$ID <- unlist(lapply(agg.taz@polygons,function(x){slot(x,'ID')}))
 

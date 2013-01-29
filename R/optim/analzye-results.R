@@ -3,7 +3,7 @@ Sys.setenv(NOAWT=1)
 load.libraries(c('yaml','stringr','RNetLogo','maptools','reshape','colorRamps'))
 
 base.path <- '/Users/sheppardc/Dropbox/serc/pev-colin/'
-base.path <- '/Users/critter/Dropbox/serc/pev-colin/'
+#base.path <- '/Users/critter/Dropbox/serc/pev-colin/'
 path.to.pevi <- paste(base.path,'pevi/',sep='')
 path.to.inputs <- paste(base.path,'pev-shared/data/inputs/optim/',sep='')
 path.to.outputs <- paste(base.path,'pev-shared/data/outputs/optim/',sep='')
@@ -24,7 +24,8 @@ load(paste(path.to.pevi,'inputs/development/aggregated-taz-with-weights-fieldnam
 names(agg.taz@data) <- c('row',taz.shp.fieldnames)
 agg.taz@data$ID <- unlist(lapply(agg.taz@polygons,function(x){slot(x,'ID')}))
 
-optim.code <- 'min-cost-constrained-by-frac-delayed'
+#optim.code <- 'min-cost-constrained-by-frac-delayed'
+optim.code <- 'min-cost-constrained-by-frac-stranded'
 #optim.code <- 'min-cost-constrained-by-num-stranded'
 
 for(pev.penetration in c(0.005,0.01,0.02,0.04)){
@@ -48,6 +49,12 @@ for(pev.penetration in c(0.005,0.01,0.02,0.04)){
                      sum.weights <- rep(1,nrow(df))
                      sum.weights[df$level==3] <- 2
                      data.frame(charger.score=2*mean(df$value*sum.weights),L2=mean(df$value[df$level==2]),L3=mean(df$value[df$level==3]))})
+  tot.by.taz$name <- agg.taz$name[match(tot.by.taz$taz,agg.taz$id)]
+  tot.to.plot <- melt(tot.by.taz,id.vars=c('taz','name'),measure.vars=c('L2','L3'))
+  tot.to.plot$order <- match(1:nrow(tot.to.plot),order(tot.by.taz$charger.score[match(tot.to.plot$taz,tot.by.taz$taz)],decreasing=T))
+  tot.to.plot$name <- reorder(tot.to.plot$name,tot.to.plot$order)
+  p <- ggplot(tot.to.plot,aes(x=factor(""),y=value,fill=variable))+geom_bar(stat='identity')+facet_wrap(~name)
+  
   agg.taz@data$L2 <- roundC(tot.by.taz$L2[match(agg.taz$id,tot.by.taz$taz)],1)
   agg.taz@data$L3 <- roundC(tot.by.taz$L3[match(agg.taz$id,tot.by.taz$taz)],1)
   agg.taz@data$charger.score <- tot.by.taz$charger.score[match(agg.taz$id,tot.by.taz$taz)]
@@ -56,4 +63,7 @@ for(pev.penetration in c(0.005,0.01,0.02,0.04)){
   c.map <- paste(map.color(agg.taz@data$charger.score,blue2red(50)),'7F',sep='')
   shp.to.kml(agg.taz,paste(path.to.google,'optim/',optim.code,'-pen',100*pev.penetration,'.kml',sep=''),paste('Pen ',100*pev.penetration,'% Optimization: ',optim.code,sep=''),'Color denotes total chargers in each TAZ with L3 counting for 2 chargers (click to get actual # chargers).','red',1.5,c.map,id.col='ID',name.col='name',description.cols=c('id','name','L2','L3','weighted.demand','frac.homes'))
 }
+
+agg.taz$long <- coordinates(agg.taz)[,1]
+agg.taz$lat  <- coordinates(agg.taz)[,2]
 

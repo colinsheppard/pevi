@@ -7,11 +7,15 @@ base.path <- '/Users/critter/Dropbox/serc/pev-colin/'
 #base.path <- '/Users/Raskolnikovbot3001/Dropbox/'
 
 optim.code <- 'min-cost-constrained-by-frac-stranded'
+optim.code.date <- paste(optim.code,"-",format(Sys.time(), "%Y%m%d"),sep='')
 
 path.to.pevi <- paste(base.path,'pevi/',sep='')
 path.to.inputs <- paste(base.path,'pev-shared/data/inputs/buildout/',optim.code,'/',sep='')
 path.to.outputs <- paste(base.path,'pev-shared/data/outputs/buildout/',optim.code,'/',sep='')
 path.to.google <- paste(base.path,'pev-shared/data/google-earth/',sep='')
+
+make.dir(paste(path.to.outputs,"plots",sep=''))
+make.dir(paste(path.to.outputs,"plots/",optim.code.date,sep=''))
 
 nl.path <- "/Applications/NetLogo\ 5.0.3"
 model.path <- paste(path.to.pevi,"netlogo/PEVI-nolog.nlogo",sep='')
@@ -20,8 +24,8 @@ source(paste(path.to.pevi,'R/gis-functions.R',sep=''))
 source(paste(path.to.pevi,"R/optim/buildout-functions.R",sep='')) 
 
 # load aggregated tazs
-agg.taz <- readShapePoly(paste(path.to.google,'aggregated-taz-with-weights',sep=''))
-load(paste(path.to.google,'aggregated-taz-with-weights-fieldnames.Rdata',sep=''))
+agg.taz <- readShapePoly(paste(path.to.google,'aggregated-taz-with-weights/aggregated-taz-with-weights',sep=''))
+load(paste(path.to.google,'aggregated-taz-with-weights/aggregated-taz-with-weights-fieldnames.Rdata',sep=''))
 names(agg.taz@data) <- c('row',taz.shp.fieldnames)
 agg.taz@data$ID <- unlist(lapply(agg.taz@polygons,function(x){slot(x,'ID')}))
 
@@ -51,7 +55,7 @@ for(pev.penetration in c(0.005,0.01,0.02,0.04)){
 
   # facet by name
   p <- ggplot(subset(build.res,level>0),aes(x=iter,y=chargers,fill=factor(level),width=1))+geom_bar(stat='identity')+facet_wrap(~name)+opts(title=paste("Loading Order, ",pev.penetration*100,"% Penetration",sep='')) + labs(x="Nth Charger Added", y="Cumulative Number of Chargers in Zone",fill="Charger Level") 
-  ggsave(paste(path.to.outputs,"plots/loading-order-pen",pev.penetration*100,".pdf",sep=''),p,width=15,height=11)
+  ggsave(paste(path.to.outputs,"plots/",optim.code.date,"/loading-order-pen",pev.penetration*100,".pdf",sep=''),p,width=15,height=11)
 
 }
 

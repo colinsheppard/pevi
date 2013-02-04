@@ -7,10 +7,10 @@ base.path <- '/Users/critter/Dropbox/serc/pev-colin/'
 #base.path <- '/Users/sheppardc/Dropbox/serc/pev-colin/'
 #base.path <- '/Users/Raskolnikovbot3001/Dropbox/'
 
-optim.code <- 'min-cost-constrained-by-frac-stranded'
+optim.code <- 'min-cost-constrained-by-frac-stranded-50-50'
 
-#num.cpu <- 2
 num.cpu <- 8
+#num.cpu <- 11
 
 path.to.pevi <- paste(base.path,'pevi/',sep='')
 path.to.inputs <- paste(base.path,'pev-shared/data/inputs/buildout/',optim.code,'/',sep='')
@@ -51,7 +51,7 @@ NLLoadModel(model.path)
 for(cmd in paste('set log-',logfiles,' false',sep='')){ NLCommand(cmd) }
 
 #pev.penetration <- 0.01
-for(pev.penetration in c(0.005,0.01,0.02)){
+for(pev.penetration in c(0.005,0.01,0.02,0.04)){
   print(paste("pen",pev.penetration))
   vary.tab <- vary.tab.original
   vary.tab$`driver-input-file` <- str_replace(vary.tab$`driver-input-file`,"penXXX",paste("pen",pev.penetration*100,sep=""))
@@ -68,7 +68,7 @@ for(pev.penetration in c(0.005,0.01,0.02)){
       write.charger.file(build.result$chargers[1:104])
       for(results.i in 1:nrow(results)){
         NLCommand('clear-all-and-initialize')
-        NLCommand(paste('set parameter-file "',path.to.inputs,'../params.txt"',sep=''))
+        NLCommand(paste('set parameter-file "',path.to.inputs,'params.txt"',sep=''))
         NLCommand(paste('set model-directory "',path.to.pevi,'netlogo/"',sep=''))
         NLCommand('read-parameter-file')
         for(param in names(vary.tab)){

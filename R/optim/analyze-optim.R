@@ -1,6 +1,6 @@
 library(colinmisc)
 Sys.setenv(NOAWT=1)
-load.libraries(c('yaml','stringr','RNetLogo','maptools','reshape','colorRamps'))
+load.libraries(c('yaml','stringr','RNetLogo','maptools','reshape','colorRamps','ggplot2'))
 
 base.path <- '/Users/sheppardc/Dropbox/serc/pev-colin/'
 #base.path <- '/Users/critter/Dropbox/serc/pev-colin/'
@@ -23,8 +23,8 @@ source(paste(path.to.pevi,"R/optim/constraints.R",sep=''))
 source(paste(path.to.pevi,"R/reporters-loggers.R",sep=''))
 
 # load aggregated tazs
-agg.taz <- readShapePoly(paste(path.to.google,'aggregated-taz-with-weights',sep=''))
-load(paste(path.to.google,'aggregated-taz-with-weights-fieldnames.Rdata',sep=''))
+agg.taz <- readShapePoly(paste(path.to.google,'aggregated-taz-with-weights/aggregated-taz-with-weights',sep=''))
+load(paste(path.to.google,'aggregated-taz-with-weights/aggregated-taz-with-weights-fieldnames.Rdata',sep=''))
 names(agg.taz@data) <- c('row',taz.shp.fieldnames)
 agg.taz@data$ID <- unlist(lapply(agg.taz@polygons,function(x){slot(x,'ID')}))
 
@@ -48,8 +48,8 @@ for(pev.penetration in c(0.005,0.01,0.02,0.04)){
   tot.to.plot$name <- reorder(tot.to.plot$name,tot.to.plot$order)
   p <- ggplot(tot.to.plot,aes(x=factor(""),y=value,fill=variable))+geom_bar(stat='identity')+facet_wrap(~name)
   
-  agg.taz@data$L2 <- roundC(tot.by.taz$L2[match(agg.taz$id,tot.by.taz$taz)],1)
-  agg.taz@data$L3 <- roundC(tot.by.taz$L3[match(agg.taz$id,tot.by.taz$taz)],1)
+  agg.taz@data$L2 <- tot.by.taz$L2[match(agg.taz$id,tot.by.taz$taz)]
+  agg.taz@data$L3 <- tot.by.taz$L3[match(agg.taz$id,tot.by.taz$taz)]
   agg.taz@data$charger.score <- tot.by.taz$charger.score[match(agg.taz$id,tot.by.taz$taz)]
   agg.taz@data$weighted.demand <- roundC(agg.taz@data$weighted.demand,0)
   agg.taz@data$frac.homes <- roundC(agg.taz@data$frac.homes,3)

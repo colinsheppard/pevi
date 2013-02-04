@@ -2,21 +2,28 @@ library(colinmisc)
 load.libraries(c('sas7bdat','plyr','ggplot2','gtools','doMC','reshape','maptools'))
 
 make.plots  <- F
-num.processors <- 7
+num.processors <- 11
 registerDoMC(num.processors)
 
+base.path <- '/Users/critter/Dropbox/serc/pev-colin/'
+#base.path <- '/Users/sheppardc/Dropbox/serc/pev-colin/'
+path.to.geatm <- paste(base.path,'pev-shared/data/GEATM-2020/',sep='')
+path.to.google <- paste(base.path,'pev-shared/data/google-earth/',sep='')
+path.to.shared.inputs <- paste(base.path,'pev-shared/data/inputs/driver-input-file/',sep='')
+path.to.pevi <- paste(base.path,'pevi/',sep='')
+
 path.to.outputs <- '~/Dropbox/serc/pev-colin/data/scheduler-optim/'
-path.to.old.outputs <- '~/Dropbox/serc/pev-colin/data/scheduler-optim-try1/'
-path.to.geatm <- '~/Dropbox/serc/pev-colin/data/GEATM-2020/'
 path.to.ctpp <- '~/Dropbox/serc/pev-colin/data/CTPP/'
 path.to.nhts <- '~/Dropbox/serc/pev-colin/data/NHTS/'
-path.to.pevi <- '~/Dropbox/serc/pev-colin/pevi/'
-path.to.shared.inputs <- '~/Dropbox/serc/pev-colin/pev-shared/data/inputs/'
 path.to.plots <- '~/Dropbox/serc/pev-colin/plots/'
 
-taz <- readShapePoly(paste(path.to.pevi,'inputs/development/aggregated-taz-with-weights',sep=''))
-load(paste(path.to.pevi,'inputs/development/aggregated-taz-with-weights-fieldnames.Rdata',sep=''))
-names(taz@data) <- c('row',taz.shp.fieldnames)
+agg.taz <- readShapePoly(paste(path.to.google,'aggregated-taz-with-weights/aggregated-taz-with-weights',sep=''))
+load(paste(path.to.google,'aggregated-taz-with-weights/aggregated-taz-with-weights-fieldnames.Rdata',sep=''))
+names(agg.taz@data) <- c('row',taz.shp.fieldnames)
+for(i in 1:nrow(agg.taz@data)){
+  agg.taz@data$shp.id[i] <- as.numeric(slot(slot(agg.taz[i,],"polygons")[[1]],"ID"))
+}
+rm('taz') 
 
 load(paste(path.to.geatm,"od-aggregated.Rdata",sep=''))
 load(paste(path.to.nhts,"TripChaining/chntrp09.Rdata",sep=''))
@@ -28,6 +35,7 @@ if(!file.exists(paste(path.to.geatm,"od-aggregated.Rdata",sep=''))){
   load(,file=paste(path.to.geatm,'od_weighted.Rdata',sep=''))
   home.dist <- read.csv(paste(path.to.geatm,'home-distribution.csv',sep=''))
   dist <- read.csv(paste(path.to.geatm,"taz-dist-time.csv",sep=""))
+  names(dist) <- c('from','to','miles','time','enroute','perf','perf1')
   taz.10 <- list() # either all neighbors within 10 miles or the 10 closest neighbors, whichever yields more, 54% of rural tours <= 10 miles
   for(taz.i in unique(dist$from)){
     within10 <- dist$to[dist$from==taz.i][which(dist$miles[dist$from==taz.i]<=10)]
@@ -161,7 +169,7 @@ if(!file.exists(paste(path.to.nhts,'data-preprocessed-for-scheduling.Rdata',sep=
   #facet_wrap(~TOURTYPE)
 
   # What is difference between max dwell time and total dwell time per journey, compare to total miles
-  dwell.to.len <- ddply(rur.tours,.(journey.id),function(df){ data.frame(max.dwell=max(df$TOT_DWEL4,na.rm=T),tot.dwell=sum(df$TOT_DWEL4,na.rm=T),tot.miles=sum(df$TOT_MILS)) },.parallel=T)
+  #dwell.to.len <- ddply(rur.tours,.(journey.id),function(df){ data.frame(max.dwell=max(df$TOT_DWEL4,na.rm=T),tot.dwell=sum(df$TOT_DWEL4,na.rm=T),tot.miles=sum(df$TOT_MILS)) },.parallel=T)
 
   # what is the distribution of the type of the final tour of each journey, answer 92.2% are to home
   #end.tourtype <- ddply(rur.tours,.(journey.id),function(df){ as.character(df$TOURTYPE[nrow(df)]) }) 
@@ -220,7 +228,7 @@ if(!file.exists(paste(path.to.nhts,'data-preprocessed-for-scheduling.Rdata',sep=
   # verify that it all sums to 1
   #weighted.mean(colSums(epdfs)[2:4],c(nrow(rur.by.type[['hw']]),nrow(rur.by.type[['ho']]),nrow(rur.by.type[['ow']])))
 
-  save(rur.tours,rur.by.type,rur.tours.per,ecdfs,epdfs,type.map,type.map.rev,od.24.simp,od.am.simp,od.pm.simp,end.tourtype,file=paste(path.to.nhts,'data-preprocessed-for-scheduling.Rdata',sep=''))
+  save(rur.tours,rur.by.type,rur.tours.per,ecdfs,epdfs,type.map,type.map.rev,od.24.simp,od.am.simp,od.pm.simp,file=paste(path.to.nhts,'data-preprocessed-for-scheduling.Rdata',sep=''))
 }else{
   load(file=paste(path.to.nhts,'data-preprocessed-for-scheduling.Rdata',sep=''))
 }
@@ -233,7 +241,7 @@ source(paste(path.to.pevi,'R/create-schedule.R',sep=''))
 # see what fraction of drivers end at home?
 # sum(ddply(schedule,.(driver),function(df){ df$to[nrow(df)]==df$home[1] })$V1)/length(unique(schedule$driver))
 
-num.replicates <- 20
+num.replicates <- 30
 schedule.reps <- list()
 for(pev.penetration in pev.pens){
   pev.pen.char <- roundC(pev.penetration,3)
@@ -241,19 +249,19 @@ for(pev.penetration in pev.pens){
   for(replicate in 1:num.replicates){
     print(paste('Penetration ',pev.penetration,' replicate ',replicate,sep=''))
     schedule.reps[[pev.pen.char]][[as.character(replicate)]] <- create.schedule(pev.penetration,1)
-    write.table(schedule.reps[[pev.pen.char]][[as.character(replicate)]][,c('driver','from','to','depart','home')],file=paste(path.to.shared.inputs,"driver-schedule-pen",pev.penetration*100,"-rep",replicate,"-20121222.txt",sep=''),sep='\t',row.names=F,quote=F)
-    save(schedule.reps,file=paste(path.to.outputs,'schedule-replicates-20121222.Rdata',sep=''))
+    write.table(schedule.reps[[pev.pen.char]][[as.character(replicate)]][,c('driver','from','to','depart','home')],file=paste(path.to.shared.inputs,"driver-schedule-pen",pev.penetration*100,"-rep",replicate,"-20130129.txt",sep=''),sep='\t',row.names=F,quote=F)
+    save(schedule.reps,file=paste(path.to.outputs,'schedule-replicates-20130129.Rdata',sep=''))
   }
 }
-save(schedule.reps,file=paste(path.to.outputs,'schedule-replicates-20121222.Rdata',sep=''))
+save(schedule.reps,file=paste(path.to.outputs,'schedule-replicates-20130129.Rdata',sep=''))
 
 # fix the bug that causes drivers to have impossible itineraries
-num.replicates <- 20
+num.replicates <- 30
 for(pev.penetration in pev.pens){
   pev.pen.char <- roundC(pev.penetration,3)
   for(replicate in 1:num.replicates){
     print(paste('Penetration ',pev.penetration,' replicate ',replicate,sep=''))
-    sched <- read.table(file=paste(path.to.shared.inputs,"driver-input-file/driver-schedule-pen",pev.penetration*100,"-rep",replicate,"-20121222.txt",sep=''),sep='\t',header=T)
+    sched <- read.table(file=paste(path.to.shared.inputs,"driver-schedule-pen",pev.penetration*100,"-rep",replicate,"-20130129.txt",sep=''),sep='\t',header=T)
     sched$ft <- paste(sched$from,sched$to)
     dist$ft <- paste(dist$from,dist$to)
     sched <- join(sched,dist,by="ft")
@@ -269,12 +277,12 @@ for(pev.penetration in pev.pens){
     })
     sched <- sched[,c('X.driver','from','to','depart','home')]
     names(sched) <- c(';driver','from','to','depart','home')
-    write.table(sched,paste(path.to.shared.inputs,"driver-input-file/driver-schedule-pen",pev.penetration*100,"-rep",replicate,"-20121222.txt",sep=''),sep="\t",row.names=F,quote=F)
+    write.table(sched,paste(path.to.shared.inputs,"driver-schedule-pen",pev.penetration*100,"-rep",replicate,"-20130129.txt",sep=''),sep="\t",row.names=F,quote=F)
   }
 }
 
 # summarize the results
-load(file=paste(path.to.outputs,'schedule-replicates-20121222.Rdata',sep=''))
+load(file=paste(path.to.outputs,'schedule-replicates-20130129.Rdata',sep=''))
 n.scheds <- num.replicates * length(pev.pens)
 sum.sched <- data.frame(pen=rep(pev.pens,num.replicates),rep=rep(1:num.replicates,each=length(pev.pens)),n.drivers=rep(NA,n.scheds),n.trips=rep(NA,n.scheds),trips.per.driver=rep(NA,n.scheds),home.rmse=rep(NA,n.scheds),home.maxe=rep(NA,n.scheds),home.max.taz=rep(NA,n.scheds))
 for(pev.penetration in pev.pens){
@@ -284,8 +292,8 @@ for(pev.penetration in pev.pens){
 
       sched.home.dist <- ddply(schedule.reps[[pev.pen.char]][[as.character(replicate)]],.(home),function(df){ data.frame(num.drivers=nrow(df)) })
       sched.home.dist$frac <- sched.home.dist$num.drivers / sum(sched.home.dist$num.drivers)
-      if(nrow(sched.home.dist) < nrow(taz@data)){
-        sched.home.dist <- rbind(sched.home.dist,data.frame(home=which(! 1:nrow(taz@data) %in% sched.home.dist$home),num.drivers=0,frac=0))
+      if(nrow(sched.home.dist) < nrow(agg.taz@data)){
+        sched.home.dist <- rbind(sched.home.dist,data.frame(home=which(! 1:nrow(agg.taz@data) %in% sched.home.dist$home),num.drivers=0,frac=0))
       }
       sched.home.dist$real <- home.dist$frac.homes[match(sched.home.dist$home,home.dist$agg.taz)]
 

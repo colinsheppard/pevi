@@ -84,7 +84,7 @@ chargers.to.kml <- function(shp,kml.filename,kmlname="KML Name", kmldescription=
   placemark.styles <- ddply(rbind(shp@data,shp.sparse),.(row),function(df){ 
     data.frame(style=paste("<Style id=\"placemark_",df$name,"\">
 		<IconStyle>",
-		if(sum(c(df$L2,df$L3))==0) "<color>00ffffff</color>
+		if(sum(round(c(df$L2,df$L3)))<1) "<color>00ffffff</color>
 		<scale>2.0</scale>" 
 		else 
 		"<scale>2.0</scale>","
@@ -93,7 +93,7 @@ chargers.to.kml <- function(shp,kml.filename,kmlname="KML Name", kmldescription=
 			</Icon>
 			<hotSpot x=\"0.5\" y=\"0\" xunits=\"fraction\" yunits=\"fraction\"/>
 		</IconStyle>",
-		if(sum(c(df$L2,df$L3))==0) "<LabelStyle>
+		if(sum(round(c(df$L2,df$L3)))==0) "<LabelStyle>
 			<color>00ffffff</color>
 			</LabelStyle>","
   </Style>",sep=''),stringsAsFactors=F)

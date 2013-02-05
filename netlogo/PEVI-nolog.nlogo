@@ -41,6 +41,7 @@ globals [
   probability-of-unneeded-charge
   electric-fuel-consumption-sd
   electric-fuel-consumption-range
+  stranded-delay-threshold
   
   ;; globals needed for testing
   test-driver
@@ -215,8 +216,8 @@ to setup
   ;;log-data "trip-journey-timeuntildepart" (sentence "time" "departure.time" "driver" "vehicle.type" "soc" "from.taz" "to.taz" "trip.distance" "journey.distance" "time.until.depart" "next.event" "remaining.range" "delay.sum")
   reset-logfile "seek-charger"
   ;;log-data "seek-charger" (sentence "time" "seek-charger-index" "current.taz" "charger.taz" "driver" "vehicle.type" "electric.fuel.consumption" "is.BEV" "charger.in.origin.dest" "level" "soc" "trip.or.journey.energy.need" "distance.o.to.c" 
-  ;;  "distance.c.to.d" "time.o.to.c" "time.c.to.d" "trip.time" "trip.distance" "journey.distance" "charging.on.a.whim." "time.until.depart" "trip.charge.time.need" "cost" "extra.time.until.end.charge" 
-  ;;  "full.charge.time.need" "trip.charge.time.need" "mid.journey.charge.time.need" "mid.state.of.charge")
+    ;;"distance.c.to.d" "time.o.to.c" "time.c.to.d" "trip.time" "trip.distance" "journey.distance" "charging.on.a.whim." "time.until.depart" "trip.charge.time.need" "cost" "extra.time.until.end.charge" 
+    ;;"full.charge.time.need" "trip.charge.time.need" "mid.journey.charge.time.need" "mid.state.of.charge")
   reset-logfile "seek-charger-result"
   ;;log-data "seek-charger-result" (sentence "time" "seek.charger.index" "driver" "chosen.taz" "charger.in.origin.dest" "chosen.level" "cost")
   set seek-charger-index 0
@@ -420,9 +421,9 @@ to seek-charger
               set #min-charger-type #this-charger-type 
             ]
             ;;log-data "seek-charger" (sentence ticks seek-charger-index ([id] of current-taz) ([id] of #this-taz) id ([name] of this-vehicle-type) electric-fuel-consumption is-BEV? #charger-in-origin-or-destination #level state-of-charge 
-            ;;  (item #level #trip-or-journey-energy-need-by-type) (distance-from-to [id] of current-taz [id] of #this-taz) (distance-from-to [id] of #this-taz [id] of destination-taz) 
-            ;;  (time-from-to [id] of current-taz [id] of #this-taz) (time-from-to [id] of #this-taz [id] of destination-taz) trip-time trip-distance journey-distance charging-on-a-whim? time-until-depart 
-            ;;  (item #level #trip-charge-time-need-by-type) #this-cost #extra-time-until-end-charge #full-charge-time-need #trip-charge-time-need #mid-journey-charge-time-need #mid-state-of-charge)
+              ;;(item #level #trip-or-journey-energy-need-by-type) (distance-from-to [id] of current-taz [id] of #this-taz) (distance-from-to [id] of #this-taz [id] of destination-taz) 
+              ;;(time-from-to [id] of current-taz [id] of #this-taz) (time-from-to [id] of #this-taz [id] of destination-taz) trip-time trip-distance journey-distance charging-on-a-whim? time-until-depart 
+              ;;(item #level #trip-charge-time-need-by-type) #this-cost #extra-time-until-end-charge #full-charge-time-need #trip-charge-time-need #mid-journey-charge-time-need #mid-state-of-charge)
           ]
         ]
       ]
@@ -988,6 +989,7 @@ to summarize
   ;;log-data "summary" (sentence "total.delay" sum [ sum map weight-delay itin-delay-amount  ] of drivers)
   ;;log-data "summary" (sentence "mean.delay" mean [ sum map weight-delay itin-delay-amount  ] of drivers)
   ;;log-data "summary" (sentence "frac.drivers.delayed" (count drivers with [ sum map weight-delay itin-delay-amount > 0 ] / count drivers))
+  ;;log-data "summary" (sentence "frac.stranded.by.delay" (num-stranded-by-delay / count drivers))
   ;;log-data "summary" (sentence "num.unscheduled.trips" sum [ sum itin-change-flag ] of drivers)
   ;;log-data "summary" (sentence "energy.charged" sum [ energy-received ] of drivers)
   ;;log-data "summary" (sentence "driver.expenses" sum [ expenses ] of drivers)
@@ -1099,7 +1101,7 @@ SWITCH
 176
 log-wait-time
 log-wait-time
-0
+1
 1
 -1000
 
@@ -1110,7 +1112,7 @@ SWITCH
 222
 log-charging
 log-charging
-0
+1
 1
 -1000
 
@@ -1121,7 +1123,7 @@ SWITCH
 268
 log-charge-time
 log-charge-time
-0
+1
 1
 -1000
 
@@ -1132,7 +1134,7 @@ SWITCH
 313
 log-need-to-charge
 log-need-to-charge
-0
+1
 1
 -1000
 
@@ -1291,7 +1293,7 @@ SWITCH
 94
 log-trip
 log-trip
-0
+1
 1
 -1000
 
@@ -1302,7 +1304,7 @@ SWITCH
 180
 log-summary
 log-summary
-1
+0
 1
 -1000
 
@@ -1635,7 +1637,7 @@ Polygon -7500403 true true 270 75 225 30 30 225 75 270
 Polygon -7500403 true true 30 75 75 30 270 225 225 270
 
 @#$#@#$#@
-NetLogo 5.0
+NetLogo 5.0.1
 @#$#@#$#@
 @#$#@#$#@
 @#$#@#$#@

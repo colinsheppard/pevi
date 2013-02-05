@@ -38,16 +38,16 @@ map.color <- function (x,c.map){
   return(res)
 }
 
-shp <- agg.taz
-kml.filename <- paste(path.to.google,'optim/',optim.code,'-pen',100*pev.penetration,'.kml',sep='')
-kmlname <- "KML Name"
-kmldescription <- "<i>Description</i>"
-borders<-'white'
-lwds<-1.5
-colors<-'red'
-id.col<-'id'
-name.col<-'id'
-description.cols<-NA
+#shp <- agg.taz
+#kml.filename <- paste(path.to.google,'optim/',optim.code,'-pen',100*pev.penetration,'.kml',sep='')
+#kmlname <- "KML Name"
+#kmldescription <- "<i>Description</i>"
+#borders<-'white'
+#lwds<-1.5
+#colors<-'red'
+#id.col<-'id'
+#name.col<-'id'
+#description.cols<-NA
 
 chargers.to.kml <- function(shp,kml.filename,kmlname="KML Name", kmldescription="<i>Description</i>",borders='white',lwds=1.5,colors='red',id.col='id',name.col='id',description.cols=NA){
   n <- length(shp@polygons)

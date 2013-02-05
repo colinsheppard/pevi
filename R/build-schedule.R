@@ -5,8 +5,8 @@ make.plots  <- F
 num.processors <- 11
 registerDoMC(num.processors)
 
-base.path <- '/Users/critter/Dropbox/serc/pev-colin/'
-#base.path <- '/Users/sheppardc/Dropbox/serc/pev-colin/'
+#base.path <- '/Users/critter/Dropbox/serc/pev-colin/'
+base.path <- '/Users/sheppardc/Dropbox/serc/pev-colin/'
 path.to.geatm <- paste(base.path,'pev-shared/data/GEATM-2020/',sep='')
 path.to.google <- paste(base.path,'pev-shared/data/google-earth/',sep='')
 path.to.shared.inputs <- paste(base.path,'pev-shared/data/inputs/driver-input-file/',sep='')
@@ -249,7 +249,9 @@ for(pev.penetration in pev.pens){
   for(replicate in 1:num.replicates){
     print(paste('Penetration ',pev.penetration,' replicate ',replicate,sep=''))
     schedule.reps[[pev.pen.char]][[as.character(replicate)]] <- create.schedule(pev.penetration,1)
-    write.table(schedule.reps[[pev.pen.char]][[as.character(replicate)]][,c('driver','from','to','depart','home')],file=paste(path.to.shared.inputs,"driver-schedule-pen",pev.penetration*100,"-rep",replicate,"-20130129.txt",sep=''),sep='\t',row.names=F,quote=F)
+    sched <- schedule.reps[[pev.pen.char]][[as.character(replicate)]][,c('driver','from','to','depart','home')]
+    names(sched) <- c(';driver','from','to','depart','home')
+    write.table(sched,file=paste(path.to.shared.inputs,"driver-schedule-pen",pev.penetration*100,"-rep",replicate,"-20130129.txt",sep=''),sep='\t',row.names=F,quote=F)
     save(schedule.reps,file=paste(path.to.outputs,'schedule-replicates-20130129.Rdata',sep=''))
   }
 }
@@ -266,7 +268,8 @@ for(pev.penetration in pev.pens){
     dist$ft <- paste(dist$from,dist$to)
     sched <- join(sched,dist,by="ft")
     sched$arrive <- sched$depart + sched$time
-    sched <- ddply(sched,.(X.driver),function(df){ 
+    if(names(sched)[1]=="X.driver")names(sched)<-c("driver",names(sched)[2:ncol(sched)])
+    sched <- ddply(sched,.(driver),function(df){ 
       if(nrow(df)>1 & any(df$depart[2:nrow(df)] < df$arrive[1:(nrow(df)-1)])){
         while(any(df$depart[2:nrow(df)] < df$arrive[1:(nrow(df)-1)])){
           i <- which(df$depart[2:nrow(df)] < df$arrive[1:(nrow(df)-1)])[1]
@@ -275,7 +278,7 @@ for(pev.penetration in pev.pens){
       }
       df
     })
-    sched <- sched[,c('X.driver','from','to','depart','home')]
+    sched <- sched[,c('driver','from','to','depart','home')]
     names(sched) <- c(';driver','from','to','depart','home')
     write.table(sched,paste(path.to.shared.inputs,"driver-schedule-pen",pev.penetration*100,"-rep",replicate,"-20130129.txt",sep=''),sep="\t",row.names=F,quote=F)
   }

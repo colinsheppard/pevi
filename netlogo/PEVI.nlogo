@@ -988,6 +988,7 @@ to summarize
   log-data "summary" (sentence "total.delay" sum [ sum map weight-delay itin-delay-amount  ] of drivers)
   log-data "summary" (sentence "mean.delay" mean [ sum map weight-delay itin-delay-amount  ] of drivers)
   log-data "summary" (sentence "frac.drivers.delayed" (count drivers with [ sum map weight-delay itin-delay-amount > 0 ] / count drivers))
+  log-data "summary" (sentence "frac.stranded.by.delay" (num-stranded-by-delay / count drivers))
   log-data "summary" (sentence "num.unscheduled.trips" sum [ sum itin-change-flag ] of drivers)
   log-data "summary" (sentence "energy.charged" sum [ energy-received ] of drivers)
   log-data "summary" (sentence "driver.expenses" sum [ expenses ] of drivers)
@@ -1099,7 +1100,7 @@ SWITCH
 176
 log-wait-time
 log-wait-time
-0
+1
 1
 -1000
 
@@ -1110,7 +1111,7 @@ SWITCH
 222
 log-charging
 log-charging
-0
+1
 1
 -1000
 
@@ -1121,7 +1122,7 @@ SWITCH
 268
 log-charge-time
 log-charge-time
-0
+1
 1
 -1000
 
@@ -1132,7 +1133,7 @@ SWITCH
 313
 log-need-to-charge
 log-need-to-charge
-0
+1
 1
 -1000
 
@@ -1291,7 +1292,7 @@ SWITCH
 94
 log-trip
 log-trip
-0
+1
 1
 -1000
 
@@ -1302,7 +1303,7 @@ SWITCH
 180
 log-summary
 log-summary
-1
+0
 1
 -1000
 
@@ -1635,7 +1636,7 @@ Polygon -7500403 true true 270 75 225 30 30 225 75 270
 Polygon -7500403 true true 30 75 75 30 270 225 225 270
 
 @#$#@#$#@
-NetLogo 5.0
+NetLogo 5.0.1
 @#$#@#$#@
 @#$#@#$#@
 @#$#@#$#@

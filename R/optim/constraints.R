@@ -30,6 +30,15 @@ frac.stranded.below.thresh <- function(results){
 }
 
 ###################################################################################################
+# total.cost.below.thresh
+#
+# the total infrastructure cost is below this max.cost
+###################################################################################################
+total.cost.below.thresh <- function(results){
+  return(all.or.nothing(mean(results$infrastructure.cost,na.rm=T) < constraint.params$max.cost))
+}
+
+###################################################################################################
 # num.stranded.below.thresh
 #
 # the number of drivers stranded cannot exceed the threshold give by max.num.stranded

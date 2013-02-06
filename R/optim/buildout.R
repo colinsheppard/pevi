@@ -7,7 +7,12 @@ base.path <- '/Users/critter/Dropbox/serc/pev-colin/'
 #base.path <- '/Users/sheppardc/Dropbox/serc/pev-colin/'
 #base.path <- '/Users/Raskolnikovbot3001/Dropbox/'
 
-optim.code <- 'min-cost-constrained-by-frac-stranded-50-50'
+#optim.code <- 'min-cost-constrained-by-frac-stranded-50-50'
+optim.code <- 'linked-min-cost-constrained-by-frac-stranded-50-50'
+#optim.code <- 'linked-min-cost-constrained-by-frac-stranded-25-75'
+
+link.pens <- T  # should the infrastructure from lower pens be used as starting place for higher? otherwise,
+                # infrastructure is reset to zero
 
 num.cpu <- 8
 #num.cpu <- 11
@@ -53,7 +58,15 @@ for(cmd in paste('set log-',logfiles,' false',sep='')){ NLCommand(cmd) }
 #pev.penetration <- 0.01
 for(pev.penetration in c(0.005,0.01,0.02,0.04)){
   print(paste("pen",pev.penetration))
-  vary.tab <- vary.tab.original
+  if(pev.penetration < 0.015){
+    vary.tab <- vary.tab.original
+  }else if(pev.penetration < 0.03){
+    vary.tab <- data.frame(vary.tab.original[sample(1:30,20),])
+    names(vary.tab) <- "driver-input-file"
+  }else{
+    vary.tab <- data.frame(vary.tab.original[sample(1:30,10),])
+    names(vary.tab) <- "driver-input-file"
+  }
   vary.tab$`driver-input-file` <- str_replace(vary.tab$`driver-input-file`,"penXXX",paste("pen",pev.penetration*100,sep=""))
   results <- data.frame(vary.tab,reporters)
   results$penetration <- as.numeric(unlist(lapply(strsplit(as.character(results$driver.input.file),'-pen',fixed=T),function(x){ unlist(strsplit(x[2],"-rep",fixed=T)[[1]][1]) })))
@@ -61,10 +74,16 @@ for(pev.penetration in c(0.005,0.01,0.02,0.04)){
   results$penetration <- as.numeric(unlist(lapply(strsplit(as.character(results$driver.input.file),'-pen',fixed=T),function(x){ unlist(strsplit(x[2],"-rep",fixed=T)[[1]][1]) })))
   results$replicate <- as.numeric(unlist(lapply(strsplit(as.character(results$driver.input.file),'-rep',fixed=T),function(x){ unlist(strsplit(x[2],"-",fixed=T)[[1]][1]) })))
 
-  build.result <- data.frame(cost=rep(NA,105),pain=rep(NA,105),chargers=0)
-  for(build.i in 1:250){
+  if(!link.pens | pev.penetration==0.005){
+    #build.result <- data.frame(cost=rep(NA,105),pain=rep(NA,105),chargers=0)  # No chargers
+    build.result <- data.frame(cost=rep(NA,105),pain=rep(NA,105),chargers=c(rep(0,5),1,rep(0,16),1,rep(0,3),1,rep(0,105-27))) # Existing, 1 in EKA_Waterfront, 1 in EKA_NW101, 1 in ARC_Plaza
+    begin.build.i <- 1
+  }else{
+    begin.build.i <- build.i
+  }
+  for(build.i in begin.build.i:250){
     print(paste("build iter:",build.i))
-    if(build.i == 1){
+    if(build.i == begin.build.i){
       write.charger.file(build.result$chargers[1:104])
       for(results.i in 1:nrow(results)){
         NLCommand('clear-all-and-initialize')
@@ -79,6 +98,7 @@ for(pev.penetration in c(0.005,0.01,0.02,0.04)){
           }
         }
         NLCommand(paste('set charger-input-file "',path.to.inputs,'chargers-alt-0.txt"',sep=''))
+        NLCommand('random-seed 1')
         NLCommand('setup')
         NLCommand('dynamic-scheduler:go-until schedule 500')
         results[results.i,names(reporters)] <- tryCatch(NLDoReport(1,"",reporter = paste("(sentence",paste(reporters,collapse=' '),")"),as.data.frame=T,df.col.names=names(reporters)),error=function(e){ NA })

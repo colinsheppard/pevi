@@ -5,14 +5,14 @@
 ###################################################################################################
 
 #optim.code <- 'min-cost-constrained-by-frac-delayed'
-optim.code <- 'min-cost-constrained-by-frac-stranded'
+optim.code <- 'min-cost-constrained-by-frac-stranded-50-50'
 
 ###################################################################################################
 # decision.vars       data.frame containing the names and bounds of the variables to alter in the 
 #                     optimization, the variables are assumed to exist inside module.settings, the
 #                     module name and parameter name are specified (e.g. 'supply.wind','capacity')
 ###################################################################################################
-decision.vars <- data.frame(taz=c(1:52,1:52),level=c(rep(2,52),rep(3,52)),lbound=rep(0,104),ubound=c(rep(15,52),rep(10,52)))
+decision.vars <- data.frame(taz=c(1:52,1:52),level=c(rep(2,52),rep(3,52)),lbound=rep(0,104),ubound=c(rep(10,52),rep(5,52)))
 decision.vars$name <-  c(paste("T",1:52,"-L2",sep=""),paste("T",1:52,"-L3",sep=""))
 
 ###################################################################################################
@@ -21,7 +21,8 @@ decision.vars$name <-  c(paste("T",1:52,"-L2",sep=""),paste("T",1:52,"-L3",sep="
 # will be executed at the end of a batch of model runs and it must return a scalar value to be minimized.
 ###################################################################################################
 #objective.name <- 'frac.drivers.delayed'
-objective.name <- 'infrastructure.cost'
+#objective.name <- 'infrastructure.cost'
+objective.name <- 'frac.stranded.by.delay'
 
 ###################################################################################################
 # constraint.names
@@ -37,12 +38,14 @@ objective.name <- 'infrastructure.cost'
 constraint.names <- c(
   #'frac.drivers.delayed.below.thresh'
   #'num.stranded.below.thresh'
-  'frac.stranded.below.thresh'
+  #'frac.stranded.below.thresh'
+  'total.cost.below.thresh'
 )
 constraint.params <- list()
 constraint.params[['max.frac.drivers.delayed']] <- 0.03
 constraint.params[['max.frac.stranded']] <- 0.01
 constraint.params[['max.num.stranded']] <- 1
+constraint.params[['max.cost']] <- 500
 
 ###################################################################################################
 # de.params           

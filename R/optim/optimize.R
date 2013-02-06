@@ -30,7 +30,7 @@ for(file.param in names(vary)[grep("-file",names(vary))]){
 # setup the data frame containing all combinations of those parameter values
 vary.tab.original <- expand.grid(vary,stringsAsFactors=F)
 
-#pev.penetration <- 0.04
+pev.penetration <- 0.02
 
 for(pev.penetration in c(0.005,0.01,0.02,0.04)){
   print(paste("pen",pev.penetration))
@@ -63,6 +63,9 @@ for(pev.penetration in c(0.005,0.01,0.02,0.04)){
   # initialize the list to store fitness values so we don't recompute if not necessary
   fit.history <- list()
 
+  # we need tighter initial distribution on decision variables to get into the feasible region, but then loosen back up after
+  decision.vars$ubound <- c(rep(2,52),rep(1,52))
+
   # initialize the particles
   while(all(all.ptx[,c('fitness'),gen.num]==Inf)){
     for(i in 1:10){
@@ -76,7 +79,13 @@ for(pev.penetration in c(0.005,0.01,0.02,0.04)){
     }
 
     for(i in 1:n){
-      all.ptx[,i,gen.num] <- sample(seq(decision.vars$lbound[i],decision.vars$ubound[i]),np,replace=T)
+      if(i<53){
+        all.ptx[,i,gen.num] <- round(rnorm(np,0,1.2))
+      }else{
+        all.ptx[,i,gen.num] <- round(rnorm(np,0,0.36667))
+      }
+      all.ptx[,i,gen.num][all.ptx[,i,gen.num]<0] <- 0
+      #all.ptx[,i,gen.num] <- sample(seq(decision.vars$lbound[i],decision.vars$ubound[i]),np,replace=T)
     }
     # evaluate the fitness of the initial particle population
     res <- evaluate.fitness(all.ptx[,1:n,gen.num])
@@ -87,6 +96,9 @@ for(pev.penetration in c(0.005,0.01,0.02,0.04)){
       fit.history[[paste(all.ptx[,1:n,gen.num],collapse=",")]] <- all.ptx[,'fitness',gen.num]
     }
   }
+  # loosen the bounds back up
+  decision.vars <- data.frame(taz=c(1:52,1:52),level=c(rep(2,52),rep(3,52)),lbound=rep(0,104),ubound=c(rep(10,52),rep(5,52)))
+  decision.vars$name <-  c(paste("T",1:52,"-L2",sep=""),paste("T",1:52,"-L3",sep=""))
   save.image(paste(path.to.outputs,optim.code,"/0saved-state-pen",pev.penetration*100,".Rdata",sep=''))
 
   # enter the loop
@@ -100,7 +112,7 @@ for(pev.penetration in c(0.005,0.01,0.02,0.04)){
     cand[,'fitness'] <- NA # just to avoid confusion between the update of the particles and before eval of fitness
 
     # which dimensions are stuck on a single value
-    stuck.dimensions <- c(apply(all.ptx[,1:n,gen.num],2,sum)>0 & apply(all.ptx[,1:n,gen.num],2,sd)<0.4,F)
+    stuck.dimensions <- c(apply(all.ptx[,1:n,gen.num],2,sum)>0 & apply(all.ptx[,1:n,gen.num],2,sd)<0.2,F)
     stuck.dimensions.rare <- c(apply(all.ptx[,1:n,gen.num],2,sum)==0,F)
 
     for(i in 1:np){
@@ -175,8 +187,6 @@ for(pev.penetration in c(0.005,0.01,0.02,0.04)){
     }
   }
 }
-
-
 
 # add noise to a previous set of ptx
 all.ptx[,1:n,gen.num] <- all.ptx[,1:n,gen.num] + round(runif(np*n,-3,3))

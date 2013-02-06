@@ -42,7 +42,7 @@ run.buildout.batch <- function(break.pair,build.result){
 
     for(results.i in 1:nrow(results)){
       try.nl('clear-all-and-initialize',break.pair.code)
-      try.nl(paste('set parameter-file "',path.to.inputs,'../params.txt"',sep=''),break.pair.code)
+      try.nl(paste('set parameter-file "',path.to.inputs,'params.txt"',sep=''),break.pair.code)
       try.nl(paste('set model-directory "',path.to.pevi,'netlogo/"',sep=''),break.pair.code)
       try.nl('read-parameter-file',break.pair.code)
       for(param in names(vary.tab)){
@@ -53,6 +53,7 @@ run.buildout.batch <- function(break.pair,build.result){
         }
       }
       try.nl(paste('set charger-input-file "',path.to.inputs,'chargers-alt-',alt.i,'.txt"',sep=''),break.pair.code)
+      try.nl('random-seed 1',break.pair.code)
       try.nl('setup',break.pair.code)
       try.nl('dynamic-scheduler:go-until schedule 500',break.pair.code)
       results[results.i,names(reporters)] <- tryCatch(NLDoReport(1,"",reporter = paste("(sentence",paste(reporters,collapse=' '),")"),as.data.frame=T,df.col.names=names(reporters)),error=function(e){ NA })

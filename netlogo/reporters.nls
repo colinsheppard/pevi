@@ -11,5 +11,5 @@ to-report num-stranded
 end
 
 to-report num-stranded-by-delay
-  report count drivers with [(max itin-delay-amount) > 3] 
+  report count drivers with [(max itin-delay-amount) > stranded-delay-threshold] 
 end

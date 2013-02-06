@@ -9,6 +9,10 @@
 # in optim-config.R
 ###################################################################################################
 
+frac.stranded.by.delay <- function(results){
+  return(mean(results$frac.stranded.by.delay,na.rm=T))
+}
+
 frac.drivers.delayed <- function(results){
   return(mean(results$frac.drivers.delayed,na.rm=T))
 }

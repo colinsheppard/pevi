@@ -5,7 +5,8 @@
 ###################################################################################################
 
 #optim.code <- 'min-cost-constrained-by-frac-delayed'
-optim.code <- 'min-cost-constrained-by-frac-stranded-50-50'
+#optim.code <- 'min-cost-constrained-by-frac-stranded-50-50'
+optim.code <- 'min-frac-stranded-constrained-by-cost-50-50'
 
 ###################################################################################################
 # decision.vars       data.frame containing the names and bounds of the variables to alter in the 

@@ -8,7 +8,10 @@ base.path <- '/Users/sheppardc/Dropbox/serc/pev-colin/'
 
 
 #optim.code <- 'linked-min-cost-constrained-by-frac-stranded-50-50'
-optim.code <- 'min-cost-constrained-by-frac-stranded-50-50'
+#optim.code <- 'linked-min-cost-constrained-by-frac-stranded-75-25'
+#optim.code <- 'linked-min-cost-constrained-by-frac-stranded-25-75'
+#optim.code <- 'min-cost-constrained-by-frac-stranded-50-50'
+optim.code <- 'thresh-1-linked-min-cost-constrained-by-frac-stranded-50-50'
 optim.code.date <- paste(optim.code,"-",format(Sys.time(), "%Y%m%d"),sep='')
 
 link.pens <- str_detect(optim.code,"linked")
@@ -20,6 +23,7 @@ path.to.google <- paste(base.path,'pev-shared/data/google-earth/',sep='')
 
 make.dir(paste(path.to.outputs,"plots",sep=''))
 make.dir(paste(path.to.outputs,"plots/",optim.code.date,sep=''))
+make.dir(paste(path.to.google,"buildout",sep=''))
 
 nl.path <- "/Applications/NetLogo\ 5.0.3"
 model.path <- paste(path.to.pevi,"netlogo/PEVI-nolog.nlogo",sep='')
@@ -37,6 +41,7 @@ agg.taz@data$ID <- unlist(lapply(agg.taz@polygons,function(x){slot(x,'ID')}))
 #pev.penetration <- 0.005
 for(pev.penetration in c(0.005,0.01,0.02,0.04)){
   build.files <- data.frame(file=list.files(path.to.outputs,paste('^buildout-pen',pev.penetration*100,'.*csv',sep='')),stringsAsFactors=F)
+  if(nrow(build.files)==0)next
   build.files$iter <- as.numeric(sapply(strsplit(build.files$file,'-iter',fixed=T),function(x){ strsplit(x[2],'-',fixed=T)[[1]][1] }))
   build.files <- build.files[order(build.files$iter),]
   n.iter <- nrow(build.files)
@@ -63,6 +68,16 @@ for(pev.penetration in c(0.005,0.01,0.02,0.04)){
   build.res$name <- reorder(build.res$name,build.res$first)
 
   if(!link.pens){
+    agg.taz$L2 <- NA
+    agg.taz$L3 <- NA
+    for(taz.i in 1:52){
+      agg.taz$L2[which(agg.taz$id==taz.i)] <- build.res$chargers[build.res$taz == taz.i & build.res$iter==n.iter & build.res$level==2]
+      agg.taz$L3[which(agg.taz$id==taz.i)] <- build.res$chargers[build.res$taz == taz.i & build.res$iter==n.iter & build.res$level==3]
+    }
+    chargers.to.kml(agg.taz,paste(path.to.google,'buildout/',optim.code,'-pen',100*pev.penetration,'.kml',sep=''),paste('Buildout Pen ',100*pev.penetration,'% Optimization: ',optim.code,sep=''),'Color denotes total chargers in each TAZ with L3 counting for 2 chargers (click to get actual # chargers).','red',1.5,c.map,id.col='ID',name.col='name',description.cols=c('id','name','L2','L3','weighted.demand','frac.homes'))
+  }
+
+  if(!link.pens){
     # facet by name
     p <- ggplot(subset(build.res,level>0),aes(x=iter,y=chargers,fill=factor(level),width=1))+geom_bar(stat='identity')+facet_wrap(~name)+opts(title=paste("Loading Order, ",pev.penetration*100,"% Penetration",sep='')) + labs(x="Nth Charger Added", y="Cumulative Number of Chargers in Zone",fill="Charger Level") 
     ggsave(paste(path.to.outputs,"plots/",optim.code.date,"/loading-order-pen",pev.penetration*100,".pdf",sep=''),p,width=15,height=11)
@@ -78,3 +93,13 @@ build.res$name <- reorder(build.res$name,build.res$first)
 pen.transitions <- ddply(build.res,.(pen),function(df){ df$iter[1] })
 p <- ggplot(subset(build.res,level>0),aes(x=iter,y=chargers,fill=factor(level),width=1))+geom_bar(stat='identity')+geom_vline(data=pen.transitions,aes(xintercept=V1),colour='grey')+facet_wrap(~name)+opts(title=paste("Loading Order, Linked Penetrations",sep='')) + labs(x="Nth Charger Added", y="Cumulative Number of Chargers in Zone",fill="Charger Level") 
 ggsave(paste(path.to.outputs,"plots/",optim.code.date,"/loading-order-linked-pens.pdf",sep=''),p,width=15,height=11)
+
+
+n.iter <- max(build.res$iter)
+agg.taz$L2 <- NA
+agg.taz$L3 <- NA
+for(taz.i in 1:52){
+  agg.taz$L2[which(agg.taz$id==taz.i)] <- build.res$chargers[build.res$taz == taz.i & build.res$iter==n.iter & build.res$level==2]
+  agg.taz$L3[which(agg.taz$id==taz.i)] <- build.res$chargers[build.res$taz == taz.i & build.res$iter==n.iter & build.res$level==3]
+}
+chargers.to.kml(agg.taz,paste(path.to.google,'buildout/',optim.code,'.kml',sep=''),paste('Linked Buildout: ',optim.code,sep=''),'Color denotes total chargers in each TAZ with L3 counting for 2 chargers (click to get actual # chargers).','red',1.5,c.map,id.col='ID',name.col='name',description.cols=c('id','name','L2','L3','weighted.demand','frac.homes'))

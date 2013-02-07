@@ -3,9 +3,8 @@ options(java.parameters="-Xmx2048m")
 library(colinmisc)
 load.libraries(c('ggplot2','yaml','RNetLogo','plyr','reshape'))
 
-#base.path <- '/Users/critter/Dropbox/serc/pev-colin/'
-#base.path <- '/Users/critter/Dropbox/serc/pev-colin/'
-base.path <- '/Users/sheppardc/Dropbox/serc/pev-colin/'
+base.path <- '/Users/critter/Dropbox/serc/pev-colin/'
+#base.path <- '/Users/sheppardc/Dropbox/serc/pev-colin/'
 #base.path <- '/Users/Raskolnikovbot3001/Dropbox/'
 
 exp.name <- commandArgs(trailingOnly=T)[1]

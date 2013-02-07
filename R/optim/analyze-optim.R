@@ -29,7 +29,7 @@ names(agg.taz@data) <- c('row',taz.shp.fieldnames)
 agg.taz@data$ID <- unlist(lapply(agg.taz@polygons,function(x){slot(x,'ID')}))
 
 for(pev.penetration in c(0.005,0.01,0.02,0.04)){
-  #pev.penetration <- 0.01
+  #pev.penetration <- 0.02
   load(paste(path.to.outputs,optim.code,"/0saved-state-pen",pev.penetration*100,".Rdata",sep=''))
 
   final.gen <- gen.num - 1

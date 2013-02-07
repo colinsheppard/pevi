@@ -7,10 +7,12 @@ base.path <- '/Users/wave/Dropbox/HSU/'
 #base.path <- '/Users/sheppardc/Dropbox/serc/pev-colin/'
 #base.path <- '/Users/Raskolnikovbot3001/Dropbox/'
 
-link.pens <- F 
+overwrite <- F
 
-#optim.code <- 'linked-min-cost-constrained-by-frac-stranded-50-50'
-optim.code <- 'min-cost-constrained-by-frac-stranded-50-50'
+link.pens <- T 
+
+optim.code <- 'linked-min-cost-constrained-by-frac-stranded-25-75'
+#optim.code <- 'min-cost-constrained-by-frac-stranded-50-50'
 optim.code.date <- paste(optim.code,"-",format(Sys.time(), "%Y%m%d"),sep='')
 
 path.to.pevi <- paste(base.path,'pevi/',sep='')
@@ -20,6 +22,10 @@ path.to.google <- paste(base.path,'pev-shared/data/google-earth/',sep='')
 
 make.dir(paste(path.to.outputs,"plots",sep=''))
 make.dir(paste(path.to.outputs,"plots/",optim.code.date,sep=''))
+
+if(overwrite){
+unlink(paste(path.to.outputs,"plots/",optim.code.date,sep=''))
+}
 
 nl.path <- "/Applications/NetLogo\ 5.0.3"
 model.path <- paste(path.to.pevi,"netlogo/PEVI-nolog.nlogo",sep='')

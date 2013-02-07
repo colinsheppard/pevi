@@ -2,7 +2,8 @@ library(colinmisc)
 Sys.setenv(NOAWT=1)
 load.libraries(c('ggplot2','yaml','stringr','RNetLogo','maptools','reshape','colorRamps'))
 
-base.path <- '/Users/critter/Dropbox/serc/pev-colin/'
+base.path <- '/Users/wave/Dropbox/HSU/'
+#base.path <- '/Users/critter/Dropbox/serc/pev-colin/'
 #base.path <- '/Users/sheppardc/Dropbox/serc/pev-colin/'
 #base.path <- '/Users/Raskolnikovbot3001/Dropbox/'
 
@@ -60,6 +61,17 @@ for(pev.penetration in c(0.005,0.01,0.02,0.04)){
   first <- ddply(build.res,.(taz),function(df){ data.frame(first=ifelse(sum(df$chargers)>0,subset(df,chargers>0)$iter[1],9999)) })
   build.res$first <- first$first[match(build.res$taz,first$taz)]
   build.res$name <- reorder(build.res$name,build.res$first)
+
+  final.infra <- subset(build.res,iter==n.iter)
+  agg.taz@data$L2 <- NA
+  agg.taz@data$L3 <- NA
+  for(taz.id in 1:52){
+    agg.taz@data$L2[which(agg.taz@data$id == taz.id)] <- final.infra$chargers[which(final.infra$level==2 & final.infra$taz==taz.id)]
+    agg.taz@data$L3[which(agg.taz@data$id == taz.id)] <- final.infra$chargers[which(final.infra$level==3 & final.infra$taz==taz.id)]
+  }
+
+  c.map <- paste(map.color(agg.taz@data$L2,blue2red(50)),'7F',sep='')
+  chargers.to.kml(agg.taz,paste(path.to.outputs,"plots/",optim.code.date,"/loading-order-pen",pev.penetration*100,".kml",sep=''),paste('Pen ',100*pev.penetration,'% Optimization: ',optim.code,sep=''),'Color denotes total chargers in each TAZ with L3 counting for 2 chargers (click to get actual # chargers).','red',1.5,c.map,id.col='ID',name.col='name',description.cols=c('id','name','L2','L3','weighted.demand','frac.homes'))
 
   if(!link.pens){
     # facet by name

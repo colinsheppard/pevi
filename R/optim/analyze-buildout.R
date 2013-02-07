@@ -2,15 +2,16 @@ library(colinmisc)
 Sys.setenv(NOAWT=1)
 load.libraries(c('ggplot2','yaml','stringr','RNetLogo','maptools','reshape','colorRamps'))
 
-base.path <- '/Users/critter/Dropbox/serc/pev-colin/'
-#base.path <- '/Users/sheppardc/Dropbox/serc/pev-colin/'
+#base.path <- '/Users/critter/Dropbox/serc/pev-colin/'
+base.path <- '/Users/sheppardc/Dropbox/serc/pev-colin/'
 #base.path <- '/Users/Raskolnikovbot3001/Dropbox/'
 
-link.pens <- F 
 
 #optim.code <- 'linked-min-cost-constrained-by-frac-stranded-50-50'
 optim.code <- 'min-cost-constrained-by-frac-stranded-50-50'
 optim.code.date <- paste(optim.code,"-",format(Sys.time(), "%Y%m%d"),sep='')
+
+link.pens <- str_detect(optim.code,"linked")
 
 path.to.pevi <- paste(base.path,'pevi/',sep='')
 path.to.inputs <- paste(base.path,'pev-shared/data/inputs/buildout/',optim.code,'/',sep='')

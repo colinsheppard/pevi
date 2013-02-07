@@ -83,13 +83,19 @@ chargers.to.kml <- function(shp,kml.filename,kmlname="KML Name", kmldescription=
 		<open>1</open>"
   placemark.styles <- ddply(rbind(shp@data,shp.sparse),.(row),function(df){ 
     data.frame(style=paste("<Style id=\"placemark_",df$name,"\">
-		<IconStyle>
-			<scale>2.0</scale>
+		<IconStyle>",
+		if(sum(round(c(df$L2,df$L3)))<1) "<color>00ffffff</color>
+		<scale>2.0</scale>" 
+		else 
+		"<scale>2.0</scale>","
 			<Icon>
 				<href>http://www.schatzlab.org/images/pev-charger-icons/charger-icon-",roundC(df$L2,0),"-",roundC(df$L3,0),".png</href>
 			</Icon>
 			<hotSpot x=\"0.5\" y=\"0\" xunits=\"fraction\" yunits=\"fraction\"/>
-		</IconStyle>
+		</IconStyle>",
+		if(sum(round(c(df$L2,df$L3)))==0) "<LabelStyle>
+			<color>00ffffff</color>
+			</LabelStyle>","
   </Style>",sep=''),stringsAsFactors=F)
   })$style
   placemark.kml <- c("<Folder><name>Regular Zones</name><open>1</open>

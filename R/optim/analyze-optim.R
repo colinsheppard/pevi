@@ -42,7 +42,7 @@ for(pev.penetration in c(0.005,0.01,0.02,0.04)){
   tot.by.taz <- ddply(ptx.m,.(taz),function(df){
                      sum.weights <- rep(1,nrow(df))
                      sum.weights[df$level==3] <- 2
-                     data.frame(charger.score=2*mean(df$value*sum.weights),L2=mean(df$value[df$level==2]),L3=mean(df$value[df$level==3]))})
+                     data.frame(charger.score=2*mean(df$value*sum.weights),L2=median(df$value[df$level==2]),L3=median(df$value[df$level==3]))})
   tot.by.taz$name <- agg.taz$name[match(tot.by.taz$taz,agg.taz$id)]
   tot.to.plot <- melt(tot.by.taz,id.vars=c('taz','name'),measure.vars=c('L2','L3'))
   tot.to.plot$order <- match(1:nrow(tot.to.plot),order(tot.by.taz$charger.score[match(tot.to.plot$taz,tot.by.taz$taz)],decreasing=T))

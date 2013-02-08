@@ -2,8 +2,8 @@ library(colinmisc)
 Sys.setenv(NOAWT=1)
 load.libraries(c('yaml','stringr','RNetLogo','maptools','reshape','colorRamps','ggplot2'))
 
-base.path <- '/Users/sheppardc/Dropbox/serc/pev-colin/'
-#base.path <- '/Users/critter/Dropbox/serc/pev-colin/'
+#base.path <- '/Users/sheppardc/Dropbox/serc/pev-colin/'
+base.path <- '/Users/critter/Dropbox/serc/pev-colin/'
 path.to.pevi <- paste(base.path,'pevi/',sep='')
 path.to.inputs <- paste(base.path,'pev-shared/data/inputs/optim/',sep='')
 path.to.outputs <- paste(base.path,'pev-shared/data/outputs/optim/',sep='')
@@ -56,6 +56,16 @@ for(pev.penetration in c(0.005,0.01,0.02,0.04)){
   agg.taz@data$frac.homes <- roundC(agg.taz@data$frac.homes,3)
   c.map <- paste(map.color(agg.taz@data$charger.score,blue2red(50)),'7F',sep='')
   chargers.to.kml(agg.taz,paste(path.to.google,'optim/',optim.code,'-pen',100*pev.penetration,'.kml',sep=''),paste('Pen ',100*pev.penetration,'% Optimization: ',optim.code,sep=''),'Color denotes total chargers in each TAZ with L3 counting for 2 chargers (click to get actual # chargers).','red',1.5,c.map,id.col='ID',name.col='name',description.cols=c('id','name','L2','L3','weighted.demand','frac.homes'))
+  to.csv <- agg.taz@data[,c('id','name','L2','L3')]
+  to.csv$cost <- 8 * to.csv$L2 + 50 * to.csv$L3
+  to.csv$power <- 6.6 * to.csv$L2 + 30 * to.csv$L3
+  write.csv(to.csv,file=paste(path.to.google,'optim/',optim.code,'-mean-of-ptx-pen',100*pev.penetration,'.csv',sep=''),row.names=F)
+  agg.taz@data$L2 <- all.ptx[which.min(all.ptx[,'fitness',final.gen]),1:52,final.gen]
+  agg.taz@data$L3 <- all.ptx[which.min(all.ptx[,'fitness',final.gen]),53:104,final.gen]
+  to.csv <- agg.taz@data[,c('id','name','L2','L3')]
+  to.csv$cost <- 8 * to.csv$L2 + 50 * to.csv$L3
+  to.csv$power <- 6.6 * to.csv$L2 + 30 * to.csv$L3
+  write.csv(to.csv,file=paste(path.to.google,'optim/',optim.code,'-min-ptx-pen',100*pev.penetration,'.csv',sep=''),row.names=F)
 }
 
 agg.taz$long <- coordinates(agg.taz)[,1]

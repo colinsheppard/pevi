@@ -7,13 +7,13 @@ base.path <- '/Users/critter/Dropbox/serc/pev-colin/'
 #base.path <- '/Users/sheppardc/Dropbox/serc/pev-colin/'
 #base.path <- '/Users/Raskolnikovbot3001/Dropbox/'
 
-#optim.code <- 'min-cost-constrained-by-frac-stranded-50-50'
+optim.code <- 'min-cost-constrained-by-frac-stranded-50-50'
 #optim.code <- 'linked-min-cost-constrained-by-frac-stranded-50-50'
 #optim.code <- 'linked-min-cost-constrained-by-frac-stranded-25-75'
 #optim.code <- 'linked-min-cost-constrained-by-frac-stranded-75-25'
-optim.code <- 'thresh-1-linked-min-cost-constrained-by-frac-stranded-50-50'
+#optim.code <- 'thresh-1-linked-min-cost-constrained-by-frac-stranded-50-50'
 
-link.pens <- T  # should the infrastructure from lower pens be used as starting place for higher? otherwise,
+link.pens <- F  # should the infrastructure from lower pens be used as starting place for higher? otherwise,
                 # infrastructure is reset to zero
 
 num.cpu <- 8

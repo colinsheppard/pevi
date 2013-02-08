@@ -7,7 +7,6 @@ base.path <- '/Users/wave/Dropbox/HSU/'
 #base.path <- '/Users/sheppardc/Dropbox/serc/pev-colin/'
 #base.path <- '/Users/Raskolnikovbot3001/Dropbox/'
 
-
 #optim.code <- 'linked-min-cost-constrained-by-frac-stranded-50-50'
 #optim.code <- 'linked-min-cost-constrained-by-frac-stranded-75-25'
 #optim.code <- 'linked-min-cost-constrained-by-frac-stranded-25-75'

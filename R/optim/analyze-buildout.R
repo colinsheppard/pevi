@@ -2,8 +2,8 @@ library(colinmisc)
 Sys.setenv(NOAWT=1)
 load.libraries(c('ggplot2','yaml','stringr','RNetLogo','maptools','reshape','colorRamps'))
 
-base.path <- '/Users/wave/Dropbox/HSU/'
-#base.path <- '/Users/critter/Dropbox/serc/pev-colin/'
+#base.path <- '/Users/wave/Dropbox/HSU/'
+base.path <- '/Users/critter/Dropbox/serc/pev-colin/'
 #base.path <- '/Users/sheppardc/Dropbox/serc/pev-colin/'
 #base.path <- '/Users/Raskolnikovbot3001/Dropbox/'
 
@@ -32,11 +32,9 @@ source(paste(path.to.pevi,'R/gis-functions.R',sep=''))
 source(paste(path.to.pevi,"R/optim/buildout-functions.R",sep='')) 
 
 # load aggregated tazs
-agg.taz <- readShapePoly(paste(path.to.google,'aggregated-taz-with-weights/aggregated-taz-with-weights',sep=''))
+agg.taz <- readShapePoly(paste(path.to.google,'aggregated-taz-with-weights/aggregated-taz-with-weights',sep=''),IDvar="ID")
 load(paste(path.to.google,'aggregated-taz-with-weights/aggregated-taz-with-weights-fieldnames.Rdata',sep=''))
-names(agg.taz@data) <- c('row',taz.shp.fieldnames)
-agg.taz@data$ID <- unlist(lapply(agg.taz@polygons,function(x){slot(x,'ID')}))
-
+names(agg.taz@data) <- c("SP_ID",taz.shp.fieldnames)
 
 #pev.penetration <- 0.005
 for(pev.penetration in c(0.005,0.01,0.02,0.04)){
@@ -67,6 +65,7 @@ for(pev.penetration in c(0.005,0.01,0.02,0.04)){
   build.res$first <- first$first[match(build.res$taz,first$taz)]
   build.res$name <- reorder(build.res$name,build.res$first)
 
+
   if(!link.pens){
     agg.taz$L2 <- NA
     agg.taz$L3 <- NA
@@ -74,7 +73,7 @@ for(pev.penetration in c(0.005,0.01,0.02,0.04)){
       agg.taz$L2[which(agg.taz$id==taz.i)] <- build.res$chargers[build.res$taz == taz.i & build.res$iter==n.iter & build.res$level==2]
       agg.taz$L3[which(agg.taz$id==taz.i)] <- build.res$chargers[build.res$taz == taz.i & build.res$iter==n.iter & build.res$level==3]
     }
-    chargers.to.kml(agg.taz,paste(path.to.google,'buildout/',optim.code,'-pen',100*pev.penetration,'.kml',sep=''),paste('Buildout Pen ',100*pev.penetration,'% Optimization: ',optim.code,sep=''),'Color denotes total chargers in each TAZ with L3 counting for 2 chargers (click to get actual # chargers).','red',1.5,c.map,id.col='ID',name.col='name',description.cols=c('id','name','L2','L3','weighted.demand','frac.homes'))
+    chargers.to.kml(agg.taz,paste(path.to.google,'buildout/',optim.code,'-pen',100*pev.penetration,'.kml',sep=''),paste('Buildout Pen ',100*pev.penetration,'% Optimization: ',optim.code,sep=''),'Color denotes total chargers in each TAZ with L3 counting for 2 chargers (click to get actual # chargers).','red',1.5,'blue',id.col='ID',name.col='name',description.cols=c('id','name','L2','L3','weighted.demand','frac.homes'))
     to.csv <- agg.taz@data[,c('id','name','L2','L3')]
     to.csv$cost <- 8 * to.csv$L2 + 50 * to.csv$L3
     to.csv$power <- 6.6 * to.csv$L2 + 30 * to.csv$L3
@@ -85,6 +84,9 @@ for(pev.penetration in c(0.005,0.01,0.02,0.04)){
     # facet by name
     p <- ggplot(subset(build.res,level>0),aes(x=iter,y=chargers,fill=factor(level),width=1))+geom_bar(stat='identity')+facet_wrap(~name)+opts(title=paste("Loading Order, ",pev.penetration*100,"% Penetration",sep='')) + labs(x="Nth Charger Added", y="Cumulative Number of Chargers in Zone",fill="Charger Level") 
     ggsave(paste(path.to.outputs,"plots/",optim.code.date,"/loading-order-pen",pev.penetration*100,".pdf",sep=''),p,width=15,height=11)
+    # plot the optimality curve
+    p <- ggplot(subset(build.res,taz==0),aes(x=cost,y=pain*100))+geom_point()+scale_x_continuous(limits=c(0,max(subset(build.res,taz==0)$cost)))+scale_y_continuous(limits=c(0,max(subset(build.res,taz==0)$pain*100)))
+    ggsave(paste(path.to.outputs,"plots/",optim.code.date,"/optim-curve-pen",pev.penetration*100,".pdf",sep=''),p,width=11,height=11)
   }
 }
 
@@ -106,7 +108,7 @@ for(taz.i in 1:52){
   agg.taz$L2[which(agg.taz$id==taz.i)] <- build.res$chargers[build.res$taz == taz.i & build.res$iter==n.iter & build.res$level==2]
   agg.taz$L3[which(agg.taz$id==taz.i)] <- build.res$chargers[build.res$taz == taz.i & build.res$iter==n.iter & build.res$level==3]
 }
-chargers.to.kml(agg.taz,paste(path.to.google,'buildout/',optim.code,'.kml',sep=''),paste('Linked Buildout: ',optim.code,sep=''),'Color denotes total chargers in each TAZ with L3 counting for 2 chargers (click to get actual # chargers).','red',1.5,c.map,id.col='ID',name.col='name',description.cols=c('id','name','L2','L3','weighted.demand','frac.homes'))
+chargers.to.kml(agg.taz,paste(path.to.google,'buildout/',optim.code,'.kml',sep=''),paste('Linked Buildout: ',optim.code,sep=''),'Color denotes total chargers in each TAZ with L3 counting for 2 chargers (click to get actual # chargers).','red',1.5,'blue',id.col='ID',name.col='name',description.cols=c('id','name','L2','L3','weighted.demand','frac.homes'))
 to.csv <- agg.taz@data[,c('id','name','L2','L3')]
 to.csv$cost <- 8 * to.csv$L2 + 50 * to.csv$L3
 to.csv$power <- 6.6 * to.csv$L2 + 30 * to.csv$L3

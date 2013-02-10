@@ -24,10 +24,9 @@ source(paste(path.to.pevi,"R/optim/constraints.R",sep=''))
 source(paste(path.to.pevi,"R/reporters-loggers.R",sep=''))
 
 # load aggregated tazs
-agg.taz <- readShapePoly(paste(path.to.google,'aggregated-taz-with-weights/aggregated-taz-with-weights',sep=''))
+agg.taz <- readShapePoly(paste(path.to.google,'aggregated-taz-with-weights/aggregated-taz-with-weights',sep=''),IDvar="ID")
 load(paste(path.to.google,'aggregated-taz-with-weights/aggregated-taz-with-weights-fieldnames.Rdata',sep=''))
-names(agg.taz@data) <- c('row',taz.shp.fieldnames)
-agg.taz@data$ID <- unlist(lapply(agg.taz@polygons,function(x){slot(x,'ID')}))
+names(agg.taz@data) <- c("SP_ID",taz.shp.fieldnames)
 
 for(pev.penetration in c(0.005,0.01,0.02,0.04)){
   #pev.penetration <- 0.02

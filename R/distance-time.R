@@ -12,12 +12,9 @@ path.to.pevi   <- '~/Dropbox/serc/pev-colin/pevi/'
 
 source(paste(path.to.pevi,'R/gis-functions.R',sep=''))
 
-agg.taz <- readShapePoly(paste(path.to.google,'aggregated-taz-with-weights/aggregated-taz-with-weights',sep=''))
+agg.taz <- readShapePoly(paste(path.to.google,'aggregated-taz-with-weights/aggregated-taz-with-weights',sep=''),IDvar="ID")
 load(paste(path.to.google,'aggregated-taz-with-weights/aggregated-taz-with-weights-fieldnames.Rdata',sep=''))
-names(agg.taz@data) <- c('row',taz.shp.fieldnames)
-for(i in 1:nrow(agg.taz@data)){
-  agg.taz@data$shp.id[i] <- as.numeric(slot(slot(agg.taz[i,],"polygons")[[1]],"ID"))
-}
+names(agg.taz@data) <- c("SP_ID",taz.shp.fieldnames)
 rm('taz') 
 
 pts <- readShapePoints(paste(path.to.google,'TAZ-Centers/TAZ-Centers',sep=''))

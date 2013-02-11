@@ -118,7 +118,7 @@ chargers.to.kml <- function(shp,kml.filename,kmlname="KML Name", kmldescription=
 				<styleUrl>#placemark_",df$name,"</styleUrl>
 				<Point>
 					<coordinates>",
-					ifelse(any(df$name==hard.code.coords$name),paste(hard.code.coords$lon,",",hard.code.coords$lat,",",0),paste(df$long,",",df$lat,",0")),"</coordinates>
+					ifelse(any(df$name==hard.code.coords$name),paste(hard.code.coords[hard.code.coords$name==df$name,"lon"],",",hard.code.coords[hard.code.coords$name==df$name,"lat"],",",0),paste(df$long,",",df$lat,",0")),"</coordinates>
 				</Point>
 			</Placemark>",sep=''),stringsAsFactors=F)
   })$placemark,"</Folder>")
@@ -143,7 +143,8 @@ chargers.to.kml <- function(shp,kml.filename,kmlname="KML Name", kmldescription=
 				<name>",df$name,"</name>
 				<styleUrl>#placemark_",df$name,"</styleUrl>
 				<Point>
-					<coordinates>",df$long,",",df$lat,",0</coordinates>
+					<coordinates>",
+					ifelse(any(df$name==hard.code.coords$name),paste(hard.code.coords[hard.code.coords$name==df$name,"lon"],",",hard.code.coords[hard.code.coords$name==df$name,"lat"],",",0),paste(df$long,",",df$lat,",0")),"</coordinates>
 				</Point>
 			</Placemark>",sep=''),stringsAsFactors=F)
   })$placemark,"</Folder>")
@@ -174,9 +175,9 @@ chargers.to.kml <- function(shp,kml.filename,kmlname="KML Name", kmldescription=
           <name>",df$name,"</name>
           <styleUrl>#placemark_",df$name,"</styleUrl>
           <Point>
-            <coordinates>",
-					ifelse(any(df$name==hard.code.coords$name),paste(hard.code.coords$lon,",",hard.code.coords$lat,",",0),paste(df$long,",",df$lat,",0")),"</coordinates>
-          </Point>
+						<coordinates>",
+						ifelse(any(df$name==hard.code.coords$name),paste(hard.code.coords[hard.code.coords$name==df$name,"lon"],",",hard.code.coords[hard.code.coords$name==df$name,"lat"],",",0),paste(df$long,",",df$lat,",0")),"</coordinates>
+					</Point>
         </Placemark>",sep=''),stringsAsFactors=F)
     })$placemark)
     dense.placemark.kml <- c(dense.placemark.kml,"</Folder>")

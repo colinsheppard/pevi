@@ -30,7 +30,7 @@ for(file.param in names(vary)[grep("-file",names(vary))]){
 # setup the data frame containing all combinations of those parameter values
 vary.tab.original <- expand.grid(vary,stringsAsFactors=F)
 
-pev.penetration <- 0.02
+pev.penetration <- 0.01
 
 for(pev.penetration in c(0.005,0.01,0.02,0.04)){
   print(paste("pen",pev.penetration))
@@ -80,9 +80,9 @@ for(pev.penetration in c(0.005,0.01,0.02,0.04)){
 
     for(i in 1:n){
       if(i<53){
-        all.ptx[,i,gen.num] <- round(rnorm(np,0,1.2))
+        all.ptx[,i,gen.num] <- round(rnorm(np,0,0.4))
       }else{
-        all.ptx[,i,gen.num] <- round(rnorm(np,0,0.36667))
+        all.ptx[,i,gen.num] <- round(rnorm(np,0,0.16667))
       }
       all.ptx[,i,gen.num][all.ptx[,i,gen.num]<0] <- 0
       #all.ptx[,i,gen.num] <- sample(seq(decision.vars$lbound[i],decision.vars$ubound[i]),np,replace=T)

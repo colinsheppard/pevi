@@ -2,8 +2,8 @@ library(colinmisc)
 Sys.setenv(NOAWT=1)
 load.libraries(c('yaml','stringr','RNetLogo','maptools','reshape','colorRamps','ggplot2'))
 
-base.path <- '/Users/sheppardc/Dropbox/serc/pev-colin/'
-#base.path <- '/Users/critter/Dropbox/serc/pev-colin/'
+#base.path <- '/Users/sheppardc/Dropbox/serc/pev-colin/'
+base.path <- '/Users/critter/Dropbox/serc/pev-colin/'
 path.to.pevi <- paste(base.path,'pevi/',sep='')
 path.to.inputs <- paste(base.path,'pev-shared/data/inputs/optim/',sep='')
 path.to.outputs <- paste(base.path,'pev-shared/data/outputs/optim/',sep='')
@@ -13,6 +13,7 @@ model.path <- paste(path.to.pevi,"netlogo/PEVI-nolog.nlogo",sep='')
 
 #optim.code <- 'min-cost-constrained-by-frac-delayed'
 optim.code <- 'min-cost-constrained-by-frac-stranded'
+optim.code <- 'min-cost-constrained-by-frac-stranded-50-50'
 #optim.code <- 'min-cost-constrained-by-num-stranded'
 
 source(paste(path.to.pevi,"R/hard-coded-coords.R",sep=''))
@@ -24,13 +25,12 @@ source(paste(path.to.pevi,"R/optim/constraints.R",sep=''))
 source(paste(path.to.pevi,"R/reporters-loggers.R",sep=''))
 
 # load aggregated tazs
-agg.taz <- readShapePoly(paste(path.to.google,'aggregated-taz-with-weights/aggregated-taz-with-weights',sep=''))
+agg.taz <- readShapePoly(paste(path.to.google,'aggregated-taz-with-weights/aggregated-taz-with-weights',sep=''),IDvar="ID")
 load(paste(path.to.google,'aggregated-taz-with-weights/aggregated-taz-with-weights-fieldnames.Rdata',sep=''))
-names(agg.taz@data) <- c('row',taz.shp.fieldnames)
-agg.taz@data$ID <- unlist(lapply(agg.taz@polygons,function(x){slot(x,'ID')}))
+names(agg.taz@data) <- c("SP_ID",taz.shp.fieldnames)
 
 for(pev.penetration in c(0.005,0.01,0.02,0.04)){
-  #pev.penetration <- 0.01
+  #pev.penetration <- 0.02
   load(paste(path.to.outputs,optim.code,"/0saved-state-pen",pev.penetration*100,".Rdata",sep=''))
 
   final.gen <- gen.num - 1
@@ -42,7 +42,7 @@ for(pev.penetration in c(0.005,0.01,0.02,0.04)){
   tot.by.taz <- ddply(ptx.m,.(taz),function(df){
                      sum.weights <- rep(1,nrow(df))
                      sum.weights[df$level==3] <- 2
-                     data.frame(charger.score=2*mean(df$value*sum.weights),L2=mean(df$value[df$level==2]),L3=mean(df$value[df$level==3]))})
+                     data.frame(charger.score=2*mean(df$value*sum.weights),L2=median(df$value[df$level==2]),L3=median(df$value[df$level==3]))})
   tot.by.taz$name <- agg.taz$name[match(tot.by.taz$taz,agg.taz$id)]
   tot.to.plot <- melt(tot.by.taz,id.vars=c('taz','name'),measure.vars=c('L2','L3'))
   tot.to.plot$order <- match(1:nrow(tot.to.plot),order(tot.by.taz$charger.score[match(tot.to.plot$taz,tot.by.taz$taz)],decreasing=T))
@@ -55,7 +55,17 @@ for(pev.penetration in c(0.005,0.01,0.02,0.04)){
   agg.taz@data$weighted.demand <- roundC(agg.taz@data$weighted.demand,0)
   agg.taz@data$frac.homes <- roundC(agg.taz@data$frac.homes,3)
   c.map <- paste(map.color(agg.taz@data$charger.score,blue2red(50)),'7F',sep='')
-  shp.to.kml(agg.taz,paste(path.to.google,'optim/',optim.code,'-pen',100*pev.penetration,'.kml',sep=''),paste('Pen ',100*pev.penetration,'% Optimization: ',optim.code,sep=''),'Color denotes total chargers in each TAZ with L3 counting for 2 chargers (click to get actual # chargers).','red',1.5,c.map,id.col='ID',name.col='name',description.cols=c('id','name','L2','L3','weighted.demand','frac.homes'))
+  chargers.to.kml(agg.taz,paste(path.to.google,'optim/',optim.code,'-pen',100*pev.penetration,'.kml',sep=''),paste('Pen ',100*pev.penetration,'% Optimization: ',optim.code,sep=''),'Color denotes total chargers in each TAZ with L3 counting for 2 chargers (click to get actual # chargers).','red',1.5,c.map,id.col='ID',name.col='name',description.cols=c('id','name','L2','L3','weighted.demand','frac.homes'))
+  to.csv <- agg.taz@data[,c('id','name','L2','L3')]
+  to.csv$cost <- 8 * to.csv$L2 + 50 * to.csv$L3
+  to.csv$power <- 6.6 * to.csv$L2 + 30 * to.csv$L3
+  write.csv(to.csv,file=paste(path.to.google,'optim/',optim.code,'-mean-of-ptx-pen',100*pev.penetration,'.csv',sep=''),row.names=F)
+  agg.taz@data$L2 <- all.ptx[which.min(all.ptx[,'fitness',final.gen]),1:52,final.gen]
+  agg.taz@data$L3 <- all.ptx[which.min(all.ptx[,'fitness',final.gen]),53:104,final.gen]
+  to.csv <- agg.taz@data[,c('id','name','L2','L3')]
+  to.csv$cost <- 8 * to.csv$L2 + 50 * to.csv$L3
+  to.csv$power <- 6.6 * to.csv$L2 + 30 * to.csv$L3
+  write.csv(to.csv,file=paste(path.to.google,'optim/',optim.code,'-min-ptx-pen',100*pev.penetration,'.csv',sep=''),row.names=F)
 }
 
 agg.taz$long <- coordinates(agg.taz)[,1]

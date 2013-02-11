@@ -5,7 +5,8 @@
 ###################################################################################################
 
 #optim.code <- 'min-cost-constrained-by-frac-delayed'
-optim.code <- 'min-cost-constrained-by-frac-stranded-50-50'
+#optim.code <- 'min-cost-constrained-by-frac-stranded-50-50'
+optim.code <- 'min-frac-stranded-constrained-by-cost-50-50'
 
 ###################################################################################################
 # decision.vars       data.frame containing the names and bounds of the variables to alter in the 
@@ -45,7 +46,7 @@ constraint.params <- list()
 constraint.params[['max.frac.drivers.delayed']] <- 0.03
 constraint.params[['max.frac.stranded']] <- 0.01
 constraint.params[['max.num.stranded']] <- 1
-constraint.params[['max.cost']] <- 500
+constraint.params[['max.cost']] <- 200
 
 ###################################################################################################
 # de.params           

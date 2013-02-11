@@ -17,12 +17,9 @@ path.to.ctpp <- '~/Dropbox/serc/pev-colin/data/CTPP/'
 path.to.nhts <- '~/Dropbox/serc/pev-colin/data/NHTS/'
 path.to.plots <- '~/Dropbox/serc/pev-colin/plots/'
 
-agg.taz <- readShapePoly(paste(path.to.google,'aggregated-taz-with-weights/aggregated-taz-with-weights',sep=''))
+agg.taz <- readShapePoly(paste(path.to.google,'aggregated-taz-with-weights/aggregated-taz-with-weights',sep=''),IDvar="ID")
 load(paste(path.to.google,'aggregated-taz-with-weights/aggregated-taz-with-weights-fieldnames.Rdata',sep=''))
-names(agg.taz@data) <- c('row',taz.shp.fieldnames)
-for(i in 1:nrow(agg.taz@data)){
-  agg.taz@data$shp.id[i] <- as.numeric(slot(slot(agg.taz[i,],"polygons")[[1]],"ID"))
-}
+names(agg.taz@data) <- c("SP_ID",taz.shp.fieldnames)
 rm('taz') 
 
 load(paste(path.to.geatm,"od-aggregated.Rdata",sep=''))

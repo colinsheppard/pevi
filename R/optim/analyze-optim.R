@@ -15,6 +15,7 @@ model.path <- paste(path.to.pevi,"netlogo/PEVI-nolog.nlogo",sep='')
 optim.code <- 'min-cost-constrained-by-frac-stranded'
 #optim.code <- 'min-cost-constrained-by-num-stranded'
 
+source(paste(path.to.pevi,"R/hard-coded-coords.R",sep=''))
 source(paste(path.to.pevi,'R/gis-functions.R',sep=''))
 source(paste(path.to.pevi,"R/optim/optim-functions.R",sep='')) # note this will in turn call optim-config, objectives, and constraints
 source(paste(path.to.pevi,"R/optim/optim-config.R",sep=''))

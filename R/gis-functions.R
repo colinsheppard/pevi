@@ -50,6 +50,8 @@ map.color <- function (x,c.map){
 #description.cols<-NA
 
 chargers.to.kml <- function(shp,kml.filename,kmlname="KML Name", kmldescription="<i>Description</i>",borders='white',lwds=1.5,colors='red',id.col='id',name.col='id',description.cols=NA){
+
+    
   n <- length(shp@polygons)
   if(length(colors)==1)colors <- rep(colors,n)
   if(length(borders)==1)borders <- rep(borders,n)
@@ -115,7 +117,8 @@ chargers.to.kml <- function(shp,kml.filename,kmlname="KML Name", kmldescription=
 				<name>",df$name,"</name>
 				<styleUrl>#placemark_",df$name,"</styleUrl>
 				<Point>
-					<coordinates>",df$long,",",df$lat,",0</coordinates>
+					<coordinates>",
+					ifelse(any(df$name==hard.code.coords$name),paste(hard.code.coords$lon,",",hard.code.coords$lat,",",0),paste(df$long,",",df$lat,",0")),"</coordinates>
 				</Point>
 			</Placemark>",sep=''),stringsAsFactors=F)
   })$placemark,"</Folder>")
@@ -171,7 +174,8 @@ chargers.to.kml <- function(shp,kml.filename,kmlname="KML Name", kmldescription=
           <name>",df$name,"</name>
           <styleUrl>#placemark_",df$name,"</styleUrl>
           <Point>
-            <coordinates>",df$long,",",df$lat,",0</coordinates>
+            <coordinates>",
+					ifelse(any(df$name==hard.code.coords$name),paste(hard.code.coords$lon,",",hard.code.coords$lat,",",0),paste(df$long,",",df$lat,",0")),"</coordinates>
           </Point>
         </Placemark>",sep=''),stringsAsFactors=F)
     })$placemark)

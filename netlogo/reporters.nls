@@ -13,3 +13,15 @@ end
 to-report num-stranded-by-delay
   report count drivers with [(max itin-delay-amount) > stranded-delay-threshold] 
 end
+
+to-report electric-miles-driven
+  report sum [electric-miles-driven-by-driver] of drivers
+end
+
+to-report electric-miles-driven-by-driver
+  ifelse is-bev? [
+    report miles-driven
+  ][
+    report miles-driven - gasoline-used / hybrid-fuel-consumption
+  ]
+end

@@ -17,6 +17,7 @@ model.path <- paste(path.to.pevi,"netlogo/PEVI-nolog.nlogo",sep='')
 #optim.code <- 'min-cost-constrained-by-num-stranded'
 optim.code <- 'min-frac-stranded-constrained-by-cost-50-50'
 
+source(paste(path.to.pevi,"R/hard-coded-coords.R",sep=''))
 source(paste(path.to.pevi,'R/gis-functions.R',sep=''))
 source(paste(path.to.pevi,"R/optim/optim-functions.R",sep='')) # note this will in turn call optim-config, objectives, and constraints
 source(paste(path.to.pevi,"R/optim/optim-config.R",sep=''))
@@ -57,7 +58,8 @@ for(pev.penetration in c(0.005,0.01,0.02,0.04)){
   #agg.taz@data$weighted.demand <- roundC(agg.taz@data$weighted.demand,0)
   #agg.taz@data$frac.homes <- roundC(agg.taz@data$frac.homes,3)
   c.map <- paste(map.color(agg.taz@data$charger.score,blue2red(50)),'7F',sep='')
-  #chargers.to.kml(agg.taz,paste(path.to.google,'optim/',optim.code,'-pen',100*pev.penetration,'.kml',sep=''),paste('Pen ',100*pev.penetration,'% Optimization: ',optim.code,sep=''),'Color denotes total chargers in each TAZ with L3 counting for 2 chargers (click to get actual # chargers).','red',1.5,c.map,id.col='ID',name.col='name',description.cols=c('id','name','L2','L3','weighted.demand','frac.homes'))
+  chargers.to.kml(agg.taz,paste(path.to.google,'optim/',optim.code,'-pen',100*pev.penetration,'.kml',sep=''),paste('Chargers: Pen ',100*pev.penetration,'% Optimization: ',optim.code,sep=''),'Color denotes total chargers in each TAZ with L3 counting for 2 chargers (click to get actual # chargers).','red',1.5,c.map,id.col='ID',name.col='name',description.cols=c('id','name','L2','L3','weighted.demand','frac.homes'))
+  demand.to.kml(agg.taz,paste(path.to.google,'optim/',optim.code,'-pen',100*pev.penetration,'demand.kml',sep=''),paste('Demand: Pen ',100*pev.penetration,'% Optimization: ',optim.code,sep=''),'Color denotes total chargers in each TAZ with L3 counting for 2 chargers (click to get actual # chargers). Icon displays the number of electric vehicles native to the TAZ. Icon image courtesy of Danilo Rizzuti / FreeDigitalPhotos.net','red',1.5,c.map,id.col='ID',name.col='name',description.cols=c('id','name','L2','L3','weighted.demand','frac.homes'))
   to.csv <- agg.taz@data[,c('id','name','L2','L3')]
   to.csv$cost <- 8 * to.csv$L2 + 50 * to.csv$L3
   to.csv$power <- 6.6 * to.csv$L2 + 30 * to.csv$L3

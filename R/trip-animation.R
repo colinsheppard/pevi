@@ -30,7 +30,6 @@ route.ordered.sub <- route.ordered[,c('from_taz','to_taz','start_lon','start_lat
 pev.penetration <- 0.04
 replicate <- 1
 pev.pen.char <- roundC(pev.penetration,3)
-print(paste('Penetration ',pev.penetration,' replicate ',replicate,sep=''))
 sched <- read.table(file=paste(path.to.shared.inputs,"driver-schedule-pen",pev.penetration*100,"-rep",replicate,"-20130129.txt",sep=''),sep='\t',header=T)
 names(sched) <- c('driver','from','to','depart','home')
 sched$ft <- paste(sched$from,sched$to)
@@ -43,47 +42,70 @@ sched <- sched[1:20,]
 
 hum.shp <- unionSpatialPolygons(agg.taz,rep(1,nrow(agg.taz@data)))
 
-rt.inds <- list()
-for(from.i in 1:52){
-  rt.inds[[from.i]] <- list()
-  for(to.i in (1:52)[-from.i]){
-    rt.inds[[from.i]][[to.i]] <- which(route.ordered.sub$from_taz == from.i & route.ordered.sub$to_taz == to.i)
+if(!file.exists(paste(path.to.plots,'route-inds-for-animation.Rdata',sep=''))){
+  rt.inds <- list()
+  for(from.i in 1:52){
+    rt.inds[[from.i]] <- list()
+    for(to.i in (1:52)[-from.i]){
+      rt.inds[[from.i]][[to.i]] <- which(route.ordered.sub$from_taz == from.i & route.ordered.sub$to_taz == to.i)
+    }
   }
+  save(rt.inds,file=paste(path.to.plots,'route-inds-for-animation.Rdata',sep=''))
+}else{
+  load(paste(path.to.plots,'route-inds-for-animation.Rdata',sep=''))
 }
 
 ani.routes <- function(){
+  trail.len <- 15
+  from.to.df <- data.frame(t(combn(52,2)))
+  names(from.to.df) <- c('from','to')
+  from.to.df$num <- 0
   from.to <- list()
-  trail.len <- 20
-  cols <- colorRampPalette(c("black","red"))( trail.len )
-  for(i in 1:nrow(sched)){
-    plot(hum.shp,col='black')
-    trail.i <- (i-1)%%trail.len+1
-    from.i <- sched$from[i]
-    to.i <- sched$to[i]
-    if(from.i==to.i){
-      from.to[[trail.i]] <- list(from=NA,to=NA)
-      next
+  for(i in 1:trail.len){ from.to[[i]] <- from.to.df }
+  cols <- c(colorRampPalette(c("black",colors()[556]))(trail.len-1),colors()[552])
+  trail.i <- 0
+  for(t in seq(0,24,by=5/60)){
+    plot(agg.taz,col=colors()[170])
+    trail.i <- trail.i + 1
+    trail.i <- (trail.i-1)%%trail.len+1
+    from.to[[trail.i]]$num <- 0
+    trips <- subset(sched,depart<=t & depart>t-5/60)
+    if(nrow(trips)>0){
+      for(trip.i in 1:nrow(trips)){
+        from.i <- trips$from[trip.i]
+        to.i <- trips$to[trip.i]
+        if(from.i==to.i){
+          next
+        }else if(to.i < from.i){
+          from.i.temp <- from.i
+          from.i <- to.i
+          to.i <- from.i.temp
+        }
+        found.row <- which(from.to[[trail.i]]$from==from.i & from.to[[trail.i]]$to==to.i)
+        from.to[[trail.i]]$num[found.row] <- from.to[[trail.i]]$num[found.row] + 1   
+      }
     }
+      
     if(i<=trail.len){
-      from.to[[trail.i]] <- list(from=from.i,to=to.i)
       trail.inds <- 1:trail.i
-      col.count <- trail.len-i+1
+      col.count <- trail.len-trail.i+1
     }else{
-      from.to[[trail.i]]$from <- from.i
-      from.to[[trail.i]]$to   <- to.i
       trail.inds <- 1:trail.i
       if(trail.i<trail.len)trail.inds <- c((trail.i+1):trail.len,trail.inds)
       col.count <- 1
     }
-    
+      
     for(trail.plot.i in trail.inds){
-      plot.from.i <- from.to[[trail.plot.i]]$from
-      if(is.na(plot.from.i))next
-      plot.to.i <- from.to[[trail.plot.i]]$to
-      segments(route.ordered.sub$start_lon[rt.inds[[plot.from.i]][[plot.to.i]]],
-                route.ordered.sub$start_lat[rt.inds[[plot.from.i]][[plot.to.i]]],
-                route.ordered.sub$end_lon[rt.inds[[plot.from.i]][[plot.to.i]]],
-                route.ordered.sub$end_lat[rt.inds[[plot.from.i]][[plot.to.i]]],col=cols[col.count],lwd=3)
+      trip.plot.inds <- which(from.to[[trail.plot.i]]$num > 0)
+      if(length(trip.plot.inds)==0)next
+      for(trip.plot.i in trip.plot.inds){
+        plot.from.i <- from.to[[trail.plot.i]]$from[trip.plot.i]
+        plot.to.i   <- from.to[[trail.plot.i]]$to[trip.plot.i]
+        segments(route.ordered.sub$start_lon[rt.inds[[plot.from.i]][[plot.to.i]]],
+                  route.ordered.sub$start_lat[rt.inds[[plot.from.i]][[plot.to.i]]],
+                  route.ordered.sub$end_lon[rt.inds[[plot.from.i]][[plot.to.i]]],
+                  route.ordered.sub$end_lat[rt.inds[[plot.from.i]][[plot.to.i]]],col=cols[col.count],lwd=2*from.to[[trail.plot.i]]$num[trip.plot.i])
+      }
       col.count <- col.count + 1
     }
   }
@@ -93,7 +115,7 @@ ani.options(ffmpeg="/usr/local/bin/ffmpeg")
 saveVideo({
     par(mar = c(3, 3, 1, 0.5), mgp = c(2, 0.5, 0), tcl = -0.3, cex.axis = 0.8, cex.lab = 0.8, 
         cex.main = 1)
-    ani.options(interval = 0.01, nmax = 300)
+    ani.options(interval = 5/60, nmax = 24*30)
 ani.routes()
-},video.name="test.mp4",other.opts="-b 300k")
+},video.name="test.mp4",other.opts="-b 1500k -s 800x950") # make res divisible by 16
 

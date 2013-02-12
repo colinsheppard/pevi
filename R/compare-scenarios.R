@@ -2,8 +2,8 @@ Sys.setenv(NOAWT=1)
 library(colinmisc)
 load.libraries(c('ggplot2','yaml','RNetLogo','plyr','reshape'))
 
-#base.path <- '/Users/critter/Dropbox/serc/pev-colin/'
-base.path <- '/Users/sheppardc/Dropbox/serc/pev-colin/'
+base.path <- '/Users/critter/Dropbox/serc/pev-colin/'
+#base.path <- '/Users/sheppardc/Dropbox/serc/pev-colin/'
 #base.path <- '/Users/Raskolnikovbot3001/Dropbox/'
 
 path.to.pevi <- paste(base.path,'pevi/',sep='')
@@ -178,7 +178,7 @@ soc.at.beg <- ddply(logs[['charging']],.(at.home,vehicle.type),function(df){ dat
 ggplot(soc.at.beg,aes(x=up.to,y=percent,fill=factor(at.home)))+geom_bar(stat='identity',position="dodge")+facet_wrap(~vehicle.type)+labs(fill="Charger Type")
 
 # Home charging power demand
-caps <- c(19.2,2.4,19.2,30)
+caps <- c(6.6,2.4,6.6,30)
 demand <- ddply(logs[['tazs']],.(replicate,time),function(df){ colSums(df[,paste('num.L',0:3,sep='')] - df[,paste('num.avail.L',0:3,sep='')]) * caps })
 demand <- data.frame(logs[['tazs']][,c('replicate','time','taz')],t(apply(logs[['tazs']][,paste('num.L',0:3,sep='')] - logs[['tazs']][,paste('num.avail.L',0:3,sep='')],1,function(x){ x * caps })))
 names(demand) <- c('replicate','time','taz','pow.L0','pow.L1','pow.L2','pow.L3')

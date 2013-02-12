@@ -5,8 +5,8 @@ make.plots  <- F
 num.processors <- 11
 registerDoMC(num.processors)
 
-#base.path <- '/Users/critter/Dropbox/serc/pev-colin/'
-base.path <- '/Users/sheppardc/Dropbox/serc/pev-colin/'
+base.path <- '/Users/critter/Dropbox/serc/pev-colin/'
+#base.path <- '/Users/sheppardc/Dropbox/serc/pev-colin/'
 path.to.geatm <- paste(base.path,'pev-shared/data/GEATM-2020/',sep='')
 path.to.google <- paste(base.path,'pev-shared/data/google-earth/',sep='')
 path.to.shared.inputs <- paste(base.path,'pev-shared/data/inputs/driver-input-file/',sep='')
@@ -262,6 +262,7 @@ for(pev.penetration in pev.pens){
     print(paste('Penetration ',pev.penetration,' replicate ',replicate,sep=''))
     sched <- read.table(file=paste(path.to.shared.inputs,"driver-schedule-pen",pev.penetration*100,"-rep",replicate,"-20130129.txt",sep=''),sep='\t',header=T)
     sched$ft <- paste(sched$from,sched$to)
+
     dist$ft <- paste(dist$from,dist$to)
     sched <- join(sched,dist,by="ft")
     sched$arrive <- sched$depart + sched$time
@@ -280,6 +281,22 @@ for(pev.penetration in pev.pens){
     write.table(sched,paste(path.to.shared.inputs,"driver-schedule-pen",pev.penetration*100,"-rep",replicate,"-20130129.txt",sep=''),sep="\t",row.names=F,quote=F)
   }
 }
+
+# make plot comparing spatial distribution of trips in itin to GEATM
+if(make.plots){
+  tot.demand <- sum(od.24.simp[,c('hw','ho','ow')])
+  compare.trips <- ddply(od.24.simp,.(from),function(df){ data.frame(source="GEATM",demand=sum(df[,c('hw','ho','ow')])/tot.demand) })
+  pev.penetration <- 0.04
+  replicate <- 1
+  tot.itin <- nrow(sched)
+  sched <- read.table(file=paste(path.to.shared.inputs,"driver-schedule-pen",pev.penetration*100,"-rep",replicate,"-20130129.txt",sep=''),sep='\t',header=T)
+  if(names(sched)[1]=="X.driver")names(sched)<-c("driver",names(sched)[2:ncol(sched)])
+  compare.trips <- rbind(compare.trips,ddply(sched,.(from),function(df){ data.frame(source="Model",demand=nrow(df)/tot.itin) }))
+  compare.trips$source <- reorder(compare.trips$source,rev(as.numeric(compare.trips$source)))
+  ggplot(compare.trips,aes(x=factor(from),fill=source,y=100*demand))+geom_bar(position='dodge')
+}
+
+
 
 # summarize the results
 load(file=paste(path.to.outputs,'schedule-replicates-20130129.Rdata',sep=''))

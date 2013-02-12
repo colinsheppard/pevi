@@ -3,8 +3,8 @@ Sys.setenv(NOAWT=1)
 load.libraries(c('ggplot2','yaml','stringr','RNetLogo','maptools','reshape','colorRamps'))
 
 #base.path <- '/Users/wave/Dropbox/HSU/'
-base.path <- '/Users/critter/Dropbox/serc/pev-colin/'
-#base.path <- '/Users/sheppardc/Dropbox/serc/pev-colin/'
+#base.path <- '/Users/critter/Dropbox/serc/pev-colin/'
+base.path <- '/Users/sheppardc/Dropbox/serc/pev-colin/'
 #base.path <- '/Users/Raskolnikovbot3001/Dropbox/'
 
 #optim.code <- 'linked-min-cost-constrained-by-frac-stranded-50-50'
@@ -58,13 +58,9 @@ for(pev.penetration in c(0.005,0.01,0.02,0.04)){
 
   build.res$name <- agg.taz$name[match(build.res$taz,agg.taz$id)]
 
-  # plot every 5th iteration
-  #ggplot(subset(build.res,level>0 & iter%%5==0),aes(x=taz,y=chargers,fill=factor(level)))+geom_bar(stat='identity')+facet_wrap(~iter)
-
   first <- ddply(build.res,.(taz),function(df){ data.frame(first=ifelse(sum(df$chargers)>0,subset(df,chargers>0)$iter[1],9999)) })
   build.res$first <- first$first[match(build.res$taz,first$taz)]
   build.res$name <- reorder(build.res$name,build.res$first)
-
 
   if(!link.pens){
     agg.taz$L2 <- NA

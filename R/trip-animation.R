@@ -4,9 +4,9 @@ load.libraries(c('sas7bdat','plyr','ggplot2','gtools','doMC','reshape','maptools
 gpclibPermit()
 num.processors <- 11
 registerDoMC(num.processors)
-
-base.path <- '/Users/critter/Dropbox/serc/pev-colin/'
-#base.path <- '/Users/sheppardc/Dropbox/serc/pev-colin/'
+#
+#base.path <- '/Users/critter/Dropbox/serc/pev-colin/'
+base.path <- '/Users/sheppardc/Dropbox/serc/pev-colin/'
 path.to.geatm <- paste(base.path,'pev-shared/data/GEATM-2020/',sep='')
 path.to.google <- paste(base.path,'pev-shared/data/google-earth/',sep='')
 path.to.shared.inputs <- paste(base.path,'pev-shared/data/inputs/driver-input-file/',sep='')
@@ -34,11 +34,13 @@ sched <- read.table(file=paste(path.to.shared.inputs,"driver-schedule-pen",pev.p
 names(sched) <- c('driver','from','to','depart','home')
 sched$ft <- paste(sched$from,sched$to)
 
+tazs <- read.csv(paste("~/Documents/serc/pev/tazs-out.csv",sep=''))
+
 # sort by depart time
 sched <- sched[order(sched$depart),]
 
 # for now subset this bad boy
-sched <- sched[1:20,]
+#sched <- sched[1:20,]
 
 hum.shp <- unionSpatialPolygons(agg.taz,rep(1,nrow(agg.taz@data)))
 
@@ -108,6 +110,12 @@ ani.routes <- function(){
       }
       col.count <- col.count + 1
     }
+    # ADD code to plot charging events
+    # use points command to add circle
+#sum(subset(tazs,taz==1 & abs(time-t)<0.00001)[,c('num.L1','num.L2','num.L3')]) -  sum(subset(tazs,taz==1 & abs(time-t)<0.000001)[,c('num.avail.L1','num.avail.L2','num.avail.L3')])
+#points(coordinates(agg.taz)[1,1],coordinates(agg.taz)[1,2],pch=1,col='black',cex=4)
+#points(coordinates(agg.taz)[1,1],coordinates(agg.taz)[1,2],pch=16,col='yellow',cex=4)
+    
   }
 }
 

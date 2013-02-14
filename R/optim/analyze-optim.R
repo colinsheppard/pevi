@@ -18,7 +18,7 @@ model.path <- paste(path.to.pevi,"netlogo/PEVI-nolog.nlogo",sep='')
 #optim.code <- 'min-cost-constrained-by-num-stranded'
 optim.code <- 'min-frac-stranded-constrained-by-cost-50-50'
 
-hard.code.coords <- read.csv(paste(path.to.google,"hard-coded-coords.csv",sep=''))
+hard.code.coords <- read.csv(paste(path.to.google,"hard-coded-coords.csv",sep=''),stringsAsFactors=F)
 source(paste(path.to.pevi,'R/gis-functions.R',sep=''))
 source(paste(path.to.pevi,"R/optim/optim-functions.R",sep='')) 
 source(paste(path.to.pevi,"R/optim/optim-config.R",sep=''))

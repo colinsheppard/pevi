@@ -164,7 +164,7 @@ to setup-and-fix-seed
     clear-all-and-initialize
     let seed new-seed
     print seed
-    random-seed seed
+    random-seed 1 ;
     if parameter-file = 0 [ set parameter-file "params.txt" ]
     if model-directory = 0 [ set model-directory "./" ]
     read-parameter-file
@@ -215,9 +215,7 @@ to setup
   reset-logfile "trip-journey-timeuntildepart"
   ;;log-data "trip-journey-timeuntildepart" (sentence "time" "departure.time" "driver" "vehicle.type" "soc" "from.taz" "to.taz" "trip.distance" "journey.distance" "time.until.depart" "next.event" "remaining.range" "delay.sum")
   reset-logfile "seek-charger"
-  ;;log-data "seek-charger" (sentence "time" "seek-charger-index" "current.taz" "charger.taz" "driver" "vehicle.type" "electric.fuel.consumption" "is.BEV" "charger.in.origin.dest" "level" "soc" "trip.or.journey.energy.need" "distance.o.to.c" 
-    ;;"distance.c.to.d" "time.o.to.c" "time.c.to.d" "trip.time" "trip.distance" "journey.distance" "charging.on.a.whim." "time.until.depart" "trip.charge.time.need" "cost" "extra.time.until.end.charge" 
-    ;;"full.charge.time.need" "trip.charge.time.need" "mid.journey.charge.time.need" "mid.state.of.charge")
+  ;;log-data "seek-charger" (sentence "time" "seek-charger-index" "current.taz" "charger.taz" "driver" "vehicle.type" "electric.fuel.consumption" "is.BEV" "charger.in.origin.dest" "level" "soc" "trip.or.journey.energy.need" "distance.o.to.c" "distance.c.to.d" "time.o.to.c" "time.c.to.d" "trip.time" "trip.distance" "journey.distance" "charging.on.a.whim." "time.until.depart" "trip.charge.time.need" "cost" "extra.time.until.end.charge" "full.charge.time.need" "trip.charge.time.need" "mid.journey.charge.time.need" "mid.state.of.charge")
   reset-logfile "seek-charger-result"
   ;;log-data "seek-charger-result" (sentence "time" "seek.charger.index" "driver" "chosen.taz" "charger.in.origin.dest" "chosen.level" "cost")
   set seek-charger-index 0
@@ -420,10 +418,7 @@ to seek-charger
               set #min-taz #this-taz
               set #min-charger-type #this-charger-type 
             ]
-            ;;log-data "seek-charger" (sentence ticks seek-charger-index ([id] of current-taz) ([id] of #this-taz) id ([name] of this-vehicle-type) electric-fuel-consumption is-BEV? #charger-in-origin-or-destination #level state-of-charge 
-              ;;(item #level #trip-or-journey-energy-need-by-type) (distance-from-to [id] of current-taz [id] of #this-taz) (distance-from-to [id] of #this-taz [id] of destination-taz) 
-              ;;(time-from-to [id] of current-taz [id] of #this-taz) (time-from-to [id] of #this-taz [id] of destination-taz) trip-time trip-distance journey-distance charging-on-a-whim? time-until-depart 
-              ;;(item #level #trip-charge-time-need-by-type) #this-cost #extra-time-until-end-charge #full-charge-time-need #trip-charge-time-need #mid-journey-charge-time-need #mid-state-of-charge)
+            ;;log-data "seek-charger" (sentence ticks seek-charger-index ([id] of current-taz) ([id] of #this-taz) id ([name] of this-vehicle-type) electric-fuel-consumption is-BEV? #charger-in-origin-or-destination #level state-of-charge (item #level #trip-or-journey-energy-need-by-type) (distance-from-to [id] of current-taz [id] of #this-taz) (distance-from-to [id] of #this-taz [id] of destination-taz) (time-from-to [id] of current-taz [id] of #this-taz) (time-from-to [id] of #this-taz [id] of destination-taz) trip-time trip-distance journey-distance charging-on-a-whim? time-until-depart (item #level #trip-charge-time-need-by-type) #this-cost #extra-time-until-end-charge #full-charge-time-need #trip-charge-time-need #mid-journey-charge-time-need #mid-state-of-charge)
           ]
         ]
       ]

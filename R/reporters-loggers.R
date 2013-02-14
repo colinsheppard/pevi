@@ -9,6 +9,8 @@ reporters <- data.frame(num.drivers="(count drivers)",
   energy.charged="(sum [ energy-received ] of drivers)",
   driver.expenses="(sum [ expenses ] of drivers)",
   infrastructure.cost="(sum [ [installed-cost] of this-charger-type ] of chargers)",
+  public.infrastructure.cost="(sum [ [installed-cost] of this-charger-type ] of chargers with [level-of self > 0])",
+  residential.infrastructure.cost="( (count drivers) * ([installed-cost] of one-of charger-types with [level = 0]) )",
   gasoline.used="(sum [ gasoline-used ] of drivers)",
   miles.driven="(sum [ miles-driven ] of drivers)",
   num.denials="(sum [ num-denials ] of drivers)",
@@ -16,6 +18,7 @@ reporters <- data.frame(num.drivers="(count drivers)",
   num.stranded.by.delay='(num-stranded-by-delay)',
   frac.stranded.by.delay='(num-stranded-by-delay / count drivers)',
   mean.duty.factor="(mean-duty-factor)",
+  electric.miles.driven="(electric-miles-driven)",
   frac.denied="(count drivers with [num-denials > 0] / count drivers)",stringsAsFactors=F)
 
 # log files, these all get set to false so logging is deactivated

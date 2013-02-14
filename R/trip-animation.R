@@ -4,7 +4,7 @@ load.libraries(c('sas7bdat','plyr','ggplot2','gtools','doMC','reshape','maptools
 gpclibPermit()
 num.processors <- 11
 registerDoMC(num.processors)
-#
+
 #base.path <- '/Users/critter/Dropbox/serc/pev-colin/'
 base.path <- '/Users/sheppardc/Dropbox/serc/pev-colin/'
 path.to.geatm <- paste(base.path,'pev-shared/data/GEATM-2020/',sep='')
@@ -42,7 +42,8 @@ sched <- sched[order(sched$depart),]
 # for now subset this bad boy
 #sched <- sched[1:20,]
 
-hum.shp <- unionSpatialPolygons(agg.taz,rep(1,nrow(agg.taz@data)))
+agg.taz.coords <- coordinates(agg.taz)
+home.cexes <- seq(1,4,length.out=40)
 
 if(!file.exists(paste(path.to.plots,'route-inds-for-animation.Rdata',sep=''))){
   rt.inds <- list()
@@ -114,21 +115,15 @@ ani.routes <- function(){
     # use points command to add circle
 		for(i in 1:52){
 			num.public.events <- sum(subset(tazs,taz==i & abs(time-t)<0.00001)[,c('num.L1','num.L2','num.L3')]) -  sum(subset(tazs,taz==i & abs(time-t)<0.000001)[,c('num.avail.L1','num.avail.L2','num.avail.L3')])
-			num.home.events <- sum(subset(tazs,taz==i & abs(time-t)<0.00001)[,c('num.L0')]) -  sum(subset(tazs,taz==i & abs(time-t)<0.000001)[,c('num.avail.L0')])
+			num.home.events <- min(40,sum(subset(tazs,taz==i & abs(time-t)<0.00001)[,c('num.L0')]) -  sum(subset(tazs,taz==i & abs(time-t)<0.000001)[,c('num.avail.L0')]))
 			
 			# Public charging events currently max out at 4, use if logic to re-size dot to match scale. More complicted logic for home charging, which maxes at 38.
-			points(coordinates(agg.taz)[i,1],coordinates(agg.taz)[i,2],pch=1,col='black',cex=num.public.events)
-			points(coordinates(agg.taz)[i,1],coordinates(agg.taz)[i,2],pch=16,col='yellow',cex=num.public.events)
-			if(num.home.events>0&num.home.events <= 10) {
-				points(coordinates(agg.taz)[i,1],coordinates(agg.taz)[i,2],pch=0,col='470',cex=1)
-			} else if(num.home.events > 10&num.home.events <= 20) {
-				points(coordinates(agg.taz)[i,1],coordinates(agg.taz)[i,2],pch=0,col='470',cex=2)
-			} else if(num.home.events >20&num.home.events <= 30) {
-				points(coordinates(agg.taz)[i,1],coordinates(agg.taz)[i,2],pch=0,col='470',cex=3)	
-			} else if(num.home.events >30&num.home.events <= 40){
-				points(coordinates(agg.taz)[i,1],coordinates(agg.taz)[i,2],pch=0,col='470',cex=4)	
-			}	
-			
+      agg.taz.row <- which(agg.taz$id == i)
+			points(agg.taz.coords[agg.taz.row,1],agg.taz.coords[agg.taz.row,2],pch=16,col='yellow',cex=num.public.events)
+			points(agg.taz.coords[agg.taz.row,1],agg.taz.coords[agg.taz.row,2],pch=1,col='black',cex=num.public.events)
+      if(num.home.events>0){
+        points(agg.taz.coords[agg.taz.row,1],agg.taz.coords[agg.taz.row,2],pch=0,col='470',cex=home.cexes[num.home.events])
+      }
     }
   }
 }

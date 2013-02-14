@@ -10,13 +10,13 @@ source(paste(path.to.pevi,'R/create-schedule.R',sep=''))
 
 registerDoMC(num.processors)
 
+num.replicates <- 80
+
 pev.pen.char <- roundC(pev.penetration,3)
 schedule.reps <- list()
 schedule.reps[[pev.pen.char]] <- list()
 for(replicate in 1:num.replicates){
   print(paste('Penetration ',pev.penetration,' replicate ',replicate,sep=''))
   schedule.reps[[pev.pen.char]][[as.character(replicate)]] <- create.schedule(pev.penetration,1)
-  write.table(schedule.reps[[pev.pen.char]][[as.character(replicate)]][,c('driver','from','to','depart','home')],file=paste(path.to.shared.inputs,"driver-schedule-pen",pev.penetration*100,"-rep",replicate,"-20130129.txt",sep=''),sep='\t',row.names=F,quote=F)
-  save(schedule.reps,file=paste(path.to.outputs,'schedule-replicates-pen',pev.penetration*100,'-20130129.Rdata',sep=''))
+  write.table(schedule.reps[[pev.pen.char]][[as.character(replicate)]][,c('driver','from','to','depart','home')],file=paste(path.to.shared.inputs,"driver-schedule-pen",pev.penetration*100,"-rep",replicate,"-20130214.txt",sep=''),sep='\t',row.names=F,quote=F)
 }
-save(schedule.reps,file=paste(path.to.outputs,'schedule-replicates-pen',pev.penetration*100,'-20130129.Rdata',sep=''))

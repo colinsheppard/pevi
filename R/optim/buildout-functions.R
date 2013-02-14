@@ -53,7 +53,7 @@ run.buildout.batch <- function(break.pair,build.result){
         }
       }
       try.nl(paste('set charger-input-file "',path.to.inputs,'chargers-alt-',alt.i,'.txt"',sep=''),break.pair.code)
-      try.nl('random-seed 1',break.pair.code)
+      try.nl('random-seed 2',break.pair.code)
       try.nl('setup',break.pair.code)
       try.nl('dynamic-scheduler:go-until schedule 500',break.pair.code)
       results[results.i,names(reporters)] <- tryCatch(NLDoReport(1,"",reporter = paste("(sentence",paste(reporters,collapse=' '),")"),as.data.frame=T,df.col.names=names(reporters)),error=function(e){ NA })
@@ -73,10 +73,11 @@ try.nl <- function(cmd,break.pair.code=""){
   return(err)
 }
 
-write.charger.file <- function(num.chargers,alt.i=0){
+write.charger.file <- function(num.chargers,alt.i=0,filepath=NA){
+  if(is.na(filepath))filepath <- paste(path.to.inputs,'chargers-alt-',alt.i,'.txt',sep='')
   chargers <- data.frame(TAZ=1:52,L0=rep(1,52),L1=num.chargers[1:52],L2=num.chargers[1:52],L3=num.chargers[53:104])
   names(chargers) <- c(";TAZ","L0","L1","L2","L3")
-  write.table(chargers,file=paste(path.to.inputs,'chargers-alt-',alt.i,'.txt',sep=''),sep="\t",row.names=F,quote=F)
+  write.table(chargers,file=filepath,sep="\t",row.names=F,quote=F)
 }
 
 ### plot.ptx(ptx,dimensions=1:2)

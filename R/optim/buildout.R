@@ -3,22 +3,22 @@ options(java.parameters="-Xmx2048m")
 library(colinmisc)
 load.libraries(c('ggplot2','yaml','RNetLogo','plyr','reshape','stringr','snow'))
 
-base.path <- '/Users/critter/Dropbox/serc/pev-colin/'
-#base.path <- '/Users/sheppardc/Dropbox/serc/pev-colin/'
+#base.path <- '/Users/critter/Dropbox/serc/pev-colin/'
+base.path <- '/Users/sheppardc/Dropbox/serc/pev-colin/'
 #base.path <- '/Users/Raskolnikovbot3001/Dropbox/'
 
-#optim.code <- 'min-cost-constrained-by-frac-stranded-50-50'
+optim.code <- 'min-cost-constrained-by-frac-stranded-50-50'
 #optim.code <- 'linked-min-cost-constrained-by-frac-stranded-50-50'
 #optim.code <- 'linked-min-cost-constrained-by-frac-stranded-25-75'
 #optim.code <- 'linked-min-cost-constrained-by-frac-stranded-75-25'
 #optim.code <- 'thresh-1-linked-min-cost-constrained-by-frac-stranded-50-50'
-optim.code <- 'thresh-2-linked-min-cost-constrained-by-frac-stranded-50-50'
+#optim.code <- 'thresh-2-linked-min-cost-constrained-by-frac-stranded-50-50'
 
-link.pens <- T  # should the infrastructure from lower pens be used as starting place for higher? otherwise,
+link.pens <- str_detect(optim.code,"linked")  # should the infrastructure from lower pens be used as starting place for higher? otherwise,
                 # infrastructure is reset to zero
 
-num.cpu <- 8
-#num.cpu <- 11
+#num.cpu <- 8
+num.cpu <- 12
 
 path.to.pevi <- paste(base.path,'pevi/',sep='')
 path.to.inputs <- paste(base.path,'pev-shared/data/inputs/buildout/',optim.code,'/',sep='')
@@ -101,7 +101,7 @@ for(pev.penetration in c(0.005,0.01,0.02,0.04)){
           }
         }
         NLCommand(paste('set charger-input-file "',path.to.inputs,'chargers-alt-0.txt"',sep=''))
-        NLCommand('random-seed 1')
+        NLCommand('random-seed 2')
         NLCommand('setup')
         NLCommand('dynamic-scheduler:go-until schedule 500')
         results[results.i,names(reporters)] <- tryCatch(NLDoReport(1,"",reporter = paste("(sentence",paste(reporters,collapse=' '),")"),as.data.frame=T,df.col.names=names(reporters)),error=function(e){ NA })

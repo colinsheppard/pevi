@@ -112,10 +112,24 @@ ani.routes <- function(){
     }
     # ADD code to plot charging events
     # use points command to add circle
-#sum(subset(tazs,taz==1 & abs(time-t)<0.00001)[,c('num.L1','num.L2','num.L3')]) -  sum(subset(tazs,taz==1 & abs(time-t)<0.000001)[,c('num.avail.L1','num.avail.L2','num.avail.L3')])
-#points(coordinates(agg.taz)[1,1],coordinates(agg.taz)[1,2],pch=1,col='black',cex=4)
-#points(coordinates(agg.taz)[1,1],coordinates(agg.taz)[1,2],pch=16,col='yellow',cex=4)
-    
+		for(i in 1:52){
+			num.public.events <- sum(subset(tazs,taz==i & abs(time-t)<0.00001)[,c('num.L1','num.L2','num.L3')]) -  sum(subset(tazs,taz==i & abs(time-t)<0.000001)[,c('num.avail.L1','num.avail.L2','num.avail.L3')])
+			num.home.events <- sum(subset(tazs,taz==i & abs(time-t)<0.00001)[,c('num.L0')]) -  sum(subset(tazs,taz==i & abs(time-t)<0.000001)[,c('num.avail.L0')])
+			
+			# Public charging events currently max out at 4, use if logic to re-size dot to match scale. More complicted logic for home charging, which maxes at 38.
+			points(coordinates(agg.taz)[i,1],coordinates(agg.taz)[i,2],pch=1,col='black',cex=num.public.events)
+			points(coordinates(agg.taz)[i,1],coordinates(agg.taz)[i,2],pch=16,col='yellow',cex=num.public.events)
+			if(num.home.events>0&num.home.events <= 10) {
+				points(coordinates(agg.taz)[i,1],coordinates(agg.taz)[i,2],pch=0,col='470',cex=1)
+			} else if(num.home.events > 10&num.home.events <= 20) {
+				points(coordinates(agg.taz)[i,1],coordinates(agg.taz)[i,2],pch=0,col='470',cex=2)
+			} else if(num.home.events >20&num.home.events <= 30) {
+				points(coordinates(agg.taz)[i,1],coordinates(agg.taz)[i,2],pch=0,col='470',cex=3)	
+			} else if(num.home.events >30&num.home.events <= 40){
+				points(coordinates(agg.taz)[i,1],coordinates(agg.taz)[i,2],pch=0,col='470',cex=4)	
+			}	
+			
+    }
   }
 }
 

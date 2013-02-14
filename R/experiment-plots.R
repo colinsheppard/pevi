@@ -36,6 +36,20 @@ ggsave(paste(path.to.inputs,"plots/key-metrics-vs-",exp.name,".pdf",sep=''),p,wi
 # EXP-SPECIFIC PLOTS FOR MANUAL CREATION
 ###########################################
 if(F){
+
+  # BUILDOUT RUNS
+  p <- ggplot(results,aes(x=factor(infrastructure.scenario),y=mean.duty.factor))+geom_boxplot(aes(fill=as.factor(penetration)))
+  p <- ggplot(results,aes(x=infrastructure.scenario,y=mean.duty.factor*100))+stat_summary(fun.y=mean, aes(colour=as.factor(penetration)), geom="line") + stat_summary(fun.y=mean, aes(colour=as.factor(penetration)), geom="point")
+  p <- ggplot(results,aes(x=infrastructure.cost,y=mean.duty.factor*100))+ stat_summary(fun.y=mean, aes(colour=as.factor(penetration)), geom="line") + stat_summary(fun.y=mean, aes(colour=as.factor(penetration)), geom="point")
+  results$electric.miles.per.driver <- results$electric.miles.driven / results$num.drivers
+  results$percent.electric.miles.per.driver <- results$electric.miles.per.driver / mean(subset(results,penetration==0.5 & infrastructure.scenario==1)$electric.miles.per.driver) * 100
+  results$percent.electric.miles.per.driver <- results$electric.miles.per.driver / min(results$electric.miles.per.driver) * 100
+  mean.emds <- ddply(results,.(penetration,infrastructure.scenario),function(df){ data.frame(mean=mean(df$percent.electric.miles.per.driver)) })
+  p <- ggplot(results,aes(x=infrastructure.cost-112,y=percent.electric.miles.per.driver))+ stat_summary(fun.y=mean, aes(colour=as.factor(penetration)), geom="line") + stat_summary(fun.y=mean, aes(colour=as.factor(penetration)), geom="point")+coord_cartesian(ylim=c(99,max(mean.emds$mean)+1))
+  p <- ggplot(results,aes(x=infrastructure.cost,y=frac.stranded.by.delay*100))+ stat_summary(fun.y=mean, aes(colour=as.factor(penetration)), geom="line") + stat_summary(fun.y=mean, aes(colour=as.factor(penetration)), geom="point")+scale_y_continuous(limits=c(0,max(results$frac.stranded.by.delay * 100)))
+  results$frac.stranded <- results$num.stranded/results$num.drivers
+  p <- ggplot(melt(results,id.vars=c("infrastructure.cost","penetration"),measure.vars=c("frac.denied","frac.stranded.by.delay","frac.drivers.delayed","frac.stranded")),aes(x=infrastructure.cost,y=value*100))+ stat_summary(fun.y=mean, aes(colour=as.factor(variable)), geom="line") + stat_summary(fun.y=mean, aes(colour=as.factor(variable)), geom="point")+facet_wrap(~penetration)
+
   # HOW MANY DRIVERS ARE DELAYED
   p <- ggplot(results,aes(x=infrastructure.scenario.named,y=frac.drivers.delayed))+geom_boxplot(aes(fill=as.factor(penetration)))+facet_wrap(~vehicle.scenario.named)
   ggsave(paste(path.to.inputs,"plots/num-drivers-delayed.pdf",sep=''),p,width=15,height=11)
@@ -129,7 +143,6 @@ if(F){
   p <- ggplot(melt(results,id.vars=c('infrastructure.scenario.named','penetration'),measure.vars=c('mean.delay','frac.drivers.delayed','num.unscheduled.trips','energy.charged','driver.expenses','infrastructure.cost','gasoline.used','miles.driven','num.denials','num.stranded','mean.duty.factor','frac.denied')),aes(x=infrastructure.scenario.named,y=value))+geom_boxplot(aes(fill=as.factor(penetration)))+facet_wrap(~variable,scales="free_y")
   p <- ggplot(melt(subset(results,infrastructure.scenario==2),id.vars=c('vehicle.scenario.named','penetration'),measure.vars=c('mean.delay','frac.drivers.delayed','num.unscheduled.trips','energy.charged','driver.expenses','infrastructure.cost','gasoline.used','miles.driven','num.denials','num.stranded','mean.duty.factor','frac.denied')),aes(x=vehicle.scenario.named,y=value))+geom_boxplot(aes(fill=as.factor(penetration)))+facet_wrap(~variable,scales="free_y")
 
-
   # CHARGE-SAFETY-FACTOR
   p <- ggplot(results,aes(x=factor(charge.safety.factor),y=total.delay))+geom_boxplot(aes(fill=factor(penetration)))+facet_grid(infrastructure.scenario.named~vehicle.scenario.named)
   ggsave(paste(path.to.inputs,"plots/num-drivers-delayed.pdf",sep=''),p,width=15,height=11)
@@ -164,5 +177,6 @@ if(F){
     #frac.stranded.cv=sd(df$num.stranded/df$num.drivers,na.rm=T)/mean(df$num.stranded/df$num.drivers,na.rm=T))})
     #ggplot( melt(stat.cvs,id.vars=c('penetration','vehicle.scenario.named','infrastructure.scenario.named')),aes(x=infrastructure.scenario.named,y=value,colour=as.factor(penetration)))+geom_point()+facet_grid(vehicle.scenario.named~variable)
     #ggplot( melt(subset(stat.cvs,vehicle.scenario.named=="BEV/PHEV (90/10)"),id.vars=c('penetration','vehicle.scenario.named','infrastructure.scenario.named')),aes(x=infrastructure.scenario.named,y=value,colour=as.factor(penetration)))+geom_point()+facet_wrap(variable~)
+
 
 }

@@ -64,7 +64,7 @@ for(results.i in 1:nrow(results)){
       NLCommand(paste('set ',param,' ',results[results.i,param.dots],'',sep=''))
     }
   }
-  NLCommand('random-seed 1')
+  NLCommand('random-seed 2')
   NLCommand('setup')
   NLCommand('dynamic-scheduler:go-until schedule 500')
   results[results.i,names(reporters)] <- tryCatch(NLDoReport(1,"",reporter = paste("(sentence",paste(reporters,collapse=' '),")"),as.data.frame=T,df.col.names=names(reporters)),error=function(e){ NA })

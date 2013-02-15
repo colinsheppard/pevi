@@ -71,6 +71,7 @@ ani.routes <- function(){
     t.routes <- t %% 24
     
     plot(agg.taz,col=colors()[170])
+    text(-124.5022,41.111,labels=paste('Hour:',roundC(t.routes,0)))
     trail.i <- trail.i + 1
     trail.i <- (trail.i-1)%%trail.len+1
     from.to[[trail.i]]$num <- 0

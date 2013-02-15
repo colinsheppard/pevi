@@ -5,8 +5,8 @@ gpclibPermit()
 num.processors <- 11
 registerDoMC(num.processors)
 
-#base.path <- '/Users/critter/Dropbox/serc/pev-colin/'
-base.path <- '/Users/sheppardc/Dropbox/serc/pev-colin/'
+base.path <- '/Users/critter/Dropbox/serc/pev-colin/'
+#base.path <- '/Users/sheppardc/Dropbox/serc/pev-colin/'
 path.to.geatm <- paste(base.path,'pev-shared/data/GEATM-2020/',sep='')
 path.to.google <- paste(base.path,'pev-shared/data/google-earth/',sep='')
 path.to.shared.inputs <- paste(base.path,'pev-shared/data/inputs/driver-input-file/',sep='')
@@ -67,12 +67,14 @@ ani.routes <- function(){
   for(i in 1:trail.len){ from.to[[i]] <- from.to.df }
   cols <- c(colorRampPalette(c("black",colors()[556]))(trail.len-1),colors()[552])
   trail.i <- 0
-  for(t in seq(0,24,by=5/60)){
+  for(t in seq(0,max(tazs$time),by=5/60)){
+    t.routes <- t %% 24
+    
     plot(agg.taz,col=colors()[170])
     trail.i <- trail.i + 1
     trail.i <- (trail.i-1)%%trail.len+1
     from.to[[trail.i]]$num <- 0
-    trips <- subset(sched,depart<=t & depart>t-5/60)
+    trips <- subset(sched,depart<=t.routes & depart>t.routes-5/60)
     if(nrow(trips)>0){
       for(trip.i in 1:nrow(trips)){
         from.i <- trips$from[trip.i]

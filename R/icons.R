@@ -1,7 +1,7 @@
 library(colinmisc)
 library('png')
 
-path.to.google <- '~/Dropbox/serc/pev-colin/data/google-earth/'
+path.to.google <- '~/Dropbox/serc/pev-colin/pev-shared/data/google-earth/'
 make.dir(paste(path.to.google,'icons',sep=''))
 
 img <- readPNG(paste(path.to.google,'icons/charging-icon.png',sep=''))

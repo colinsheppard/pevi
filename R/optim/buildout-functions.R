@@ -53,7 +53,7 @@ run.buildout.batch <- function(break.pair,build.result){
         }
       }
       try.nl(paste('set charger-input-file "',path.to.inputs,'chargers-alt-',alt.i,'.txt"',sep=''),break.pair.code)
-      try.nl('random-seed 3',break.pair.code)
+      try.nl('random-seed 8',break.pair.code)
       try.nl('setup',break.pair.code)
       try.nl('dynamic-scheduler:go-until schedule 500',break.pair.code)
       results[results.i,names(reporters)] <- tryCatch(NLDoReport(1,"",reporter = paste("(sentence",paste(reporters,collapse=' '),")"),as.data.frame=T,df.col.names=names(reporters)),error=function(e){ NA })

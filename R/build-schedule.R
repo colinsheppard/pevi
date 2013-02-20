@@ -5,8 +5,8 @@ make.plots  <- F
 num.processors <- 11
 registerDoMC(num.processors)
 
-base.path <- '/Users/critter/Dropbox/serc/pev-colin/'
-#base.path <- '/Users/sheppardc/Dropbox/serc/pev-colin/'
+#base.path <- '/Users/critter/Dropbox/serc/pev-colin/'
+base.path <- '/Users/sheppardc/Dropbox/serc/pev-colin/'
 path.to.geatm <- paste(base.path,'pev-shared/data/GEATM-2020/',sep='')
 path.to.google <- paste(base.path,'pev-shared/data/google-earth/',sep='')
 path.to.shared.inputs <- paste(base.path,'pev-shared/data/inputs/driver-input-file/',sep='')
@@ -238,7 +238,7 @@ source(paste(path.to.pevi,'R/create-schedule.R',sep=''))
 # see what fraction of drivers end at home?
 # sum(ddply(schedule,.(driver),function(df){ df$to[nrow(df)]==df$home[1] })$V1)/length(unique(schedule$driver))
 
-num.replicates <- 30
+num.replicates <- 80
 schedule.reps <- list()
 for(pev.penetration in pev.pens){
   pev.pen.char <- roundC(pev.penetration,3)

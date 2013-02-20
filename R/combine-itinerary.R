@@ -1,5 +1,5 @@
 # A handy for loop to combine 0.5% penetration itineraries into half as many 1% itineraries.
-# To combine 1% and 2% files, adjust "pev.penetration".
+# To combine 1% and 2% files, adjust "pev.penetration". If working with more than 80 files, adjust the i limits.
 
 path.to.combined.inputs <- paste(base.path,'pev-shared/data/inputs/driver-input-file/combined/',sep='')
 

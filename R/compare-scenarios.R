@@ -1,4 +1,5 @@
 Sys.setenv(NOAWT=1)
+options(java.parameters="-Xmx2048m")
 library(colinmisc)
 load.libraries(c('ggplot2','yaml','RNetLogo','plyr','reshape'))
 
@@ -12,8 +13,8 @@ path.to.inputs <- paste(base.path,'pev-shared/data/inputs/compare/phev-only/',se
 path.to.inputs <- paste(base.path,'pev-shared/data/inputs/compare/patterns/',sep='')
 
 #to.log <- c('pain','charging','need-to-charge')
-#to.log <- c('pain','charging','tazs','trip')
-to.log <- c('pain','charging','trip')
+to.log <- c('pain','charging','tazs','trip')
+#to.log <- c('pain','charging','trip')
 
 # load the reporters and loggers needed to summarize runs and disable logging
 source(paste(path.to.pevi,"R/reporters-loggers.R",sep=''))

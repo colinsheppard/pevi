@@ -197,6 +197,17 @@ chargers.to.kml <- function(shp,kml.filename,kmlname="KML Name", kmldescription=
   system(paste('open ',kml.filename,sep=''))
 }
 
+collapse.df.num.veh <- function(df,newname){
+  df$newname <- newname
+  ddply(data.frame(df),.(newname),function(df){
+    res <- df[1,]
+    res$name <- df$newname[1]
+    res$num.in.taz <- sum(round(df$num.in.taz))
+    res$lat <- mean(df$lat)
+    res$long <- mean(df$long)
+    res
+  })
+}
 collapse.df <- function(df,newname){
   df$newname <- newname
   ddply(data.frame(df),.(newname),function(df){
@@ -235,8 +246,9 @@ shp.to.kml <- function(shp,kml.filename,kmlname="KML Name", kmldescription="<i>D
   system(paste('open ',kml.filename,sep=''))
 }
 
-demand.to.kml <- function(shp,kml.filename,kmlname="KML Name", kmldescription="<i>Description</i>",borders='white',lwds=1.5,colors='red',id.col='id',name.col='id',description.cols=NA){
+demand.to.kml <- function(shp,num.vehicles,kml.filename,kmlname="KML Name", kmldescription="<i>Description</i>",borders='white',lwds=1.5,colors='red',id.col='id',name.col='id',description.cols=NA){
     
+  shp$num.in.taz <- num.vehicles * as.numeric(shp$frac.homes)
   n <- length(shp@polygons)
   if(length(colors)==1)colors <- rep(colors,n)
   if(length(borders)==1)borders <- rep(borders,n)
@@ -261,26 +273,26 @@ demand.to.kml <- function(shp,kml.filename,kmlname="KML Name", kmldescription="<
   for.dense.rows <- grep("FOR_",shp$name)
   arc.dense.rows <- grep("ARC_",shp$name)
   dense.rows <- c(eka.dense.rows,mck.dense.rows,for.dense.rows,arc.dense.rows)
-  shp.sparse <- rbind(collapse.df(shp@data[eka.dense.rows,],"Eureka"),
-    collapse.df(shp@data[arc.dense.rows,],"Arcata"),
-    collapse.df(shp@data[for.dense.rows,],"Fortuna"),
-    collapse.df(shp@data[mck.dense.rows,],"McKinleyville"))
+  shp.sparse <- rbind(collapse.df.num.veh(shp@data[eka.dense.rows,],"Eureka"),
+    collapse.df.num.veh(shp@data[arc.dense.rows,],"Arcata"),
+    collapse.df.num.veh(shp@data[for.dense.rows,],"Fortuna"),
+    collapse.df.num.veh(shp@data[mck.dense.rows,],"McKinleyville"))
   placemark.header <- "	<Folder>
 		<name>Charger Distribution</name>
 		<open>1</open>"
   placemark.styles <- ddply(rbind(shp@data,shp.sparse),.(row),function(df){ 
     data.frame(style=paste("<Style id=\"placemark_",df$name,"\">
 		<IconStyle>",
-		if(roundC(1500*as.numeric(df$frac.homes),0)<1) "<color>00ffffff</color>
+		if(round(df$num.in.taz)==0) "<color>00ffffff</color>
 		<scale>1.75</scale>" 
 		else 
 		"<scale>1.75</scale>","
 			<Icon>
-				<href>http://schatzlab.org/images/pev-charger-icons/ev-icon-",roundC(1500*as.numeric(df$frac.homes),0),".png</href>
+				<href>http://schatzlab.org/images/pev-charger-icons/ev-icon-",roundC(df$num.in.taz,0),".png</href>
 			</Icon>
 			<hotSpot x=\"0.5\" y=\"0\" xunits=\"fraction\" yunits=\"fraction\"/>
 		</IconStyle>",
-		if(roundC(1500*as.numeric(df$frac.homes),0)==0) "<LabelStyle>
+		if(round(df$num.in.taz)==0) "<LabelStyle>
 			<color>00ffffff</color>
 			</LabelStyle>","
   </Style>",sep=''),stringsAsFactors=F)

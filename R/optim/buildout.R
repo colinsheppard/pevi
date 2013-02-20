@@ -8,7 +8,7 @@ base.path <- '/Users/critter/Dropbox/serc/pev-colin/'
 #base.path <- '/Users/Raskolnikovbot3001/Dropbox/'
 
 #optim.code <- 'min-cost-constrained-by-frac-stranded-50-50'
-optim.code <- 'min-cost-constrained-by-frac-stranded-50-50-seed3'
+optim.code <- 'min-cost-constrained-by-frac-stranded-50-50-seed8'
 #optim.code <- 'linked-min-cost-constrained-by-frac-stranded-50-50'
 #optim.code <- 'linked-min-cost-constrained-by-frac-stranded-25-75'
 #optim.code <- 'linked-min-cost-constrained-by-frac-stranded-75-25'
@@ -18,8 +18,8 @@ optim.code <- 'min-cost-constrained-by-frac-stranded-50-50-seed3'
 link.pens <- str_detect(optim.code,"linked")  # should the infrastructure from lower pens be used as starting place for higher? otherwise,
                 # infrastructure is reset to zero
 
-#num.cpu <- 8
-num.cpu <- 12
+num.cpu <- 8
+#num.cpu <- 12
 
 path.to.pevi <- paste(base.path,'pevi/',sep='')
 path.to.inputs <- paste(base.path,'pev-shared/data/inputs/buildout/',optim.code,'/',sep='')
@@ -102,7 +102,7 @@ for(pev.penetration in c(0.005,0.01,0.02,0.04)){
           }
         }
         NLCommand(paste('set charger-input-file "',path.to.inputs,'chargers-alt-0.txt"',sep=''))
-        NLCommand('random-seed 3')
+        NLCommand('random-seed 8')
         NLCommand('setup')
         NLCommand('dynamic-scheduler:go-until schedule 500')
         results[results.i,names(reporters)] <- tryCatch(NLDoReport(1,"",reporter = paste("(sentence",paste(reporters,collapse=' '),")"),as.data.frame=T,df.col.names=names(reporters)),error=function(e){ NA })

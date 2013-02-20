@@ -43,6 +43,8 @@ names(dist)[1] <- "from"
 
 #pev.penetration <- 0.005
 for(pev.penetration in c(0.005,0.01,0.02,0.04)){
+  for(seed in 1:7){
+
   build.files <- data.frame(file=list.files(path.to.outputs,paste('^buildout-pen',pev.penetration*100,'.*csv',sep='')),stringsAsFactors=F)
   if(nrow(build.files)==0)next
   build.files$iter <- as.numeric(sapply(strsplit(build.files$file,'-iter',fixed=T),function(x){ strsplit(x[2],'-',fixed=T)[[1]][1] }))

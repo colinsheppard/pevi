@@ -79,8 +79,8 @@ for(pev.penetration in c(0.005,0.01,0.02,0.04)){
 		build.res$name <- reorder(build.res$name,build.res$first)
 				
 			if(!link.pens){
-				agg.taz$L2 <- NA
-				agg.taz$L3 <- NA
+				results.matrix[taz.i,c(paste('seed',seed,sep=''))] <- NA
+				results.matrix[taz.i+52,c(paste('seed',seed,sep=''))] <- NA
 				for(taz.i in 1:52){
 					results.matrix[taz.i,c(paste('seed',seed,sep=''))] <- build.res$chargers[build.res$taz == taz.i & build.res$iter==n.iter & build.res$level==2]
 					results.matrix[taz.i+52,c(paste('seed',seed,sep=''))] <- build.res$chargers[build.res$taz == taz.i & build.res$iter==n.iter & build.res$level==3]

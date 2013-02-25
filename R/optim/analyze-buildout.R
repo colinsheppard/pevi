@@ -43,7 +43,6 @@ names(dist)[1] <- "from"
 
 #pev.penetration <- 0.005
 for(pev.penetration in c(0.005,0.01,0.02,0.04)){
-  for(seed in 1:7){
 
   build.files <- data.frame(file=list.files(path.to.outputs,paste('^buildout-pen',pev.penetration*100,'.*csv',sep='')),stringsAsFactors=F)
   if(nrow(build.files)==0)next
@@ -124,15 +123,17 @@ for(taz.i in 1:52){
   agg.taz$L3[which(agg.taz$id==taz.i)] <- build.res$chargers[build.res$taz == taz.i & build.res$iter==n.iter & build.res$level==3]
 }
 chargers.to.kml(agg.taz,paste(path.to.google,'buildout/',optim.code,'.kml',sep=''),paste('Linked Buildout: ',optim.code,sep=''),'Color denotes total chargers in each TAZ with L3 counting for 2 chargers (click to get actual # chargers).','red',1.5,'blue',id.col='ID',name.col='name',description.cols=c('id','name','L2','L3','weighted.demand','frac.homes'))
+
 to.csv <- agg.taz@data[,c('id','name','L2','L3')]
-to.csv$cost <- 8 * to.csv$L2 + 50 * to.csv$L3
-to.csv$power <- 6.6 * to.csv$L2 + 30 * to.csv$L3
-l2.l3.tazs <- agg.taz$id[which(agg.taz@data$L2>0 | agg.taz@data$L3>0)]
-for(taz.id in agg.taz$id){ 
-  to.csv$min.dist.to[which(to.csv$id==taz.id)] <- min(subset(dist,from==taz.id & to%in%l2.l3.tazs[l2.l3.tazs != taz.id])$miles) 
-}
-to.csv$l2.per.trip <- agg.taz$weighted.demand*pev.penetration / agg.taz$L2
-to.csv$l3.per.trip <- agg.taz$weighted.demand*pev.penetration / agg.taz$L3
-to.csv$l2.per.trip[to.csv$l2.per.trip == Inf] <- NA
-to.csv$l3.per.trip[to.csv$l3.per.trip == Inf] <- NA
-#write.csv(to.csv,file=paste(path.to.google,'buildout/',optim.code,'.csv',sep=''),row.names=F)
+write.csv(to.csv,file=paste(path.to.google,'buildout/',optim.code,'.csv',sep=''),row.names=F)
+#to.csv$cost <- 8 * to.csv$L2 + 50 * to.csv$L3
+#to.csv$power <- 6.6 * to.csv$L2 + 30 * to.csv$L3
+#l2.l3.tazs <- agg.taz$id[which(agg.taz@data$L2>0 | agg.taz@data$L3>0)]
+#for(taz.id in agg.taz$id){ 
+  #to.csv$min.dist.to[which(to.csv$id==taz.id)] <- min(subset(dist,from==taz.id & to%in%l2.l3.tazs[l2.l3.tazs != taz.id])$miles) 
+#}
+#to.csv$l2.per.trip <- agg.taz$weighted.demand*pev.penetration / agg.taz$L2
+#to.csv$l3.per.trip <- agg.taz$weighted.demand*pev.penetration / agg.taz$L3
+#to.csv$l2.per.trip[to.csv$l2.per.trip == Inf] <- NA
+#to.csv$l3.per.trip[to.csv$l3.per.trip == Inf] <- NA
+##write.csv(to.csv,file=paste(path.to.google,'buildout/',optim.code,'.csv',sep=''),row.names=F)

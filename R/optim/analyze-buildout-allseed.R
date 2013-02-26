@@ -41,16 +41,18 @@ names(agg.taz@data) <- c("SP_ID",taz.shp.fieldnames)
 dist <- read.csv(file=paste(path.to.geatm,'taz-dist-time.csv',sep=''))
 names(dist)[1] <- "from"
 
-results <- list(c(0.005,0.01,0.02,0.04))
+results <- list()
+
+n.seeds <- 9
 
 #pev.penetration <- 0.005
 for(pev.penetration in c(0.005,0.01,0.02,0.04)){
 
 	#Prepares a null matrix to fill with values			
-	results.matrix <- matrix(,104,9)
-	colnames(results.matrix) <- c("seed1","seed2","seed3","seed4","seed5","seed6","seed7","seed8","seed9")
+	results.matrix <- matrix(,104,n.seeds)
+	colnames(results.matrix) <- paste("seed",1:n.seeds,sep='')
 	
-	for(seed in 1:9){
+	for(seed in 1:n.seeds){
 		path.to.outputs <- path.to.outputs <- paste(base.path,'pev-shared/data/outputs/buildout/',optim.code,'-seed',seed,'/',sep='')
 		build.files <- data.frame(file=list.files(path.to.outputs,paste('^buildout-pen',pev.penetration*100,'.*csv',sep='')),stringsAsFactors=F)
 		if(nrow(build.files)==0)next
@@ -76,44 +78,43 @@ for(pev.penetration in c(0.005,0.01,0.02,0.04)){
 	
 		first <- ddply(build.res,.(taz),function(df){ data.frame(first=ifelse(sum(df$chargers)>0,subset(df,chargers>0)$iter[1],9999)) })
 		build.res$first <- first$first[match(build.res$taz,first$taz)]
-		build.res$name <- reorder(build.res$name,build.res$first)
+    build.res$name <- reorder(build.res$name,build.res$first)
 				
-			if(!link.pens){
-				results.matrix[taz.i,c(paste('seed',seed,sep=''))] <- NA
-				results.matrix[taz.i+52,c(paste('seed',seed,sep=''))] <- NA
-				for(taz.i in 1:52){
-					results.matrix[taz.i,c(paste('seed',seed,sep=''))] <- build.res$chargers[build.res$taz == taz.i & build.res$iter==n.iter & build.res$level==2]
-					results.matrix[taz.i+52,c(paste('seed',seed,sep=''))] <- build.res$chargers[build.res$taz == taz.i & build.res$iter==n.iter & build.res$level==3]
-				}
-				c.map <- paste(map.color(agg.taz@data$weighted.demand,blue2red(50)),'7F',sep='')
-				#chargers.to.kml(agg.taz,paste(path.to.google,'buildout/',optim.code,'-pen',100*pev.penetration,'.kml',sep=''),paste('Buildout Pen ',100*pev.penetration,'% Optimization: ',optim.code,sep=''),'Color denotes total chargers in each TAZ with L3 counting for 2 chargers (click to get actual # chargers).','black',1.5,c.map,id.col='ID',name.col='name',description.cols=c('id','name','L2','L3','weighted.demand','frac.homes'))
-				to.csv <- agg.taz@data[,c('id','name','L2','L3')]
-				to.csv$cost <- 8 * to.csv$L2 + 50 * to.csv$L3
-				to.csv$power <- 6.6 * to.csv$L2 + 30 * to.csv$L3
-				# min distances between chargers
-				#l2.l3.tazs <- agg.taz$id[which(agg.taz@data$L2>0 | agg.taz@data$L3>0)]
-				#for(taz.id in agg.taz$id){ 
-					#to.csv$min.dist.to[which(to.csv$id==taz.id)] <- min(subset(dist,from==taz.id & to%in%l2.l3.tazs[l2.l3.tazs != taz.id])$miles) 
-				#}
-				#to.csv$l2.per.trip <- agg.taz$weighted.demand*pev.penetration / agg.taz$L2
-				#to.csv$l3.per.trip <- agg.taz$weighted.demand*pev.penetration / agg.taz$L3
-				#to.csv$l2.per.trip[to.csv$l2.per.trip == Inf] <- NA
-				#to.csv$l3.per.trip[to.csv$l3.per.trip == Inf] <- NA
-				#write.csv(to.csv,file=paste(path.to.google,'buildout/',optim.code,'-pen',100*pev.penetration,'.csv',sep=''),row.names=F)
-			}
+    if(!link.pens){
+      results.matrix[,paste('seed',seed,sep='')] <- NA
+      n.iter <- max(build.res$iter)
+      agg.taz$L2 <- NA
+      agg.taz$L3 <- NA
+      for(taz.i in 1:52){
+        results.matrix[taz.i,c(paste('seed',seed,sep=''))] <- build.res$chargers[build.res$taz == taz.i & build.res$iter==n.iter & build.res$level==2]
+        results.matrix[taz.i+52,c(paste('seed',seed,sep=''))] <- build.res$chargers[build.res$taz == taz.i & build.res$iter==n.iter & build.res$level==3]
+        agg.taz$L2[which(agg.taz$id==taz.i)] <- build.res$chargers[build.res$taz == taz.i & build.res$iter==n.iter & build.res$level==2]
+        agg.taz$L3[which(agg.taz$id==taz.i)] <- build.res$chargers[build.res$taz == taz.i & build.res$iter==n.iter & build.res$level==3]
+      }
+      #c.map <- paste(map.color(agg.taz@data$weighted.demand,blue2red(50)),'7F',sep='')
+      #chargers.to.kml(agg.taz,paste(path.to.google,'buildout/',optim.code,'-pen',100*pev.penetration,'.kml',sep=''),paste('Buildout Pen ',100*pev.penetration,'% Optimization: ',optim.code,sep=''),'Color denotes total chargers in each TAZ with L3 counting for 2 chargers (click to get actual # chargers).','black',1.5,c.map,id.col='ID',name.col='name',description.cols=c('id','name','L2','L3','weighted.demand','frac.homes'))
+      to.csv <- agg.taz@data[,c('id','name','L2','L3')]
+      #write.csv(to.csv,file=paste(path.to.google,'buildout/',optim.code,'-pen',100*pev.penetration,'-seed-',seed,'.csv',sep=''),row.names=F)
+    }
 	
 		if(!link.pens){
 			# facet by name
-			p <- ggplot(subset(build.res,level>0),aes(x=iter,y=chargers,fill=factor(level),width=1))+geom_bar(stat='identity')+facet_wrap(~name)+opts(title=paste("Loading Order, ",pev.penetration*100,"% Penetration",sep='')) + labs(x="Nth Charger Added", y="Cumulative Number of Chargers in Zone",fill="Charger Level") 
+			#p <- ggplot(subset(build.res,level>0),aes(x=iter,y=chargers,fill=factor(level),width=1))+geom_bar(stat='identity')+facet_wrap(~name)+opts(title=paste("Loading Order, ",pev.penetration*100,"% Penetration",sep='')) + labs(x="Nth Charger Added", y="Cumulative Number of Chargers in Zone",fill="Charger Level") 
 			#ggsave(paste(path.to.outputs,"plots/",optim.code.date,"/loading-order-pen",pev.penetration*100,".pdf",sep=''),p,width=15,height=11)
 			# plot the optimality curve
-			p <- ggplot(subset(build.res,taz==0),aes(x=cost,y=pain*100))+geom_point()+scale_x_continuous(limits=c(0,max(subset(build.res,taz==0)$cost)))+scale_y_continuous(limits=c(0,max(subset(build.res,taz==0)$pain*100)))
+			#p <- ggplot(subset(build.res,taz==0),aes(x=cost,y=pain*100))+geom_point()+scale_x_continuous(limits=c(0,max(subset(build.res,taz==0)$cost)))+scale_y_continuous(limits=c(0,max(subset(build.res,taz==0)$pain*100)))
 			#ggsave(paste(path.to.outputs,"plots/",optim.code.date,"/optim-curve-pen",pev.penetration*100,".pdf",sep=''),p,width=11,height=11)
 		}
 	}	
-	results[[paste(c(pev.penetration))]] <- results.matrix
-	cov.data <- cov(results[[paste(c(pev.penetration))]])
+  # make sure we only process columns with numeric values, no NA's
+  numeric.cols <- !is.na(results.matrix[1,])
+	results[[as.character(pev.penetration)]] <- results.matrix[,numeric.cols]
+	cov.data <- cor(t(results[[as.character(pev.penetration)]]))
+  reorder.inds <- match(agg.taz$id,agg.taz$order)
+  reorder.inds <- c(reorder.inds,(53:104)[reorder.inds])
+  cov.data <- cov.data[reorder.inds,reorder.inds]
 	write.csv(cov.data,file=paste(base.path,'pev-shared/data/outputs/buildout/covariance-data/','cov-pen',100*pev.penetration,'.csv',sep=''),row.names=T)
+	write.csv(data.frame(name=agg.taz$name,mean=apply(results[[as.character(pev.penetration)]],1,mean,na.rm=T)[reorder.inds],sd=apply(results[[as.character(pev.penetration)]],1,sd,na.rm=T)[reorder.inds]),file=paste(base.path,'pev-shared/data/outputs/buildout/covariance-data/mean-sd-pen',100*pev.penetration,'.csv',sep=''),row.names=T)
 }
 
 

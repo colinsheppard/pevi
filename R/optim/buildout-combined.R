@@ -7,7 +7,7 @@ load.libraries(c('ggplot2','yaml','RNetLogo','plyr','reshape','stringr','snow'))
 base.path <- '/Users/sheppardc/Dropbox/serc/pev-colin/'
 #base.path <- '/Users/Raskolnikovbot3001/Dropbox/'
 
-seed <- 5
+seed <- 9
 
 #optim.code <- 'min-cost-constrained-by-frac-stranded-50-50'
 #optim.code <- 'min-cost-constrained-by-frac-stranded-50-50-seed9'

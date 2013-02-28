@@ -115,6 +115,7 @@ for(pev.penetration in c(0.005,0.01,0.02,0.04)){
   cov.data <- cov.data[reorder.inds,reorder.inds]
 	write.csv(cov.data,file=paste(base.path,'pev-shared/data/outputs/buildout/covariance-data/','cov-pen',100*pev.penetration,'.csv',sep=''),row.names=T)
 	write.csv(data.frame(name=agg.taz$name,mean=apply(results[[as.character(pev.penetration)]],1,mean,na.rm=T)[reorder.inds],sd=apply(results[[as.character(pev.penetration)]],1,sd,na.rm=T)[reorder.inds]),file=paste(base.path,'pev-shared/data/outputs/buildout/covariance-data/mean-sd-pen',100*pev.penetration,'.csv',sep=''),row.names=T)
+    #apply(results[[as.character(pev.penetration)]],1,mean,na.rm=T)[reorder.inds]
 }
 
 

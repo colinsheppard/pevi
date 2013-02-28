@@ -10,7 +10,8 @@ base.path <- '/Users/sheppardc/Dropbox/serc/pev-colin/'
 #optim.code <- 'linked-min-cost-constrained-by-frac-stranded-50-50'
 #optim.code <- 'linked-min-cost-constrained-by-frac-stranded-75-25'
 #optim.code <- 'linked-min-cost-constrained-by-frac-stranded-25-75'
-optim.code <- 'min-cost-constrained-by-frac-stranded-50-50'
+#optim.code <- 'min-cost-constrained-by-frac-stranded-50-50'
+optim.code <- 'linked2-50-50'
 #optim.code <- 'thresh-1-linked-min-cost-constrained-by-frac-stranded-50-50'
 #optim.code <- 'thresh-2-linked-min-cost-constrained-by-frac-stranded-50-50'
 optim.code.date <- paste(optim.code,"-",format(Sys.time(), "%Y%m%d"),sep='')
@@ -43,7 +44,10 @@ names(dist)[1] <- "from"
 
 results <- list()
 
-n.seeds <- 9
+#Make build.res a list, differentiated by seed.
+build.res <- list()
+
+n.seeds <- 7
 
 #pev.penetration <- 0.005
 for(pev.penetration in c(0.005,0.01,0.02,0.04)){
@@ -58,44 +62,44 @@ for(pev.penetration in c(0.005,0.01,0.02,0.04)){
 		if(nrow(build.files)==0)next
 		build.files$iter <- as.numeric(sapply(strsplit(build.files$file,'-iter',fixed=T),function(x){ strsplit(x[2],'-',fixed=T)[[1]][1] }))
 		build.files <- build.files[order(build.files$iter),]
-		n.iter <- nrow(build.files)
+		build.file.iter <- nrow(build.files)
 	
 		if(!link.pens | pev.penetration==0.005){
-			build.res <- data.frame(iter=rep(build.files$iter,each=105),taz=rep(c(1:52,1:52,0),nrow(build.files)),level=c(rep(2,52),rep(3,52),0),cost=NA,pain=NA,chargers=NA,marg.cost.of.abatement=NA,pen=pev.penetration)
-			all.build.rows <- 1:nrow(build.res)
+			build.res[[seed]] <- data.frame(iter=rep(build.files$iter,each=105),taz=rep(c(1:52,1:52,0),nrow(build.files)),level=c(rep(2,52),rep(3,52),0),cost=NA,pain=NA,chargers=NA,marg.cost.of.abatement=NA,pen=pev.penetration)
+			all.build.rows <- 1:nrow(build.res[[seed]])
 		}else{
-			build.res <- rbind(build.res,data.frame(iter=rep(build.files$iter,each=105),taz=rep(c(1:52,1:52,0),nrow(build.files)),level=c(rep(2,52),rep(3,52),0),cost=NA,pain=NA,chargers=NA,marg.cost.of.abatement=NA,first=NA,name=NA,pen=pev.penetration))
-			all.build.rows <- which(build.res$iter %in% build.files$iter)
+			build.res[[seed]] <- rbind(build.res[[seed]],data.frame(iter=rep(build.files$iter,each=105),taz=rep(c(1:52,1:52,0),nrow(build.files)),level=c(rep(2,52),rep(3,52),0),cost=NA,pain=NA,chargers=NA,marg.cost.of.abatement=NA,first=NA,name=NA,pen=pev.penetration))
+			all.build.rows <- which(build.res[[seed]]$iter %in% build.files$iter)
 		}
 		
-		for(build.i in 1:n.iter){
-			build.res[build.res$iter==build.files$iter[build.i],c('cost','pain','chargers','marg.cost.of.abatement')] <- read.csv(paste(path.to.outputs,build.files$file[build.i],sep=''))[,c('cost','pain','chargers','marg.cost.of.abatement')]
+		for(build.i in 1:build.file.iter){
+			build.res[[seed]][build.res[[seed]]$iter==build.files$iter[build.i],c('cost','pain','chargers','marg.cost.of.abatement')] <- read.csv(paste(path.to.outputs,build.files$file[build.i],sep=''))[,c('cost','pain','chargers','marg.cost.of.abatement')]
 			# write the charger distribution to the inputs directory for use in future model runs
-			# write.charger.file(build.res$chargers[build.res$iter==build.files$iter[build.i]][1:104],filepath=paste(path.to.inputs,"../../charger-input-file/",optim.code,"/chargers-iter",build.files$iter[build.i],"-pen",pev.penetration*100,".txt",sep=''))
+			# write.charger.file(build.res[[seed]]$chargers[build.res[[seed]]$iter==build.files$iter[build.i]][1:104],filepath=paste(path.to.inputs,"../../charger-input-file/",optim.code,"/chargers-iter",build.files$iter[build.i],"-pen",pev.penetration*100,".txt",sep=''))
 		}
 	
-		build.res$name <- agg.taz$name[match(build.res$taz,agg.taz$id)]
+		build.res[[seed]]$name <- agg.taz$name[match(build.res[[seed]]$taz,agg.taz$id)]
 	
-		first <- ddply(build.res,.(taz),function(df){ data.frame(first=ifelse(sum(df$chargers)>0,subset(df,chargers>0)$iter[1],9999)) })
-		build.res$first <- first$first[match(build.res$taz,first$taz)]
-    build.res$name <- reorder(build.res$name,build.res$first)
+		first <- ddply(build.res[[seed]],.(taz),function(df){ data.frame(first=ifelse(sum(df$chargers)>0,subset(df,chargers>0)$iter[1],9999)) })
+		build.res[[seed]]$first <- first$first[match(build.res[[seed]]$taz,first$taz)]
+    build.res[[seed]]$name <- reorder(build.res[[seed]]$name,build.res[[seed]]$first)
 				
-    if(!link.pens){
+    #if(!link.pens){
       results.matrix[,paste('seed',seed,sep='')] <- NA
-      n.iter <- max(build.res$iter)
+      n.iter <- max(build.res[[seed]]$iter)
       agg.taz$L2 <- NA
       agg.taz$L3 <- NA
       for(taz.i in 1:52){
-        results.matrix[taz.i,c(paste('seed',seed,sep=''))] <- build.res$chargers[build.res$taz == taz.i & build.res$iter==n.iter & build.res$level==2]
-        results.matrix[taz.i+52,c(paste('seed',seed,sep=''))] <- build.res$chargers[build.res$taz == taz.i & build.res$iter==n.iter & build.res$level==3]
-        agg.taz$L2[which(agg.taz$id==taz.i)] <- build.res$chargers[build.res$taz == taz.i & build.res$iter==n.iter & build.res$level==2]
-        agg.taz$L3[which(agg.taz$id==taz.i)] <- build.res$chargers[build.res$taz == taz.i & build.res$iter==n.iter & build.res$level==3]
+        results.matrix[taz.i,c(paste('seed',seed,sep=''))] <- build.res[[seed]]$chargers[build.res[[seed]]$taz == taz.i & build.res[[seed]]$iter==n.iter & build.res[[seed]]$level==2]
+        results.matrix[taz.i+52,c(paste('seed',seed,sep=''))] <- build.res[[seed]]$chargers[build.res[[seed]]$taz == taz.i & build.res[[seed]]$iter==n.iter & build.res[[seed]]$level==3]
+        agg.taz$L2[which(agg.taz$id==taz.i)] <- build.res[[seed]]$chargers[build.res[[seed]]$taz == taz.i & build.res[[seed]]$iter==n.iter & build.res[[seed]]$level==2]
+        agg.taz$L3[which(agg.taz$id==taz.i)] <- build.res[[seed]]$chargers[build.res[[seed]]$taz == taz.i & build.res[[seed]]$iter==n.iter & build.res[[seed]]$level==3]
       }
       #c.map <- paste(map.color(agg.taz@data$weighted.demand,blue2red(50)),'7F',sep='')
-      #chargers.to.kml(agg.taz,paste(path.to.google,'buildout/',optim.code,'-pen',100*pev.penetration,'.kml',sep=''),paste('Buildout Pen ',100*pev.penetration,'% Optimization: ',optim.code,sep=''),'Color denotes total chargers in each TAZ with L3 counting for 2 chargers (click to get actual # chargers).','black',1.5,c.map,id.col='ID',name.col='name',description.cols=c('id','name','L2','L3','weighted.demand','frac.homes'))
+      chargers.to.kml(agg.taz,paste(path.to.google,'buildout/',optim.code,'-pen',100*pev.penetration,'-seed',seed,'.kml',sep=''),paste('Buildout Pen ',100*pev.penetration,'% Optimization: ',optim.code,sep=''),'Color denotes total chargers in each TAZ with L3 counting for 2 chargers (click to get actual # chargers).','black',1.5,c.map,id.col='ID',name.col='name',description.cols=c('id','name','L2','L3','weighted.demand','frac.homes'))
       to.csv <- agg.taz@data[,c('id','name','L2','L3')]
       #write.csv(to.csv,file=paste(path.to.google,'buildout/',optim.code,'-pen',100*pev.penetration,'-seed-',seed,'.csv',sep=''),row.names=F)
-    }
+    #}
 	
 		if(!link.pens){
 			# facet by name
@@ -105,7 +109,7 @@ for(pev.penetration in c(0.005,0.01,0.02,0.04)){
 			#p <- ggplot(subset(build.res,taz==0),aes(x=cost,y=pain*100))+geom_point()+scale_x_continuous(limits=c(0,max(subset(build.res,taz==0)$cost)))+scale_y_continuous(limits=c(0,max(subset(build.res,taz==0)$pain*100)))
 			#ggsave(paste(path.to.outputs,"plots/",optim.code.date,"/optim-curve-pen",pev.penetration*100,".pdf",sep=''),p,width=11,height=11)
 		}
-	}	
+	}	# end loop for(seed in 1:n.seeds)
   # make sure we only process columns with numeric values, no NA's
   numeric.cols <- !is.na(results.matrix[1,])
 	results[[as.character(pev.penetration)]] <- results.matrix[,numeric.cols]
@@ -115,14 +119,22 @@ for(pev.penetration in c(0.005,0.01,0.02,0.04)){
   cov.data <- cov.data[reorder.inds,reorder.inds]
 	write.csv(cov.data,file=paste(base.path,'pev-shared/data/outputs/buildout/covariance-data/','cov-pen',100*pev.penetration,'.csv',sep=''),row.names=T)
 	write.csv(data.frame(name=agg.taz$name,mean=apply(results[[as.character(pev.penetration)]],1,mean,na.rm=T)[reorder.inds],sd=apply(results[[as.character(pev.penetration)]],1,sd,na.rm=T)[reorder.inds]),file=paste(base.path,'pev-shared/data/outputs/buildout/covariance-data/mean-sd-pen',100*pev.penetration,'.csv',sep=''),row.names=T)
-    #apply(results[[as.character(pev.penetration)]],1,mean,na.rm=T)[reorder.inds]
+  mean.results <- apply(results[[as.character(pev.penetration)]],1,mean,na.rm=T)[reorder.inds]
+  
+  agg.taz$L2 <- NA
+  agg.taz$L3 <- NA
+  agg.taz$L2 <- round(mean.results[1:52],digits = 0)
+  agg.taz$L3 <- round(mean.results[53:104])
+  
+  chargers.to.kml(agg.taz,paste(path.to.google,'buildout/',optim.code,'-pen',100*pev.penetration,'-mean.kml',sep=''),paste('Buildout Pen ',100*pev.penetration,'% Optimization: ',optim.code,sep=''),'Color denotes total chargers in each TAZ with L3 counting for 2 chargers (click to get actual # chargers).','black',1.5,c.map,id.col='ID',name.col='name',description.cols=c('id','name','L2','L3','weighted.demand','frac.homes'))
+  #to.csv <- agg.taz@data[,c('id','name','L2','L3')]  
 }
 
 
-build.res$name <- agg.taz$name[match(build.res$taz,agg.taz$id)]
-first <- ddply(build.res,.(taz),function(df){ data.frame(first=ifelse(sum(df$chargers)>0,subset(df,chargers>0)$iter[1],9999)) })
-build.res$first <- first$first[match(build.res$taz,first$taz)]
-build.res$name <- reorder(build.res$name,build.res$first)
+build.res[[seed]]$name <- agg.taz$name[match(build.res[[seed]]$taz,agg.taz$id)]
+first <- ddply(build.res[[seed]],.(taz),function(df){ data.frame(first=ifelse(sum(df$chargers)>0,subset(df,chargers>0)$iter[1],9999)) })
+build.res[[seed]]$first <- first$first[match(build.res[[seed]]$taz,first$taz)]
+build.res[[seed]]$name <- reorder(build.res[[seed]]$name,build.res[[seed]]$first)
 
 
 pen.transitions <- ddply(build.res,.(pen),function(df){ df$iter[1] })
@@ -130,12 +142,12 @@ p <- ggplot(subset(build.res,level>0),aes(x=iter,y=chargers,fill=factor(level),w
 #ggsave(paste(path.to.outputs,"plots/",optim.code.date,"/loading-order-linked-pens.pdf",sep=''),p,width=15,height=11)
 
 
-n.iter <- max(build.res$iter)
+n.iter <- max(build.res[[seed]]$iter)
 agg.taz$L2 <- NA
 agg.taz$L3 <- NA
 for(taz.i in 1:52){
-  agg.taz$L2[which(agg.taz$id==taz.i)] <- build.res$chargers[build.res$taz == taz.i & build.res$iter==n.iter & build.res$level==2]
-  agg.taz$L3[which(agg.taz$id==taz.i)] <- build.res$chargers[build.res$taz == taz.i & build.res$iter==n.iter & build.res$level==3]
+  agg.taz$L2[which(agg.taz$id==taz.i)] <- build.res[[seed]]$chargers[build.res[[seed]]$taz == taz.i & build.res[[seed]]$iter==n.iter & build.res[[seed]]$level==2]
+  agg.taz$L3[which(agg.taz$id==taz.i)] <- build.res[[seed]]$chargers[build.res[[seed]]$taz == taz.i & build.res[[seed]]$iter==n.iter & build.res[[seed]]$level==3]
 }
 chargers.to.kml(agg.taz,paste(path.to.google,'buildout/',optim.code,'.kml',sep=''),paste('Linked Buildout: ',optim.code,sep=''),'Color denotes total chargers in each TAZ with L3 counting for 2 chargers (click to get actual # chargers).','red',1.5,'blue',id.col='ID',name.col='name',description.cols=c('id','name','L2','L3','weighted.demand','frac.homes'))
 to.csv <- agg.taz@data[,c('id','name','L2','L3')]

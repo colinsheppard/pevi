@@ -1,8 +1,8 @@
 library(colinmisc)
 load.libraries(c('ggplot2','plyr','reshape','stringr'))
 
-#base.path <- '/Users/critter/Dropbox/serc/pev-colin/'
-base.path <- '/Users/sheppardc/Dropbox/serc/pev-colin/'
+base.path <- '/Users/critter/Dropbox/serc/pev-colin/'
+#base.path <- '/Users/sheppardc/Dropbox/serc/pev-colin/'
 #base.path <- '/Users/Raskolnikovbot3001/Dropbox/'
 
 exp.name <- commandArgs(trailingOnly=T)[1]
@@ -46,6 +46,7 @@ if(F){
   #results$percent.electric.miles.per.driver <- results$electric.miles.per.driver / min(results$electric.miles.per.driver) * 100
   mean.emds <- ddply(results,.(penetration,infrastructure.scenario),function(df){ data.frame(mean=mean(df$percent.electric.miles.per.driver)) })
   p <- ggplot(results,aes(x=infrastructure.cost-112-16,y=percent.electric.miles.per.driver))+ stat_summary(fun.y=mean, aes(colour=as.factor(penetration)), geom="line") + stat_summary(fun.y=mean, aes(colour=as.factor(penetration)), geom="point")+coord_cartesian(ylim=c(99,max(mean.emds$mean)+1))
+  p <- ggplot(results,aes(x=infrastructure.cost-112-16,y=electric.miles.per.driver))+ stat_summary(fun.y=mean, aes(colour=as.factor(penetration)), geom="line") + stat_summary(fun.y=mean, aes(colour=as.factor(penetration)), geom="point")
   p <- ggplot(results,aes(x=infrastructure.cost-112-16,y=frac.stranded.by.delay*100))+ stat_summary(fun.y=mean, aes(colour=as.factor(penetration)), geom="line") + stat_summary(fun.y=mean, aes(colour=as.factor(penetration)), geom="point")+scale_y_continuous(limits=c(0,max(results$frac.stranded.by.delay * 100)))
   results$frac.stranded <- results$num.stranded/results$num.drivers
   p <- ggplot(melt(results,id.vars=c("infrastructure.cost","penetration"),measure.vars=c("frac.denied","frac.stranded.by.delay","frac.drivers.delayed","frac.stranded")),aes(x=infrastructure.cost-112-16,y=value*100))+ stat_summary(fun.y=mean, aes(colour=as.factor(penetration)), geom="line") + stat_summary(fun.y=mean, aes(colour=as.factor(penetration)), geom="point")+facet_wrap(~variable,scales="free_y")

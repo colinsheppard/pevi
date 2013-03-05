@@ -7,7 +7,10 @@ load.libraries(c('ggplot2','yaml','RNetLogo','plyr','reshape','stringr','snow'))
 base.path <- '/Users/sheppardc/Dropbox/serc/pev-colin/'
 #base.path <- '/Users/Raskolnikovbot3001/Dropbox/'
 
-seed <- 9
+seed <- 17
+
+#num.cpu <- 8
+num.cpu <- 12
 
 #optim.code <- 'min-cost-constrained-by-frac-stranded-50-50'
 #optim.code <- 'min-cost-constrained-by-frac-stranded-50-50-seed9'
@@ -20,9 +23,6 @@ optim.code <- paste('linked2-50-50-seed',seed,sep='')
 
 link.pens <- str_detect(optim.code,"linked")  # should the infrastructure from lower pens be used as starting place for higher? otherwise,
                 # infrastructure is reset to zero
-
-#num.cpu <- 8
-num.cpu <- 12
 
 path.to.pevi <- paste(base.path,'pevi/',sep='')
 path.to.inputs <- paste(base.path,'pev-shared/data/inputs/buildout/',optim.code,'/',sep='')

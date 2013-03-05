@@ -47,7 +47,7 @@ results <- list()
 #Make build.res a list, differentiated by seed.
 build.res <- list()
 
-n.seeds <- 7
+n.seeds <- 15
 
 #pev.penetration <- 0.005
 for(pev.penetration in c(0.005,0.01,0.02,0.04)){
@@ -80,7 +80,7 @@ for(pev.penetration in c(0.005,0.01,0.02,0.04)){
 	
 		build.res[[seed]]$name <- agg.taz$name[match(build.res[[seed]]$taz,agg.taz$id)]
 	
-		first <- ddply(build.res[[seed]],.(taz),function(df){ data.frame(first=ifelse(sum(df$chargers)>0,subset(df,chargers>0)$iter[1],9999)) })
+		first <- ddply(build.res[[seed]],.(taz),function(df){ data.frame(first=ifelse(sum(df$chargers)>0,subset(df,chargers>ifelse(df$taz%in%c(6,23,27),1,0))$iter[1],9999)) })
 		build.res[[seed]]$first <- first$first[match(build.res[[seed]]$taz,first$taz)]
     build.res[[seed]]$name <- reorder(build.res[[seed]]$name,build.res[[seed]]$first)
 				
@@ -96,8 +96,8 @@ for(pev.penetration in c(0.005,0.01,0.02,0.04)){
         agg.taz$L3[which(agg.taz$id==taz.i)] <- build.res[[seed]]$chargers[build.res[[seed]]$taz == taz.i & build.res[[seed]]$iter==n.iter & build.res[[seed]]$level==3]
       }
       #c.map <- paste(map.color(agg.taz@data$weighted.demand,blue2red(50)),'7F',sep='')
-      chargers.to.kml(agg.taz,paste(path.to.google,'buildout/',optim.code,'-pen',100*pev.penetration,'-seed',seed,'.kml',sep=''),paste('Buildout Pen ',100*pev.penetration,'% Optimization: ',optim.code,sep=''),'Color denotes total chargers in each TAZ with L3 counting for 2 chargers (click to get actual # chargers).','black',1.5,c.map,id.col='ID',name.col='name',description.cols=c('id','name','L2','L3','weighted.demand','frac.homes'))
-      to.csv <- agg.taz@data[,c('id','name','L2','L3')]
+      #chargers.to.kml(agg.taz,paste(path.to.google,'buildout/',optim.code,'-pen',100*pev.penetration,'-seed',seed,'.kml',sep=''),paste('Buildout Pen ',100*pev.penetration,'% Optimization: ',optim.code,sep=''),'Color denotes total chargers in each TAZ with L3 counting for 2 chargers (click to get actual # chargers).','black',1.5,c.map,id.col='ID',name.col='name',description.cols=c('id','name','L2','L3','weighted.demand','frac.homes'))
+      #to.csv <- agg.taz@data[,c('id','name','L2','L3')]
       #write.csv(to.csv,file=paste(path.to.google,'buildout/',optim.code,'-pen',100*pev.penetration,'-seed-',seed,'.csv',sep=''),row.names=F)
     #}
 	
@@ -117,8 +117,8 @@ for(pev.penetration in c(0.005,0.01,0.02,0.04)){
   reorder.inds <- match(agg.taz$id,agg.taz$order)
   reorder.inds <- c(reorder.inds,(53:104)[reorder.inds])
   cov.data <- cov.data[reorder.inds,reorder.inds]
-	write.csv(cov.data,file=paste(base.path,'pev-shared/data/outputs/buildout/covariance-data/','cov-pen',100*pev.penetration,'.csv',sep=''),row.names=T)
-	write.csv(data.frame(name=agg.taz$name,mean=apply(results[[as.character(pev.penetration)]],1,mean,na.rm=T)[reorder.inds],sd=apply(results[[as.character(pev.penetration)]],1,sd,na.rm=T)[reorder.inds]),file=paste(base.path,'pev-shared/data/outputs/buildout/covariance-data/mean-sd-pen',100*pev.penetration,'.csv',sep=''),row.names=T)
+	#write.csv(cov.data,file=paste(base.path,'pev-shared/data/outputs/buildout/covariance-data/','cov-pen',100*pev.penetration,'.csv',sep=''),row.names=T)
+	#write.csv(data.frame(name=agg.taz$name,mean=apply(results[[as.character(pev.penetration)]],1,mean,na.rm=T)[reorder.inds],sd=apply(results[[as.character(pev.penetration)]],1,sd,na.rm=T)[reorder.inds]),file=paste(base.path,'pev-shared/data/outputs/buildout/covariance-data/mean-sd-pen',100*pev.penetration,'.csv',sep=''),row.names=T)
   mean.results <- apply(results[[as.character(pev.penetration)]],1,mean,na.rm=T)[reorder.inds]
   
   agg.taz$L2 <- NA
@@ -126,9 +126,27 @@ for(pev.penetration in c(0.005,0.01,0.02,0.04)){
   agg.taz$L2 <- round(mean.results[1:52],digits = 0)
   agg.taz$L3 <- round(mean.results[53:104])
   
+  c.map <- paste(map.color(agg.taz@data$weighted.demand,blue2red(50)),'7F',sep='')
   chargers.to.kml(agg.taz,paste(path.to.google,'buildout/',optim.code,'-pen',100*pev.penetration,'-mean.kml',sep=''),paste('Buildout Pen ',100*pev.penetration,'% Optimization: ',optim.code,sep=''),'Color denotes total chargers in each TAZ with L3 counting for 2 chargers (click to get actual # chargers).','black',1.5,c.map,id.col='ID',name.col='name',description.cols=c('id','name','L2','L3','weighted.demand','frac.homes'))
   #to.csv <- agg.taz@data[,c('id','name','L2','L3')]  
+
 }
+
+# summarize the ranking of each taz in terms of order of first acquisition of a charger, only do it for the last loop or pen4
+rankings <- data.frame(matrix(NA,52,n.seeds))
+names(rankings) <- paste("seed",1:n.seeds,sep='')
+for(seed in 1:n.seeds){
+  winners <- subset(build.res[[seed]],iter==build.res[[seed]]$iter[nrow(build.res[[seed]])] & level > 0 & first < 9999)[,c('taz','first')]
+  rankings[winners$taz,seed] <- winners$first
+}
+rankings <- apply(rankings,2,function(x){ x/max(x,na.rm=T) })
+mean.rank <- order(apply(rankings,1,function(x){ mean(x,na.rm=T) }))
+#write.csv(data.frame(name=agg.taz$name,mean.rank=match(agg.taz$id,mean.rank)),file=paste(base.path,'pev-shared/data/outputs/buildout/covariance-data/mean-rankings-',100*pev.penetration,'.csv',sep=''),row.names=T)
+write.csv(data.frame(name=agg.taz$name[match(mean.rank,agg.taz$id)]),file=paste(base.path,'pev-shared/data/outputs/buildout/covariance-data/mean-rankings-',100*pev.penetration,'.csv',sep=''),row.names=T)
+
+  
+  
+  
 
 
 build.res[[seed]]$name <- agg.taz$name[match(build.res[[seed]]$taz,agg.taz$id)]

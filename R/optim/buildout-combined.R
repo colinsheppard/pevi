@@ -7,7 +7,7 @@ load.libraries(c('ggplot2','yaml','RNetLogo','plyr','reshape','stringr','snow'))
 base.path <- '/Users/sheppardc/Dropbox/serc/pev-colin/'
 #base.path <- '/Users/Raskolnikovbot3001/Dropbox/'
 
-seed <- 17
+seed <- 19
 
 #num.cpu <- 8
 num.cpu <- 12

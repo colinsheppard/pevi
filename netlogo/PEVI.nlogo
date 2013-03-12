@@ -97,6 +97,7 @@ drivers-own [
   trip-time
   itin-complete?  
   type-assignment-code
+  next-home-log
 
   willing-to-roam?
   charging-on-a-whim?
@@ -713,6 +714,53 @@ to itinerary-event-scheduler
   dynamic-scheduler:add schedule self task depart departure-time
 end
 
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;; PLUG IN AT HOME SCHEDULER
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+to home-V2G-scheduler
+  set state "V2G-home"
+  set current-charger (item 0 [chargers-by-type] of current-taz)
+  print (word "current-charger: " current-charger " current-taz: " current-taz " home-taz: " home-taz)
+    
+;  if current-taz = home-taz [
+;    if (random-float 1) < (1 / (1 + exp(-5 + 6 * state-of-charge))) [
+;      set current-charger (one-of item 0 [chargers-by-type] of current-taz)
+
+  dynamic-scheduler:add schedule self task plug-in-at-home next-home-log ;; if this task is called, 
+  ;; the vehicle has found a home charger, and will execute plug-in-at-home immediately
+  ;; plug-in-at-home needs:
+  ;; time-until-depart (to ensure the vehicle departs on time)
+  ;; to schedule next departure -- do not use itinerary-event-scheduler if state = V2G-home
+  
+end
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;; PLUG IN AT HOME
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+to plug-in-at-home
+  ; when is the next departure time?
+  ;--> first set in setup, update-itinerary
+  ; need time-until-depart
+  set time-until-depart departure-time - ticks
+  
+  ; if time-until-depart > .25, then continue to log-home-soc
+  let #new-soc state-of-charge + 0.25 * (charge-rate-of current-charger)
+  if #new-soc <= 1 - small-num [ ;; only update charge if needed
+    set state-of-charge #new-soc
+  ]  
+  
+  ifelse time-until-depart > 0.25 [
+    set next-home-log (ticks + 0.25)
+  ][
+    itinerary-event-scheduler  
+  ]
+  print (word precision ticks 3 " driver: " self " charger: " current-charger " soc: " state-of-charge " home ")
+  ; schedule it
+  ;dynamic-scheduler:add schedule self task depart departure-time
+  ;
+end
+
+
 ;;;;;;;;;;;;;;;;;;;;
 ;; DEPART 
 ;;;;;;;;;;;;;;;;;;;;
@@ -913,52 +961,6 @@ to update-itinerary
   ]
 end
 
-to-report available-chargers [#taz #level]
-  let #found-chargers 0
-  ask #taz[
-    set #found-chargers ((item #level chargers-by-type) with [current-driver = nobody])
-  ]
-  report #found-chargers
-end
-
-to-report existing-chargers [#taz #level]
-  let #found-chargers 0
-  ask #taz[
-    set #found-chargers (item #level chargers-by-type)
-  ]
-  report #found-chargers
-end
-
-to-report charge-rate-of [#charger]
-  report [charge-rate] of ([this-charger-type] of #charger)
-end
-to-report energy-price-of [#charger]
-  report [energy-price] of ([this-charger-type] of #charger)
-end
-to-report level-of [#charger]
-  report [level] of ([this-charger-type] of #charger)
-end
-to-report distance-from-to [from-taz to-taz]
-  report item ((from-taz - 1) * n-tazs + to-taz - 1 ) od-dist
-end
-to-report time-from-to [from-taz to-taz]
-  report item ((from-taz - 1) * n-tazs + to-taz - 1 ) od-time
-end
-to-report od-index [destination source]
-  report ((destination - 1) * n-tazs + source - 1)
-end
-
-to-report my-od-index
-  report (([id] of current-taz - 1) * n-tazs + [id] of destination-taz - 1)
-end
-
-to-report driver-soc [the-driver]
-  report [state-of-charge] of the-driver
-end
-
-to-report weight-delay [delay]
-  ifelse delay >= 0 [report delay][report -0.5 * delay]
-end
 
 to summarize
   reset-logfile "driver-summary"
@@ -1070,7 +1072,7 @@ go-until-time
 go-until-time
 0
 100
-32
+4
 0.5
 1
 NIL
@@ -1636,7 +1638,7 @@ Polygon -7500403 true true 270 75 225 30 30 225 75 270
 Polygon -7500403 true true 30 75 75 30 270 225 225 270
 
 @#$#@#$#@
-NetLogo 5.0
+NetLogo 5.0.1
 @#$#@#$#@
 @#$#@#$#@
 @#$#@#$#@

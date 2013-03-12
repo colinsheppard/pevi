@@ -134,6 +134,75 @@ to convert-enroute-ids
 end
 
 ;;;;;;;;;;;;;;;;;;;;
+;; SETUP CHARGER-TYPES
+;;;;;;;;;;;;;;;;;;;;
+to setup-charger-types
+  ;print "setup-charger-types"
+  
+  ifelse (file-exists? charger-type-input-file) [
+    file-close
+    file-open charger-type-input-file
+    while [file-at-end? = false] [
+      create-charger-types 1 [
+        set level file-read
+        set charge-rate file-read
+        set energy-price file-read
+        set installed-cost file-read
+      ]
+    ]
+    file-close
+  ][ 
+    error (word "Input file '" charger-type-input-file "' not found!") 
+  ]
+end 
+
+;;;;;;;;;;;;;;;;;;;;
+;; SETUP CHARGERS
+;;;;;;;;;;;;;;;;;;;;
+to setup-chargers
+  ;print "setup-chargers"
+  ; The charger level, location, and quantity of chargers was read in during setup-tazs.
+  ; Now chargers of each level are created at the appropriate taz.
+  ; Charger-rate is currently a separate state variable from charger level. We may want to combine the two later, if
+  ; we do not use "charger level" for anything else.
+
+  ; At each taz,  chargers equal to "taz-chargers"are created.
+  foreach sort tazs [
+    let #this-taz ?
+    create-chargers [item 0 n-levels] of #this-taz [  ; The location of each charger created is then set as the current TAZ location
+      set this-charger-type one-of charger-types with [level = 0]
+      set location ?
+    ]
+    create-chargers [item 1 n-levels] of #this-taz [  ; The location of each charger created is then set as the current TAZ location
+      set this-charger-type one-of charger-types with [level = 1]
+      set location ?
+    ]
+    create-chargers [item 2 n-levels] of #this-taz [  ; The location of each charger created is then set as the current TAZ location
+      set this-charger-type one-of charger-types with [level = 2]
+      set location ?
+    ]
+    create-chargers [item 3 n-levels] of #this-taz [  ; The location of each charger created is then set as the current TAZ location
+      set this-charger-type one-of charger-types with [level = 3]
+      set location ?
+    ]
+    foreach n-values n-charger-types [?] [
+      ask #this-taz [
+        set chargers-by-type replace-item ? chargers-by-type chargers with [([level] of this-charger-type = ?) and (location = myself)]
+      ]
+    ]
+  ]  
+  ask chargers [
+    set shape "Circle 2"
+    set color red
+    set size 1
+    set current-driver nobody
+    let #level [level] of this-charger-type
+    set energy-delivered 0
+  ]
+end ;setup-chargers
+
+
+;;;;;;;;;;;;;;;;;;;;
 ;; SETUP DRIVERS
 ;;;;;;;;;;;;;;;;;;;;
 to setup-drivers
@@ -205,8 +274,14 @@ to setup-drivers
   
   ; finally initialize driver state variables
   ask drivers [
+    ;plug-in-at-home ;; let's assume for now that the vehicles are self-programmed to START their home charging event 
+                    ;; at midnight (0 ticks), and that the SOC at the beginning of the charge event
+                    ;; is ~gauss(mu=.5,sigma=.2)
+    ;..
     set current-itin-row -1
-    update-itinerary
+    update-itinerary ;; this gives each driver their first itin event of the day -- not yet scheduled
+    ;..                 sets current-taz
+
     set shape "car"
     set color green
     set size 2
@@ -221,31 +296,6 @@ to setup-drivers
       set electric-fuel-consumption random-normal electric-fuel-consumption-mean electric-fuel-consumption-sd
     ]
 
-    ifelse is-bev? [
-    let rand-draw random-float 1
-    ifelse rand-draw < 0.63 [
-      set state-of-charge 0.9 + random-float 0.1
-    ][
-      ifelse rand-draw < 0.68 [ 
-        set state-of-charge 0.8 + random-float 0.1
-      ][
-        ifelse rand-draw < 0.94 [ 
-          set state-of-charge 0.7 + random-float 0.1
-        ][
-          ifelse rand-draw < 0.97 [ 
-            set state-of-charge 0.6 + random-float 0.1
-          ][
-            ifelse rand-draw < 0.99 [ 
-              set state-of-charge 0.5 + random-float 0.1
-            ][
-              ifelse rand-draw < 0.995 [ 
-                set state-of-charge 0.4 + random-float 0.1
-              ][
-                set state-of-charge 0.3 + random-float 0.1
-     ]]]]]]][
-      set state-of-charge 1
-    ]
-
     set state "not-charging"
     set current-charger nobody
     set energy-used 0
@@ -255,7 +305,43 @@ to setup-drivers
     set num-denials 0
   
     set itin-complete? false
-    itinerary-event-scheduler
+
+    ifelse current-taz = home-taz [  ;; at home, track these vehicles for V2G
+      ifelse is-bev? [
+        set state-of-charge random-normal 0.5 0.2 
+        ][
+        set state-of-charge random-normal 0.4 0.4  ;; this is just a place-holder for now
+      ]
+      set next-home-log 0
+      home-V2G-scheduler
+
+    ][   ;; not at home -- do not track for V2G.  Schedule first departure.
+      ifelse is-bev? [
+        let rand-draw random-float 1
+        ifelse rand-draw < 0.63 [
+          set state-of-charge 0.9 + random-float 0.1
+        ][
+        ifelse rand-draw < 0.68 [ 
+          set state-of-charge 0.8 + random-float 0.1
+        ][
+        ifelse rand-draw < 0.94 [ 
+          set state-of-charge 0.7 + random-float 0.1
+        ][
+        ifelse rand-draw < 0.97 [ 
+          set state-of-charge 0.6 + random-float 0.1
+        ][
+        ifelse rand-draw < 0.99 [ 
+          set state-of-charge 0.5 + random-float 0.1
+        ][
+        ifelse rand-draw < 0.995 [ 
+          set state-of-charge 0.4 + random-float 0.1
+        ][
+        set state-of-charge 0.3 + random-float 0.1
+        ]]]]]]][
+      set state-of-charge 1
+        ]
+      itinerary-event-scheduler
+    ]
   ]
 end ;setup-drivers
 
@@ -344,73 +430,6 @@ to setup-itinerary
   file-close
 end ;setup-itinerary
 
-;;;;;;;;;;;;;;;;;;;;
-;; SETUP CHARGER-TYPES
-;;;;;;;;;;;;;;;;;;;;
-to setup-charger-types
-  ;print "setup-charger-types"
-  
-  ifelse (file-exists? charger-type-input-file) [
-    file-close
-    file-open charger-type-input-file
-    while [file-at-end? = false] [
-      create-charger-types 1 [
-        set level file-read
-        set charge-rate file-read
-        set energy-price file-read
-        set installed-cost file-read
-      ]
-    ]
-    file-close
-  ][ 
-    error (word "Input file '" charger-type-input-file "' not found!") 
-  ]
-end 
-
-;;;;;;;;;;;;;;;;;;;;
-;; SETUP CHARGERS
-;;;;;;;;;;;;;;;;;;;;
-to setup-chargers
-  ;print "setup-chargers"
-  ; The charger level, location, and quantity of chargers was read in during setup-tazs.
-  ; Now chargers of each level are created at the appropriate taz.
-  ; Charger-rate is currently a separate state variable from charger level. We may want to combine the two later, if
-  ; we do not use "charger level" for anything else.
-
-  ; At each taz,  chargers equal to "taz-chargers"are created.
-  foreach sort tazs [
-    let #this-taz ?
-    create-chargers [item 0 n-levels] of #this-taz [  ; The location of each charger created is then set as the current TAZ location
-      set this-charger-type one-of charger-types with [level = 0]
-      set location ?
-    ]
-    create-chargers [item 1 n-levels] of #this-taz [  ; The location of each charger created is then set as the current TAZ location
-      set this-charger-type one-of charger-types with [level = 1]
-      set location ?
-    ]
-    create-chargers [item 2 n-levels] of #this-taz [  ; The location of each charger created is then set as the current TAZ location
-      set this-charger-type one-of charger-types with [level = 2]
-      set location ?
-    ]
-    create-chargers [item 3 n-levels] of #this-taz [  ; The location of each charger created is then set as the current TAZ location
-      set this-charger-type one-of charger-types with [level = 3]
-      set location ?
-    ]
-    foreach n-values n-charger-types [?] [
-      ask #this-taz [
-        set chargers-by-type replace-item ? chargers-by-type chargers with [([level] of this-charger-type = ?) and (location = myself)]
-      ]
-    ]
-  ]  
-  ask chargers [
-    set shape "Circle 2"
-    set color red
-    set size 1
-    set current-driver nobody
-    let #level [level] of this-charger-type
-    set energy-delivered 0
-  ]
-end ;setup-chargers
 
 ;;;;;;;;;;;;;;;;;;;;
 ;; LOG DATA

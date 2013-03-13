@@ -719,12 +719,6 @@ end
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 to home-V2G-scheduler
   set state "V2G-home"
-  set current-charger (item 0 [chargers-by-type] of current-taz)
-  print (word "current-charger: " current-charger " current-taz: " current-taz " home-taz: " home-taz)
-    
-;  if current-taz = home-taz [
-;    if (random-float 1) < (1 / (1 + exp(-5 + 6 * state-of-charge))) [
-;      set current-charger (one-of item 0 [chargers-by-type] of current-taz)
 
   dynamic-scheduler:add schedule self task plug-in-at-home next-home-log ;; if this task is called, 
   ;; the vehicle has found a home charger, and will execute plug-in-at-home immediately
@@ -738,10 +732,12 @@ end
 ;; PLUG IN AT HOME
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 to plug-in-at-home
-  ; when is the next departure time?
-  ;--> first set in setup, update-itinerary
-  ; need time-until-depart
+
   set time-until-depart departure-time - ticks
+  set current-charger (one-of item 0 [chargers-by-type] of current-taz)
+
+  ;print (word "current-charger: " current-charger " current-taz: " current-taz " home-taz: " home-taz)
+
   
   ; if time-until-depart > .25, then continue to log-home-soc
   let #new-soc state-of-charge + 0.25 * (charge-rate-of current-charger)
@@ -754,7 +750,9 @@ to plug-in-at-home
   ][
     itinerary-event-scheduler  
   ]
-  print (word precision ticks 3 " driver: " self " charger: " current-charger " soc: " state-of-charge " home ")
+  
+  print (word precision ticks 3 " driver: " [id] of self " charger: " current-charger " soc: " state-of-charge " taz: " current-taz " home: " home-taz)
+  
   ; schedule it
   ;dynamic-scheduler:add schedule self task depart departure-time
   ;
@@ -1072,7 +1070,7 @@ go-until-time
 go-until-time
 0
 100
-4
+5
 0.5
 1
 NIL

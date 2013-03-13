@@ -308,10 +308,27 @@ to setup-drivers
 
     ifelse current-taz = home-taz [  ;; at home, track these vehicles for V2G
       ifelse is-bev? [
-        set state-of-charge random-normal 0.5 0.2 
+        let rand-draw random-normal 0.5 0.2
+        ifelse rand-draw > 1 [
+         set state-of-charge 1 
+         ][
+           ifelse rand-draw < 0 [
+             set state-of-charge 0 
+             ][
+           set state-of-charge rand-draw
+           ]
+         ] 
         ][
-        set state-of-charge random-normal 0.4 0.4  ;; this is just a place-holder for now
-      ]
+        let rand-draw random-normal 0.4 0.4 ;; this is just a place-holder for now
+        ifelse rand-draw > 1 [
+          set state-of-charge 1 
+          ][
+            ifelse rand-draw < 0 [
+              set state-of-charge 0 
+              ][
+            set state-of-charge rand-draw
+            ]
+          ]
       set next-home-log 0
       home-V2G-scheduler
 

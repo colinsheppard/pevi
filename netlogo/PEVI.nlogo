@@ -740,18 +740,21 @@ to plug-in-at-home
 
   
   ; if time-until-depart > .25, then continue to log-home-soc
-  let #new-soc state-of-charge + 0.25 * (charge-rate-of current-charger)
+  let #new-soc state-of-charge + (0.25 * (charge-rate-of current-charger)) / battery-capacity
+  ;print (word precision ticks 3 " old soc: " state-of-charge " new soc: " #new-soc " driver: " [id] of self " charge-rate " charge-rate-of current-charger)
   if #new-soc <= 1 - small-num [ ;; only update charge if needed
     set state-of-charge #new-soc
   ]  
-  
+
+  print (word precision ticks 3 " time-until-depart " time-until-depart " driver: " [id] of self " charger: " current-charger " soc: " state-of-charge " taz: " current-taz " home: " home-taz)  
   ifelse time-until-depart > 0.25 [
     set next-home-log (ticks + 0.25)
+    home-V2G-scheduler
   ][
     itinerary-event-scheduler  
   ]
   
-  print (word precision ticks 3 " driver: " [id] of self " charger: " current-charger " soc: " state-of-charge " taz: " current-taz " home: " home-taz)
+
   
   ; schedule it
   ;dynamic-scheduler:add schedule self task depart departure-time
@@ -1070,7 +1073,7 @@ go-until-time
 go-until-time
 0
 100
-5
+12
 0.5
 1
 NIL

@@ -65,7 +65,7 @@ ani.routes <- function(){
   from.to.df$num <- 0
   from.to <- list()
   for(i in 1:trail.len){ from.to[[i]] <- from.to.df }
-  cols <- c(colorRampPalette(c("black",colors()[556]))(trail.len-1),colors()[552])
+  cols <- c(colorRampPalette(c("black",colors()['#660000']))(trail.len-1),colors()['#FF0000'])
   trail.i <- 0
   for(t in seq(0,max(tazs$time),by=5/60)){
     t.routes <- t %% 24
@@ -122,10 +122,10 @@ ani.routes <- function(){
 			
 			# Public charging events currently max out at 4, use if logic to re-size dot to match scale. More complicted logic for home charging, which maxes at 38.
       agg.taz.row <- which(agg.taz$id == i)
-			points(agg.taz.coords[agg.taz.row,1],agg.taz.coords[agg.taz.row,2],pch=16,col='yellow',cex=num.public.events)
+			points(agg.taz.coords[agg.taz.row,1],agg.taz.coords[agg.taz.row,2],pch=16,col='#9FEE00',cex=num.public.events)
 			points(agg.taz.coords[agg.taz.row,1],agg.taz.coords[agg.taz.row,2],pch=1,col='black',cex=num.public.events)
       if(num.home.events>0){
-        points(agg.taz.coords[agg.taz.row,1],agg.taz.coords[agg.taz.row,2],pch=0,col='470',cex=home.cexes[num.home.events])
+        points(agg.taz.coords[agg.taz.row,1],agg.taz.coords[agg.taz.row,2],pch=0,col='#5CCCCC',cex=home.cexes[num.home.events])
       }
     }
   }
@@ -135,7 +135,7 @@ ani.options(ffmpeg="/usr/local/bin/ffmpeg")
 saveVideo({
     par(mar = c(3, 3, 1, 0.5), mgp = c(2, 0.5, 0), tcl = -0.3, cex.axis = 0.8, cex.lab = 0.8, 
         cex.main = 1)
-    ani.options(interval = 5/60, nmax = 24*30)
+    ani.options(interval = 10/60, nmax = 24*30)
 ani.routes()
 },video.name="test.mp4",other.opts="-b 1500k -s 800x950") # make res divisible by 16
 

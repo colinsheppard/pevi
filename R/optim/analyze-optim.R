@@ -2,8 +2,8 @@ library(colinmisc)
 Sys.setenv(NOAWT=1)
 load.libraries(c('yaml','stringr','RNetLogo','maptools','reshape','colorRamps','ggplot2'))
 
-base.path <- '/Users/sheppardc/Dropbox/serc/pev-colin/'
-#base.path <- '/Users/critter/Dropbox/serc/pev-colin/'
+#base.path <- '/Users/sheppardc/Dropbox/serc/pev-colin/'
+base.path <- '/Users/critter/Dropbox/serc/pev-colin/'
 path.to.pevi <- paste(base.path,'pevi/',sep='')
 path.to.inputs <- paste(base.path,'pev-shared/data/inputs/optim/',sep='')
 path.to.outputs <- paste(base.path,'pev-shared/data/outputs/optim/',sep='')

@@ -110,14 +110,25 @@ pevs.by.year <- hybrids.by.year
 pevs.by.year$year <- pevs.by.year$year + year.offset
 pevs.by.year$count <- pevs.by.year$count * (tot.and.proj$count[match(pevs.by.year$year,tot.and.proj$year)]/tot.and.proj$count[match(pevs.by.year$year-year.offset,tot.and.proj$year)])
 
+pevs.by.year$i <- pevs.by.year$year - 2012
+fit.count.by.year <- lm('count~i',pevs.by.year)
+pevs.by.year$count.plus.10p <- pevs.by.year$i * fit.count.by.year$coefficients['i'] * 1.1 + fit.count.by.year$coefficients['(Intercept)']
+pevs.by.year$count.plus.25p <- pevs.by.year$i * fit.count.by.year$coefficients['i'] * 1.25 + fit.count.by.year$coefficients['(Intercept)']
+
 par(mar=c(5,4,6,5)+.1)
-plot(pevs.by.year$year,pevs.by.year$count,xlim=c(2010,2021),ylim=c(0,1.05*max(pevs.by.year$count)),xlab="Year",ylab="Number of PEVs",main="Projection of PEV Adoption in Humbodlt County")
+plot(pevs.by.year$year,pevs.by.year$count,xlim=c(2010,2026),ylim=c(0,3200),xlab="Year",ylab="Number of PEVs",main="Projection of PEV Adoption in Humbodlt County",xaxt='n')
 title(main=paste("(assuming linear growth in total reg. vehicles and PEV adoption"),line=1.7,font.main=1)
 title(main=paste("follows same trend as hybrid-electric adoption)"),line=0.5,font.main=1)
-axis(4,at=axTicks(2),labels=roundC(axTicks(2)/tot.and.proj$count[tot.and.proj$year==2020]*100,2))
+axis(4,at=tot.and.proj$count[tot.and.proj$year==2020]*c(0.5,1,2)/100,labels=c(0.5,1,2))
+axis(1,at=2010:2026)
 mtext("% of 2020 Vehicle Stock",side=4,line=3)
 grid()
-abline(lm('count~year',pevs.by.year),col='red')
+abline(h=0.005*tot.and.proj$count[tot.and.proj$year==2020],lty=2)
+abline(h=0.01*tot.and.proj$count[tot.and.proj$year==2020],lty=2)
+abline(h=0.02*tot.and.proj$count[tot.and.proj$year==2020],lty=2)
+abline(lm('count~year',pevs.by.year))
+abline(lm('count.plus.10p ~ year',pevs.by.year))
+abline(lm('count.plus.25p ~ year',pevs.by.year))
 
 # Now do an independent calc based on observed vehicle replacements
 k.val <- read.csv(paste(path.to.humveh,'k-values.csv',sep=''))

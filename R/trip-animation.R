@@ -1,10 +1,6 @@
 library(colinmisc)
 load.libraries(c('sas7bdat','plyr','ggplot2','gtools','doMC','reshape','maptools','animation'))
 
-gpclibPermit()
-num.processors <- 11
-registerDoMC(num.processors)
-
 base.path <- '/Users/critter/Dropbox/serc/pev-colin/'
 #base.path <- '/Users/sheppardc/Dropbox/serc/pev-colin/'
 path.to.geatm <- paste(base.path,'pev-shared/data/GEATM-2020/',sep='')
@@ -35,6 +31,7 @@ names(sched) <- c('driver','from','to','depart','home')
 sched$ft <- paste(sched$from,sched$to)
 
 tazs <- read.csv(paste("~/Documents/serc/pev/tazs-out.csv",sep=''))
+tazs <- subset(tazs,time<=32)
 
 # sort by depart time
 sched <- sched[order(sched$depart),]
@@ -65,7 +62,7 @@ ani.routes <- function(){
   from.to.df$num <- 0
   from.to <- list()
   for(i in 1:trail.len){ from.to[[i]] <- from.to.df }
-  cols <- c(colorRampPalette(c("black",colors()['#660000']))(trail.len-1),colors()['#FF0000'])
+  cols <- c(colorRampPalette(c("black",colors()[556]))(trail.len-1),'#FF0000')
   trail.i <- 0
   for(t in seq(0,max(tazs$time),by=5/60)){
     t.routes <- t %% 24
@@ -114,11 +111,11 @@ ani.routes <- function(){
       }
       col.count <- col.count + 1
     }
-    # ADD code to plot charging events
-    # use points command to add circle
+    # Charging
+    t.charging <- ifelse(t>30,t %% 24,t)
 		for(i in 1:52){
-			num.public.events <- sum(subset(tazs,taz==i & abs(time-t)<0.00001)[,c('num.L1','num.L2','num.L3')]) -  sum(subset(tazs,taz==i & abs(time-t)<0.000001)[,c('num.avail.L1','num.avail.L2','num.avail.L3')])
-			num.home.events <- min(40,sum(subset(tazs,taz==i & abs(time-t)<0.00001)[,c('num.L0')]) -  sum(subset(tazs,taz==i & abs(time-t)<0.000001)[,c('num.avail.L0')]))
+			num.public.events <- sum(subset(tazs,taz==i & abs(time-t.charging)<0.00001)[,c('num.L1','num.L2','num.L3')]) -  sum(subset(tazs,taz==i & abs(time-t.charging)<0.000001)[,c('num.avail.L1','num.avail.L2','num.avail.L3')])
+			num.home.events <- min(40,sum(subset(tazs,taz==i & abs(time-t.charging)<0.00001)[,c('num.L0')]) -  sum(subset(tazs,taz==i & abs(time-t.charging)<0.000001)[,c('num.avail.L0')]))
 			
 			# Public charging events currently max out at 4, use if logic to re-size dot to match scale. More complicted logic for home charging, which maxes at 38.
       agg.taz.row <- which(agg.taz$id == i)

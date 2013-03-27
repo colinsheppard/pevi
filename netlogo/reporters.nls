@@ -25,3 +25,13 @@ to-report electric-miles-driven-by-driver
     report miles-driven - gasoline-used / hybrid-fuel-consumption
   ]
 end
+
+to-report mean-delay
+  let num-delay-events sum [length (filter [abs ? > 0] itin-delay-amount)] of drivers
+   
+  ifelse num-delay-events > 0 [
+    report (sum [ sum map weight-delay itin-delay-amount  ] of drivers) / num-delay-events
+  ][
+    report 0
+  ]
+end

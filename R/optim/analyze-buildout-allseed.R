@@ -127,7 +127,8 @@ for(pev.penetration in c(0.005,0.01,0.02,0.04)){
   agg.taz$L3 <- round(mean.results[53:104])
   
   #c.map <- paste(map.color(agg.taz@data$weighted.demand,blue2red(50)),'7F',sep='')
-  #chargers.to.kml(agg.taz,paste(path.to.google,'buildout/',optim.code,'-pen',100*pev.penetration,'-mean.kml',sep=''),paste('Buildout Pen ',100*pev.penetration,'% Optimization: ',optim.code,sep=''),'Color denotes total chargers in each TAZ with L3 counting for 2 chargers (click to get actual # chargers).','black',1.5,c.map,id.col='ID',name.col='name',description.cols=c('id','name','L2','L3','weighted.demand','frac.homes'))
+  #chargers.to.kml(agg.taz,paste(path.to.google,'buildout/',optim.code,'-pen',100*pev.penetration,'-publish.kml',sep=''),paste(100*pev.penetration,'% PEV Penetration',sep=''),'Color denotes total chargers in each TAZ with L3 counting for 2 chargers (click to get actual # chargers).','black',1.5,c.map,id.col='ID',name.col='name',description.cols=c('L2','L3','weighted.demand'))
+  #chargers.to.kml(agg.taz,paste(path.to.google,'buildout/',optim.code,'-pen',100*pev.penetration,'-publish.kml',sep=''),paste(100*pev.penetration,'% PEV Penetration',sep=''),'Color denotes total chargers in each TAZ with L3 counting for 2 chargers (click to get actual # chargers).','red',1.5,'blue',id.col='ID',name.col='name',description.cols=c('L2','L3','weighted.demand'))
   #to.csv <- agg.taz@data[,c('id','name','L2','L3')]  
 
   # summarize the ranking of each taz in terms of order of first acquisition of a charger, only do it for the last loop or pen4
@@ -171,7 +172,7 @@ for(taz.i in 1:52){
   agg.taz$L2[which(agg.taz$id==taz.i)] <- build.res[[seed]]$chargers[build.res[[seed]]$taz == taz.i & build.res[[seed]]$iter==n.iter & build.res[[seed]]$level==2]
   agg.taz$L3[which(agg.taz$id==taz.i)] <- build.res[[seed]]$chargers[build.res[[seed]]$taz == taz.i & build.res[[seed]]$iter==n.iter & build.res[[seed]]$level==3]
 }
-chargers.to.kml(agg.taz,paste(path.to.google,'buildout/',optim.code,'.kml',sep=''),paste('Linked Buildout: ',optim.code,sep=''),'Color denotes total chargers in each TAZ with L3 counting for 2 chargers (click to get actual # chargers).','red',1.5,'blue',id.col='ID',name.col='name',description.cols=c('id','name','L2','L3','weighted.demand','frac.homes'))
+chargers.to.kml(agg.taz,paste(path.to.google,'buildout/',optim.code,'.kml',sep=''),paste('Linked Buildout: ',optim.code,sep=''),'Color denotes total chargers in each TAZ with L3 counting for 2 chargers (click to get actual # chargers).','red',1.5,'blue',id.col='ID',name.col='name',description.cols=c('L2','L3','weighted.demand'))
 to.csv <- agg.taz@data[,c('id','name','L2','L3')]
 to.csv$cost <- 8 * to.csv$L2 + 50 * to.csv$L3
 to.csv$power <- 6.6 * to.csv$L2 + 30 * to.csv$L3

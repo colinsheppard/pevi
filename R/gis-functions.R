@@ -257,7 +257,9 @@ demand.to.kml <- function(shp,num.vehicles,kml.filename,kmlname="KML Name", kmld
   if(length(lwds)==1)lwds <- rep(lwds,n)
   kml.data <- sapply(slot(shp, "polygons"), function(x) { 
     row.num = which(as.numeric(slot(x, "ID"))==shp@data[[id.col]])
-    descrip = ifelse(is.na(description.cols),'',paste(paste(description.cols,': ',shp@data[row.num,description.cols],sep=''),collapse='<br/><br/>')) 
+    #descrip = ifelse(is.na(description.cols),'',paste(paste(description.cols,': ',shp@data[row.num,description.cols],sep=''),collapse='<br/><br/>')) 
+    #Different descrip command makes for more user-friendly data labels
+    descrip = ifelse(is.na(description.cols),'',paste('Number of Trips: ',round(shp@data[row.num,'weighted.demand']*pev.penetration),'<br/><br/>',sep=''))
     kmlPolygon(x,
       name=shp@data[[name.col]][row.num], 
       col=colors[row.num], lwd=lwds[row.num], border=borders[row.num], 

@@ -50,15 +50,15 @@ build.res <- list()
 n.seeds <- 19
 
 #pev.penetration <- 0.005
-for(pev.penetration in c(0.005,0.01,0.02,0.04)){
+for(pev.penetration in c(0.005,0.01,0.02)){
 
 	#Prepares a null matrix to fill with values			
 	results.matrix <- matrix(,104,n.seeds)
 	colnames(results.matrix) <- paste("seed",1:n.seeds,sep='')
 	
-	if(pev.penetration==0.005) {target.year <- 2015}
-	if(pev.penetration==0.01) {target.year <- 2018}
-	if(pev.penetration==0.02) {target.year <- 2026}
+	if(pev.penetration==0.005) {target.year <- 2014}
+	if(pev.penetration==0.01) {target.year <- 2017}
+	if(pev.penetration==0.02) {target.year <- 2023}
 	if(pev.penetration==0.04) {target.year <- 'After 2026'}
 	
 	charger.descrip.text <- paste('This google earth layer presents the number of recommended plug-in electric vehicle (PEV) chargers for each each travel analysis zone if PEV adoption reaches ',pev.penetration*100,'% penetration into the Humboldt County vehicle fleet.  Each icon contains two numbers indicating the number of Level 2 and the number of Level 3 chargers to be sited in that zone (separated by a slash).  Level 2 chargers can provide a full charge to a Nissan Leaf in 5-6 hours, Level 3 chargers would take less than 1 hour.   The map contains an additional level of detail for the municipalities of Eureka, Arcata, McKinleyville, and Fortuna, zoom in to reveal this detail.',sep='')
@@ -125,8 +125,8 @@ for(pev.penetration in c(0.005,0.01,0.02,0.04)){
   reorder.inds <- match(agg.taz$id,agg.taz$order)
   reorder.inds <- c(reorder.inds,(53:104)[reorder.inds])
   cov.data <- cov.data[reorder.inds,reorder.inds]
-	write.csv(cov.data,file=paste(base.path,'pev-shared/data/outputs/buildout/covariance-data/','cov-pen',100*pev.penetration,'.csv',sep=''),row.names=T)
-	write.csv(data.frame(name=agg.taz$name,mean=apply(results[[as.character(pev.penetration)]],1,mean,na.rm=T)[reorder.inds],sd=apply(results[[as.character(pev.penetration)]],1,sd,na.rm=T)[reorder.inds]),file=paste(base.path,'pev-shared/data/outputs/buildout/covariance-data/mean-sd-pen',100*pev.penetration,'.csv',sep=''),row.names=T)
+	#write.csv(cov.data,file=paste(base.path,'pev-shared/data/outputs/buildout/covariance-data/','cov-pen',100*pev.penetration,'.csv',sep=''),row.names=T)
+	#write.csv(data.frame(name=agg.taz$name,mean=apply(results[[as.character(pev.penetration)]],1,mean,na.rm=T)[reorder.inds],sd=apply(results[[as.character(pev.penetration)]],1,sd,na.rm=T)[reorder.inds]),file=paste(base.path,'pev-shared/data/outputs/buildout/covariance-data/mean-sd-pen',100*pev.penetration,'.csv',sep=''),row.names=T)
   mean.results <- apply(results[[as.character(pev.penetration)]],1,mean,na.rm=T)[reorder.inds]
   
   agg.taz$L2 <- NA
@@ -134,10 +134,10 @@ for(pev.penetration in c(0.005,0.01,0.02,0.04)){
   agg.taz$L2 <- round(mean.results[1:52],digits = 0)
   agg.taz$L3 <- round(mean.results[53:104])
   
-  #c.map <- paste(map.color(agg.taz@data$weighted.demand,blue2red(50)),'7F',sep='')
+  c.map <- paste(map.color(agg.taz@data$weighted.demand,blue2red(50)),'7F',sep='')
   demand.to.kml(agg.taz,150e3 * pev.penetration,paste(path.to.google,'buildout/',optim.code,'-pen',100*pev.penetration,'-demand-publish.kml',sep=''),paste('PEV Drivers at ',100*pev.penetration,'% Penetration (Target Year ',target.year,')',sep=''),driver.descrip.text,'black',1.5,c.map,id.col='ID',name.col='name',description.cols=c('weighted.demand'))
   #chargers.to.kml(agg.taz,paste(path.to.google,'buildout/',optim.code,'-pen',100*pev.penetration,'-publish.kml',sep=''),paste(100*pev.penetration,'% PEV Penetration',sep=''),'Color denotes total chargers in each TAZ with L3 counting for 2 chargers (click to get actual # chargers).','black',1.5,c.map,id.col='ID',name.col='name',description.cols=c('L2','L3','weighted.demand'))
-  #chargers.to.kml(agg.taz,paste(path.to.google,'buildout/',optim.code,'-pen',100*pev.penetration,'-publish.kml',sep=''),paste('Charger Deployment for ',100*pev.penetration,'% PEV Penetration (Target Year ',target.year,')',sep=''),charger.descrip.text,'red',1.5,'blue',id.col='ID',name.col='name',description.cols=c('L2','L3','weighted.demand'))
+  chargers.to.kml(agg.taz,paste(path.to.google,'buildout/',optim.code,'-pen',100*pev.penetration,'-publish.kml',sep=''),paste('Charger Deployment for ',100*pev.penetration,'% PEV Penetration (Target Year ',target.year,')',sep=''),charger.descrip.text,'black',1.5,'#0000FF7F',id.col='ID',name.col='name',description.cols=c('L2','L3','weighted.demand'))
   #to.csv <- agg.taz@data[,c('id','name','L2','L3')]  
 
   # summarize the ranking of each taz in terms of order of first acquisition of a charger, only do it for the last loop or pen4
@@ -153,7 +153,7 @@ for(pev.penetration in c(0.005,0.01,0.02,0.04)){
                     x[x==9999] <- max.real+1
                     x/(max.real+1) })
   mean.rank <- order(apply(rankings,1,function(x){ mean(x,na.rm=T) }))
-  write.csv(data.frame(name=agg.taz$name,mean.rank=match(agg.taz$id,mean.rank)),file=paste(base.path,'pev-shared/data/outputs/buildout/covariance-data/mean-rankings-',100*pev.penetration,'.csv',sep=''),row.names=T)
+  #write.csv(data.frame(name=agg.taz$name,mean.rank=match(agg.taz$id,mean.rank)),file=paste(base.path,'pev-shared/data/outputs/buildout/covariance-data/mean-rankings-',100*pev.penetration,'.csv',sep=''),row.names=T)
   #write.csv(data.frame(name=agg.taz$name[match(mean.rank,agg.taz$id)]),file=paste(base.path,'pev-shared/data/outputs/buildout/covariance-data/mean-rankings-',100*pev.penetration,'.csv',sep=''),row.names=T)
 }
 

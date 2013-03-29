@@ -137,7 +137,7 @@ for(pev.penetration in c(0.005,0.01,0.02,0.04)){
   #c.map <- paste(map.color(agg.taz@data$weighted.demand,blue2red(50)),'7F',sep='')
   demand.to.kml(agg.taz,150e3 * pev.penetration,paste(path.to.google,'buildout/',optim.code,'-pen',100*pev.penetration,'-demand-publish.kml',sep=''),paste('PEV Drivers at ',100*pev.penetration,'% Penetration (Target Year ',target.year,')',sep=''),driver.descrip.text,'black',1.5,c.map,id.col='ID',name.col='name',description.cols=c('weighted.demand'))
   #chargers.to.kml(agg.taz,paste(path.to.google,'buildout/',optim.code,'-pen',100*pev.penetration,'-publish.kml',sep=''),paste(100*pev.penetration,'% PEV Penetration',sep=''),'Color denotes total chargers in each TAZ with L3 counting for 2 chargers (click to get actual # chargers).','black',1.5,c.map,id.col='ID',name.col='name',description.cols=c('L2','L3','weighted.demand'))
-  #chargers.to.kml(agg.taz,paste(path.to.google,'buildout/',optim.code,'-pen',100*pev.penetration,'-publish.kml',sep=''),paste('Charger Deployment for ',100*pev.penetration,'% PEV Penetration (Target Year ',target.year,')',sep=''),charger.descrip.text,'red',1.5,'blue',id.col='ID',name.col='name',description.cols=c('L2','L3','weighted.demand'))
+  #chargers.to.kml(agg.taz,paste(path.to.google,'buildout/',optim.code,'-pen',100*pev.penetration,'-publish.kml',sep=''),paste('Charger Deployment for ',100*pev.penetration,'% PEV Penetration (Target Year ',target.year,')',sep=''),charger.descrip.text,'black',1.5,'blue',id.col='ID',name.col='name',description.cols=c('L2','L3','weighted.demand'))
   #to.csv <- agg.taz@data[,c('id','name','L2','L3')]  
 
   # summarize the ranking of each taz in terms of order of first acquisition of a charger, only do it for the last loop or pen4

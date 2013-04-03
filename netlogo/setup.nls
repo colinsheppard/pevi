@@ -329,9 +329,9 @@ to setup-drivers
             set state-of-charge rand-draw
             ]
           ]
+        ]
       set next-home-log 0
       home-V2G-scheduler
-        ]
     ][   ;; not at home -- do not track for V2G.  Schedule first departure.
       ifelse is-bev? [
         let rand-draw random-float 1

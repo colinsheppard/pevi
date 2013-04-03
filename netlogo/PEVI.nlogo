@@ -429,6 +429,7 @@ to seek-charger
       ]
     ]
   ]
+
   ifelse #min-taz = -99 [
     log-data "seek-charger-result" (sentence ticks seek-charger-index id -1 "" -1 -1)  
     log-data "pain" (sentence ticks id [id] of current-taz [name] of this-vehicle-type "denial" (num-denials + 1) state-of-charge)
@@ -710,17 +711,24 @@ end
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 to itinerary-event-scheduler
   set state "not-charging"
+  ;if [id] of self = 286 [
+  if ticks > 0 and [id] of self = 232 [
+    print (word "itin-sched " precision ticks 3 " departure-time " departure-time " driver: " [id] of self " soc: " state-of-charge " taz: " current-taz " home: " home-taz)      
+  ]
   
   dynamic-scheduler:add schedule self task depart departure-time
 end
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-;; PLUG IN AT HOME SCHEDULER
+;; home V2G scheduler
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 to home-V2G-scheduler
   set state "V2G-home"
-
-  dynamic-scheduler:add schedule self task plug-in-at-home next-home-log ;; if this task is called, 
+  
+  if [id] of self = 232 [
+    print (word "V2G-sched " precision ticks 3 " departure-time " departure-time " driver: " [id] of self " soc: " state-of-charge " taz: " current-taz " home: " home-taz)      
+  ]
+  dynamic-scheduler:add schedule self task home-V2G next-home-log ;; if this task is called, 
   ;; the vehicle has found a home charger, and will execute plug-in-at-home immediately
   ;; plug-in-at-home needs:
   ;; time-until-depart (to ensure the vehicle departs on time)
@@ -729,9 +737,9 @@ to home-V2G-scheduler
 end
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-;; PLUG IN AT HOME
+;; home V2G
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-to plug-in-at-home
+to home-V2G
 
   set time-until-depart departure-time - ticks
   set current-charger (one-of item 0 [chargers-by-type] of current-taz)
@@ -746,11 +754,23 @@ to plug-in-at-home
     set state-of-charge #new-soc
   ]  
 
-  print (word precision ticks 3 " time-until-depart " time-until-depart " driver: " [id] of self " charger: " current-charger " soc: " state-of-charge " taz: " current-taz " home: " home-taz)  
+  if [id] of self = 232 [
+    print (word "home-V2G" precision ticks 3 " time-until-depart " time-until-depart " departure-time " departure-time " driver: " [id] of self " level of charger: " level-of current-charger " soc: " state-of-charge " taz: " current-taz " home: " home-taz)      
+  ]
+
   ifelse time-until-depart > 0.25 [
     set next-home-log (ticks + 0.25)
+    if [id] of self = 232 [
+      print (word "GOTO home-V2G-sched " precision ticks 3 " time-until-depart " time-until-depart " departure-time " departure-time " driver: " [id] of self " soc: " state-of-charge " taz: " current-taz " home: " home-taz)      
+    ]
+
     home-V2G-scheduler
   ][
+  if [id] of self = 232 [
+    print (word "GOTO itin-sched " precision ticks 3 " time-until-depart " time-until-depart " departure-time " departure-time " driver: " [id] of self " soc: " state-of-charge " taz: " current-taz " home: " home-taz)      
+  ]
+
+    end-charge
     itinerary-event-scheduler  
   ]
   
@@ -766,6 +786,11 @@ end
 ;; DEPART 
 ;;;;;;;;;;;;;;;;;;;;
 to depart
+  
+  if [id] of self = 232 [
+    print (word precision ticks 3 " departing, driver: " [id] of self " soc: " state-of-charge " taz: " current-taz " home: " home-taz)      
+  ]
+
 ;  log-data "drivers" (sentence precision ticks 3 [id] of self "departing" state-of-charge)
   ifelse need-to-charge "depart" [  
     ifelse state-of-charge >= 1 - small-num or (( count (existing-chargers current-taz 1)  = 0) and (count (existing-chargers current-taz 2)  = 0) and state-of-charge >= 0.8 - small-num)[
@@ -888,6 +913,7 @@ end
 ;;;;;;;;;;;;;;;;;;;;
 to arrive
   ; for logging trip
+
   let #is-scheduled true
   if item current-itin-row itin-change-flag = 1 [ set #is-scheduled false ]
   
@@ -913,6 +939,9 @@ to arrive
   
   update-itinerary 
   let #to-taz [id] of current-taz
+  if [id] of self = 47 [
+    print (word precision ticks 3 " arriving, driver: " [id] of self " soc: " state-of-charge " taz: " current-taz " home: " home-taz)      
+  ]
       
   ifelse not itin-complete? [
     ifelse need-to-charge "arrive" [   
@@ -928,8 +957,12 @@ to arrive
       if (random-float 1) < (1 / (1 + exp(-5 + 6 * state-of-charge))) [
         set current-charger (one-of item 0 [chargers-by-type] of current-taz)
         set full-charge-time-need (1 - state-of-charge) * battery-capacity / charge-rate-of current-charger
-        dynamic-scheduler:add schedule self task end-charge ticks + full-charge-time-need 
         set time-until-end-charge full-charge-time-need
+        set next-home-log ticks
+        set departure-time 99
+        ;; dynamic-scheduler:add schedule self task end-charge ticks + full-charge-time-need 
+        print (word "HEY! arriving at end of itin, and starting to charge V2G")
+        home-V2G-scheduler
         log-data "charging" (sentence ticks [who] of current-charger level-of current-charger [id] of current-taz [id] of self [name] of this-vehicle-type full-charge-time-need (full-charge-time-need * charge-rate-of current-charger) state-of-charge (state-of-charge + (full-charge-time-need * charge-rate-of current-charger) / battery-capacity ) "stop" false)
       ]
       log-data "trip-journey-timeuntildepart" (sentence ticks ticks id [name] of this-vehicle-type state-of-charge #from-taz #to-taz #completed-trip #completed-journey 0 "home" remaining-range sum map weight-delay itin-delay-amount)
@@ -1073,7 +1106,7 @@ go-until-time
 go-until-time
 0
 100
-5.5
+1.5
 0.5
 1
 NIL

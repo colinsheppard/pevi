@@ -9,7 +9,8 @@ library(colinmisc)
 load.libraries(c('maptools','plotrix','stats','gpclib','plyr','png','RgoogleMaps','lattice','stringr','ggplot2','rgdal','XML','plotKML'))
 gpclibPermit()
 
-base.path <- '/Users/critter/Dropbox/serc/pev-colin/'
+base.path <- '/Users/sheppardc/Dropbox/serc/pev-colin/'
+#base.path <- '/Users/critter/Dropbox/serc/pev-colin/'
 path.to.geatm <- paste(base.path,'pev-shared/data/GEATM-2020/',sep='')
 path.to.google <- paste(base.path,'pev-shared/data/google-earth/',sep='')
 path.to.humveh <- '~/Dropbox/serc/pev-colin/data/Vehicle-Registration/'
@@ -75,6 +76,9 @@ od.pm.new <- ddply(na.omit(od.pm.old),.(from.new,to.new),function(df){
 names(od.pm.new) <- c('from','to','hbw','hbshop','hbelem','hbuniv','hbro','nhb','ix','xi','ee','demand')
 
 save(od.24.new,od.am.new,od.pm.new,od.24.old,od.am.old,od.pm.old,file=paste(path.to.geatm,'od-old-and-new.Rdata',sep=''))
+
+# To include external trips, remove the "na.omit" command from the ddply blocks above
+#save(od.24.new,od.24.old,file=paste(path.to.geatm,'od-old-and-new-including-external-trips.Rdata',sep=''))
 
 # check that the sum of the rows equals the value in the sum column
 # they are currently not quite equal and I suspect this is from omiting zones 1-10

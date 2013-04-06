@@ -58,6 +58,36 @@ ggplot(munis.demand,aes(x=speed,y=vmt))+geom_point()+facet_wrap(~muni)+scale_y_l
 
 # now break the vmt out by vehicle type for each muni
 load(paste(path.to.humveh,'veh.Rdata',sep=''))  
+load(paste(path.to.geatm,'../CA-ZIPS/hum-zip-shp.Rdata',sep=''))
 
+overlay(SpatialPoints(coordinates(agg.taz)),zips)
+
+zips.in.taz <- overlay(SpatialPoints(coordinates(agg.taz)),zips)
+# hard code the zips for those whose centroids fall in no-man's land
+zips.in.taz[31] <- which(zips$ZCTA5CE10 == 95519)
+zips.in.taz[33] <- which(zips$ZCTA5CE10 == 95555)
+zips.in.taz[44] <- which(zips$ZCTA5CE10 == 95573)
+zips.in.taz[48] <- which(zips$ZCTA5CE10 == 95565)
+zips.in.taz[52] <- which(zips$ZCTA5CE10 == 95526)
+
+agg.taz$zip <- as.numeric(as.character(zips$ZCTA5CE10[zips.in.taz]))
+
+munis$zip <- agg.taz$zip[match(munis$id,agg.taz$id)]
+
+veh.sub <- subset(veh,year==2012)
+veh.types <- read.csv(paste(path.to.humveh,"/ghg-analysis/veh-reg-melted.csv",sep=''))
+types.sub <- subset(veh.types,year==2012)
+
+munis.demand.by.tech <- ddply(munis,.(muni),function(df){
+  tot.num <- sum(subset(types.sub,zip %in% unique(df$zip))$num)
+  techs <- ddply(subset(types.sub,zip %in% unique(df$zip)),.(veh.tech.code),function(dff){ data.frame(frac=sum(dff$num)/tot.num) })
+  ddply(subset(munis.demand,muni==df$muni[1]),.(speed),function(dff){
+    data.frame(tech=techs$veh.tech.code,vmt=techs$frac * dff$vmt)
+  })
+})
+
+ggplot(munis.demand.by.tech,aes(x=speed,y=vmt))+geom_point()+facet_grid(tech~muni)+scale_y_log10()
+
+write.csv(munis.demand.by.tech,paste(path.to.humveh,"/ghg-analysis/vmt-by-muni-speed-and-type.csv",sep=''))
 
 

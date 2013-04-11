@@ -6,6 +6,7 @@ source('params.R')
 
 for(seed in 1:10){
   optim.code <- paste('linked2-',optim.scenario,'-seed',seed,sep='')
+  print(optim.code)
 
   link.pens <- str_detect(optim.code,"linked")  # should the infrastructure from lower pens be used as starting place for higher? otherwise,
                   # infrastructure is reset to zero
@@ -41,13 +42,15 @@ for(seed in 1:10){
     clusterEvalQ(cl,library('RNetLogo'))
   }
 
-  # start NL
-  nl.path <- "NetLogo\ 5.0.3"
-  tryCatch(NLStart(nl.path, gui=F),error=function(err){ NA })
-  model.path <- paste(path.to.pevi,"netlogo/PEVI-nolog.nlogo",sep='')
-  NLLoadModel(model.path)
+  if(seed==1){
+    # start NL
+    nl.path <- "NetLogo\ 5.0.3"
+    tryCatch(NLStart(nl.path, gui=F),error=function(err){ NA })
+    model.path <- paste(path.to.pevi,"netlogo/PEVI-nolog.nlogo",sep='')
+    NLLoadModel(model.path)
 
-  for(cmd in paste('set log-',logfiles,' false',sep='')){ NLCommand(cmd) }
+    for(cmd in paste('set log-',logfiles,' false',sep='')){ NLCommand(cmd) }
+  }
 
   #pev.penetration <- 0.01
   for(pev.penetration in c(0.005,0.01,0.02,0.04)){
@@ -111,9 +114,8 @@ for(seed in 1:10){
       build.result[105,] <- build.result[winner.i,]
       print(paste("winner: ",winner.i,sep=''))
       save.image(file=paste(path.to.outputs,'buildout-pen',pev.penetration*100,'.Rdata',sep=''))
-      break
     }
   }
-  stopCluster(cl)
-  rm('cl')
+  #stopCluster(cl)
+  #rm('cl')
 }

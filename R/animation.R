@@ -136,3 +136,53 @@ saveVideo({
 ani.routes()
 },video.name="test.mp4",other.opts="-b 1500k -s 800x950") # make res divisible by 16
 
+
+## animate itin generation
+
+disttime <- read.csv(file=paste(path.to.geatm,'taz-dist-time.csv',sep=''))[,1:4]
+names(disttime) <- c('from','to','miles','time')
+
+ch <- read.csv(paste("~/Documents/serc/pev/charging-out.csv",sep=''))
+
+sched <- sched[1:100,]
+sched <- join(sched,disttime)
+
+tour.dist <- ddply(sched,.(driver),function(df){ data.frame(miles=sum(df$miles)) })
+tour.order <- rev(order(tour.dist$miles))
+
+max.t <- max(sched$depart + sched$time)
+ #df <- subset(sched,driver== 168)
+
+scheds <- ddply(sched,.(driver),function(df){
+  res <- data.frame(time=rep(0,2+2*nrow(df)),dist=0)
+  for(i in 1:nrow(df)){
+    res$time[2+2*(i-1)] <- df$depart[i]
+    res$time[3+2*(i-1)] <- df$depart[i]+df$time[i]
+    res$dist[2+2*(i-1)] <- res$dist[1+2*(i-1)]
+    res$dist[3+2*(i-1)] <- res$dist[2+2*(i-1)] + df$miles[i]
+  }
+  res[nrow(res),] <- c(max.t,res$dist[nrow(res)-1])
+  res
+})
+
+location <- function(time){ 
+  locs <- ddply(scheds,.(driver),function(df){
+    data.frame(miles=approx(df$time,df$dist,time)$y)
+  })$miles[tour.order]
+  locs
+}
+
+ani.tours <- function(){
+  max.dist <- max(location(max.t))
+  for(t in seq(0,max.t,by=10/60)){
+    barplot(location(t),xlim=c(0,max.dist),horiz=T)
+  }
+}
+
+ani.options(ffmpeg="/usr/local/bin/ffmpeg")
+saveVideo({
+  par(mar = c(3, 3, 1, 0.5), mgp = c(2, 0.5, 0), tcl = -0.3, cex.axis = 0.8, cex.lab = 0.8, 
+        cex.main = 1)
+  ani.options(interval = 10/60, nmax = 24*30)
+  ani.tours()
+},video.name="test.mp4",other.opts="-b 1500k -s 1200x900") # make res divisible by 16

@@ -11,7 +11,9 @@ gpclibPermit()
 
 base.path <- '/Users/sheppardc/Dropbox/serc/pev-colin/'
 #base.path <- '/Users/critter/Dropbox/serc/pev-colin/'
-path.to.geatm <- paste(base.path,'pev-shared/data/GEATM-2020/',sep='')
+#path.to.geatm <- paste(base.path,'data/GEATM-2020/',sep='')
+#path.to.geatm <- paste(base.path,'data/GEATM-2005/',sep='')
+path.to.geatm <- paste(base.path,'data/HCOAG/',sep='')
 path.to.google <- paste(base.path,'pev-shared/data/google-earth/',sep='')
 path.to.humveh <- '~/Dropbox/serc/pev-colin/data/Vehicle-Registration/'
 path.to.plots  <- '~/Dropbox/serc/pev-colin/plots/'
@@ -22,13 +24,24 @@ source(paste(path.to.pevi,'R/gis-functions.R',sep=''))
 
 taz <- readShapePoly(paste(path.to.geatm,'Shape_Files/taz-LATLON.shp',sep=''))
 
-# load the OD data
-od.24.old <- read.table(paste(path.to.geatm,'OD_Tables/OD by type 24 hr (2020).txt',sep=''),header=FALSE, sep=",",colClasses='numeric')
-names(od.24.old) <- c('from','to','hbw','hbshop','hbelem','hbuniv','hbro','nhb','ix','xi','ee','demand')
-od.am.old <- read.table(paste(path.to.geatm,'OD_Tables/OD by type AM (2020).txt',sep=''),header=FALSE, sep=",",colClasses='numeric')
-names(od.am.old) <- c('from','to','hbw','hbshop','hbelem','hbuniv','hbro','nhb','ix','xi','ee','demand')
-od.pm.old <- read.table(paste(path.to.geatm,'OD_Tables/OD by type PM (2020).txt',sep=''),header=FALSE, sep=",",colClasses='numeric')
-names(od.pm.old) <- c('from','to','hbw','hbshop','hbelem','hbuniv','hbro','nhb','ix','xi','ee','demand')
+# load the 2020 OD data
+#od.24.old <- read.table(paste(path.to.geatm,'OD_Tables/OD by type 24 hr (2020).txt',sep=''),header=FALSE, sep=",",colClasses='numeric')
+#names(od.24.old) <- c('from','to','hbw','hbshop','hbelem','hbuniv','hbro','nhb','ix','xi','ee','demand')
+#od.am.old <- read.table(paste(path.to.geatm,'OD_Tables/OD by type AM (2020).txt',sep=''),header=FALSE, sep=",",colClasses='numeric')
+#names(od.am.old) <- c('from','to','hbw','hbshop','hbelem','hbuniv','hbro','nhb','ix','xi','ee','demand')
+#od.pm.old <- read.table(paste(path.to.geatm,'OD_Tables/OD by type PM (2020).txt',sep=''),header=FALSE, sep=",",colClasses='numeric')
+#names(od.pm.old) <- c('from','to','hbw','hbshop','hbelem','hbuniv','hbro','nhb','ix','xi','ee','demand')
+
+## Load 2005 OD data, since this is for GHG analysis, we don't need AM/PM
+#taz <- readShapePoly(paste(path.to.geatm,'../GEATM-2020/Shape_Files/taz-LATLON.shp',sep=''))
+#od.24.old <- read.table(paste(path.to.geatm,'OD Tables/OD by type 24 hr.txt',sep=''),header=FALSE, sep=",",colClasses='numeric')
+#names(od.24.old) <- c('from','to','hbw','hbshop','hbelem','hbuniv','hbro','nhb','ix','xi','ee','demand')
+
+# Load 2012 OD data from newer HCOAG model, since this is for GHG analysis, we don't need AM/PM
+taz <- readShapePoly(paste(path.to.geatm,'../GEATM-2020/Shape_Files/taz-LATLON.shp',sep=''))
+od.24.old <- read.csv(paste(path.to.geatm,'HCTDM OP OD.csv',sep=''))
+names(od.24.old) <- c('from','to','hbw','hbshop','hbuniv','hbo','hbelem','wbo','obo','ee','demand')
+
 
 # Sum demand to get a total
 od.24.sum <- ddply(od.24.old,.(from),function(df){ sum(df$demand) })
@@ -43,6 +56,9 @@ taz@data$total.demand.per.acre <- taz@data$total.demand / taz@data$ACRES
 
 # Load the aggregation polygons
 agg.polys <- readShapePoly(paste(path.to.google,'proposed-aggregations/ProposedAggregations.shp',sep=''))
+# For GHG Analysis, we want to include external travel so we need to load the appropriate shp data
+agg.polys <- readShapePoly(paste(path.to.google,'proposed-aggregations/ProposedAggregations-with-external.shp',sep=''))
+
 taz.centroids <-SpatialPointsDataFrame(coordinates(taz),data=data.frame(longitude= coordinates(taz)[,1],latitude= coordinates(taz)[,2]))
 agg.mapping <- data.frame(name=over(taz.centroids,agg.polys)$Name)
 agg.mapping$agg.id <- as.numeric(agg.mapping$name)
@@ -78,7 +94,9 @@ names(od.pm.new) <- c('from','to','hbw','hbshop','hbelem','hbuniv','hbro','nhb',
 save(od.24.new,od.am.new,od.pm.new,od.24.old,od.am.old,od.pm.old,file=paste(path.to.geatm,'od-old-and-new.Rdata',sep=''))
 
 # To include external trips, remove the "na.omit" command from the ddply blocks above
-#save(od.24.new,od.24.old,file=paste(path.to.geatm,'od-old-and-new-including-external-trips.Rdata',sep=''))
+#save(od.24.new,od.24.old,file=paste(path.to.geatm,'od-2020-old-and-new-including-external-trips.Rdata',sep=''))
+#save(od.24.new,od.24.old,file=paste(path.to.geatm,'od-2005-old-and-new-including-external-trips.Rdata',sep=''))
+#save(od.24.new,od.24.old,file=paste(path.to.geatm,'od-2012-old-and-new-including-external-trips.Rdata',sep=''))
 
 # check that the sum of the rows equals the value in the sum column
 # they are currently not quite equal and I suspect this is from omiting zones 1-10

@@ -5,10 +5,12 @@ make.plots  <- F
 num.processors <- 11
 registerDoMC(num.processors)
 
+scenario.year <- 2020 # or 2005 or 2012
+
 #base.path <- '/Users/critter/Dropbox/serc/pev-colin/'
 base.path <- '/Users/sheppardc/Dropbox/serc/pev-colin/'
 path.to.humveh <- paste(base.path,'data/Vehicle-Registration/',sep='')
-path.to.geatm <- paste(base.path,'pev-shared/data/GEATM-2020/',sep='')
+path.to.geatm <- paste(base.path,'data/GEATM-2020/',sep='')
 path.to.google <- paste(base.path,'pev-shared/data/google-earth/',sep='')
 path.to.shared.inputs <- paste(base.path,'pev-shared/data/inputs/driver-input-file/',sep='')
 path.to.pevi <- paste(base.path,'pevi/',sep='')
@@ -24,7 +26,15 @@ names(agg.taz@data) <- c("SP_ID",taz.shp.fieldnames)
 
 disttime <- read.csv(file=paste(path.to.geatm,'taz-dist-time.csv',sep=''))
 
-load(file=paste(path.to.geatm,'od-old-and-new-including-external-trips.Rdata',sep=''))
+
+if(scenario.year==2020){
+  load(file=paste(path.to.geatm,'od-2020-old-and-new-including-external-trips.Rdata',sep=''))
+}else if(scenario.year==2005){
+  load(file=paste(path.to.geatm,'../GEATM-2005/od-2005-old-and-new-including-external-trips.Rdata',sep=''))
+}else{
+  load(file=paste(path.to.geatm,'../HCOAG/od-2012-old-and-new-including-external-trips.Rdata',sep=''))
+}
+
 load(paste(path.to.pevi,'inputs/routing-corrected.Rdata',sep=''))
 y.bins <- seq(0,70,by=5)
 y.labs <- c("[0,25)","[25,40)","[40,50)","[50,60)","[60,70)")
@@ -54,7 +64,7 @@ munis.demand <- ddply(munis,.(muni),function(df){
 munis.demand$vmt <- munis.demand$demand * munis.demand$length
 
 # plot the results to inspect
-ggplot(munis.demand,aes(x=speed,y=vmt))+geom_point()+facet_wrap(~muni)+scale_y_log10()
+#ggplot(munis.demand,aes(x=speed,y=vmt))+geom_point()+facet_wrap(~muni)+scale_y_log10()
 
 # now break the vmt out by vehicle type for each muni
 load(paste(path.to.humveh,'veh.Rdata',sep=''))  
@@ -86,8 +96,20 @@ munis.demand.by.tech <- ddply(munis,.(muni),function(df){
   })
 })
 
-ggplot(munis.demand.by.tech,aes(x=speed,y=vmt))+geom_point()+facet_grid(tech~muni)+scale_y_log10()
+#ggplot(munis.demand.by.tech,aes(x=speed,y=vmt))+geom_point()+facet_grid(tech~muni)+scale_y_log10()
 
-write.csv(munis.demand.by.tech,paste(path.to.humveh,"/ghg-analysis/vmt-by-muni-speed-and-type.csv",sep=''))
+write.csv(munis.demand.by.tech,paste(path.to.humveh,"/ghg-analysis/year-",scenario.year,"-vmt-by-muni-speed-and-type.csv",sep=''))
+
+sum(munis.demand.by.tech$vmt)
+# 2005
+#[1] 4783894
+# 2012
+#[1] 2292422
+# 2020
+#[1] 5266045
 
 
+sum(od.24.new$demand)
+# 2005: 382638.9
+# 2012: 416905.9  # but 79965.91 are NA
+# 2020: 408773.4

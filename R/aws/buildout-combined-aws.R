@@ -4,12 +4,22 @@ library(colinmisc)
 load.libraries(c('yaml','RNetLogo','plyr','reshape','stringr','snow'))
 source('params.R')
 
-for(seed in 1:10){
+if(hot.start){
+  dirs <- list.files(path.to.outputs.base)
+  relevant.dirs <- dirs[grep(optim.scenario,dirs[grep("linked2",dirs)])]
+  latest.run <- tail(relevant.dirs,1)
+  path.to.latest.run <- paste(path.to.outputs.base,latest.run,sep='')
+  run.file <- tail(list.files(path.to.latest.run,'*.Rdata'),1)
+  load(paste(path.to.latest.run,'/',run.file,sep=''))
+  seed.start <- seed
+  rm('cl')
+}else{
+  seed.start <- 1
+}
+
+for(seed in seed.start:10){
   optim.code <- paste('linked2-',optim.scenario,'-seed',seed,sep='')
   print(optim.code)
-
-  link.pens <- str_detect(optim.code,"linked")  # should the infrastructure from lower pens be used as starting place for higher? otherwise,
-                  # infrastructure is reset to zero
 
   # setup the paths
   path.to.pevi <- paste(base.path,'pevi/',sep='')
@@ -42,7 +52,7 @@ for(seed in 1:10){
     clusterEvalQ(cl,library('RNetLogo'))
   }
 
-  if(seed==1){
+  if(seed==seed.start){
     # start NL
     nl.path <- "NetLogo\ 5.0.3"
     tryCatch(NLStart(nl.path, gui=F),error=function(err){ NA })
@@ -52,8 +62,12 @@ for(seed in 1:10){
     for(cmd in paste('set log-',logfiles,' false',sep='')){ NLCommand(cmd) }
   }
 
-  #pev.penetration <- 0.01
-  for(pev.penetration in c(0.005,0.01,0.02,0.04)){
+  pev.penetrations <- c(0.005,0.01,0.02,0.04)
+  if(hot.start){
+    pev.penetrations <- pev.penetrations[pev.penetrations>=pev.penetration]
+  }
+
+  for(pev.penetration in pev.penetrations){
     print(paste("pen",pev.penetration))
     if(pev.penetration <= 0.0051){
       vary.tab <- vary.tab.original
@@ -66,20 +80,23 @@ for(seed in 1:10){
     }
     names(vary.tab) <- "driver-input-file"
     vary.tab$`driver-input-file` <- str_replace(vary.tab$`driver-input-file`,"penXXX",paste("pen",pev.penetration*100,sep=""))
-    results <- data.frame(vary.tab,reporters)
-    results$penetration <- as.numeric(unlist(lapply(strsplit(as.character(results$driver.input.file),'-pen',fixed=T),function(x){ unlist(strsplit(x[2],"-rep",fixed=T)[[1]][1]) })))
-    results$replicate <- as.numeric(unlist(lapply(strsplit(as.character(results$driver.input.file),'-rep',fixed=T),function(x){ unlist(strsplit(x[2],"-",fixed=T)[[1]][1]) })))
+    if(!hot.start){
+      results <- data.frame(vary.tab,reporters)
+      results$penetration <- as.numeric(unlist(lapply(strsplit(as.character(results$driver.input.file),'-pen',fixed=T),function(x){ unlist(strsplit(x[2],"-rep",fixed=T)[[1]][1]) })))
+      results$replicate <- as.numeric(unlist(lapply(strsplit(as.character(results$driver.input.file),'-rep',fixed=T),function(x){ unlist(strsplit(x[2],"-",fixed=T)[[1]][1]) })))
+    }
 
-    if(!link.pens | pev.penetration==0.005){
+    if(!hot.start & pev.penetration==0.005){
       #build.result <- data.frame(cost=rep(NA,105),pain=rep(NA,105),chargers=0)  # No chargers
       build.result <- data.frame(cost=rep(NA,105),pain=rep(NA,105),chargers=c(rep(0,5),1,rep(0,16),1,rep(0,3),1,rep(0,105-27))) # Existing, 1 in EKA_Waterfront, 1 in EKA_NW101, 1 in ARC_Plaza
       begin.build.i <- 1
     }else{
+      if(hot.start)begin.build.i.save <- begin.build.i
       begin.build.i <- build.i
     }
     for(build.i in begin.build.i:250){
       print(paste("build iter:",build.i))
-      if(build.i == begin.build.i){
+      if((!hot.start & build.i == begin.build.i) | (hot.start & begin.build.i.save == begin.build.i)){
         write.charger.file(build.result$chargers[1:104])
         for(results.i in 1:nrow(results)){
           NLCommand('clear-all-and-initialize')
@@ -114,6 +131,8 @@ for(seed in 1:10){
       build.result[105,] <- build.result[winner.i,]
       print(paste("winner: ",winner.i,sep=''))
       save.image(file=paste(path.to.outputs,'buildout-pen',pev.penetration*100,'.Rdata',sep=''))
+      # we're no longer in a hot start
+      hot.start <- F
     }
   }
   #stopCluster(cl)

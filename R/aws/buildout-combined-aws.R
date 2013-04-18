@@ -91,7 +91,13 @@ for(seed in seed.start:10){
       build.result <- data.frame(cost=rep(NA,105),pain=rep(NA,105),chargers=c(rep(0,5),1,rep(0,16),1,rep(0,3),1,rep(0,105-27))) # Existing, 1 in EKA_Waterfront, 1 in EKA_NW101, 1 in ARC_Plaza
       begin.build.i <- 1
     }else{
-      if(hot.start)begin.build.i.save <- begin.build.i
+      if(hot.start){
+        begin.build.i.save <- begin.build.i
+        if(build.i>1){
+          # load the build.results data frame from the previous iteration to ensure that we are starting in the same place we left off
+          build.results <- read.csv(paste(path.to.outputs,tail(grep(paste("buildout-pen",pev.penetration*100,'-iter',build.i-1,sep=''),list.files(path.to.outputs),value=T),1),sep=''))
+        }
+      }
       begin.build.i <- build.i
     }
     for(build.i in begin.build.i:250){

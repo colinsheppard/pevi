@@ -95,6 +95,7 @@ for(seed in seed.start:10){
         begin.build.i.save <- begin.build.i
         if(build.i>1){
           # load the build.results data frame from the previous iteration to ensure that we are starting in the same place we left off
+          print(paste("hot start, loading file ",paste(path.to.outputs,tail(grep(paste("buildout-pen",pev.penetration*100,'-iter',build.i-1,sep=''),list.files(path.to.outputs),value=T),1),sep='')))
           build.results <- read.csv(paste(path.to.outputs,tail(grep(paste("buildout-pen",pev.penetration*100,'-iter',build.i-1,sep=''),list.files(path.to.outputs),value=T),1),sep=''))
         }
       }
@@ -126,6 +127,9 @@ for(seed in seed.start:10){
         }
         build.result[105,c('cost','pain')] <- c(mean(as.numeric(results$infrastructure.cost)),mean(as.numeric(results$frac.stranded.by.delay)))
       }
+      # we're no longer in a hot start
+      hot.start <- F
+
       build.result <- evaluate.fitness(build.result)
       
       build.result$marg.cost.of.abatement <- (build.result$cost - build.result$cost[105])*1000/(build.result$pain[105] - build.result$pain)/100
@@ -137,8 +141,6 @@ for(seed in seed.start:10){
       build.result[105,] <- build.result[winner.i,]
       print(paste("winner: ",winner.i,sep=''))
       save.image(file=paste(path.to.outputs,'buildout-pen',pev.penetration*100,'.Rdata',sep=''))
-      # we're no longer in a hot start
-      hot.start <- F
     }
   }
   #stopCluster(cl)

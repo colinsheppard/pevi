@@ -11,6 +11,7 @@ path.to.pevi <- paste(base.path,'pevi/',sep='')
 path.to.inputs <- paste(base.path,'pev-shared/data/inputs/compare/charge-safety-factor/',sep='')
 path.to.inputs <- paste(base.path,'pev-shared/data/inputs/compare/phev-only/',sep='')
 path.to.inputs <- paste(base.path,'pev-shared/data/inputs/compare/patterns/',sep='')
+path.to.inputs <- paste(base.path,'pev-shared/data/inputs/compare/animation/',sep='')
 
 #to.log <- c('pain','charging','need-to-charge')
 to.log <- c('pain','charging','tazs','trip')
@@ -101,6 +102,16 @@ for(results.i in 1:nrow(results)){
       tmp <- read.csv(paste(outputs.dir,logger,"-out.csv",sep=''),stringsAsFactors=F)
       logs[[logger]] <- rbind(logs[[logger]],data.frame(results[results.i,],tmp,row.names=1:nrow(tmp)))
     }
+  }
+  if(length(grep("animation",path.to.inputs))>0){
+    for(logger in to.log){
+      file.copy(paste(outputs.dir,logger,"-out.csv",sep=''),paste(outputs.dir,logger,"-out-",results.i,".csv",sep=''))
+    }
+  }
+}
+if(length(grep("animation",path.to.inputs))>0){
+  for(logger in to.log){
+    file.remove(paste(outputs.dir,logger,"-out.csv",sep=''))
   }
 }
 save(logs,file=paste(path.to.inputs,'logs.Rdata',sep=''))

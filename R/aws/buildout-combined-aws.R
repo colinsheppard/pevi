@@ -90,6 +90,7 @@ for(seed in seed.start:10){
       #build.result <- data.frame(cost=rep(NA,105),pain=rep(NA,105),chargers=0)  # No chargers
       build.result <- data.frame(cost=rep(NA,105),pain=rep(NA,105),chargers=c(rep(0,5),1,rep(0,16),1,rep(0,3),1,rep(0,105-27))) # Existing, 1 in EKA_Waterfront, 1 in EKA_NW101, 1 in ARC_Plaza
       begin.build.i <- 1
+      begin.build.i.save <- begin.build.i
     }else{
       if(hot.start){
         begin.build.i.save <- begin.build.i

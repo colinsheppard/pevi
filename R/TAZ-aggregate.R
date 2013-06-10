@@ -11,9 +11,7 @@ gpclibPermit()
 
 base.path <- '/Users/sheppardc/Dropbox/serc/pev-colin/'
 #base.path <- '/Users/critter/Dropbox/serc/pev-colin/'
-#path.to.geatm <- paste(base.path,'data/GEATM-2020/',sep='')
-#path.to.geatm <- paste(base.path,'data/GEATM-2005/',sep='')
-path.to.geatm <- paste(base.path,'data/HCOAG/',sep='')
+path.to.geatm <- paste(base.path,'data/GEATM-2020/',sep='')
 path.to.google <- paste(base.path,'pev-shared/data/google-earth/',sep='')
 path.to.humveh <- '~/Dropbox/serc/pev-colin/data/Vehicle-Registration/'
 path.to.plots  <- '~/Dropbox/serc/pev-colin/plots/'
@@ -34,14 +32,18 @@ taz <- readShapePoly(paste(path.to.geatm,'Shape_Files/taz-LATLON.shp',sep=''))
 
 ## Load 2005 OD data, since this is for GHG analysis, we don't need AM/PM
 #taz <- readShapePoly(paste(path.to.geatm,'../GEATM-2020/Shape_Files/taz-LATLON.shp',sep=''))
-#od.24.old <- read.table(paste(path.to.geatm,'OD Tables/OD by type 24 hr.txt',sep=''),header=FALSE, sep=",",colClasses='numeric')
+#od.24.old <- read.table(paste(path.to.geatm,'../GEATM-2005/OD Tables/OD by type 24 hr.txt',sep=''),header=FALSE, sep=",",colClasses='numeric')
 #names(od.24.old) <- c('from','to','hbw','hbshop','hbelem','hbuniv','hbro','nhb','ix','xi','ee','demand')
 
-# Load 2012 OD data from newer HCOAG model, since this is for GHG analysis, we don't need AM/PM
-taz <- readShapePoly(paste(path.to.geatm,'../GEATM-2020/Shape_Files/taz-LATLON.shp',sep=''))
-od.24.old <- read.csv(paste(path.to.geatm,'HCTDM OP OD.csv',sep=''))
+# Load 2010 OD data from newer HCOAG model, since this is for GHG analysis, we don't need AM/PM
+taz <- readShapePoly(paste(path.to.geatm,'../HCOAG/shapefiles/Humboldt TA.shp',sep=''))
+od.24.old <- read.csv(paste(path.to.geatm,'../HCOAG/HCTDM OP OD.csv',sep=''))
 names(od.24.old) <- c('from','to','hbw','hbshop','hbuniv','hbo','hbelem','wbo','obo','ee','demand')
-
+od.24.old$ee[is.na(od.24.old$ee)]<-0
+taz$NEWTAZ <- taz$TAZ
+aggregate.data <- function(df){ 
+  sum(df$AREA)
+}
 
 # Sum demand to get a total
 od.24.sum <- ddply(od.24.old,.(from),function(df){ sum(df$demand) })
@@ -95,8 +97,8 @@ save(od.24.new,od.am.new,od.pm.new,od.24.old,od.am.old,od.pm.old,file=paste(path
 
 # To include external trips, remove the "na.omit" command from the ddply blocks above
 #save(od.24.new,od.24.old,file=paste(path.to.geatm,'od-2020-old-and-new-including-external-trips.Rdata',sep=''))
-#save(od.24.new,od.24.old,file=paste(path.to.geatm,'od-2005-old-and-new-including-external-trips.Rdata',sep=''))
-#save(od.24.new,od.24.old,file=paste(path.to.geatm,'od-2012-old-and-new-including-external-trips.Rdata',sep=''))
+#save(od.24.new,od.24.old,file=paste(path.to.geatm,'../GEATM-2005/od-2005-old-and-new-including-external-trips.Rdata',sep=''))
+#save(od.24.new,od.24.old,file=paste(path.to.geatm,'../HCOAG/od-2010-old-and-new-including-external-trips.Rdata',sep=''))
 
 # check that the sum of the rows equals the value in the sum column
 # they are currently not quite equal and I suspect this is from omiting zones 1-10

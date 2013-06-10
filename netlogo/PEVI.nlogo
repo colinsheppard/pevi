@@ -519,9 +519,15 @@ to charge-time-event-scheduler
                                                     [this-charger-type] of current-charger)
   let next-event-scheduled-at 0 
   ifelse (not charging-on-a-whim?) and (time-until-end-charge > 0) and (time-until-end-charge < full-charge-time-need) and   
-         (time-until-depart > willing-to-roam-time-threshold) and (level-of current-charger < 3) and 
-         (time-until-end-charge > time-until-depart or time-until-end-charge < journey-charge-time-need) [                                                                                                    
-    set next-event-scheduled-at ticks + min (sentence (random-exponential wait-time-mean) (time-until-depart - willing-to-roam-time-threshold))
+         (level-of current-charger < 3) and 
+         ( time-until-end-charge > time-until-depart or 
+           ( (time-until-end-charge < journey-charge-time-need) and (time-until-depart > willing-to-roam-time-threshold) )
+         ) [
+    ifelse time-until-end-charge > time-until-depart [
+      set next-event-scheduled-at ticks + random-exponential wait-time-mean
+    ][
+      set next-event-scheduled-at ticks + min (sentence (random-exponential wait-time-mean) (time-until-depart - willing-to-roam-time-threshold))
+    ]
     dynamic-scheduler:add schedule self task end-charge-then-retry next-event-scheduled-at
   ][
     set next-event-scheduled-at ticks + time-until-end-charge
@@ -1070,7 +1076,7 @@ go-until-time
 go-until-time
 0
 100
-32
+30
 0.5
 1
 NIL
@@ -1111,7 +1117,7 @@ SWITCH
 222
 log-charging
 log-charging
-1
+0
 1
 -1000
 
@@ -1155,7 +1161,7 @@ SWITCH
 359
 log-seek-charger
 log-seek-charger
-1
+0
 1
 -1000
 
@@ -1199,7 +1205,7 @@ SWITCH
 400
 log-seek-charger-result
 log-seek-charger-result
-1
+0
 1
 -1000
 
@@ -1292,7 +1298,7 @@ SWITCH
 94
 log-trip
 log-trip
-1
+0
 1
 -1000
 
@@ -1303,7 +1309,7 @@ SWITCH
 180
 log-summary
 log-summary
-0
+1
 1
 -1000
 
@@ -1636,7 +1642,7 @@ Polygon -7500403 true true 270 75 225 30 30 225 75 270
 Polygon -7500403 true true 30 75 75 30 270 225 225 270
 
 @#$#@#$#@
-NetLogo 5.0
+NetLogo 5.0.1
 @#$#@#$#@
 @#$#@#$#@
 @#$#@#$#@

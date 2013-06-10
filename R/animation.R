@@ -1,8 +1,8 @@
 library(colinmisc)
 load.libraries(c('sas7bdat','plyr','ggplot2','gtools','doMC','reshape','maptools','animation','colorRamps','DAAG'))
 
-base.path <- '/Users/critter/Dropbox/serc/pev-colin/'
-#base.path <- '/Users/sheppardc/Dropbox/serc/pev-colin/'
+#base.path <- '/Users/critter/Dropbox/serc/pev-colin/'
+base.path <- '/Users/sheppardc/Dropbox/serc/pev-colin/'
 path.to.ani <- paste(base.path,'data/animations/',sep='')
 path.to.geatm <- paste(base.path,'pev-shared/data/GEATM-2020/',sep='')
 path.to.google <- paste(base.path,'pev-shared/data/google-earth/',sep='')
@@ -285,7 +285,7 @@ for(evse.i in c(1,15,30,45)){
   tr <- read.csv(paste(path.to.ani,"itin-barplot/trip-out-",evse.i,".csv",sep=''))
   pain <- subset(read.csv(paste(path.to.ani,"itin-barplot/pain-out-",evse.i,".csv",sep='')),pain.type=="delay")
   ch <- read.csv(paste(path.to.ani,"itin-barplot/charging-out-",evse.i,".csv",sep=''))
-
+  max.t <- max(ch$time + ch$duration)
   tr <- tr[,c('driver','origin','destination','time','vehicle.type')]
   names(tr) <- c('driver','from','to','depart','type')
   # sort by depart time

@@ -9,11 +9,13 @@ public class HeadlessPEVI {
 		HeadlessWorkspace workspace = HeadlessWorkspace.newInstance();
 		try {
 			workspace.open("../netlogo/PEVI.nlogo");
-			workspace.command("__clear-all-and-reset-ticks");
-			workspace.command("set parameter-file \"../../../pev-shared/data/inputs/sensitivity/base/params.txt\"");
-			workspace.command("setup");
-			workspace.command("go") ;
-			workspace.command("summarize") ;
+			workspace.command("setup-and-fix-seed");
+			workspace.command("set go-until-time 30.0");
+			workspace.command("go-until") ;
+			workspace.command("__clear-all-and-reset-ticks") ;
+			System.out.println("run complete");
+			
+			Thread.sleep(400000);
 			workspace.dispose();
 		}
 		catch(Exception ex) {

@@ -198,9 +198,32 @@ agg.taz$zip <- as.numeric(as.character(zips$ZCTA5CE10[zips.in.taz]))
 
 munis$zip <- agg.taz$zip[match(munis$id,agg.taz$id)]
 
+# Use 2010 as the baseline for the distribution of all vehicles by type
+# Use 2012 as the projection of the spatial distribution of PEVs
 veh.sub <- subset(veh,year==2010)
 veh.types <- read.csv(paste(path.to.humveh,"../ghg-analysis/veh-reg-melted.csv",sep=''))
 types.sub <- subset(veh.types,year==2010)
+pev.sub <- na.omit(ddply(subset(veh.types,veh.tech.code%in%c("LDA-GHybd","LDA-ELECTRIC","LDT1-GHybd","LDT2-GHybd") & year==2012),.(zip),numcolwise(sum)))[,c('zip','num')]
+pev.sub$frac <- pev.sub$num/sum(pev.sub$num)
+
+# Assumptions about electric miles driven for a given penetration of pevs
+# 
+# Effect of PHEV/BEV breakdown at 2% pen, doubling BEV from 25% to 50% increases EMT by 2.6%
+#   at 1% pen, doubling increase EMT by 3%
+# Effect of infrastructure: 3 chargers -> 40 chargers results in ~2% increase in electric VMT
+#
+# Assuming 40 chargers:
+# Avg EMT by Pen: 1% 26048.07
+#                 2% 51343.08
+
+# Scale emt to the 2020 population used in the remainder of the analysis
+pop.2010 <- 127136
+pop.2020 <- 134512
+pevi.pop.2020 <- 154955
+
+emt <- data.frame(pen=c(0,0.01,0.02),emt=c(0,26048.07,51343.08),num.drivers=c(0,1549.55,3026.20))
+emt$emt <- emt$emt * pop.2020 / pevi.pop.2020
+emt$num.drivers <- emt$num.drivers * pop.2020 / pevi.pop.2020
 
 for(scenario.year in emfac.years){
   munis.demand <- ddply(munis,.(muni),function(df){
@@ -208,29 +231,61 @@ for(scenario.year in emfac.years){
     ddply(sub.od,.(speed),function(ddf){ data.frame(vmt=sum(ddf$demand*ddf$length)) })
   })
 
-  # plot the results to inspect
-  #ggplot(munis.demand,aes(x=speed,y=vmt))+geom_point()+facet_wrap(~muni)+scale_y_log10()
-
-  munis.demand.by.tech <- ddply(munis,.(muni),function(df){
-    tot.num <- sum(subset(types.sub,zip %in% unique(df$zip))$num)
-    techs <- ddply(subset(types.sub,zip %in% unique(df$zip)),.(veh.tech.code),function(dff){ data.frame(frac=sum(dff$num)/tot.num) })
-    ddply(subset(munis.demand,muni==df$muni[1]),.(speed),function(dff){
-      data.frame(tech=techs$veh.tech.code,vmt=techs$frac * dff$vmt)
-    })
-  })
-
-  #ggplot(munis.demand.by.tech,aes(x=speed,y=vmt))+geom_point()+facet_grid(tech~muni)+scale_y_log10()
 
   if(scenario.year == emfac.years[1]){
+    # plot the results to inspect
+    #ggplot(munis.demand,aes(x=speed,y=vmt))+geom_point()+facet_wrap(~muni)+scale_y_log10()
+    munis.demand.by.tech <- ddply(munis,.(muni),function(df){
+      tot.num <- sum(subset(types.sub,zip %in% unique(df$zip))$num)
+      techs <- ddply(subset(types.sub,zip %in% unique(df$zip)),.(veh.tech.code),function(dff){ data.frame(frac=sum(dff$num)/tot.num) })
+      ddply(subset(munis.demand,muni==df$muni[1]),.(speed),function(dff){
+        data.frame(tech=techs$veh.tech.code,vmt=techs$frac * dff$vmt)
+      })
+    })
+    #ggplot(munis.demand.by.tech,aes(x=speed,y=vmt))+geom_point()+facet_grid(tech~muni)+scale_y_log10()
+
     munis.demand.by.tech.all <- munis.demand.by.tech
     munis.demand.by.tech.all$scenario <- scenario.year
-  }else{
-    munis.demand.by.tech$scenario <- scenario.year
-    munis.demand.by.tech.all <- rbind(munis.demand.by.tech.all,munis.demand.by.tech)
-    munis.demand.by.tech <- munis.demand.by.tech[,1:(ncol(munis.demand.by.tech)-1)]
-  }
-  write.csv(cast(melt(munis.demand.by.tech,id.vars=c("muni","tech","speed"),measure.vars="vmt"),muni + tech ~ speed),
+    write.csv(cast(melt(munis.demand.by.tech,id.vars=c("muni","tech","speed"),measure.vars="vmt"),muni + tech ~ speed),
             paste(path.to.humveh,"../ghg-analysis/year-",scenario.year,"-vmt-by-muni-speed-and-type.csv",sep=''))
+  }else{
+    for(pev.pen in c(0,0.01,0.02)){
+      tot.emt <- subset(emt,pev.pen==pen)$emt
+      tot.vmt <- sum(munis.demand$vmt)
+      munis.demand.by.tech <- ddply(munis,.(muni),function(df){
+        # now redistribute VMT based on EMT, but use "num" as a proxy for VMT as it will be proportionally distributed anyway
+        types.sub.emt.adjusted <- ddply(na.omit(types.sub),.(zip),function(dff){
+          if(sum(dff$veh.tech.code=="LDA-ELECTRIC")==0){
+            dff <- rbind(dff,dff[1,])
+            dff$veh.tech.code[nrow(dff)] <- "LDA-ELECTRIC"
+            dff$num[nrow(dff)] <- 0
+          }
+          if(sum(dff$veh.tech.code=="LDA-GAS")==0){
+            dff <- rbind(dff,dff[1,])
+            dff$veh.tech.code[nrow(dff)] <- "LDA-GAS"
+            dff$num[nrow(dff)] <- 0
+          }
+          zip.num <- sum(dff$num)
+          zip.frac <- ifelse(dff$zip[1]%in%pev.sub$zip,subset(pev.sub,zip==dff$zip[1])$frac,0)
+          dff$num[dff$veh.tech.code=="LDA-ELECTRIC"] <- dff$num[dff$veh.tech.code=="LDA-ELECTRIC"] + zip.num * zip.frac * tot.emt / tot.vmt
+          dff$num[dff$veh.tech.code=="LDA-GAS"] <- dff$num[dff$veh.tech.code=="LDA-GAS"] - zip.num * zip.frac * tot.emt / tot.vmt
+          dff
+        })
+
+        tot.num <- sum(subset(types.sub.emt.adjusted,zip %in% unique(df$zip))$num)
+        techs <- ddply(subset(types.sub.emt.adjusted,zip %in% unique(df$zip)),.(veh.tech.code),function(dff){ data.frame(frac=sum(dff$num)/tot.num) })
+        ddply(subset(munis.demand,muni==df$muni[1]),.(speed),function(dff){
+          data.frame(tech=techs$veh.tech.code,vmt=techs$frac * dff$vmt)
+        })
+      })
+      munis.demand.by.tech$scenario <- paste(scenario.year,"-pen",roundC(pev.pen*100,0),sep='')
+      munis.demand.by.tech.all <- rbind(munis.demand.by.tech.all,munis.demand.by.tech)
+      munis.demand.by.tech <- munis.demand.by.tech[,1:(ncol(munis.demand.by.tech)-1)]
+
+      write.csv(cast(melt(munis.demand.by.tech,id.vars=c("muni","tech","speed"),measure.vars="vmt"),muni + tech ~ speed),
+              paste(path.to.humveh,"../ghg-analysis/year-",scenario.year,"-pen-",roundC(pev.pen*100,0),"-vmt-by-muni-speed-and-type.csv",sep=''))
+    }
+  }
 }
 
 ddply(munis.demand.by.tech.all,.(scenario),function(df){ data.frame(vmt=sum(df$vmt)) })
@@ -259,9 +314,6 @@ sum(subset(od.24.all,scenario==scenario.year)$demand)
 ##############################################################
 #  Rig sales fractions to match our penetration scenarios
 ##############################################################
-
-pop.2010 <- 127136
-pop.2020 <- 134512
 
 age <- read.csv(paste(path.to.ghg,"age-dist-2020.csv",sep=''))
 age <- subset(age,model.year>2010 & model.year<=2020)

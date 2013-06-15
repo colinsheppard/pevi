@@ -16,6 +16,7 @@ exp.name <- commandArgs(trailingOnly=T)[1]
 #exp.name <- "electric-fuel-consumption"
 #exp.name <- "electric-fuel-consumption-mean"
 #exp.name <- "stranded-delay-threshold"
+exp.name <- "electric-miles-driven"
 
 path.to.inputs <- paste(base.path,'pev-shared/data/inputs/sensitivity/',exp.name,'/',sep='')
 
@@ -50,6 +51,9 @@ if(F){
   p <- ggplot(results,aes(x=infrastructure.cost-112-16,y=frac.stranded.by.delay*100))+ stat_summary(fun.y=mean, aes(colour=as.factor(penetration)), geom="line") + stat_summary(fun.y=mean, aes(colour=as.factor(penetration)), geom="point")+scale_y_continuous(limits=c(0,max(results$frac.stranded.by.delay * 100)))
   results$frac.stranded <- results$num.stranded/results$num.drivers
   p <- ggplot(melt(results,id.vars=c("infrastructure.cost","penetration"),measure.vars=c("frac.denied","frac.stranded.by.delay","frac.drivers.delayed","frac.stranded")),aes(x=infrastructure.cost-112-16,y=value*100))+ stat_summary(fun.y=mean, aes(colour=as.factor(penetration)), geom="line") + stat_summary(fun.y=mean, aes(colour=as.factor(penetration)), geom="point")+facet_wrap(~variable,scales="free_y")
+
+  p <- ggplot(results,aes(x=infrastructure.cost-112-16,y=electric.miles.driven)) + geom_boxplot(aes(fill=as.factor(penetration)))+facet_grid(charger.input.file~vehicle.scenario.named)
+
 
   # HOW MANY DRIVERS ARE DELAYED
   p <- ggplot(results,aes(x=infrastructure.scenario.named,y=frac.drivers.delayed))+geom_boxplot(aes(fill=as.factor(penetration)))+facet_wrap(~vehicle.scenario.named)

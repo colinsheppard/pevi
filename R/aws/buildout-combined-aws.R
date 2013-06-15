@@ -1,20 +1,33 @@
+# setwd('~/Dropbox/serc/pev-colin/aws/')
 Sys.setenv(NOAWT=1)
 options(java.parameters="-Xmx2048m")
 library(colinmisc)
 load.libraries(c('yaml','RNetLogo','plyr','reshape','stringr','snow'))
 source('params.R')
 
-if(hot.start){
-  dirs <- list.files(path.to.outputs.base)
-  relevant.dirs <- dirs[grep(optim.scenario,dirs[grep("linked2",dirs)])]
-  latest.run <- tail(relevant.dirs,1)
-  path.to.latest.run <- paste(path.to.outputs.base,latest.run,sep='')
-  run.file <- tail(list.files(path.to.latest.run,'*.Rdata'),1)
+zz <- file("log.out", open="at")
+sink(zz, type="message")
+
+touch.and.stop <- function(msg){
+  system(paste("touch ",base.path,"/ERROR",sep=""))
+  stop(msg)
+}
+
+# infer if it's a hot start
+dirs <- list.files(path.to.outputs.base)
+relevant.dirs <- grep(optim.scenario,dirs[grep("linked2",dirs)],value=T)
+latest.run <- tail(relevant.dirs,1)
+path.to.latest.run <- paste(path.to.outputs.base,latest.run,sep='')
+run.file <- tail(list.files(path.to.latest.run,'*.Rdata'),1)
+if(length(run.file)==0){
+  hot.start <- F
+  seed.start <- 1
+}else{
   load(paste(path.to.latest.run,'/',run.file,sep=''))
+  source('params.R')
+  hot.start <- T
   seed.start <- seed
   rm('cl')
-}else{
-  seed.start <- 1
 }
 
 for(seed in seed.start:10){
@@ -94,8 +107,12 @@ for(seed in seed.start:10){
     }else{
       if(hot.start){
         begin.build.i.save <- begin.build.i
+        # load the build.results data frame from the previous iteration to ensure that we are starting in the same place we left off
         if(build.i>1){
-          # load the build.results data frame from the previous iteration to ensure that we are starting in the same place we left off
+          # the special case / exception to this is when the first iteration of a new penetration was completed, let this go
+          if(length(grep(paste("buildout-pen",pev.penetration*100,'-iter',build.i-1,sep=''),list.files(path.to.outputs),value=T))==0){
+            build.i <- build.i + 1
+          }
           print(paste("hot start, loading file ",paste(path.to.outputs,tail(grep(paste("buildout-pen",pev.penetration*100,'-iter',build.i-1,sep=''),list.files(path.to.outputs),value=T),1),sep='')))
           build.results <- read.csv(paste(path.to.outputs,tail(grep(paste("buildout-pen",pev.penetration*100,'-iter',build.i-1,sep=''),list.files(path.to.outputs),value=T),1),sep=''))
         }
@@ -130,8 +147,8 @@ for(seed in seed.start:10){
       }
       # we're no longer in a hot start
       hot.start <- F
-
-      build.result <- evaluate.fitness(build.result)
+      
+      tryCatch(build.result <- evaluate.fitness(build.result),error=function(e) touch.and.stop(e))
       
       build.result$marg.cost.of.abatement <- (build.result$cost - build.result$cost[105])*1000/(build.result$pain[105] - build.result$pain)/100
       build.result$marg.cost.of.abatement[build.result$marg.cost.of.abatement<0] <- Inf

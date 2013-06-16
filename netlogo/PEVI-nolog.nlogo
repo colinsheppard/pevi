@@ -522,7 +522,7 @@ to charge-time-event-scheduler
     ][
       set next-event-scheduled-at ticks + min (sentence (random-exponential wait-time-mean) (time-until-depart - willing-to-roam-time-threshold))
     ]
-    dynamic-scheduler:add schedule self task end-charge-then-retry next-event-scheduled-at
+    time:schedule-event self task end-charge-then-retry next-event-scheduled-at
   ][
     set next-event-scheduled-at ticks + time-until-end-charge
     time:schedule-event self task end-charge-then-itin next-event-scheduled-at

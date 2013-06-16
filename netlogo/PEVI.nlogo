@@ -517,10 +517,23 @@ to charge-time-event-scheduler
                                                     [this-charger-type] of current-charger)
   let next-event-scheduled-at 0 
   ifelse (not charging-on-a-whim?) and (time-until-end-charge > 0) and (time-until-end-charge < full-charge-time-need) and   
+<<<<<<< HEAD
          (time-until-depart > willing-to-roam-time-threshold) and (level-of current-charger < 3) and 
          (time-until-end-charge > time-until-depart or time-until-end-charge < journey-charge-time-need) [                                                                                                    
     set next-event-scheduled-at ticks + min (sentence (random-exponential wait-time-mean) (time-until-depart - willing-to-roam-time-threshold))
     time:schedule-event self task end-charge-then-retry next-event-scheduled-at
+=======
+         (level-of current-charger < 3) and 
+         ( time-until-end-charge > time-until-depart or 
+           ( (time-until-end-charge < journey-charge-time-need) and (time-until-depart > willing-to-roam-time-threshold) )
+         ) [
+    ifelse time-until-end-charge > time-until-depart [
+      set next-event-scheduled-at ticks + random-exponential wait-time-mean
+    ][
+      set next-event-scheduled-at ticks + min (sentence (random-exponential wait-time-mean) (time-until-depart - willing-to-roam-time-threshold))
+    ]
+    dynamic-scheduler:add schedule self task end-charge-then-retry next-event-scheduled-at
+>>>>>>> chargetime
   ][
     set next-event-scheduled-at ticks + time-until-end-charge
     time:schedule-event self task end-charge-then-itin next-event-scheduled-at
@@ -1068,7 +1081,7 @@ go-until-time
 go-until-time
 0
 100
-32
+30
 0.5
 1
 NIL
@@ -1109,7 +1122,7 @@ SWITCH
 222
 log-charging
 log-charging
-1
+0
 1
 -1000
 
@@ -1153,7 +1166,7 @@ SWITCH
 359
 log-seek-charger
 log-seek-charger
-1
+0
 1
 -1000
 
@@ -1197,7 +1210,7 @@ SWITCH
 400
 log-seek-charger-result
 log-seek-charger-result
-1
+0
 1
 -1000
 
@@ -1290,7 +1303,7 @@ SWITCH
 94
 log-trip
 log-trip
-1
+0
 1
 -1000
 
@@ -1301,7 +1314,7 @@ SWITCH
 180
 log-summary
 log-summary
-0
+1
 1
 -1000
 

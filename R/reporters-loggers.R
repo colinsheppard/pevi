@@ -3,7 +3,7 @@
 reporters <- data.frame(num.drivers="(count drivers)",
   num.trips="(sum [ length itin-change-flag - sum itin-change-flag ] of drivers)",
   total.delay="(sum [ sum map weight-delay itin-delay-amount  ] of drivers)",
-  mean.delay="((sum [ sum map weight-delay itin-delay-amount  ] of drivers) / (sum [length (filter [abs ? > 0] itin-delay-amount)] of drivers))",
+  mean.delay="(mean-delay)",
   frac.drivers.delayed="(count drivers with [ sum map abs itin-delay-amount > 0 ] / count drivers)",
   num.unscheduled.trips="(sum [ sum itin-change-flag ] of drivers)",
   energy.charged="(sum [ energy-received ] of drivers)",

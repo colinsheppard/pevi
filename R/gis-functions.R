@@ -49,7 +49,7 @@ map.color <- function (x,c.map){
 #name.col<-'id'
 #description.cols<-NA
 
-chargers.to.kml <- function(shp,kml.filename,kmlname="KML Name", kmldescription="<i>Description</i>",borders='white',lwds=1.5,colors='red',id.col='id',name.col='id',description.cols=NA){
+chargers.to.kml <- function(shp,kml.filename,kmlname="KML Name", kmldescription="<i>Description</i>",borders='white',lwds=1.5,colors='red',id.col='id',name.col='id',description.cols=NA,open.kml=T){
 
     
   n <- length(shp@polygons)
@@ -58,7 +58,9 @@ chargers.to.kml <- function(shp,kml.filename,kmlname="KML Name", kmldescription=
   if(length(lwds)==1)lwds <- rep(lwds,n)
   kml.data <- sapply(slot(shp, "polygons"), function(x) { 
     row.num = which(as.numeric(slot(x, "ID"))==shp@data[[id.col]])
-    descrip = ifelse(is.na(description.cols),'',paste(paste(description.cols,': ',shp@data[row.num,description.cols],sep=''),collapse='<br/><br/>')) 
+    #descrip = ifelse(is.na(description.cols),'',paste(paste(description.cols,': ',shp@data[row.num,description.cols],sep=''),collapse='<br/><br/>')) 
+    #Different descrip command makes for more user-friendly data labels
+    descrip = ifelse(is.na(description.cols),'',paste('Level 2 Chargers: ',shp@data[row.num,'L2'],'<br/><br/>','Level 3 Chargers: ',shp@data[row.num,'L3'],'<br/><br/>','Daily trips to/from this zone: ',round(shp@data[row.num,'weighted.demand']*pev.penetration),'<br/><br/>',sep=''))
     kmlPolygon(x,
       name=shp@data[[name.col]][row.num], 
       col=colors[row.num], lwd=lwds[row.num], border=borders[row.num], 
@@ -194,7 +196,7 @@ chargers.to.kml <- function(shp,kml.filename,kmlname="KML Name", kmldescription=
   cat(kmlPolygon()$footer, file=kmlFile, sep="\n")
   close(kmlFile)
 
-  system(paste('open ',kml.filename,sep=''))
+  if(open.kml)system(paste('open ',kml.filename,sep=''))
 }
 
 collapse.df.num.veh <- function(df,newname){
@@ -255,7 +257,9 @@ demand.to.kml <- function(shp,num.vehicles,kml.filename,kmlname="KML Name", kmld
   if(length(lwds)==1)lwds <- rep(lwds,n)
   kml.data <- sapply(slot(shp, "polygons"), function(x) { 
     row.num = which(as.numeric(slot(x, "ID"))==shp@data[[id.col]])
-    descrip = ifelse(is.na(description.cols),'',paste(paste(description.cols,': ',shp@data[row.num,description.cols],sep=''),collapse='<br/><br/>')) 
+    #descrip = ifelse(is.na(description.cols),'',paste(paste(description.cols,': ',shp@data[row.num,description.cols],sep=''),collapse='<br/><br/>')) 
+    #Different descrip command makes for more user-friendly data labels
+    descrip = ifelse(is.na(description.cols),'',paste('Daily trips to/from this zone: ',round(shp@data[row.num,'weighted.demand']*pev.penetration),'<br/><br/>',sep=''))
     kmlPolygon(x,
       name=shp@data[[name.col]][row.num], 
       col=colors[row.num], lwd=lwds[row.num], border=borders[row.num], 

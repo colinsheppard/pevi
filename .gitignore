@@ -10,3 +10,5 @@ netlogo/*-out.csv
 netlogo/params.txt
 postgis
 headless/bin
+headless/.classpath
+headless/lib/*.jar

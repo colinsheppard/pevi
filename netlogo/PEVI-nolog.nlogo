@@ -1,4 +1,4 @@
-extensions [dynamic-scheduler] 
+extensions [time] 
 __includes["setup.nls" "reporters.nls"]
 
 globals [    
@@ -13,8 +13,6 @@ globals [
   
   n-tazs
   n-charger-types
-  
-  schedule  ;; this global variable holds the dynamic schedule for the PEVI program, appended by the drivers from their itineraries
   
 ;; FILE PATHS
   model-directory
@@ -176,7 +174,7 @@ end
 to clear-all-and-initialize
   ;print "clear all"
   __clear-all-and-reset-ticks
-  set schedule dynamic-scheduler:create
+  time:clear-schedule
   create-turtles 1 [ setxy 0 0 set color black] ;This invisible turtle makes sure we start at taz 1 not taz 0
 end
 
@@ -201,10 +199,10 @@ to setup
   reset-logfile "tazs"
   ;;log-data "tazs" (sentence "time" "taz" "num-bevs" "num-phevs" "num-L0" "num-L1" "num-L2" "num-L3" "num-avail-L0"  "num-avail-L1" "num-avail-L2" "num-avail-L3")
   if log-tazs [
-    dynamic-scheduler:repeat schedule tazs task log-taz-data 0.0 (log-taz-time-interval / 60)
+    time:schedule-repeating-event tazs task log-taz-data 0.0 (log-taz-time-interval / 60)
   ]
   if log-summary [
-     dynamic-scheduler:add schedule one-of drivers task summarize go-until-time - 0.01
+     time:schedule-event one-of drivers task summarize go-until-time - 0.01
   ]
   reset-logfile "wait-time"
   ;;log-data "wait-time" (sentence "time" "driver" "vehicle.type" "soc" "trip.distance" "journey.distance" "time.until.depart" "result.action" "time.from.now")
@@ -230,10 +228,10 @@ to setup
 end 
 
 to go
-  dynamic-scheduler:go schedule
+  time:go
 end
 to go-until
-  dynamic-scheduler:go-until schedule go-until-time
+  time:go-until go-until-time
 end
 
 to log-taz-data
@@ -468,17 +466,17 @@ to wait-time-event-scheduler
       ;;log-data "pain" (sentence ticks id [id] of current-taz [name] of this-vehicle-type "stranded" "" state-of-charge)
     ][
       let event-time-from-now random-exponential wait-time-mean
-      dynamic-scheduler:add schedule self task retry-seek ticks + event-time-from-now
+      time:schedule-event self task retry-seek ticks + event-time-from-now
       ;;log-data "wait-time" (sentence ticks id [name] of this-vehicle-type state-of-charge trip-distance journey-distance time-until-depart "retry-seek" event-time-from-now)
     ]
   ][
     ifelse remaining-range / charge-safety-factor >= journey-distance or time-until-depart <= willing-to-roam-time-threshold [
-      dynamic-scheduler:add schedule self task depart departure-time
+      time:schedule-event self task depart departure-time
       ;;log-data "wait-time" (sentence ticks id [name] of this-vehicle-type state-of-charge trip-distance journey-distance time-until-depart "depart" departure-time)
     ][
       let event-time-from-now min(sentence (random-exponential wait-time-mean) (time-until-depart - willing-to-roam-time-threshold))
       if event-time-from-now < 0 [ set event-time-from-now 0 ]
-      dynamic-scheduler:add schedule self task retry-seek ticks + event-time-from-now
+      time:schedule-event self task retry-seek ticks + event-time-from-now
       ;;log-data "wait-time" (sentence ticks id [name] of this-vehicle-type state-of-charge trip-distance journey-distance time-until-depart "retry-seek" event-time-from-now)
     ]
   ]
@@ -515,13 +513,19 @@ to charge-time-event-scheduler
                                                     [this-charger-type] of current-charger)
   let next-event-scheduled-at 0 
   ifelse (not charging-on-a-whim?) and (time-until-end-charge > 0) and (time-until-end-charge < full-charge-time-need) and   
-         (time-until-depart > willing-to-roam-time-threshold) and (level-of current-charger < 3) and 
-         (time-until-end-charge > time-until-depart or time-until-end-charge < journey-charge-time-need) [                                                                                                    
-    set next-event-scheduled-at ticks + min (sentence (random-exponential wait-time-mean) (time-until-depart - willing-to-roam-time-threshold))
-    dynamic-scheduler:add schedule self task end-charge-then-retry next-event-scheduled-at
+         (level-of current-charger < 3) and 
+         ( time-until-end-charge > time-until-depart or 
+           ( (time-until-end-charge < journey-charge-time-need) and (time-until-depart > willing-to-roam-time-threshold) )
+         ) [
+    ifelse time-until-end-charge > time-until-depart [
+      set next-event-scheduled-at ticks + random-exponential wait-time-mean
+    ][
+      set next-event-scheduled-at ticks + min (sentence (random-exponential wait-time-mean) (time-until-depart - willing-to-roam-time-threshold))
+    ]
+    time:schedule-event self task end-charge-then-retry next-event-scheduled-at
   ][
     set next-event-scheduled-at ticks + time-until-end-charge
-    dynamic-scheduler:add schedule self task end-charge-then-itin next-event-scheduled-at
+    time:schedule-event self task end-charge-then-itin next-event-scheduled-at
     set after-end-charge "depart"
   ]
   ;;log-data "charge-time" (sentence ticks id charger-in-origin-or-destination (level-of current-charger) state-of-charge trip-distance journey-distance time-until-depart after-end-charge (next-event-scheduled-at - ticks))
@@ -706,7 +710,7 @@ end
 to itinerary-event-scheduler
   set state "not-charging"
   
-  dynamic-scheduler:add schedule self task depart departure-time
+  time:schedule-event self task depart departure-time
 end
 
 ;;;;;;;;;;;;;;;;;;;;
@@ -827,7 +831,7 @@ end
 to travel-time-event-scheduler
   set state "traveling"
   set trip-time item my-od-index od-time
-  dynamic-scheduler:add schedule self task arrive (ticks + trip-time)
+  time:schedule-event self task arrive (ticks + trip-time)
 end
 
 ;;;;;;;;;;;;;;;;;;;;
@@ -875,7 +879,7 @@ to arrive
       if (random-float 1) < (1 / (1 + exp(-5 + 6 * state-of-charge))) [
         set current-charger (one-of item 0 [chargers-by-type] of current-taz)
         set full-charge-time-need (1 - state-of-charge) * battery-capacity / charge-rate-of current-charger
-        dynamic-scheduler:add schedule self task end-charge ticks + full-charge-time-need 
+        time:schedule-event self task end-charge ticks + full-charge-time-need 
         set time-until-end-charge full-charge-time-need
         ;;log-data "charging" (sentence ticks [who] of current-charger level-of current-charger [id] of current-taz [id] of self [name] of this-vehicle-type full-charge-time-need (full-charge-time-need * charge-rate-of current-charger) state-of-charge (state-of-charge + (full-charge-time-need * charge-rate-of current-charger) / battery-capacity ) "stop" false)
       ]
@@ -1066,7 +1070,7 @@ go-until-time
 go-until-time
 0
 100
-32
+30
 0.5
 1
 NIL
@@ -1251,7 +1255,7 @@ SWITCH
 92
 log-pain
 log-pain
-0
+1
 1
 -1000
 
@@ -1299,7 +1303,7 @@ SWITCH
 180
 log-summary
 log-summary
-0
+1
 1
 -1000
 

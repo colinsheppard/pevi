@@ -11,7 +11,8 @@ load.libraries(c('maptools','plotrix','stats','gpclib','plyr','png','RgoogleMaps
 gpclibPermit()
 registerDoMC(7)
 
-base.path <- '/Users/critter/Dropbox/serc/pev-colin/'
+base.path <- '/Users/sheppardc/Dropbox/serc/pev-colin/'
+#base.path <- '/Users/critter/Dropbox/serc/pev-colin/'
 path.to.geatm <- paste(base.path,'pev-shared/data/GEATM-2020/',sep='')
 path.to.google <- paste(base.path,'pev-shared/data/google-earth/',sep='')
 path.to.parcel <- paste(base.path,'pev-shared/data/HUM-PARCELS/',sep='')

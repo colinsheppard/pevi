@@ -3,18 +3,24 @@ load.libraries(c('sas7bdat','plyr','ggplot2','gtools','doMC','reshape','maptools
 
 base.path <- '/Users/critter/Dropbox/serc/pev-colin/'
 #base.path <- '/Users/sheppardc/Dropbox/serc/pev-colin/'
+
+ani.code <- '50-50'
+ani.code <- 'base-fixed'
+
+if(ani.code=="50-50"){
+  evses <- c(1,15,30,45)
+}else{
+  evses <- 1:5 # which correspond to iters 1 20 24 28 36 or the break points between each pen
+}
+
 path.to.ani <- paste(base.path,'data/animations/',sep='')
+path.to.pevi.outputs <- paste(path.to.ani,'outputs-',ani.code,'/',sep='')
 path.to.geatm <- paste(base.path,'pev-shared/data/GEATM-2020/',sep='')
 path.to.google <- paste(base.path,'pev-shared/data/google-earth/',sep='')
 path.to.shared.inputs <- paste(base.path,'pev-shared/data/inputs/driver-input-file/',sep='')
 path.to.pevi <- paste(base.path,'pevi/',sep='')
 
 source(paste(path.to.pevi,"R/gis-functions.R",sep=''))
-
-path.to.outputs <- '~/Dropbox/serc/pev-colin/data/scheduler-optim/'
-path.to.ctpp <- '~/Dropbox/serc/pev-colin/data/CTPP/'
-path.to.nhts <- '~/Dropbox/serc/pev-colin/data/NHTS/'
-path.to.plots <- '~/Dropbox/serc/pev-colin/plots/'
 
 agg.taz <- readShapePoly(paste(path.to.google,'aggregated-taz-with-weights/aggregated-taz-with-weights',sep=''),IDvar="ID")
 load(paste(path.to.google,'aggregated-taz-with-weights/aggregated-taz-with-weights-fieldnames.Rdata',sep=''))
@@ -50,6 +56,7 @@ sched <- sched[order(sched$depart),]
 agg.taz.coords <- coordinates(agg.taz)
 home.cexes <- seq(1,4,length.out=40)
 
+path.to.plots <- '~/Dropbox/serc/pev-colin/plots/'
 if(!file.exists(paste(path.to.plots,'route-inds-for-animation.Rdata',sep=''))){
   rt.inds <- list()
   for(from.i in 1:52){
@@ -216,14 +223,14 @@ ani.routes <- function(){
 
 step.size = 2.5/60
 
-for(evse.i in c(1,15,30,45)){
-  tazs <- read.csv(paste("~/Dropbox/serc/pev-colin/data/animations/itin-barplot/tazs-out-",evse.i,".csv",sep=''))
-  sched <- read.csv(paste("~/Dropbox/serc/pev-colin/data/animations/itin-barplot/trip-out-",evse.i,".csv",sep=''))
-  pain <- subset(read.csv(paste("~/Dropbox/serc/pev-colin/data/animations/itin-barplot/pain-out-",evse.i,".csv",sep='')),pain.type=="delay")
-  ch <- read.csv(paste(path.to.ani,"itin-barplot/charging-out-",evse.i,".csv",sep=''))
+for(evse.i in evses){
+  tazs <- read.csv(paste(path.to.pevi.outputs,"tazs-out-",evse.i,".csv",sep=''))
+  sched <- read.csv(paste(path.to.pevi.outputs,"trip-out-",evse.i,".csv",sep=''))
+  pain <- subset(read.csv(paste(path.to.pevi.outputs,"pain-out-",evse.i,".csv",sep='')),pain.type=="delay")
+  ch <- read.csv(paste(path.to.pevi.outputs,"charging-out-",evse.i,".csv",sep=''))
   max.t <- max(ch$time + ch$duration)
 
-  ani.options(ffmpeg="/usr/local/bin/ffmpeg",outdir=paste(path.to.ani,"itin-barplot/ani",sep=''),ani.width=750,ani.height=900)
+  ani.options(ffmpeg="/usr/local/bin/ffmpeg",outdir=paste(path.to.ani,"ani-",ani.code,sep=''),ani.width=750,ani.height=900)
   saveVideo({
       par(mar = c(3, 3, 1, 0.5), mgp = c(2, 0.5, 0), tcl = -0.3, cex.axis = 0.8, cex.lab = 0.8, 
           cex.main = 1)
@@ -281,7 +288,7 @@ ani.tours <- function(){
   }
 }
 
-for(evse.i in c(1,15,30,45)){
+for(evse.i in evses){
   tr <- read.csv(paste(path.to.ani,"itin-barplot/trip-out-",evse.i,".csv",sep=''))
   pain <- subset(read.csv(paste(path.to.ani,"itin-barplot/pain-out-",evse.i,".csv",sep='')),pain.type=="delay")
   ch <- read.csv(paste(path.to.ani,"itin-barplot/charging-out-",evse.i,".csv",sep=''))

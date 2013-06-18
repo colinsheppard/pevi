@@ -49,7 +49,7 @@ map.color <- function (x,c.map){
 #name.col<-'id'
 #description.cols<-NA
 
-chargers.to.kml <- function(shp,kml.filename,kmlname="KML Name", kmldescription="<i>Description</i>",borders='white',lwds=1.5,colors='red',id.col='id',name.col='id',description.cols=NA){
+chargers.to.kml <- function(shp,kml.filename,kmlname="KML Name", kmldescription="<i>Description</i>",borders='white',lwds=1.5,colors='red',id.col='id',name.col='id',description.cols=NA,open.kml=T){
 
     
   n <- length(shp@polygons)
@@ -196,7 +196,7 @@ chargers.to.kml <- function(shp,kml.filename,kmlname="KML Name", kmldescription=
   cat(kmlPolygon()$footer, file=kmlFile, sep="\n")
   close(kmlFile)
 
-  system(paste('open ',kml.filename,sep=''))
+  if(open.kml)system(paste('open ',kml.filename,sep=''))
 }
 
 collapse.df.num.veh <- function(df,newname){

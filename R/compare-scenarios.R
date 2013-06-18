@@ -31,8 +31,10 @@ naming <- yaml.load(readChar(paste(path.to.inputs,'naming.yaml',sep=''),file.inf
 vary.tab <- expand.grid(vary,stringsAsFactors=F)
 
 results <- data.frame(vary.tab)
-results$penetration <- as.numeric(unlist(lapply(strsplit(as.character(results$driver.input.file),'-pen',fixed=T),function(x){ unlist(strsplit(x[2],"-rep",fixed=T)[[1]][1]) })))
-results$replicate <- as.numeric(unlist(lapply(strsplit(as.character(results$driver.input.file),'-rep',fixed=T),function(x){ unlist(strsplit(x[2],"-",fixed=T)[[1]][1]) })))
+if("driver.input.file" %in% names(vary)){
+  results$penetration <- as.numeric(unlist(lapply(strsplit(as.character(results$driver.input.file),'-pen',fixed=T),function(x){ unlist(strsplit(x[2],"-rep",fixed=T)[[1]][1]) })))
+  results$replicate <- as.numeric(unlist(lapply(strsplit(as.character(results$driver.input.file),'-rep',fixed=T),function(x){ unlist(strsplit(x[2],"-",fixed=T)[[1]][1]) })))
+}
 if("charger.input.file" %in% names(vary)){
   results$infrastructure.scenario <- as.numeric(unlist(lapply(strsplit(as.character(results$charger.input.file),'-scen',fixed=T),function(x){ unlist(strsplit(x[2],".txt",fixed=T)) })))
   results$infrastructure.scenario.named <- results$infrastructure.scenario
@@ -85,12 +87,8 @@ for(results.i in 1:nrow(results)){
   if("tazs" %in% to.log)NLCommand('set log-taz-time-interval 15')
   NLCommand('set go-until-time 30')
   NLCommand('setup')
-  #NLCommand('ask drivers [ set this-vehicle-type vehicle-type 53 ]')
-  #NLCommand('ask drivers [ set is-bev? [is-bev?] of this-vehicle-type ]')
-  #NLCommand('ask drivers [ set battery-capacity [battery-capacity] of this-vehicle-type ]')
-  #NLCommand('ask drivers [ set hybrid-fuel-consumption [hybrid-fuel-consumption] of this-vehicle-type ]')
 
-  NLCommand('dynamic-scheduler:go-until schedule go-until-time')
+  NLCommand('time:go-until go-until-time')
   if(results.i == 1){
     outputs.dir <- NLReport('outputs-directory')
     for(logger in to.log){
@@ -211,8 +209,5 @@ ggplot(melt(subset(demand.sum,level==0),id.vars=c('time','level','taz')),aes(x=t
 # Charging length and energy distributions
 ggplot(logs[['charging']],aes(x=duration))+geom_histogram(binwidth=1)+facet_wrap(~public)
 ggplot(logs[['charging']],aes(x=energy))+geom_histogram(binwidth=0.1)
-
-
-
 
 

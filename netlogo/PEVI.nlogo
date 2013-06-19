@@ -96,9 +96,12 @@ drivers-own [
   itin-complete?  
   type-assignment-code
   next-home-log
+  V2G-charge-time-need
 
   willing-to-roam?
   charging-on-a-whim?
+  first-morning-charge?
+  midday-charge?
 
 ;; TRACKING
   energy-used
@@ -374,7 +377,7 @@ to seek-charger
 
       foreach [level] of charger-types [
         let #level ?
-        if (count (available-chargers #this-taz #level) > 0) and (#level > 0 or #this-taz = home-taz) [
+        if (count (available-chargers #this-taz #level) > 0) and (#level > 0 or #this-taz = home-taz) [ ;; take the home-charger in your TAZ, not neighbor's TAZ
           let #this-charger-type one-of charger-types with [ level = #level ]
           let #this-charge-rate [charge-rate] of #this-charger-type
           ifelse #charger-in-origin-or-destination [
@@ -440,16 +443,31 @@ to seek-charger
   ][
     log-data "seek-charger-result" (sentence ticks seek-charger-index id ([id] of #min-taz) (#min-taz = current-taz or #min-taz = destination-taz) ([level] of #min-charger-type) #min-cost)
     ifelse #min-taz = current-taz [
+      ;; **** midday charge found here
       set current-charger one-of available-chargers #min-taz [level] of #min-charger-type
-      if [level] of #min-charger-type > 0 [
-        ask current-charger[
-          set current-driver myself
+      set charger-in-origin-or-destination (#min-taz = current-taz)  ;; this may pose a problem -- what if the current taz is not the origin taz?
+      ifelse #min-taz = home-taz [
+        set midday-charge? true
+        ifelse is-bev?[
+          set trip-charge-time-need max sentence 0 ((trip-distance * charge-safety-factor * electric-fuel-consumption - state-of-charge * battery-capacity) / charge-rate-of current-charger)
+        ][
+        set trip-charge-time-need 0
         ]
+        set time-until-end-charge trip-charge-time-need 
+        set V2G-charge-time-need time-until-end-charge
+        set next-home-log ticks
+        home-V2G-scheduler
+      ][
+        if [level] of #min-charger-type > 0 [
+          ask current-charger[
+            set current-driver myself
+          ]
+        ]
+        charge-time-event-scheduler
       ]
-      set charger-in-origin-or-destination (#min-taz = current-taz or #min-taz = destination-taz)
-      charge-time-event-scheduler
     ][
       ifelse #min-taz = destination-taz [
+        set charger-in-origin-or-destination true
         change-depart-time ticks
       ][
         add-trip-to-itinerary #min-taz
@@ -731,12 +749,46 @@ end
 ;; home V2G scheduler
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 to home-V2G-scheduler
-  set state "V2G-home"
+  
+  
+  set time-until-depart departure-time - ticks
   
   if [id] of self = 28 [
     print (word "V2G-scheduling: " precision ticks 3 " for time: " next-home-log " departure-time " departure-time " driver: " [id] of self " soc: " state-of-charge " taz: " current-taz " home: " home-taz)      
   ]
-  dynamic-scheduler:add schedule self task home-V2G next-home-log ;; if this task is called, 
+  
+  if first-morning-charge? [
+    set current-charger (one-of item 0 [chargers-by-type] of current-taz)
+    set full-charge-time-need (1 - state-of-charge) * battery-capacity / charge-rate-of current-charger
+    set time-until-end-charge full-charge-time-need
+    set V2G-charge-time-need time-until-end-charge
+    set first-morning-charge? false
+  ]
+  
+  ifelse V2G-charge-time-need < time-until-depart [
+  ; possible to discharge
+    ifelse state-of-charge >= 0.5 [
+      ; allow discharge!
+      ; set state "V2G"
+      set state "V2G"
+      ; time:schedule-event self task home-V2G next-home-log
+    ][
+      ; charge-only still
+      ; set state "G2V"
+      set state "G2V"
+      time:schedule-event self task home-G2V next-home-log 
+    ]
+       
+  ][
+  ; charge-only
+  ; set state "G2V"
+    set state "G2V"
+    time:schedule-event self task home-G2V next-home-log 
+  ]
+
+
+
+  ;; if this task is called, 
   ;; the vehicle has found a home charger, and will execute plug-in-at-home immediately
   ;; plug-in-at-home needs:
   ;; time-until-depart (to ensure the vehicle departs on time)
@@ -745,13 +797,12 @@ to home-V2G-scheduler
 end
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-;; home V2G
+;; home G2V -- provide reg down only
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-to home-V2G
+to home-G2V
 
-  set time-until-depart departure-time - ticks
-  set current-charger (one-of item 0 [chargers-by-type] of current-taz)
 
+    
   ;print (word "current-charger: " current-charger " current-taz: " current-taz " home-taz: " home-taz)
 
   
@@ -784,6 +835,8 @@ to home-V2G
   if [id] of self = 28 [
     print (word "GOTO itin-sched " precision ticks 3 " time-until-depart " time-until-depart " departure-time " departure-time " driver: " [id] of self " soc: " state-of-charge " taz: " current-taz " home: " home-taz)      
   ]
+  
+    if midday-charge? [ set midday-charge? false ]
     end-charge
     itinerary-event-scheduler  
   ]
@@ -791,7 +844,7 @@ to home-V2G
 
   
   ; schedule it
-  ;dynamic-scheduler:add schedule self task depart departure-time
+  ;time:schedule-event self task depart departure-time
   ;
 end
 
@@ -985,7 +1038,7 @@ to arrive
       set time-until-end-charge full-charge-time-need
       set next-home-log ((ceiling (ticks * 4)) * .25)
       set departure-time 99
-        ;; dynamic-scheduler:add schedule self task end-charge ticks + full-charge-time-need 
+        ;; time:schedule-event self task end-charge ticks + full-charge-time-need 
         if [id] of self = 28 [
         print (word "HEY! arriving at end of itin, and starting to charge V2G at time " next-home-log)
         ]
@@ -1378,7 +1431,6 @@ log-V2G-soc
 log-V2G-soc
 0
 1
-1
 -1000
 
 @#$#@#$#@
@@ -1710,7 +1762,7 @@ Polygon -7500403 true true 270 75 225 30 30 225 75 270
 Polygon -7500403 true true 30 75 75 30 270 225 225 270
 
 @#$#@#$#@
-NetLogo 5.0.1
+NetLogo 5.0.3
 @#$#@#$#@
 @#$#@#$#@
 @#$#@#$#@

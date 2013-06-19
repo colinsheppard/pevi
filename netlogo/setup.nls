@@ -297,6 +297,7 @@ to setup-drivers
     ]
 
     set state "not-charging"
+    ;; set regulation-available? false  -- set this here, and then changed in main code? yes?
     set current-charger nobody
     set energy-used 0
     set energy-received 0
@@ -305,6 +306,8 @@ to setup-drivers
     set num-denials 0
   
     set itin-complete? false
+    set midday-charge? false
+
 
     ifelse current-taz = home-taz [  ;; at home, track these vehicles for V2G
       ifelse is-bev? [
@@ -330,7 +333,8 @@ to setup-drivers
             ]
           ]
         ]
-      set next-home-log 0
+      set next-home-log 0 ;; begin providing regulation now, at beginning of day
+      set first-morning-charge? true
       home-V2G-scheduler
     ][   ;; not at home -- do not track for V2G.  Schedule first departure.
       ifelse is-bev? [

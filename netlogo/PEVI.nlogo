@@ -23,6 +23,7 @@ globals [
   od-input-file
   vehicle-type-input-file
   outputs-directory
+  freq-reg-input-file
   
 ;; PARAMETERS
   charge-safety-factor
@@ -44,6 +45,14 @@ globals [
   ;; globals needed for testing
   test-driver
   seek-charger-index
+  
+  ;; V2G regulation variables
+  current-reg-row
+  reg-time
+  reg-demand
+  regulation-time
+  frequency-regulation
+  
 ]
 
 breed [drivers driver]
@@ -80,6 +89,9 @@ drivers-own [
   max-trip-distance
   max-dwell-time
   current-itin-row          ; index of current location in the itinerary (referring to next trip or current trip if traveling)
+
+
+
 
 ;; CONVENIENCE VARIABLES
   journey-distance
@@ -751,7 +763,7 @@ end
 to home-V2G-scheduler
   
   
-  set time-until-depart departure-time - ticks
+  set time-until-depart departure-time - next-home-log  ;; this is the time-until-depart when the V2G happens
   
   if [id] of self = 28 [
     print (word "V2G-scheduling: " precision ticks 3 " for time: " next-home-log " departure-time " departure-time " driver: " [id] of self " soc: " state-of-charge " taz: " current-taz " home: " home-taz)      
@@ -1071,6 +1083,20 @@ to update-itinerary
   ][
     set current-taz destination-taz  ;; ac 12.20
     set itin-complete? true
+  ]
+end
+
+;;;;;;;;;;;;;;;;;;;;
+;; UPDATE REGULATION ITIN
+;;;;;;;;;;;;;;;;;;;;
+to update-regulation-itin
+  ifelse (current-reg-row + 1 < length reg-time) [
+    set current-reg-row current-reg-row + 1
+    set regulation-time item current-reg-row reg-time
+    set frequency-regulation item current-reg-row reg-demand
+    
+  ][
+    set current-reg-row -1  ;; continue to next day -- later include variability?
   ]
 end
 

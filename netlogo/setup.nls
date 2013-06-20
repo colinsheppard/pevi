@@ -27,7 +27,8 @@ to read-parameter-file
       ifelse param-name = "outputs-directory" [ set outputs-directory word model-directory file-read ][
       ifelse param-name = "probability-of-unneeded-charge" [ set probability-of-unneeded-charge file-read ][
       ifelse param-name = "stranded-delay-threshold" [ set stranded-delay-threshold file-read ][  
-      ]]]]]]]]]]]]]]]]]]
+      ifelse param-name = "freq-reg-input-file" [ set freq-reg-input-file word model-directory file-read ][
+      ]]]]]]]]]]]]]]]]]]]
     ]
     file-close
   ][ 
@@ -450,6 +451,29 @@ to setup-itinerary
   [ error (word "Input file '" driver-input-file "' not found!") ]
   file-close
 end ;setup-itinerary
+
+
+;;;;;;;;;;;;;;;;;;;;
+;; SETUP FREQ-REG
+;;;;;;;;;;;;;;;;;;;;
+to setup-freq-reg
+  ifelse (file-exists? freq-reg-input-file) [
+    file-close
+    file-open freq-reg-input-file
+    
+    while [file-at-end? = false] [
+     set reg-time n-values 1 [file-read]
+     set reg-demand n-values 1 [file-read] 
+      
+    ]
+    
+    
+  ][ error (word "Input file '" freq-reg-input-file "' not found!")  ]
+  file-close
+  set current-reg-row -1
+  update-regulation-itin ;; 
+  
+end  ; setup-freq-reg
 
 
 ;;;;;;;;;;;;;;;;;;;;

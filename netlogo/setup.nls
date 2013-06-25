@@ -334,7 +334,9 @@ to setup-drivers
             ]
           ]
         ]
-      set next-home-log 0 ;; begin providing regulation now, at beginning of day
+      set next-home-log regulation-time ;; 06.24 regulation-time = 0.25; 15min after midnight
+                          ;; begin providing regulation now, at beginning of day
+                          ;; later, this will be set by the freq-reg dataset, regulation-time
       set first-morning-charge? true
       home-V2G-scheduler
     ][   ;; not at home -- do not track for V2G.  Schedule first departure.
@@ -471,6 +473,8 @@ to setup-freq-reg
   ][ error (word "Input file '" freq-reg-input-file "' not found!")  ]
   file-close
   set current-reg-row -1
+  set charge-load 0
+  set discharge-load 0
   update-regulation-itin ;; 
   
 end  ; setup-freq-reg

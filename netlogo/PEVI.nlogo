@@ -52,6 +52,9 @@ globals [
   reg-demand
   regulation-time
   frequency-regulation
+  charge-load
+  discharge-load
+  available-power
   
 ]
 
@@ -205,6 +208,9 @@ to setup
   setup-tazs
   convert-enroute-ids
   print "setup-drivers"
+  
+  setup-freq-reg
+  
   setup-drivers
   print "setup-chargers"
   setup-charger-types
@@ -769,7 +775,7 @@ to home-V2G-scheduler
     print (word "V2G-scheduling: " precision ticks 3 " for time: " next-home-log " departure-time " departure-time " driver: " [id] of self " soc: " state-of-charge " taz: " current-taz " home: " home-taz)      
   ]
   
-  if first-morning-charge? [
+  if first-morning-charge? [  ;; could this be moved to setup?
     set current-charger (one-of item 0 [chargers-by-type] of current-taz)
     set full-charge-time-need (1 - state-of-charge) * battery-capacity / charge-rate-of current-charger
     set time-until-end-charge full-charge-time-need
@@ -780,25 +786,42 @@ to home-V2G-scheduler
   ifelse V2G-charge-time-need < time-until-depart [
   ; possible to discharge
     ifelse state-of-charge >= 0.5 [
-      ; allow discharge!
+      ; if CURRENT soc is >= 0.5, 
+      ; allow discharge at next regulation session!
       ; set state "V2G"
-      set state "V2G"
+      set state "V2G"  ;; in home-V2G, driver can provide either charger or discharging
+      set discharge-load discharge-load + 0.25 * (charge-rate-of current-charger) * 1.0e-3 ;; check later to make sure this can never be greater than the full battery capacity
       ; time:schedule-event self task home-V2G next-home-log
     ][
       ; charge-only still
       ; set state "G2V"
       set state "G2V"
-      time:schedule-event self task home-G2V next-home-log 
+      set charge-load charge-load + 0.25 * (charge-rate-of current-charger) * 1.0e-3 ;; units: [MWh]
+                                                  ;; later change 0.25 to be the time interval read in from freq-reg dataset
+      ;time:schedule-event self task home-G2V next-home-log REINSTATE THIS -- DRIVERS NEED TO DRAW POWER
+      ;; ACTUALLY, DON'T REINSTATE -- DRIVERS ONLY GET PAID IF THEY PROVIDE THE NECESSARY SERVICE
     ]
        
   ][
   ; charge-only
   ; set state "G2V"
     set state "G2V"
-    time:schedule-event self task home-G2V next-home-log 
+    set charge-load charge-load + 0.25 * (charge-rate-of current-charger) * 1.0e-3 ;; units: [MWh]
+                                                  ;; later change 0.25 to be the time interval read in from freq-reg dataset
+    ;time:schedule-event self task home-G2V next-home-log REINSTATE THIS
   ]
 
-
+  ifelse frequency-regulation > 0 [
+    ;; G2V needed
+    time:schedule-event self task home-reg-down next-home-log
+    
+  ][                                
+    ;; V2G needed, but some vehicles may need to charge as well; V2G + G2V
+    time:schedule-event self task home-reg-up next-home-log
+    ;; at next home-V2G, some drivers provide V2G, others provide G2V
+  
+  
+  ]
 
   ;; if this task is called, 
   ;; the vehicle has found a home charger, and will execute plug-in-at-home immediately
@@ -809,9 +832,25 @@ to home-V2G-scheduler
 end
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-;; home G2V -- provide reg down only
+;; home-reg-up -- provide reg up only, but allow G2V drivers to charge batteries as needed
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-to home-G2V
+to home-reg-up
+  
+  set available-power charge-load - discharge-load ;; accounts for the drivers that need to charge
+                                                   ;; this is the power available to be provided for reg-up in each regulation session
+                                                   ;; charge each G2V driver by equally divisible amount of charge-load, aka full charge-rate
+                                                   ;; discharge each V2G driver by equally divisible amount of available-power, or the 
+                                                   ;; total amount of reg-up needed, whichever is smaller
+  
+  
+  ; set charge-load 0 ;; after each regulation session
+  
+end
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;; home-reg-down -- provide reg down only
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+to home-reg-down
 
 
     
@@ -1097,6 +1136,7 @@ to update-regulation-itin
     
   ][
     set current-reg-row -1  ;; continue to next day -- later include variability?
+    update-regulation-itin
   ]
 end
 

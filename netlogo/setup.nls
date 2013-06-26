@@ -473,8 +473,6 @@ to setup-freq-reg
   ][ error (word "Input file '" freq-reg-input-file "' not found!")  ]
   file-close
   set current-reg-row -1
-  set charge-load 0
-  set discharge-load 0
   update-regulation-itin ;; 
   
 end  ; setup-freq-reg
@@ -501,7 +499,8 @@ to log-data [logfile data-list]
      (logfile = "drivers" and log-drivers) or
      (logfile = "summary") or 
      (logfile = "driver-summary") or
-     (logfile = "V2G-soc" and log-V2G-soc)
+     (logfile = "V2G-soc" and log-V2G-soc) or
+     (logfile = "V2G-power" and log-V2G-power)
   [
     open-logfile logfile
     file-print reduce [(word ?1 "," ?2)] data-list

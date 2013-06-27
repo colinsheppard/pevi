@@ -477,7 +477,7 @@ to seek-charger
         set trip-charge-time-need 0
         ]
         set time-until-end-charge trip-charge-time-need 
-        set V2G-charge-time-need time-until-end-charge
+        ;set V2G-charge-time-need time-until-end-charge ; now set in home-v2g-scheduler
         set next-home-log ticks
         home-V2G-scheduler
       ][
@@ -776,21 +776,27 @@ to home-V2G-scheduler
 ;  if [id] of self = 28 [
 ;    print (word "V2G-scheduling: " precision ticks 3 " for time: " next-home-log " departure-time " departure-time " driver: " [id] of self " soc: " state-of-charge " taz: " current-taz " home: " home-taz)      
 ; ]
+
   ask current-charger [  ;; this should only occur once per regulation session -- where should this go?
     set total-drivers-at-home count drivers with [home-taz = myself]
   ]
    
-  if first-morning-charge? [  ;; could this be moved to setup?
+  ifelse first-morning-charge? [  ;; could this be moved to setup?
     set current-charger (one-of item 0 [chargers-by-type] of current-taz)
     set full-charge-time-need (1 - state-of-charge) * battery-capacity / charge-rate-of current-charger
     set time-until-end-charge full-charge-time-need
-    set V2G-charge-time-need time-until-end-charge
     set first-morning-charge? false
-    set time-until-depart departure-time - next-home-log  ;; this is the time-until-depart when the next V2G happens    
-;    ask current-charger [
-;      set total-drivers-at-home count drivers with [home-taz = myself]
-;    ]
+
+  ][ ; if not first-morning-charge, then the driver may be charging midday
+     ; if midday? is true, then set time-until-end-charge = pre-determined charging time (enough for next TRIP only)
+     ; departure-time = set. next-home-log = now.
+     
+     ; if midday? is false, then the driver is at the end of his day.  next-home-log = ? departure time = 99
+  
   ]
+  
+  set V2G-charge-time-need time-until-end-charge
+  set time-until-depart departure-time - next-home-log  ;; this is the time-until-depart when the next V2G happens    
   
   ifelse V2G-charge-time-need < time-until-depart [
   ; possible to discharge

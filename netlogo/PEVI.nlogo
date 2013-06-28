@@ -790,7 +790,9 @@ to home-V2G-scheduler
   ][ ; if not first-morning-charge, then the driver may be charging midday
      ; if midday? is true, then set time-until-end-charge = pre-determined charging time (enough for next TRIP only)
      ; departure-time = set. next-home-log = now.
-     
+    ifelse 
+    
+    
      ; if midday? is false, then the driver is at the end of his day.  next-home-log = ? departure time = 99
   
   ]
@@ -1923,7 +1925,7 @@ Polygon -7500403 true true 270 75 225 30 30 225 75 270
 Polygon -7500403 true true 30 75 75 30 270 225 225 270
 
 @#$#@#$#@
-NetLogo 5.0.3
+NetLogo 5.0.1
 @#$#@#$#@
 @#$#@#$#@
 @#$#@#$#@

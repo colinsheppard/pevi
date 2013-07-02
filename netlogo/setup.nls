@@ -116,9 +116,10 @@ to setup-tazs
         ]
       ]
     ]
+    file-close
   ]
   [ error (word "Input file '" charger-input-file "' not found!")]
-  file-close
+
    
 end ;setup-tazs
 

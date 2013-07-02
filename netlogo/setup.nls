@@ -118,6 +118,7 @@ to setup-tazs
     ]
   ]
   [ error (word "Input file '" charger-input-file "' not found!")]
+  file-close
    
 end ;setup-tazs
 
@@ -334,7 +335,7 @@ to setup-drivers
             ]
           ]
         ]
-      set next-home-log regulation-time ;; 06.24 regulation-time = 0.25; 15min after midnight
+      ;set next-home-log regulation-time ;; 06.24 regulation-time = 0.25; 15min after midnight
                           ;; begin providing regulation now, at beginning of day
                           ;; later, this will be set by the freq-reg dataset, regulation-time
       set first-morning-charge? true
@@ -459,21 +460,39 @@ end ;setup-itinerary
 ;; SETUP FREQ-REG
 ;;;;;;;;;;;;;;;;;;;;
 to setup-freq-reg
+  
+  create-regulation-aggregators 1 [ ;; just want 1 regulation aggregator
+   set shape "circle"
+   set color white
+   set size 0.7
+    
+  ]
   ifelse (file-exists? freq-reg-input-file) [
     file-close
     file-open freq-reg-input-file
     
-    while [file-at-end? = false] [
-     set reg-time n-values 1 [file-read]
-     set reg-demand n-values 1 [file-read] 
+    ask regulation-aggregators [  ;; is this the right way to set reg-time and reg-demand as a reg-agg-own?
+      while [file-at-end? = false] [
+        set reg-time n-values 1 [file-read]
+        set reg-demand n-values 1 [file-read] 
       
+      ]
     ]
-    
-    
   ][ error (word "Input file '" freq-reg-input-file "' not found!")  ]
   file-close
-  set current-reg-row -1
-  update-regulation-itin ;; 
+  
+  ask regulation-aggregators [
+    ;set available-power 0
+    set charge-load 0
+    set discharge-load 0
+    set current-reg-row -1
+    set day 0
+    set first-charge? true
+    update-regulation-itin ;; 
+    set next-frequency-regulation frequency-regulation ;; messy coding -- should next-freq-reg overwrite here, or 
+                                                     ;; better to have another if loop in the main code for the
+                                                     ;; 1st charge of the day?
+  ]
   
 end  ; setup-freq-reg
 

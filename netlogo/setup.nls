@@ -489,9 +489,6 @@ to setup-freq-reg
     set day 0
     set first-charge? true
     update-regulation-itin ;; 
-    set next-frequency-regulation frequency-regulation ;; messy coding -- should next-freq-reg overwrite here, or 
-                                                     ;; better to have another if loop in the main code for the
-                                                     ;; 1st charge of the day?
   ]
   
 end  ; setup-freq-reg

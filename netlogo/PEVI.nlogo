@@ -1225,24 +1225,20 @@ to update-regulation-itin
         update-regulation-itin
       ]
     ]
+    ifelse frequency-regulation > 0 [
+      ;; need reg-down
+      set available-power charge-load  ;;   
+    ][
+      ;; need reg-up
+      set available-power discharge-load - charge-load 
+    ]  
+    set charge-load 0
+    set discharge-load 0
+    set num-V2G-drivers V2G-drivers-count
+    ;; num-V2G-drivers is the total count of drivers that are entering V2G mode for the next regulation time 
+    ;; (reset before next regulation time schedule, but retained in num-V2G-drivers to be used at the now "regulation-time")
+    set V2G-drivers-count 0    
   ]
-
-  ifelse frequency-regulation > 0 [
-    ;; need reg-down
-    set available-power charge-load  ;;   
-  ][
-    ;; need reg-up
-    set available-power discharge-load - charge-load ;; accounts for the drivers that need to charge
-                                                   ;; this is the power available to be provided for reg-up in each regulation session
-                                                   ;; charge each G2V driver by equally divisible amount of charge-load, aka full charge-rate
-                                                   ;; discharge each V2G driver by equally divisible amount of available-power, or the 
-                                                   ;; total amount of reg-up needed, whichever is smaller
-  ]  
-  
-  set charge-load 0
-  set discharge-load 0
-  set num-V2G-drivers V2G-drivers-count
-  set V2G-drivers-count 0
 
   time:schedule-event self task update-regulation-itin next-regulation-time
 end
@@ -1946,7 +1942,7 @@ Polygon -7500403 true true 270 75 225 30 30 225 75 270
 Polygon -7500403 true true 30 75 75 30 270 225 225 270
 
 @#$#@#$#@
-NetLogo 5.0.1
+NetLogo 5.0.3
 @#$#@#$#@
 @#$#@#$#@
 @#$#@#$#@

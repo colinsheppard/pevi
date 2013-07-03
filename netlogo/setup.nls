@@ -320,8 +320,8 @@ to setup-drivers
          ][
            ifelse rand-draw < 0 [
              set state-of-charge 0 
-             ][
-           set state-of-charge rand-draw
+           ][
+             set state-of-charge rand-draw
            ]
          ] 
         ][
@@ -331,8 +331,8 @@ to setup-drivers
           ][
             ifelse rand-draw < 0 [
               set state-of-charge 0 
-              ][
-            set state-of-charge rand-draw
+            ][
+              set state-of-charge rand-draw
             ]
           ]
         ]
@@ -486,6 +486,7 @@ to setup-freq-reg
     ;set available-power 0
     set charge-load 0
     set discharge-load 0
+    set V2G-drivers-count 0
     set current-reg-row -1
     set day 0
     set first-charge? true

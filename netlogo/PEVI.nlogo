@@ -794,18 +794,19 @@ to home-V2G-scheduler
     set full-charge-time-need (1 - state-of-charge) * battery-capacity / charge-rate-of current-charger
     set time-until-end-charge full-charge-time-need
     set first-morning-charge? false
+    set time-until-depart departure-time - next-regulation-time  ;; this is the time-until-depart when the next V2G happens    
   ][ ; if not first-morning-charge, then the driver may be charging midday
      ; if midday? is true, then set time-until-end-charge = pre-determined charging time (enough for next TRIP only)
      ; departure-time = set. next-home-log = now.
   ;  ifelse [][]
     
-    
+    ;?  set time-until-depart departure-time - next-regulation-time  ;; this is the time-until-depart when the next V2G happens    
      ; if midday? is false, then the driver is at the end of his day.  next-home-log = ? departure time = 99
   
   ]
   
   set V2G-charge-time-need time-until-end-charge
-  set time-until-depart departure-time - next-regulation-time  ;; this is the time-until-depart when the next V2G happens    
+
   
   ifelse V2G-charge-time-need < time-until-depart [
   ; possible to discharge
@@ -1215,13 +1216,13 @@ to update-regulation-itin
     ][
       ifelse (current-reg-row + 1 = length reg-time) [  ;; last 15 min of the day
         set current-reg-row current-reg-row + 1
+        set day day + 24 ;; 24 hours have passed
         set regulation-time item current-reg-row reg-time
         set next-regulation-time (item 0 reg-time) + day  ;; should be able to do this... = 24:15
         set frequency-regulation item current-reg-row reg-demand
         set next-frequency-regulation item 0 reg-demand     ; item 0 is at time 00:15
       ][ ;; otherwise, reset to the next day
         set current-reg-row -1  ;; continue to next day -- later include variability?
-        set day day + 24 ;; 24 hours have passed
         update-regulation-itin
       ]
     ]
@@ -1942,7 +1943,7 @@ Polygon -7500403 true true 270 75 225 30 30 225 75 270
 Polygon -7500403 true true 30 75 75 30 270 225 225 270
 
 @#$#@#$#@
-NetLogo 5.0.3
+NetLogo 5.0.4
 @#$#@#$#@
 @#$#@#$#@
 @#$#@#$#@

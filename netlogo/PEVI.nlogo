@@ -473,25 +473,37 @@ to seek-charger
     log-data "seek-charger-result" (sentence ticks seek-charger-index id ([id] of #min-taz) (#min-taz = current-taz or #min-taz = destination-taz) ([level] of #min-charger-type) #min-cost)
     ifelse #min-taz = current-taz [
       ;; **** midday charge found here
-      set current-charger one-of available-chargers #min-taz [level] of #min-charger-type
-      set charger-in-origin-or-destination (#min-taz = current-taz)  ;; this may pose a problem -- what if the current taz is not the origin taz?
       ifelse #min-taz = home-taz [
-        set midday-charge? true
-        ifelse is-bev?[
-          set trip-charge-time-need max sentence 0 ((trip-distance * charge-safety-factor * electric-fuel-consumption - state-of-charge * battery-capacity) / charge-rate-of current-charger)
+        ifelse [level] of #min-charger-type < 3 [
+        ;; instead of taking the #min-charger, plug in at home.  
+          print (word "MIDDAY CHARGE NOT ON ARRIVAL -- RESULT OF SEEK-CHARGER")
+          set midday-charge? true
+          set current-charger (one-of item 0 [chargers-by-type] of current-taz)
+          ifelse is-bev? [
+            set trip-charge-time-need max sentence 0 ((trip-distance * charge-safety-factor * electric-fuel-consumption - state-of-charge * battery-capacity) / charge-rate-of current-charger)
+          ][
+            set trip-charge-time-need 0
+          ]
+          set time-until-end-charge trip-charge-time-need 
+          set time-until-depart departure-time - next-regulation-time  ;; this is the time-until-depart when the next V2G happens      
+          home-V2G-scheduler
         ][
-        set trip-charge-time-need 0
+        ;; the #min-charger is level 3 -- use this charger in lieu of plugging in at home
+          set current-charger one-of available-chargers #min-taz [level] of #min-charger-type
+          ask current-charger[
+            set current-driver myself
+          ]
+          set charger-in-origin-or-destination (#min-taz = current-taz)  ;; this may pose a problem -- what if the current taz is not the origin taz?
+          charge-time-event-scheduler        
         ]
-        set time-until-end-charge trip-charge-time-need 
-        ;set V2G-charge-time-need time-until-end-charge ; now set in home-v2g-scheduler
-        set next-home-log ticks
-        home-V2G-scheduler
       ][
+        set current-charger one-of available-chargers #min-taz [level] of #min-charger-type
         if [level] of #min-charger-type > 0 [
           ask current-charger[
             set current-driver myself
           ]
         ]
+        set charger-in-origin-or-destination (#min-taz = current-taz or #min-taz = destination-taz)
         charge-time-event-scheduler
       ]
     ][
@@ -789,24 +801,15 @@ to home-V2G-scheduler
 ; ]
 
    
-  ifelse first-morning-charge? [  ;; could this be moved to setup?
+  if first-morning-charge? [  ;; could this be moved to setup?
     set current-charger (one-of item 0 [chargers-by-type] of current-taz)
     set full-charge-time-need (1 - state-of-charge) * battery-capacity / charge-rate-of current-charger
     set time-until-end-charge full-charge-time-need
     set first-morning-charge? false
-    set time-until-depart departure-time - next-regulation-time  ;; this is the time-until-depart when the next V2G happens    
-  ][ ; if not first-morning-charge, then the driver may be charging midday
-     ; if midday? is true, then set time-until-end-charge = pre-determined charging time (enough for next TRIP only)
-     ; departure-time = set. next-home-log = now.
-  ;  ifelse [][]
-    
-    ;?  set time-until-depart departure-time - next-regulation-time  ;; this is the time-until-depart when the next V2G happens    
-     ; if midday? is false, then the driver is at the end of his day.  next-home-log = ? departure time = 99
-  
+    set time-until-depart departure-time - next-regulation-time  ;; this is the time-until-depart when the next V2G happens      
   ]
   
   set V2G-charge-time-need time-until-end-charge
-
   
   ifelse V2G-charge-time-need < time-until-depart [
   ; possible to discharge
@@ -898,10 +901,10 @@ to home-reg-up
   set time-until-depart departure-time - next-regulation-time  ;; this is the time-until-depart when the next V2G happens
     
   ifelse time-until-depart > 0 [
-    ifelse ticks + next-regulation-time < 24 [
+    ifelse next-regulation-time < 24 [
       home-V2G-scheduler
     ][
-      end-charge
+      end-charge  ;; this may need to be removed?
     ]
   ][ 
     ifelse state = "G2V" [
@@ -1134,15 +1137,29 @@ to arrive
       
   ifelse not itin-complete? [
     if [id] of self = 28 [
-     print (word "arriving, and itin not complete") 
+      print (word "arriving, and itin not complete") 
     ]
-    ifelse need-to-charge "arrive" [   
-      seek-charger
-      log-data "trip-journey-timeuntildepart" (sentence ticks departure-time id [name] of this-vehicle-type state-of-charge #from-taz #to-taz #completed-trip #completed-journey (departure-time - ticks) "seeking-charger" remaining-range sum map weight-delay itin-delay-amount)
+    ifelse current-taz = home-taz [
+      print (word "arriving at home-taz -- V2G!!")
+      set midday-charge? true
+      set current-charger (one-of item 0 [chargers-by-type] of current-taz)
+      ifelse is-bev? [
+        set trip-charge-time-need max sentence 0 ((trip-distance * charge-safety-factor * electric-fuel-consumption - state-of-charge * battery-capacity) / charge-rate-of current-charger)
+      ][
+        set trip-charge-time-need 0
+      ]
+      set time-until-end-charge trip-charge-time-need 
+      set time-until-depart departure-time - next-regulation-time  ;; this is the time-until-depart when the next V2G happens      
+      home-V2G-scheduler
     ][
-      itinerary-event-scheduler  
-      log-data "trip-journey-timeuntildepart" (sentence ticks departure-time id [name] of this-vehicle-type state-of-charge #from-taz #to-taz #completed-trip #completed-journey (departure-time - ticks) "scheduling-itinerary" remaining-range sum map weight-delay itin-delay-amount)
-    ]
+      ifelse need-to-charge "arrive" [   
+        seek-charger
+        log-data "trip-journey-timeuntildepart" (sentence ticks departure-time id [name] of this-vehicle-type state-of-charge #from-taz #to-taz #completed-trip #completed-journey (departure-time - ticks) "seeking-charger" remaining-range sum map weight-delay itin-delay-amount)
+      ][
+        itinerary-event-scheduler  
+        log-data "trip-journey-timeuntildepart" (sentence ticks departure-time id [name] of this-vehicle-type state-of-charge #from-taz #to-taz #completed-trip #completed-journey (departure-time - ticks) "scheduling-itinerary" remaining-range sum map weight-delay itin-delay-amount)
+      ]
+    ]    
   ][
     if [id] of self = 28 [
      print (word "arriving, itin complete, current-taz: " current-taz " home-taz: " home-taz) 
@@ -1158,12 +1175,12 @@ to arrive
       set current-charger (one-of item 0 [chargers-by-type] of current-taz)
       set full-charge-time-need (1 - state-of-charge) * battery-capacity / charge-rate-of current-charger
       set time-until-end-charge full-charge-time-need
-      set next-home-log ((ceiling (ticks * 4)) * .25)
       set departure-time 99
         ;; time:schedule-event self task end-charge ticks + full-charge-time-need 
         if [id] of self = 28 [
         print (word "HEY! arriving at end of itin, and starting to charge V2G at time " next-home-log)
         ]
+      set time-until-depart departure-time - next-regulation-time  ;; this is the time-until-depart when the next V2G happens      
       home-V2G-scheduler
       log-data "charging" (sentence ticks [who] of current-charger level-of current-charger [id] of current-taz [id] of self [name] of this-vehicle-type full-charge-time-need (full-charge-time-need * charge-rate-of current-charger) state-of-charge (state-of-charge + (full-charge-time-need * charge-rate-of current-charger) / battery-capacity ) "stop" false)
       log-data "trip-journey-timeuntildepart" (sentence ticks ticks id [name] of this-vehicle-type state-of-charge #from-taz #to-taz #completed-trip #completed-journey 0 "home" remaining-range sum map weight-delay itin-delay-amount)

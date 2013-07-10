@@ -299,9 +299,6 @@ to setup-drivers
       set electric-fuel-consumption random-normal electric-fuel-consumption-mean electric-fuel-consumption-sd
     ]
 
-    set state "not-charging"
-    ;; set regulation-available? false  -- set this here, and then changed in main code? yes?
-    set current-charger nobody
     set energy-used 0
     set energy-received 0
     set expenses 0
@@ -313,35 +310,51 @@ to setup-drivers
 
 
     ifelse current-taz = home-taz [  ;; at home, track these vehicles for V2G
-      ifelse is-bev? [
-        let rand-draw random-normal 0.5 0.2
-        ifelse rand-draw > 1 [
-         set state-of-charge 1 
-         ][
-           ifelse rand-draw < 0 [
-             set state-of-charge 0 
-           ][
-             set state-of-charge rand-draw
-           ]
-         ] 
+      let rand-draw random-normal 0.5 0.1
+      ifelse rand-draw > 1 [
+        set state-of-charge 1 
+      ][
+        ifelse rand-draw < 0 [
+          set state-of-charge 0 
         ][
-        let rand-draw random-normal 0.4 0.4 ;; this is just a place-holder for now
-        ifelse rand-draw > 1 [
-          set state-of-charge 1 
-          ][
-            ifelse rand-draw < 0 [
-              set state-of-charge 0 
-            ][
-              set state-of-charge rand-draw
-            ]
-          ]
+          set state-of-charge rand-draw
         ]
-      ;set next-home-log regulation-time ;; 06.24 regulation-time = 0.25; 15min after midnight
-                          ;; begin providing regulation now, at beginning of day
-                          ;; later, this will be set by the freq-reg dataset, regulation-time
+      ] 
+      let #end-soc 1
+      ifelse is-bev? [  ; set end-soc here
+        set rand-draw random-float 1
+        ifelse rand-draw < 0.63 [
+          set #end-soc 0.9 + random-float 0.1
+        ][
+          ifelse rand-draw < 0.68 [ 
+            set #end-soc 0.8 + random-float 0.1
+          ][
+            ifelse rand-draw < 0.94 [ 
+              set #end-soc 0.7 + random-float 0.1
+            ][
+              ifelse rand-draw < 0.97 [ 
+                set #end-soc 0.6 + random-float 0.1
+              ][
+                ifelse rand-draw < 0.99 [ 
+                  set #end-soc 0.5 + random-float 0.1
+                ][
+                  ifelse rand-draw < 0.995 [ 
+                    set #end-soc 0.4 + random-float 0.1
+                  ][
+                    set #end-soc 0.3 + random-float 0.1
+       ]]]]]]][
+        set #end-soc 1
+      ]
       set first-morning-charge? true
+      
+      set current-charger (one-of item 0 [chargers-by-type] of current-taz)
+      set time-until-end-charge (#end-soc - state-of-charge) * battery-capacity / charge-rate-of current-charger
+      set time-until-depart departure-time - next-regulation-time  ;; this is the time-until-depart when the next V2G happens      
       home-V2G-scheduler
     ][   ;; not at home -- do not track for V2G.  Schedule first departure.
+      set state "not-charging"
+      set current-charger nobody
+
       ifelse is-bev? [
         let rand-draw random-float 1
         ifelse rand-draw < 0.63 [
@@ -487,6 +500,7 @@ to setup-freq-reg
     set charge-load 0
     set discharge-load 0
     set V2G-drivers-count 0
+    set G2V-drivers-count 0
     set current-reg-row -1
     set day 0
     set first-charge? true
@@ -518,7 +532,8 @@ to log-data [logfile data-list]
      (logfile = "summary") or 
      (logfile = "driver-summary") or
      (logfile = "V2G-soc" and log-V2G-soc) or
-     (logfile = "V2G-power" and log-V2G-power)
+     (logfile = "V2G-power" and log-V2G-power) or
+     (logfile = "frequency-reg" and log-frequency-reg)
   [
     open-logfile logfile
     file-print reduce [(word ?1 "," ?2)] data-list

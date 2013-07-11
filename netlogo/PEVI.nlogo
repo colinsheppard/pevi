@@ -114,8 +114,8 @@ drivers-own [
   trip-time
   itin-complete?  
   type-assignment-code
-  next-home-log
-  V2G-charge-time-need
+  end-home-soc
+  provide-regulation?
 
   willing-to-roam?
   charging-on-a-whim?
@@ -223,10 +223,12 @@ to setup
   
   setup-freq-reg
   
-  setup-drivers
   print "setup-chargers"
   setup-charger-types
   setup-chargers
+
+  setup-drivers
+
   reset-logfile "drivers"
   reset-logfile "charging"
   log-data "charging" (sentence "time" "charger.id" "charger.level" "location" "driver" "vehicle.type" "duration" "energy" "begin.soc" "end.soc" "after.end.charge" "charging.on.whim" "time.until.depart")
@@ -271,7 +273,7 @@ to setup
   log-data "V2G-power" (sentence "time" "driver" "power.delivered" "charge/discharge?" "regulation.provided?" "reg.up/down" "reg.requirements.met?")
 
   reset-logfile "frequency-reg"
-  log-data "frequency-reg" (sentence "time" "reg.up/down" "power.demand" "available.power" "V2G.drivers" "G2V.drivers")
+  log-data "frequency-reg" (sentence "time" "reg.up/down" "power.demand" "available.power" "additional.load" "V2G.drivers" "G2V.drivers")
 end 
 
 to go
@@ -786,7 +788,7 @@ to itinerary-event-scheduler
   set state "not-charging"
   ;if [id] of self = 286 [
   if ticks > 0 and [id] of self = 28 [
-    print (word "itin-sched " precision ticks 3 " departure-time " departure-time " driver: " [id] of self " soc: " state-of-charge " taz: " current-taz " home: " home-taz)      
+   ;print (word "itin-sched " precision ticks 3 " departure-time " departure-time " driver: " [id] of self " soc: " state-of-charge " taz: " current-taz " home: " home-taz)      
   ]
   
   time:schedule-event self task depart departure-time
@@ -803,17 +805,19 @@ end
 to home-V2G-scheduler
   
 ;  if [id] of self = 28 [
-;    print (word "V2G-scheduling: " precision ticks 3 " for time: " next-home-log " departure-time " departure-time " driver: " [id] of self " soc: " state-of-charge " taz: " current-taz " home: " home-taz)      
+;  print (word "V2G-scheduling: " precision ticks 3 " for time: " next-regulation-time " departure-time " departure-time " driver: " [id] of self " soc: " state-of-charge " taz: " current-taz " home: " home-taz)      
 ; ]
 
    
-  if first-morning-charge? [  ;; could this be moved to setup?
+  if first-morning-charge? [ 
     set first-morning-charge? false
   ]
   
-  set V2G-charge-time-need time-until-end-charge
+  if not midday-charge? [
+    set time-until-end-charge (end-home-soc - state-of-charge) * battery-capacity / charge-rate-of current-charger
+  ]
   
-  ifelse V2G-charge-time-need < time-until-depart [
+  ifelse time-until-end-charge < time-until-depart [
     ifelse state-of-charge >= 0.5 [
       set state "V2G"  ;; in home-V2G, driver can provide either charger or discharging
     ][
@@ -823,10 +827,28 @@ to home-V2G-scheduler
     set state "G2V"
   ]
 
+  if [id] of self = 682 [
+    ;print (word " driver: " [id] of self " time: " precision ticks 3 " time-until-end-charge: " time-until-end-charge " time-until-depart: " time-until-depart " departure-time: " departure-time " next-regulation-time: " next-regulation-time " soc: " state-of-charge " end-home-soc: " end-home-soc " taz: " current-taz " home: " home-taz)      
+  ]
+
   ifelse next-frequency-regulation > 0 [
     ;; G2V needed -- all drivers to charge mode
-    set charge-load charge-load + reg-interval * (charge-rate-of current-charger)  ;; units: [kWh]
-    set G2V-drivers-count G2V-drivers-count + 1
+    
+    ifelse midday-charge? [
+      ; charge as much as possible -- if charging is provided, take it
+      if state-of-charge <= 1 - small-num [
+        set charge-load charge-load + reg-interval * (charge-rate-of current-charger)  ;; units: [kWh]
+        set G2V-drivers-count G2V-drivers-count + 1
+        set provide-regulation? true
+      ]
+    ][
+      ; charge only until end-home-soc
+      if state-of-charge <= end-home-soc - small-num [
+        set charge-load charge-load + reg-interval * (charge-rate-of current-charger)  ;; units: [kWh]
+        set G2V-drivers-count G2V-drivers-count + 1
+        set provide-regulation? true
+      ]
+    ]
     time:schedule-event self task home-reg-down next-regulation-time
   ][                                
     ;; V2G needed, but some vehicles may need to charge as well; V2G + G2V
@@ -834,6 +856,7 @@ to home-V2G-scheduler
     ifelse state = "V2G" [
       set discharge-load discharge-load + reg-interval * (charge-rate-of current-charger)  ;; check later to make sure this can never be greater than the full battery capacity
       set V2G-drivers-count V2G-drivers-count + 1
+      set provide-regulation? true
     ][
       ifelse state = "G2V" [
         set charge-load charge-load + reg-interval * (charge-rate-of current-charger)  ;; units: [kWh]
@@ -855,8 +878,8 @@ to home-reg-up
   let #this-discharge 0
   let #req-met false
   let #charging-state "error"
-  let #regulation-provided? false
-  ifelse state = "V2G" [
+
+  ifelse provide-regulation? [
     ifelse available-power > frequency-regulation * -1.0e3 [ ; [kWh]
       ; only discharge by amount frequency-regulation
       set #this-discharge frequency-regulation * -1.0e3 / num-V2G-drivers
@@ -865,37 +888,39 @@ to home-reg-up
       ; discharge by amount available-power
       set #this-discharge available-power / num-V2G-drivers 
     ]
-    set #regulation-provided? true
     let #new-soc state-of-charge - (#this-discharge / battery-capacity)
     ifelse #new-soc >= 0 + small-num [ 
       set state-of-charge #new-soc
     ][
-      print (word precision ticks 3 " ERROR IN HOME-REG-UP " )
+     ;print (word precision ticks 3 " ERROR IN HOME-REG-UP: new-soc = " #new-soc)
     ]
     set #charging-state "discharge"
   ][
-    ifelse state = "G2V" [ 
-      ; charge vehicle
-      set #this-discharge -1 * (reg-interval * (charge-rate-of current-charger))
-      let #new-soc state-of-charge - #this-discharge / battery-capacity
-      if #new-soc <= 1 - small-num [ ;; only update charge if needed
-        set state-of-charge #new-soc
-      ] 
-      set #charging-state "charge"
-    ][
-      print (word "ERROR IN HOME-REG-UP")
-    ]
+    ; charge vehicle
+    set #this-discharge -1 * (reg-interval * (charge-rate-of current-charger))
+    let #new-soc state-of-charge - #this-discharge / battery-capacity
+    if #new-soc <= 1 - small-num [ ;; only update charge if needed
+      set state-of-charge #new-soc
+    ] 
+    set #charging-state "charge"  
   ]
-
+ 
   ;  log-data "V2G-power" (sentence ticks id "power.delivered" "charge/discharge?" "regulation.provided?" "reg.up/down" "reg.requirements.met?")
-  log-data "V2G-power" (sentence ticks id #this-discharge #charging-state #regulation-provided? state #req-met)
+  log-data "V2G-power" (sentence ticks id #this-discharge #charging-state provide-regulation? state #req-met)
   log-data "V2G-soc" (sentence ticks id battery-capacity state-of-charge ([id] of current-taz) (level-of current-charger))
 
   ; vehicles charged/discharged
   ; now, determine if they will schedule themselves for another regulation session:
     
   set time-until-depart departure-time - next-regulation-time  ;; this is the time-until-depart when the next V2G happens
-    
+  set provide-regulation? false
+
+;  if ticks = 13.5 [
+  if [id] of self = 682 [
+    ;print (word " driver: " [id] of self " time: " precision ticks 3 " reg up")      
+    ;print (word " driver: " [id] of self " time: " precision ticks 3 " time-until-end-charge: " time-until-end-charge " time-until-depart: " time-until-depart " departure-time: " departure-time " next-regulation-time: " next-regulation-time " soc: " state-of-charge " end-home-soc: " end-home-soc " taz: " current-taz " home: " home-taz)      
+  ]
+
   ifelse time-until-depart > 0 [
     ifelse next-regulation-time < 24 [
       home-V2G-scheduler
@@ -904,13 +929,18 @@ to home-reg-up
     ]
   ][ 
     ifelse state = "G2V" [
-      print (word precision ticks 3 " leaving pool of regulation drivers : G2V-mode, soc = " state-of-charge) 
+      ;print (word precision ticks 3 " leaving REG-UP : G2V-mode, soc = " state-of-charge) 
     ][
       if state = "V2G" [
-        print (word precision ticks 3 " leaving pool of regulation drivers : V2G-mode, soc = " state-of-charge)
+        ;print (word precision ticks 3 " leaving REG-UP : V2G-mode, soc = " state-of-charge)
       ]
     ] 
     if midday-charge? [ set midday-charge? false ]
+
+    if [id] of self = 682 [
+      ;print (word " driver: " [id] of self " time: " precision ticks 3 " time-until-end-charge: " time-until-end-charge " time-until-depart: " time-until-depart " departure-time: " departure-time " next-regulation-time: " next-regulation-time " soc: " state-of-charge " end-home-soc: " end-home-soc " taz: " current-taz " home: " home-taz)      
+    ]
+
     end-charge
     itinerary-event-scheduler  
   ]
@@ -925,51 +955,62 @@ to home-reg-down
   let #this-charge 0
   let #req-met false
   let #charging-state "error"
-  let #regulation-provided? false
-  ifelse state = "G2V" [
+
+  ifelse provide-regulation? [
     ifelse available-power > frequency-regulation * 1.0e3 [ ; [kWh]
-      ; only charge by amount frequency-regulation
       set #this-charge frequency-regulation * 1.0e3 / num-G2V-drivers
       set #req-met true
     ][
-      ; charge by amount available-power
       set #this-charge available-power / num-G2V-drivers 
     ]
-    set #regulation-provided? true
     let #new-soc state-of-charge + (#this-charge / battery-capacity)
+    ;; req not met if they have a large SOC and are not actually increasing battery charge
     ifelse #new-soc <= 1 - small-num [ 
       set state-of-charge #new-soc
     ][
-      print (word precision ticks 3 " ERROR IN HOME-REG-UP " )
+      set state-of-charge 1 - small-num
+      set #this-charge (#new-soc - state-of-charge) * battery-capacity ;; in excel, calculate the deficite 
+      set #req-met false      
+;      print (word precision ticks 3 " ERROR IN HOME-REG-DOWN: new-soc = " state-of-charge)
     ]
     set #charging-state "charge"
   ][
-    print (word "ERROR IN HOME-REG-UP")
+    set #charging-state "idle"
   ]
 
+
   ;  log-data "V2G-power" (sentence ticks id "power.delivered" "charge/discharge?" "regulation.provided?" "reg.up/down" "reg.requirements.met?")
-  log-data "V2G-power" (sentence ticks id #this-charge #charging-state #regulation-provided? state #req-met)
+  log-data "V2G-power" (sentence ticks id #this-charge #charging-state provide-regulation? state #req-met)
   log-data "V2G-soc" (sentence ticks id battery-capacity state-of-charge ([id] of current-taz) (level-of current-charger))
 
   ; vehicles charged/discharged
   ; now, determine if they will schedule themselves for another regulation session:
     
   set time-until-depart departure-time - next-regulation-time  ;; this is the time-until-depart when the next V2G happens
+  set provide-regulation? false
     
-  ifelse time-until-depart > 0 [
+  if [id] of self = 682 [
+    ;print (word " driver: " [id] of self " time: " precision ticks 3 " reg down")      
+    ;print (word " driver: " [id] of self " time: " precision ticks 3 " time-until-end-charge: " time-until-end-charge " time-until-depart: " time-until-depart " departure-time: " departure-time " next-regulation-time: " next-regulation-time " soc: " state-of-charge " end-home-soc: " end-home-soc " taz: " current-taz " home: " home-taz)      
+  ]
+    
+  ifelse time-until-depart > reg-interval [
     ifelse next-regulation-time < 24 [
       home-V2G-scheduler
     ][
       end-charge  ;; this may need to be removed?
     ]
   ][ 
+  
+  if [id] of self = 682 [
     ifelse state = "G2V" [
-      print (word precision ticks 3 " leaving pool of regulation drivers : G2V-mode, soc = " state-of-charge) 
+      ;print (word precision ticks 3 " leaving REG-DOWN : G2V-mode, soc = " state-of-charge " driver: " [id] of self) 
     ][
       if state = "V2G" [
-        print (word precision ticks 3 " leaving pool of regulation drivers : V2G-mode, soc = " state-of-charge)
+        ;print (word precision ticks 3 " leaving REG-DOWN : V2G-mode, soc = " state-of-charge " driver: " [id] of self)
       ]
     ] 
+  ]
     if midday-charge? [ set midday-charge? false ]
     end-charge
     itinerary-event-scheduler  
@@ -983,7 +1024,7 @@ end
 to depart
   
   if [id] of self = 28 [
-    print (word precision ticks 3 " departing, driver: " [id] of self " soc: " state-of-charge " taz: " current-taz " home: " home-taz)      
+   ;print (word precision ticks 3 " departing, driver: " [id] of self " soc: " state-of-charge " taz: " current-taz " home: " home-taz)      
   ]
 
 ;  log-data "drivers" (sentence precision ticks 3 [id] of self "departing" state-of-charge)
@@ -1135,25 +1176,35 @@ to arrive
   update-itinerary 
   let #to-taz [id] of current-taz
   if [id] of self = 28 [
-    print (word precision ticks 3 " arriving, driver: " [id] of self " soc: " state-of-charge " taz: " current-taz " home: " home-taz)      
+   ;print (word precision ticks 3 " arriving, driver: " [id] of self " soc: " state-of-charge " taz: " current-taz " home: " home-taz)      
   ]
       
   ifelse not itin-complete? [
     if [id] of self = 28 [
-      print (word "arriving, and itin not complete") 
+     ;print (word "arriving, and itin not complete") 
     ]
     ifelse current-taz = home-taz [
-      print (word "arriving at home-taz -- V2G!!")
-      set midday-charge? true
-      set current-charger (one-of item 0 [chargers-by-type] of current-taz)
-      ifelse is-bev? [
-        set trip-charge-time-need max sentence 0 ((trip-distance * charge-safety-factor * electric-fuel-consumption - state-of-charge * battery-capacity) / charge-rate-of current-charger)
+      ifelse departure-time - next-regulation-time > reg-interval [
+       ;print (word "arriving at home-taz -- V2G!!")
+        set midday-charge? true
+        set current-charger (one-of item 0 [chargers-by-type] of current-taz)
+        ifelse is-bev? [
+          set trip-charge-time-need max sentence 0 ((trip-distance * charge-safety-factor * electric-fuel-consumption - state-of-charge * battery-capacity) / charge-rate-of current-charger)
+        ][
+          set trip-charge-time-need 0
+        ]
+        set time-until-end-charge trip-charge-time-need 
+        set time-until-depart departure-time - next-regulation-time  ;; this is the time-until-depart when the next V2G happens      
+        home-V2G-scheduler
       ][
-        set trip-charge-time-need 0
+        ifelse need-to-charge "arrive" [   
+          seek-charger
+          log-data "trip-journey-timeuntildepart" (sentence ticks departure-time id [name] of this-vehicle-type state-of-charge #from-taz #to-taz #completed-trip #completed-journey (departure-time - ticks) "seeking-charger" remaining-range sum map weight-delay itin-delay-amount)
+        ][
+          itinerary-event-scheduler  
+          log-data "trip-journey-timeuntildepart" (sentence ticks departure-time id [name] of this-vehicle-type state-of-charge #from-taz #to-taz #completed-trip #completed-journey (departure-time - ticks) "scheduling-itinerary" remaining-range sum map weight-delay itin-delay-amount)
+        ]
       ]
-      set time-until-end-charge trip-charge-time-need 
-      set time-until-depart departure-time - next-regulation-time  ;; this is the time-until-depart when the next V2G happens      
-      home-V2G-scheduler
     ][
       ifelse need-to-charge "arrive" [   
         seek-charger
@@ -1165,25 +1216,28 @@ to arrive
     ]    
   ][
     if [id] of self = 28 [
-     print (word "arriving, itin complete, current-taz: " current-taz " home-taz: " home-taz) 
+    ;print (word "arriving, itin complete, current-taz: " current-taz " home-taz: " home-taz) 
     ]
   
     ;; itin is complete and at home? plug-in immediately and charge till full
     ifelse current-taz = home-taz [
       if [id] of self = 28 [
-       print (word "current-taz = home-taz, r-float: " random-float 1 ", < " (1 / (1 + exp(-5 + 6 * state-of-charge)))) 
+      ;print (word "current-taz = home-taz, r-float: " random-float 1 ", < " (1 / (1 + exp(-5 + 6 * state-of-charge)))) 
       ]
       
-      ;if (random-float 1) < (1 / (1 + exp(-5 + 6 * state-of-charge))) [ ;; want to force the drivers to plug in when they get home, for now at least
       set current-charger (one-of item 0 [chargers-by-type] of current-taz)
-      set full-charge-time-need (1 - state-of-charge) * battery-capacity / charge-rate-of current-charger
-      set time-until-end-charge full-charge-time-need
+      ;; less than .95? 1?
+      ifelse end-home-soc > state-of-charge [
+        set time-until-end-charge (end-home-soc - state-of-charge) * battery-capacity / charge-rate-of current-charger
+      ][
+        set time-until-end-charge 0
+      ]
       set departure-time 99
         ;; time:schedule-event self task end-charge ticks + full-charge-time-need 
         if [id] of self = 28 [
-        print (word "HEY! arriving at end of itin, and starting to charge V2G at time " next-home-log)
+       ;print (word "HEY! arriving at end of itin, and starting to charge V2G at time " next-regulation-time)
         ]
-      set time-until-depart departure-time - next-regulation-time  ;; this is the time-until-depart when the next V2G happens      
+      set time-until-depart departure-time - next-regulation-time  ;; at departure-time, state-of-charge must = end-home-soc      
       home-V2G-scheduler
       log-data "charging" (sentence ticks [who] of current-charger level-of current-charger [id] of current-taz [id] of self [name] of this-vehicle-type full-charge-time-need (full-charge-time-need * charge-rate-of current-charger) state-of-charge (state-of-charge + (full-charge-time-need * charge-rate-of current-charger) / battery-capacity ) "stop" false)
       log-data "trip-journey-timeuntildepart" (sentence ticks ticks id [name] of this-vehicle-type state-of-charge #from-taz #to-taz #completed-trip #completed-journey 0 "home" remaining-range sum map weight-delay itin-delay-amount)
@@ -1228,14 +1282,15 @@ to update-regulation-itin
     set reg-interval next-regulation-time
     set first-charge? false
   ][    
-    ifelse (current-reg-row + 1 < length reg-time) [
+    print (word "current-reg-row: " (current-reg-row + 1) " len reg-time: " length reg-time " time: " ticks) 
+    ifelse (current-reg-row + 1 < length reg-time - 1) [
       set current-reg-row current-reg-row + 1
       set regulation-time (item current-reg-row reg-time) + day
       set next-regulation-time (item (current-reg-row + 1) reg-time) + day
       set frequency-regulation item current-reg-row reg-demand
       set next-frequency-regulation item (current-reg-row + 1) reg-demand
     ][
-      ifelse (current-reg-row + 1 = length reg-time) [  ;; last 15 min of the day
+      ifelse (current-reg-row + 1 = length reg-time - 1) [  ;; last 15 min of the day
         set current-reg-row current-reg-row + 1
         set day day + 24 ;; 24 hours have passed
         set regulation-time item current-reg-row reg-time
@@ -1248,13 +1303,15 @@ to update-regulation-itin
       ]
     ]
     let #regulation "error"
+    let #additional-load 0
     ifelse frequency-regulation > 0 [
       ;; need reg-down
       set available-power charge-load  ;;  
       set #regulation "down" 
     ][
       ;; need reg-up
-      set available-power discharge-load - charge-load 
+      set available-power discharge-load 
+      set #additional-load charge-load
       set #regulation "up"
     ]  
     set charge-load 0
@@ -1266,7 +1323,7 @@ to update-regulation-itin
     set V2G-drivers-count 0  
     set G2V-drivers-count 0  
 
-    log-data "frequency-reg" (sentence ticks #regulation frequency-regulation available-power num-V2G-drivers num-G2V-drivers)
+    log-data "frequency-reg" (sentence ticks #regulation frequency-regulation available-power #additional-load num-V2G-drivers num-G2V-drivers)
   ]
 
 
@@ -1384,7 +1441,7 @@ go-until-time
 go-until-time
 0
 100
-37.5
+30
 0.5
 1
 NIL
@@ -1414,7 +1471,7 @@ SWITCH
 176
 log-wait-time
 log-wait-time
-0
+1
 1
 -1000
 
@@ -1425,7 +1482,7 @@ SWITCH
 222
 log-charging
 log-charging
-0
+1
 1
 -1000
 
@@ -1469,7 +1526,7 @@ SWITCH
 359
 log-seek-charger
 log-seek-charger
-0
+1
 1
 -1000
 
@@ -1606,7 +1663,7 @@ SWITCH
 94
 log-trip
 log-trip
-0
+1
 1
 -1000
 
@@ -1639,7 +1696,7 @@ SWITCH
 95
 log-V2G-power
 log-V2G-power
-1
+0
 1
 -1000
 
@@ -1647,10 +1704,10 @@ SWITCH
 847
 107
 1019
-141
+140
 log-frequency-reg
 log-frequency-reg
-1
+0
 1
 -1000
 

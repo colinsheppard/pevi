@@ -73,3 +73,30 @@ end
 to-report weight-delay [delay]
   ifelse delay >= 0 [report delay][report -0.5 * delay]
 end
+
+to-report end-soc-dist
+  let #end-soc 1
+  if is-bev? [  ; set end-soc here
+    let rand-draw random-float 1
+    ifelse rand-draw < 0.63 [
+      set #end-soc 0.9 + random-float 0.1
+      ][
+      ifelse rand-draw < 0.68 [ 
+        set #end-soc 0.8 + random-float 0.1
+        ][
+        ifelse rand-draw < 0.94 [ 
+          set #end-soc 0.7 + random-float 0.1
+          ][
+          ifelse rand-draw < 0.97 [ 
+            set #end-soc 0.6 + random-float 0.1
+            ][
+            ifelse rand-draw < 0.99 [ 
+              set #end-soc 0.5 + random-float 0.1
+              ][
+              ifelse rand-draw < 0.995 [ 
+                set #end-soc 0.4 + random-float 0.1
+                ][
+                set #end-soc 0.3 + random-float 0.1
+       ]]]]]]]
+  report #end-soc
+end

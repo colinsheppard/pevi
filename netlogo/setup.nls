@@ -307,78 +307,38 @@ to setup-drivers
   
     set itin-complete? false
     set midday-charge? false
-
+    set first-morning-charge? false
+    set provide-regulation? false
 
     ifelse current-taz = home-taz [  ;; at home, track these vehicles for V2G
-      let rand-draw random-normal 0.5 0.1
-      ifelse rand-draw > 1 [
-        set state-of-charge 1 
+      ifelse departure-time < next-regulation-time [
+        set state "not-charging"
+        set current-charger nobody
+        set state-of-charge end-soc-dist
+        itinerary-event-scheduler
       ][
-        ifelse rand-draw < 0 [
-          set state-of-charge 0 
+        let rand-draw random-normal 0.5 0.1
+        ifelse rand-draw > 1 [
+          set state-of-charge 1 
         ][
-          set state-of-charge rand-draw
-        ]
-      ] 
-      let #end-soc 1
-      ifelse is-bev? [  ; set end-soc here
-        set rand-draw random-float 1
-        ifelse rand-draw < 0.63 [
-          set #end-soc 0.9 + random-float 0.1
-        ][
-          ifelse rand-draw < 0.68 [ 
-            set #end-soc 0.8 + random-float 0.1
+          ifelse rand-draw < 0 [
+            set state-of-charge 0 
           ][
-            ifelse rand-draw < 0.94 [ 
-              set #end-soc 0.7 + random-float 0.1
-            ][
-              ifelse rand-draw < 0.97 [ 
-                set #end-soc 0.6 + random-float 0.1
-              ][
-                ifelse rand-draw < 0.99 [ 
-                  set #end-soc 0.5 + random-float 0.1
-                ][
-                  ifelse rand-draw < 0.995 [ 
-                    set #end-soc 0.4 + random-float 0.1
-                  ][
-                    set #end-soc 0.3 + random-float 0.1
-       ]]]]]]][
-        set #end-soc 1
-      ]
-      set first-morning-charge? true
+            set state-of-charge rand-draw
+          ]
+        ] 
+        set first-morning-charge? true
       
-      set current-charger (one-of item 0 [chargers-by-type] of current-taz)
-      set time-until-end-charge (#end-soc - state-of-charge) * battery-capacity / charge-rate-of current-charger
-      set time-until-depart departure-time - next-regulation-time  ;; this is the time-until-depart when the next V2G happens      
-      home-V2G-scheduler
+        set current-charger (one-of item 0 [chargers-by-type] of current-taz)
+        set end-home-soc end-soc-dist
+        set time-until-depart departure-time - next-regulation-time  ;; this is the time-until-depart when the next V2G happens      
+        home-V2G-scheduler      
+      ]
     ][   ;; not at home -- do not track for V2G.  Schedule first departure.
       set state "not-charging"
       set current-charger nobody
 
-      ifelse is-bev? [
-        let rand-draw random-float 1
-        ifelse rand-draw < 0.63 [
-          set state-of-charge 0.9 + random-float 0.1
-        ][
-        ifelse rand-draw < 0.68 [ 
-          set state-of-charge 0.8 + random-float 0.1
-        ][
-        ifelse rand-draw < 0.94 [ 
-          set state-of-charge 0.7 + random-float 0.1
-        ][
-        ifelse rand-draw < 0.97 [ 
-          set state-of-charge 0.6 + random-float 0.1
-        ][
-        ifelse rand-draw < 0.99 [ 
-          set state-of-charge 0.5 + random-float 0.1
-        ][
-        ifelse rand-draw < 0.995 [ 
-          set state-of-charge 0.4 + random-float 0.1
-        ][
-        set state-of-charge 0.3 + random-float 0.1
-        ]]]]]]][
-      set state-of-charge 1
-        ]
+      set state-of-charge end-soc-dist
       itinerary-event-scheduler
     ]
   ]
@@ -486,14 +446,19 @@ to setup-freq-reg
     file-open freq-reg-input-file
     
     ask regulation-aggregators [  ;; is this the right way to set reg-time and reg-demand as a reg-agg-own?
+      set reg-time n-values 1 [file-read]
+      set reg-demand n-values 1 [file-read]
       while [file-at-end? = false] [
-        set reg-time n-values 1 [file-read]
-        set reg-demand n-values 1 [file-read] 
-      
+        set reg-time lput file-read reg-time
+        set reg-demand lput file-read reg-demand
+;        print (word "reg-time: " reg-time)
       ]
     ]
   ][ error (word "Input file '" freq-reg-input-file "' not found!")  ]
   file-close
+  
+  print (word "reg-time: " [reg-time] of one-of regulation-aggregators)
+  print (word "reg-demand: " [reg-demand] of one-of regulation-aggregators)
   
   ask regulation-aggregators [
     ;set available-power 0

@@ -244,13 +244,7 @@ for(evse.i in evses){
 ## trips as barplot
 #####################################################################
 
-# note we use the inputs from the "map-optim" directory which were based on 
-# the itinerary driver-schedule-pen4-rep1-20130129
-
-pev.penetration <- 0.04
-replicate <- 1
 step.size <- 5/60
-pev.pen.char <- roundC(pev.penetration,3)
 
 disttime <- read.csv(file=paste(path.to.geatm,'taz-dist-time.csv',sep=''))[,1:4]
 names(disttime) <- c('from','to','miles','time')
@@ -289,9 +283,10 @@ ani.tours <- function(){
 }
 
 for(evse.i in evses){
-  tr <- read.csv(paste(path.to.ani,"itin-barplot/trip-out-",evse.i,".csv",sep=''))
-  pain <- subset(read.csv(paste(path.to.ani,"itin-barplot/pain-out-",evse.i,".csv",sep='')),pain.type=="delay")
-  ch <- read.csv(paste(path.to.ani,"itin-barplot/charging-out-",evse.i,".csv",sep=''))
+  tazs <- read.csv(paste(path.to.pevi.outputs,"tazs-out-",evse.i,".csv",sep=''))
+  tr <- read.csv(paste(path.to.pevi.outputs,"trip-out-",evse.i,".csv",sep=''))
+  pain <- subset(read.csv(paste(path.to.pevi.outputs,"pain-out-",evse.i,".csv",sep='')),pain.type=="delay")
+  ch <- read.csv(paste(path.to.pevi.outputs,"charging-out-",evse.i,".csv",sep=''))
   max.t <- max(ch$time + ch$duration)
   tr <- tr[,c('driver','origin','destination','time','vehicle.type')]
   names(tr) <- c('driver','from','to','depart','type')
@@ -327,17 +322,17 @@ for(evse.i in evses){
     })
   }
 
-  if(!file.exists(paste(path.to.ani,"itin-barplot/locs-",evse.i,".Rdata",sep=''))){
+  if(!file.exists(paste(path.to.pevi.outputs,"locs-",evse.i,".Rdata",sep=''))){
     locs <- list()
     for(t in seq(0,max.t,by=step.size)){
       locs[[as.character(t)]] <- location(t)
     }
-    save(locs,file=paste(path.to.ani,"itin-barplot/locs-",evse.i,".Rdata",sep=''))
+    save(locs,file=paste(path.to.pevi.outputs,"locs-",evse.i,".Rdata",sep=''))
   }else{
-    load(paste(path.to.ani,"itin-barplot/locs-",evse.i,".Rdata",sep=''))
+    load(paste(path.to.pevi.outputs,"locs-",evse.i,".Rdata",sep=''))
   }
 
-  ani.options(ffmpeg="/usr/local/bin/ffmpeg",outdir=paste(path.to.ani,"itin-barplot/ani",sep=''))
+  ani.options(ffmpeg="/usr/local/bin/ffmpeg",outdir=paste(path.to.ani,"ani-",ani.code,sep=''))
   saveVideo({
     par(mar = c(3, 3, 1, 0.5), mgp = c(2, 0.5, 0), tcl = -0.3, cex.axis = 0.8, cex.lab = 0.8, 
           cex.main = 1)

@@ -1,10 +1,10 @@
 library(colinmisc)
 Sys.setenv(NOAWT=1)
-load.libraries(c('ggplot2','yaml','stringr','RNetLogo','maptools','reshape','colorRamps'))
+load.libraries(c('ggplot2','yaml','stringr','RNetLogo','maptools','reshape','colorRamps','caTools'))
 
 #base.path <- '/Users/wave/Dropbox/HSU/'
-#base.path <- '/Users/critter/Dropbox/serc/pev-colin/'
-base.path <- '/Users/sheppardc/Dropbox/serc/pev-colin/'
+base.path <- '/Users/critter/Dropbox/serc/pev-colin/'
+#base.path <- '/Users/sheppardc/Dropbox/serc/pev-colin/'
 #base.path <- '/Users/Raskolnikovbot3001/Dropbox/'
 
 path.to.pevi <- paste(base.path,'pevi/',sep='')
@@ -23,8 +23,6 @@ names(agg.taz@data) <- c("SP_ID",taz.shp.fieldnames)
 dist <- read.csv(file=paste(path.to.geatm,'taz-dist-time.csv',sep=''))
 names(dist)[1] <- "from"
 
-naming <- yaml.load(readChar(paste(path.to.inputs,'../naming.yaml',sep=''),file.info(paste(path.to.inputs,'../naming.yaml',sep=''))$size))
-
 #optim.code <- 'linked-min-cost-constrained-by-frac-stranded-50-50'
 #optim.code <- 'linked-min-cost-constrained-by-frac-stranded-75-25'
 #optim.code <- 'linked-min-cost-constrained-by-frac-stranded-25-75'
@@ -34,6 +32,9 @@ optim.code <- 'linked2-50-50'
 #optim.code <- 'thresh-2-linked-min-cost-constrained-by-frac-stranded-50-50'
 
 optim.codes <- c('linked2-50-50','linked2-battery-1.25','linked2-battery-1.5','linked2-battery-2.0','linked2-cost-1.5','linked2-cost-2.0','linked2-type','linked2-base-fixed')
+
+path.to.inputs <- paste(base.path,'pev-shared/data/inputs/buildout/',optim.codes[1],'-seed1/',sep='')
+naming <- yaml.load(readChar(paste(path.to.inputs,'../naming.yaml',sep=''),file.info(paste(path.to.inputs,'../naming.yaml',sep=''))$size))
 
 if(exists('compare'))rm('compare')
 for(optim.code in optim.codes){
@@ -159,6 +160,11 @@ for(optim.code in optim.codes){
 }
 write.csv(compare,file=paste(path.to.outputs.base,'/../analysis/compare-optim-scenarios.csv',sep=''))
 
+# Load data already compiled
+path.to.outputs.base <- paste(base.path,'pev-shared/data/outputs/sensitivity/',optim.codes[1],sep='')
+compare <- read.csv(file=paste(path.to.outputs.base,'/../analysis/compare-optim-scenarios.csv',sep=''))
+
+
 # Plotting Comparisons
 
 compare$level <- factor(compare$level)
@@ -170,7 +176,31 @@ for(name.i in names(naming$`optim-code`)){
   compare$scenario.order[compare$scenario==name.i] <- naming$`optim-code`[[name.i]][[2]]
 }
 compare$scenario.named <- reorder(factor(compare$scenario.named),compare$scenario.order)
+for(name.i in names(naming$tazs)){
+  compare$name.order[compare$name==name.i] <- naming$tazs[[name.i]][[2]]
+}
+compare$name <- reorder(factor(compare$name),-compare$name.order)
 
 # Summary of total L2/L3 chargers in 2% by scenario
 ggplot(ddply(subset(compare,pen==.02),.(scenario.named,level),summarise,num.chargers=sum(mean)),aes(x=scenario.named,y=num.chargers,fill=level))+geom_bar(stat="identity",position="dodge")
 
+# Compare spatial distributions
+scen.combs <- combs(as.character(unique(compare$scenario)),2)
+
+pdf(file=paste(path.to.outputs.base,'/../analysis/compare-tazs.pdf',sep=''),width=8,height=11)
+for(scen.i in 1:nrow(scen.combs)){
+  scen.a.code <- scen.combs[scen.i,1]
+  scen.b.code <- scen.combs[scen.i,2]
+  scen.a.name <- naming$`optim-code`[[scen.a.code]][[1]]
+  scen.b.name <- naming$`optim-code`[[scen.b.code]][[1]]
+  scen.a <- subset(compare,scenario==scen.a.code & pen==0.02)
+  scen.b <- subset(compare,scenario==scen.b.code & pen==0.02)
+
+  scen.a$b.named <- scen.b$scenario.named
+  scen.a$diff <- scen.b$mean - scen.a$mean
+  scen.a$diff.rank <- scen.a$mean.rank - scen.b$mean.rank
+
+  p <- ggplot(scen.a,aes(x=name,y=diff,fill=level))+geom_bar(position="dodge",stat='identity')+coord_flip()+labs(title=paste("(",scen.b.name,") - (",scen.a.name,")",sep=''),y="Difference in Chargers",x="TAZ")
+  print(p)
+}
+dev.off()

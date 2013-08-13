@@ -32,7 +32,7 @@ if(interactive()){
 opts <- data.frame(args$options,stringsAsFactors=F)
 infile <- args$args
 
-dat <- scan(file=infile,what="character",sep="\n",quiet=T)
+dat <- scan(file=infile,what="character",sep="\n",quiet=T,blank.lines.skip=F)
 log.rows <- grep(";;;LOG",dat)
 dat[log.rows] <- pp(";;;",dat[log.rows])
 

@@ -3,9 +3,9 @@ options(java.parameters="-Xmx2048m")
 library(colinmisc)
 load.libraries(c('ggplot2','yaml','RNetLogo','plyr','reshape','stringr'))
 
-base.path <- '/Users/critter/Dropbox/serc/pev-colin/'
+#base.path <- '/Users/critter/Dropbox/serc/pev-colin/'
 #base.path <- '/Users/sheppardc/Dropbox/serc/pev-colin/'
-#base.path <- '/Users/Raskolnikovbot3001/Dropbox/'
+base.path <- '/Users/Raskolnikovbot3001/Dropbox/serc/'
 
 exp.name <- commandArgs(trailingOnly=T)[1]
 #exp.name <- "linked-min-cost-constrained-by-frac-stranded-50-50"
@@ -52,6 +52,7 @@ for(results.i in 1:nrow(results)){
     cat(paste(results.i,""))
     save(results,file=paste(path.to.inputs,'results.Rdata',sep=''))
   }
+  NLCommand('profiler:start')
   NLCommand('clear-all-and-initialize')
   NLCommand(paste('set parameter-file "',path.to.inputs,'params.txt"',sep=''))
   NLCommand(paste('set model-directory "',path.to.pevi,'netlogo/"',sep=''))
@@ -68,6 +69,8 @@ for(results.i in 1:nrow(results)){
   NLCommand('setup')
   NLCommand('dynamic-scheduler:go-until schedule 500')
   results[results.i,names(reporters)] <- tryCatch(NLDoReport(1,"",reporter = paste("(sentence",paste(reporters,collapse=' '),")"),as.data.frame=T,df.col.names=names(reporters)),error=function(e){ NA })
+  NLCommand('profiler:stop')
+  NLCommand('print profiler:report')
 }
 
 for(res in names(reporters)){

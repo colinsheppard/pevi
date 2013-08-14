@@ -80,6 +80,7 @@ drivers-own [
   max-trip-distance
   max-dwell-time
   current-itin-row          ; index of current location in the itinerary (referring to next trip or current trip if traveling)
+  current-od-index
 
 ;; CONVENIENCE VARIABLES
   journey-distance
@@ -247,7 +248,7 @@ end
 ;;;;;;;;;;;;;;;;;;;;
 to-report need-to-charge [calling-event]
   set charging-on-a-whim? false
-  set trip-distance item my-od-index od-dist
+  set trip-distance item current-od-index od-dist
   set time-until-depart departure-time - ticks
   set departure-time item current-itin-row itin-depart
   ifelse is-bev? [
@@ -330,7 +331,7 @@ to seek-charger
   ]
   let #taz-list n-values 0 [?]
   ifelse willing-to-roam? [
-    set #taz-list remove-duplicates (sentence current-taz destination-taz [neighbor-tazs] of current-taz item my-od-index od-enroute)
+    set #taz-list remove-duplicates (sentence current-taz destination-taz [neighbor-tazs] of current-taz item current-od-index od-enroute)
   ][  
     set #taz-list (sentence current-taz)
   ]
@@ -739,7 +740,7 @@ end
 ;; BREAK UP TRIP
 ;;;;;;;;;;;;;;;;;;;;
 to break-up-trip
-  let #cand-taz-list (remove current-taz (remove destination-taz (item my-od-index od-enroute)))
+  let #cand-taz-list (remove current-taz (remove destination-taz (item current-od-index od-enroute)))
   let #this-taz 0
   let #max-score 0
   let #max-taz 0
@@ -834,7 +835,7 @@ end
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 to travel-time-event-scheduler
   set state "traveling"
-  set trip-time item my-od-index od-time
+  set trip-time item current-od-index od-time
   time:schedule-event self task arrive (ticks + trip-time)
 end
 
@@ -904,13 +905,14 @@ to update-itinerary
     set current-itin-row current-itin-row + 1
     set current-taz taz item current-itin-row itin-from
     set destination-taz taz item current-itin-row itin-to
+    update-od-index
     ifelse ((item current-itin-row itin-depart) < ticks)[     
       change-depart-time ticks
     ][
       set departure-time item current-itin-row itin-depart
     ] 
-    set trip-distance item my-od-index od-dist
-    set trip-time item my-od-index od-time
+    set trip-distance item current-od-index od-dist
+    set trip-time item current-od-index od-time
   ][
     set current-taz destination-taz  ;; ac 12.20
     set itin-complete? true
@@ -952,8 +954,8 @@ to-report od-index [destination source]
   report ((destination - 1) * n-tazs + source - 1)
 end
 
-to-report my-od-index
-  report (([id] of current-taz - 1) * n-tazs + [id] of destination-taz - 1)
+to update-od-index
+  set current-od-index (([id] of current-taz - 1) * n-tazs + [id] of destination-taz - 1)
 end
 
 to-report driver-soc [the-driver]
@@ -1159,7 +1161,7 @@ SWITCH
 359
 log-seek-charger
 log-seek-charger
-0
+1
 1
 -1000
 
@@ -1203,7 +1205,7 @@ SWITCH
 400
 log-seek-charger-result
 log-seek-charger-result
-0
+1
 1
 -1000
 

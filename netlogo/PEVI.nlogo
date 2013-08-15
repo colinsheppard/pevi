@@ -510,7 +510,7 @@ to charge-time-event-scheduler
   ][
     set full-charge-time-need (1 - state-of-charge) * battery-capacity / charge-rate-of current-charger
   ]
-  set time-until-end-charge (calc-time-until-end-charge-with-logging full-charge-time-need 
+  set time-until-end-charge (calc-time-until-end-charge full-charge-time-need 
                                                     trip-charge-time-need 
                                                     journey-charge-time-need 
                                                     time-until-depart 

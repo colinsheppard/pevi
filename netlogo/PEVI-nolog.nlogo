@@ -428,8 +428,8 @@ to seek-charger
     ]
   ]
   ifelse #min-taz = -99 [
-    log-data "seek-charger-result" (sentence ticks seek-charger-index id -1 "" -1 -1)  
-    log-data "pain" (sentence ticks id [id] of current-taz [name] of this-vehicle-type "denial" (num-denials + 1) state-of-charge)
+;;;    log-data "seek-charger-result" (sentence ticks seek-charger-index id -1 "" -1 -1)  ;;;LOG
+;;;    log-data "pain" (sentence ticks id [id] of current-taz [name] of this-vehicle-type "denial" (num-denials + 1) state-of-charge) ;;;LOG
     set num-denials (num-denials + 1)
     wait-time-event-scheduler
   ][

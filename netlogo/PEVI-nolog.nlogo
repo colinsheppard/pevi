@@ -179,6 +179,21 @@ to clear-all-and-initialize
   create-turtles 1 [ setxy 0 0 set color black] ;This invisible turtle makes sure we start at taz 1 not taz 0
 end
 
+;;;;;;;;;;;;;;;;;;
+;; RUN & PROFILE
+;;;;;;;;;;;;;;;;;;
+to run-with-profiler
+  print "Profiler activated"
+  profiler:start
+  setup-and-fix-seed
+  go-until
+  profiler:stop
+  print profiler:report
+  profiler:reset
+  ;Stuff
+end
+
+
 ;;;;;;;;;;;;;;;;;;;;
 ;; SETUP 
 ;;;;;;;;;;;;;;;;;;;;
@@ -541,7 +556,7 @@ to charge-time-event-scheduler
   set time-until-end-charge (next-event-scheduled-at - ticks)
 end
 
-;;;to-report calc-time-until-end-charge-with-logging [#full-charge-time-need #trip-charge-time-need #journey-charge-time-need #time-until-depart #charger-in-origin-or-destination #this-charger-type] 
+;;;to-report calc-time-until-end-charge-with-logging [#full-charge-time-need #trip-charge-time-need #journey-charge-time-need #time-until-depart #charger-in-origin-or-destination #this-charger-type] ;;;LOG
 ;;;  ifelse #full-charge-time-need <= #trip-charge-time-need [  ;; if sufficent time to charge to full ;;;LOG
 ;;;    log-data "charge-limiting-factor" (sentence ticks id [name] of this-vehicle-type state-of-charge "full-charge-less-than-trip-need" #full-charge-time-need #trip-charge-time-need #journey-charge-time-need #time-until-depart #charger-in-origin-or-destination [level] of #this-charger-type) ;;;LOG
 ;;;    report #full-charge-time-need ;;;LOG
@@ -1312,6 +1327,23 @@ log-summary
 1
 1
 -1000
+
+BUTTON
+12
+176
+151
+209
+run-with-profiler
+run-with-profiler
+NIL
+1
+T
+OBSERVER
+NIL
+NIL
+NIL
+NIL
+1
 
 @#$#@#$#@
 ## ## WHAT IS IT?

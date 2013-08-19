@@ -189,6 +189,7 @@ to run-with-profiler
   go-until
   profiler:stop
   print profiler:report
+  profiler:reset
   ;Stuff
 end
 

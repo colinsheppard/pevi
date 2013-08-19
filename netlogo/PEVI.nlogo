@@ -179,6 +179,20 @@ to clear-all-and-initialize
   create-turtles 1 [ setxy 0 0 set color black] ;This invisible turtle makes sure we start at taz 1 not taz 0
 end
 
+;;;;;;;;;;;;;;;;;;
+;; RUN & PROFILE
+;;;;;;;;;;;;;;;;;;
+to run-with-profiler
+  print "Profiler activated"
+  profiler:start
+  setup-and-fix-seed
+  go-until
+  profiler:stop
+  print profiler:report
+  ;Stuff
+end
+
+
 ;;;;;;;;;;;;;;;;;;;;
 ;; SETUP 
 ;;;;;;;;;;;;;;;;;;;;
@@ -1312,6 +1326,23 @@ log-summary
 1
 1
 -1000
+
+BUTTON
+12
+176
+151
+209
+run-with-profiler
+run-with-profiler
+NIL
+1
+T
+OBSERVER
+NIL
+NIL
+NIL
+NIL
+1
 
 @#$#@#$#@
 ## ## WHAT IS IT?

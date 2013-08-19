@@ -6,7 +6,7 @@
 ##############################################################################################################################################
 # BOILERPLATE LIBRARY SETUP
 if(length(grep("colinmisc",installed.packages()))==0){
-  if(length(grep("devtools",installed.packages()))==0)install.packages('devtools')
+  if(length(grep("devtools",installed.packages()))==0)install.packages('devtools',repos='http://cran.cnr.Berkeley.edu')
   library(devtools)
   install_github('colinmisc','colinsheppard')
 }

@@ -14,6 +14,8 @@ globals [
   n-tazs
   n-charger-types
   
+  batch-setup?
+  
 ;; FILE PATHS
   model-directory
   parameter-file
@@ -154,6 +156,7 @@ vehicle-types-own[
 
 to setup-from-gui
     clear-all-and-initialize
+    set batch-setup? false
     if parameter-file = 0 [ set parameter-file "params.txt" ]
     if model-directory = 0 [ set model-directory "./" ]
     read-parameter-file
@@ -253,7 +256,16 @@ end
 to setup-in-batch-mode
   ifelse count turtles = 0 [
     setup-from-gui][
-    print "Already got turtles"]
+    print "Already got turtles"
+    set batch-setup? true
+    ask chargers [
+      set current-driver nobody
+      set energy-delivered 0
+      set num-sessions 0
+    ]
+    initialize-drivers
+    ]
+    reset-ticks
 end
 
 to go
@@ -665,7 +677,7 @@ to change-depart-time-row [row-num]
 end
 
 to add-trip-to-itinerary [new-destination-taz]
-  ;print (word precision ticks 3 " " self " new-taz: " new-destination-taz " for row: " current-itin-row " itin-depart: " itin-depart " itin-from: " itin-from " itin-to: " itin-to)
+  print (word precision ticks 3 " " self " new-taz: " new-destination-taz " for row: " current-itin-row " itin-depart: " itin-depart " itin-from: " itin-from " itin-to: " itin-to)
   
   ; start from the end and work backwards to the current-itin-row
   let last-row (length itin-depart - 1)
@@ -1309,7 +1321,7 @@ log-taz-time-interval
 log-taz-time-interval
 0
 60
-5
+55
 1
 1
 minutes
@@ -1333,7 +1345,7 @@ SWITCH
 180
 log-summary
 log-summary
-1
+0
 1
 -1000
 

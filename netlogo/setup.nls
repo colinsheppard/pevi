@@ -141,12 +141,6 @@ to setup-drivers
   
   setup-vehicle-types
   setup-itinerary
-
-  ; Set the master itinerary for batch setup
-  
-  ;set master-itin-from itin-from
-  ;set master-itin-to itin-to
-  ;set master-itin-depart itin-depart
   
   ; assing driver vehicles to a vehicle type
   ; first deal with drivers that must belong to certain vehicle types due to lengthy trips in their itinerary
@@ -208,21 +202,34 @@ to setup-drivers
     set this-vehicle-type one-of vehicle-types with [not is-bev?]
     set type-assignment-code 3
   ]
+  initialize-drivers
+end ; setup-drivers
+
+to initialize-drivers
   ; finally initialize driver state variables
   ask drivers [
-    set current-itin-row -1
-    update-itinerary
-    set shape "car"
-    set color green
-    set size 2
-    set is-bev? [is-bev?] of this-vehicle-type
-    set battery-capacity [battery-capacity] of this-vehicle-type
-    set hybrid-fuel-consumption [hybrid-fuel-consumption] of this-vehicle-type
-
-    let electric-fuel-consumption-mean [electric-fuel-consumption] of this-vehicle-type
-    set electric-fuel-consumption random-normal electric-fuel-consumption-mean electric-fuel-consumption-sd
-    while [abs (electric-fuel-consumption - electric-fuel-consumption-mean) > electric-fuel-consumption-range / 2][
+    
+    ifelse batch-setup? [
+      set itin-to master-itin-to
+      set itin-from master-itin-from
+      set itin-depart master-itin-depart
+      set current-itin-row -1
+      update-itinerary
+    ][
+      set current-itin-row -1
+      update-itinerary
+      set shape "car"
+      set color green
+      set size 2
+      set is-bev? [is-bev?] of this-vehicle-type
+      set battery-capacity [battery-capacity] of this-vehicle-type
+      set hybrid-fuel-consumption [hybrid-fuel-consumption] of this-vehicle-type
+  
+      let electric-fuel-consumption-mean [electric-fuel-consumption] of this-vehicle-type
       set electric-fuel-consumption random-normal electric-fuel-consumption-mean electric-fuel-consumption-sd
+      while [abs (electric-fuel-consumption - electric-fuel-consumption-mean) > electric-fuel-consumption-range / 2][
+        set electric-fuel-consumption random-normal electric-fuel-consumption-mean electric-fuel-consumption-sd
+      ]
     ]
 
     ifelse is-bev? [
@@ -261,7 +268,7 @@ to setup-drivers
     set itin-complete? false
     itinerary-event-scheduler
   ]
-end ;setup-drivers
+end ;initialize-drivers
 
 ;;;;;;;;;;;;;;;;;;;;
 ;; SETUP VEHICLE TYPES

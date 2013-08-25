@@ -72,8 +72,11 @@ drivers-own [
   current-charger           ; nobody if not charging
   
   itin-from 
+  master-itin-from          ; For batch setup
   itin-to
+  master-itin-to            ; For batch setup 
   itin-depart
+  master-itin-depart        ; For batch setup
   itin-trip-type
   itin-change-flag
   itin-delay-amount
@@ -246,6 +249,12 @@ to setup
 ;;;  reset-logfile "charge-limiting-factor" ;;;LOG
 ;;;  log-data "charge-limiting-factor" (sentence "time" "driver" "vehicle.type" "state.of.charge" "result.action" "full-charge-time-need" "trip-charge-time-need" "journey-charge-time-need" "time-until-depart" "charger-in-origin-or-destination" "this-charger-type") ;;;LOG
 end 
+
+to setup-in-batch-mode
+  ifelse count turtles = 0 [
+    setup-from-gui][
+    print "Already got turtles"]
+end
 
 to go
   time:go
@@ -729,7 +738,7 @@ end
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 to itinerary-event-scheduler
   set state "not-charging"
-  
+    ask taz 1 [if (drivers-in-taz > 0) [print drivers-in-taz]]
   time:schedule-event self task depart departure-time
 end
 
@@ -1335,6 +1344,23 @@ BUTTON
 209
 run-with-profiler
 run-with-profiler
+NIL
+1
+T
+OBSERVER
+NIL
+NIL
+NIL
+NIL
+1
+
+BUTTON
+11
+136
+152
+169
+NIL
+setup-in-batch-mode
 NIL
 1
 T

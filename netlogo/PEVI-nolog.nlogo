@@ -14,6 +14,8 @@ globals [
   n-tazs
   n-charger-types
   
+  batch-setup?
+  
 ;; FILE PATHS
   model-directory
   parameter-file
@@ -154,6 +156,7 @@ vehicle-types-own[
 
 to setup-from-gui
     clear-all-and-initialize
+    set batch-setup? false
     if parameter-file = 0 [ set parameter-file "params.txt" ]
     if model-directory = 0 [ set model-directory "./" ]
     read-parameter-file
@@ -253,7 +256,16 @@ end
 to setup-in-batch-mode
   ifelse count turtles = 0 [
     setup-from-gui][
-    print "Already got turtles"]
+    print "Already got turtles"
+    set batch-setup? true
+    ask chargers [
+      set current-driver nobody
+      set energy-delivered 0
+      set num-sessions 0
+    ]
+    initialize-drivers
+    ]
+    reset-ticks
 end
 
 to go
@@ -267,6 +279,33 @@ end
 ;;;  let #num-0 count drivers with [home-taz = myself] ;;;LOG
 ;;;  log-data "tazs" (sentence ticks id (count drivers with [current-taz = myself and is-bev?]) (count drivers with [current-taz = myself and not is-bev?]) #num-0 (count item 1 chargers-by-type) (count item 2 chargers-by-type) (count item 3 chargers-by-type) (#num-0 - count drivers with [current-taz = myself and current-charger = (one-of item 0 [chargers-by-type] of myself)]) (count (item 1 chargers-by-type) with [current-driver = nobody]) (count (item 2 chargers-by-type) with [current-driver = nobody]) (count (item 3 chargers-by-type) with [current-driver = nobody]) ) ;;;LOG
 ;;;end ;;;LOG
+
+to add-charger [ taz-id charger-level ]
+  create-chargers 1 [
+    set this-charger-type one-of charger-types with [level = charger-level]
+    set location taz taz-id
+    set shape "Circle 2"
+    set color red
+    set size 1
+    set current-driver nobody
+    let #level [level] of this-charger-type
+    set energy-delivered 0
+  ]
+  ask taz taz-id [
+    set chargers-by-type replace-item charger-level chargers-by-type chargers with [([level] of this-charger-type = charger-level) and (location = myself)]
+    set n-levels replace-item charger-level n-levels (item charger-level n-levels + 1)
+  ]
+end
+
+to remove-charger [taz-id charger-level]
+  ifelse count chargers with [location = taz taz-id and this-charger-type = one-of charger-types with [level = charger-level]] > 0 [
+    ask one-of chargers with [location = taz taz-id and this-charger-type = one-of charger-types with [level = charger-level]] [die]
+    ask taz taz-id [
+      set chargers-by-type replace-item charger-level chargers-by-type chargers with [([level] of this-charger-type = charger-level) and (location = myself)]
+      set n-levels replace-item charger-level n-levels (item charger-level n-levels - 1)
+  ]
+  ][print (sentence "TAZ" taz-id "doesn't have a level" charger-level "charger.")] 
+end
 ;;;;;;;;;;;;;;;;;;;;
 ;; NEED TO CHARGE
 ;;;;;;;;;;;;;;;;;;;;
@@ -665,7 +704,7 @@ to change-depart-time-row [row-num]
 end
 
 to add-trip-to-itinerary [new-destination-taz]
-  ;print (word precision ticks 3 " " self " new-taz: " new-destination-taz " for row: " current-itin-row " itin-depart: " itin-depart " itin-from: " itin-from " itin-to: " itin-to)
+  print (word precision ticks 3 " " self " new-taz: " new-destination-taz " for row: " current-itin-row " itin-depart: " itin-depart " itin-from: " itin-from " itin-to: " itin-to)
   
   ; start from the end and work backwards to the current-itin-row
   let last-row (length itin-depart - 1)
@@ -1309,7 +1348,7 @@ log-taz-time-interval
 log-taz-time-interval
 0
 60
-5
+55
 1
 1
 minutes
@@ -1333,7 +1372,7 @@ SWITCH
 180
 log-summary
 log-summary
-1
+0
 1
 -1000
 

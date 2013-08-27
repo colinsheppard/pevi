@@ -297,11 +297,14 @@ to add-charger [ taz-id charger-level ]
   ]
 end
 
-to remove-charger [charger-level taz-id]
-  ; n-levels must be changed
-  ; chargers-by-type must be recreated using the code in setup-chargers (at the end of the foreach sort tazs loop)
-  ; Charger agent must be created
-  
+to remove-charger [taz-id charger-level]
+  ifelse count chargers with [location = taz taz-id and this-charger-type = one-of charger-types with [level = charger-level]] > 0 [
+    ask one-of chargers with [location = taz taz-id and this-charger-type = one-of charger-types with [level = charger-level]] [die]
+    ask taz taz-id [
+      set chargers-by-type replace-item charger-level chargers-by-type chargers with [([level] of this-charger-type = charger-level) and (location = myself)]
+      set n-levels replace-item charger-level n-levels (item charger-level n-levels - 1)
+  ]
+  ][print (sentence "TAZ" taz-id "doesn't have a level" charger-level "charger.")] 
 end
 ;;;;;;;;;;;;;;;;;;;;
 ;; NEED TO CHARGE

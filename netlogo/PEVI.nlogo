@@ -279,6 +279,30 @@ to log-taz-data ;;;LOG
   let #num-0 count drivers with [home-taz = myself] ;;;LOG
   log-data "tazs" (sentence ticks id (count drivers with [current-taz = myself and is-bev?]) (count drivers with [current-taz = myself and not is-bev?]) #num-0 (count item 1 chargers-by-type) (count item 2 chargers-by-type) (count item 3 chargers-by-type) (#num-0 - count drivers with [current-taz = myself and current-charger = (one-of item 0 [chargers-by-type] of myself)]) (count (item 1 chargers-by-type) with [current-driver = nobody]) (count (item 2 chargers-by-type) with [current-driver = nobody]) (count (item 3 chargers-by-type) with [current-driver = nobody]) ) ;;;LOG
 end ;;;LOG
+
+to add-charger [ taz-id charger-level ]
+  create-chargers 1 [
+    set this-charger-type one-of charger-types with [level = charger-level]
+    set location taz taz-id
+    set shape "Circle 2"
+    set color red
+    set size 1
+    set current-driver nobody
+    let #level [level] of this-charger-type
+    set energy-delivered 0
+  ]
+  ask taz taz-id [
+    set chargers-by-type replace-item charger-level chargers-by-type chargers with [([level] of this-charger-type = charger-level) and (location = myself)]
+    set n-levels replace-item charger-level n-levels (item charger-level n-levels + 1)
+  ]
+end
+
+to remove-charger [charger-level taz-id]
+  ; n-levels must be changed
+  ; chargers-by-type must be recreated using the code in setup-chargers (at the end of the foreach sort tazs loop)
+  ; Charger agent must be created
+  
+end
 ;;;;;;;;;;;;;;;;;;;;
 ;; NEED TO CHARGE
 ;;;;;;;;;;;;;;;;;;;;

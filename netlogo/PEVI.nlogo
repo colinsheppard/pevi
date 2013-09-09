@@ -89,6 +89,7 @@ drivers-own [
 
 ;; CONVENIENCE VARIABLES
   journey-distance
+  master-journey-distance
   trip-distance
   remaining-range
   departure-time
@@ -289,6 +290,8 @@ to setup-in-batch-mode
     log-data "trip" (sentence "time" "driver" "vehicle.type" "origin" "destination" "distance" "scheduled" "begin.soc" "end.soc" "elec.used" "gas.used" "end.time") ;;;LOG
     reset-logfile "need-to-charge" ;;;LOG
     log-data "need-to-charge" (sentence "time" "driver" "vehicle.type" "soc" "trip.distance" "journey.distance" "time.until.depart" "calling.event" "remaining.range" "charging.on.a.whim?" "need.to.charge?") ;;;LOG
+    random-seed 1;
+    print random 1000
   ][
     print "Already got turtles"
     set batch-setup? true
@@ -304,7 +307,7 @@ to setup-in-batch-mode
     print random 1000
     initialize-drivers
     print random 1000
-      reset-logfile "charging" ;;;LOG
+    reset-logfile "charging" ;;;LOG
     log-data "charging" (sentence "time" "charger.id" "charger.level" "location" "driver" "vehicle.type" "duration" "energy" "begin.soc" "end.soc" "after.end.charge" "charging.on.whim" "time.until.depart") ;;;LOG
     reset-logfile "pain" ;;;LOG
     log-data "pain" (sentence "time" "driver" "location" "vehicle.type" "pain.type" "pain.value" "state.of.charge") ;;;LOG
@@ -312,6 +315,8 @@ to setup-in-batch-mode
     log-data "trip" (sentence "time" "driver" "vehicle.type" "origin" "destination" "distance" "scheduled" "begin.soc" "end.soc" "elec.used" "gas.used" "end.time") ;;;LOG
     reset-logfile "need-to-charge" ;;;LOG
     log-data "need-to-charge" (sentence "time" "driver" "vehicle.type" "soc" "trip.distance" "journey.distance" "time.until.depart" "calling.event" "remaining.range" "charging.on.a.whim?" "need.to.charge?") ;;;LOG
+    random-seed 1;
+    print random 1000
   ]
 end
 
@@ -1786,7 +1791,7 @@ Polygon -7500403 true true 270 75 225 30 30 225 75 270
 Polygon -7500403 true true 30 75 75 30 270 225 225 270
 
 @#$#@#$#@
-NetLogo 5.0.1
+NetLogo 5.0
 @#$#@#$#@
 @#$#@#$#@
 @#$#@#$#@

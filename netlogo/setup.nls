@@ -214,6 +214,10 @@ to initialize-drivers
       set itin-from master-itin-from
       set itin-depart master-itin-depart
       set current-itin-row -1
+      set full-charge-time-need 0
+      set time-until-end-charge 0
+      set gasoline-used 0
+      set journey-distance master-journey-distance
       update-itinerary
     ][
       set current-itin-row -1
@@ -351,6 +355,7 @@ to setup-itinerary
         set master-itin-from itin-from ; set master variables for batch setup
         set master-itin-to itin-to
         set master-itin-depart itin-depart
+        set master-journey-distance journey-distance
       ] ; end create-drivers
     ] ; end while file-at-end
   ] ; end ifelse

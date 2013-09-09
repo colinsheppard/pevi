@@ -192,7 +192,6 @@ to clear-all-and-initialize
   time:clear-schedule
   create-turtles 1 [ setxy 0 0 set color black] ;This invisible turtle makes sure we start at taz 1 not taz 0
   reset-ticks
-  set seed-list (sentence random 9999999999 random 9999999999 random 9999999999)
 end
 
 ;;;;;;;;;;;;;;;;;;

@@ -275,7 +275,9 @@ to setup-in-batch-mode
     setup-drivers
     random-seed 1;
     print "initialize-drivers"
+    print random 1000
     initialize-drivers
+    print random 1000
     print "setup-chargers"
     setup-charger-types
     setup-chargers
@@ -299,7 +301,9 @@ to setup-in-batch-mode
     reset-ticks
     
     random-seed 1;
+    print random 1000
     initialize-drivers
+    print random 1000
       reset-logfile "charging" ;;;LOG
     log-data "charging" (sentence "time" "charger.id" "charger.level" "location" "driver" "vehicle.type" "duration" "energy" "begin.soc" "end.soc" "after.end.charge" "charging.on.whim" "time.until.depart") ;;;LOG
     reset-logfile "pain" ;;;LOG

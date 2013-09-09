@@ -224,13 +224,13 @@ to initialize-drivers
       set is-bev? [is-bev?] of this-vehicle-type
       set battery-capacity [battery-capacity] of this-vehicle-type
       set hybrid-fuel-consumption [hybrid-fuel-consumption] of this-vehicle-type
-  
+    ]  
       let electric-fuel-consumption-mean [electric-fuel-consumption] of this-vehicle-type
       set electric-fuel-consumption random-normal electric-fuel-consumption-mean electric-fuel-consumption-sd
       while [abs (electric-fuel-consumption - electric-fuel-consumption-mean) > electric-fuel-consumption-range / 2][
         set electric-fuel-consumption random-normal electric-fuel-consumption-mean electric-fuel-consumption-sd
       ]
-    ]
+    ;]
 
     ifelse is-bev? [
     let rand-draw random-float 1

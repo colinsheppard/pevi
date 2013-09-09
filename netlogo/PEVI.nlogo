@@ -180,9 +180,10 @@ end
 
 to clear-all-and-initialize
   ;print "clear all"
-  __clear-all-and-reset-ticks
+  clear-all
   time:clear-schedule
   create-turtles 1 [ setxy 0 0 set color black] ;This invisible turtle makes sure we start at taz 1 not taz 0
+  reset-ticks
 end
 
 ;;;;;;;;;;;;;;;;;;
@@ -254,8 +255,12 @@ to setup
 end 
 
 to setup-in-batch-mode
+  random-seed 1
   ifelse count turtles = 0 [
+    print random 100
+    set batch-setup? false
     setup-from-gui][
+    print random 100
     print "Already got turtles"
     set batch-setup? true
     ask chargers [
@@ -263,9 +268,10 @@ to setup-in-batch-mode
       set energy-delivered 0
       set num-sessions 0
     ]
+    time:clear-schedule
+    reset-ticks
     initialize-drivers
     ]
-    reset-ticks
 end
 
 to go
@@ -704,7 +710,7 @@ to change-depart-time-row [row-num]
 end
 
 to add-trip-to-itinerary [new-destination-taz]
-  print (word precision ticks 3 " " self " new-taz: " new-destination-taz " for row: " current-itin-row " itin-depart: " itin-depart " itin-from: " itin-from " itin-to: " itin-to)
+  ; print (word precision ticks 3 " " self " new-taz: " new-destination-taz " for row: " current-itin-row " itin-depart: " itin-depart " itin-from: " itin-from " itin-to: " itin-to)
   
   ; start from the end and work backwards to the current-itin-row
   let last-row (length itin-depart - 1)
@@ -1361,7 +1367,7 @@ SWITCH
 94
 log-trip
 log-trip
-1
+0
 1
 -1000
 
@@ -1372,7 +1378,7 @@ SWITCH
 180
 log-summary
 log-summary
-0
+1
 1
 -1000
 

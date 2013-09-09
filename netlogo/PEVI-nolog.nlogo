@@ -255,6 +255,7 @@ end
 
 to setup-in-batch-mode
   ifelse count turtles = 0 [
+    set batch-setup? false
     setup-from-gui][
     print "Already got turtles"
     set batch-setup? true
@@ -263,9 +264,10 @@ to setup-in-batch-mode
       set energy-delivered 0
       set num-sessions 0
     ]
+    time:clear-schedule
+    reset-ticks
     initialize-drivers
     ]
-    reset-ticks
 end
 
 to go
@@ -704,7 +706,7 @@ to change-depart-time-row [row-num]
 end
 
 to add-trip-to-itinerary [new-destination-taz]
-  print (word precision ticks 3 " " self " new-taz: " new-destination-taz " for row: " current-itin-row " itin-depart: " itin-depart " itin-from: " itin-from " itin-to: " itin-to)
+  ; print (word precision ticks 3 " " self " new-taz: " new-destination-taz " for row: " current-itin-row " itin-depart: " itin-depart " itin-from: " itin-from " itin-to: " itin-to)
   
   ; start from the end and work backwards to the current-itin-row
   let last-row (length itin-depart - 1)
@@ -1372,7 +1374,7 @@ SWITCH
 180
 log-summary
 log-summary
-0
+1
 1
 -1000
 

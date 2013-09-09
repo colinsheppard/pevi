@@ -202,12 +202,12 @@ to setup-drivers
     set this-vehicle-type one-of vehicle-types with [not is-bev?]
     set type-assignment-code 3
   ]
-  initialize-drivers
 end ; setup-drivers
 
 to initialize-drivers
   ; finally initialize driver state variables
-  ask drivers [
+  foreach sort drivers [
+    ask ? [
     
     ifelse batch-setup? [
       set itin-to master-itin-to
@@ -267,7 +267,7 @@ to initialize-drivers
   
     set itin-complete? false
     itinerary-event-scheduler
-  ]
+  ]]
 end ;initialize-drivers
 
 ;;;;;;;;;;;;;;;;;;;;
@@ -322,8 +322,8 @@ to setup-itinerary
         set itin-depart n-values 1 [file-read]
         set home-taz taz file-read
         let itin-row 0
-        set journey-distance 0
-        set max-trip-distance (distance-from-to item itin-row itin-to item itin-row itin-from)
+        set journey-distance (distance-from-to item itin-row itin-to item itin-row itin-from)
+        set max-trip-distance journey-distance
         set max-dwell-time 0
         set this-vehicle-type nobody
         if file-at-end? = false [

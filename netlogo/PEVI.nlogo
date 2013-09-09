@@ -167,9 +167,10 @@ end
 
 to setup-and-fix-seed
     clear-all-and-initialize
-    let seed new-seed
-    print seed
-    random-seed 1 ;
+    set batch-setup? false
+    ;let seed new-seed
+    ;print seed
+    random-seed 1;
     if parameter-file = 0 [ set parameter-file "params.txt" ]
     if model-directory = 0 [ set model-directory "./" ]
     read-parameter-file
@@ -213,6 +214,8 @@ to setup
   convert-enroute-ids
   print "setup-drivers"
   setup-drivers
+  print "initialize-drivers"
+  initialize-drivers
   print "setup-chargers"
   setup-charger-types
   setup-chargers
@@ -255,12 +258,36 @@ to setup
 end 
 
 to setup-in-batch-mode
-  random-seed 1
   ifelse count turtles = 0 [
-    print random 100
+    clear-all-and-initialize
+    set small-num 1e-11
     set batch-setup? false
-    setup-from-gui][
-    print random 100
+    random-seed 1;
+    if parameter-file = 0 [ set parameter-file "params.txt" ]
+    if model-directory = 0 [ set model-directory "./" ]
+    read-parameter-file
+    print "setting up...."
+    setup-od-data
+    print "setup-tazs"
+    setup-tazs
+    convert-enroute-ids
+    print "setup-drivers"
+    setup-drivers
+    random-seed 1;
+    print "initialize-drivers"
+    initialize-drivers
+    print "setup-chargers"
+    setup-charger-types
+    setup-chargers
+    reset-logfile "charging" ;;;LOG
+    log-data "charging" (sentence "time" "charger.id" "charger.level" "location" "driver" "vehicle.type" "duration" "energy" "begin.soc" "end.soc" "after.end.charge" "charging.on.whim" "time.until.depart") ;;;LOG
+    reset-logfile "pain" ;;;LOG
+    log-data "pain" (sentence "time" "driver" "location" "vehicle.type" "pain.type" "pain.value" "state.of.charge") ;;;LOG
+    reset-logfile "trip" ;;;LOG
+    log-data "trip" (sentence "time" "driver" "vehicle.type" "origin" "destination" "distance" "scheduled" "begin.soc" "end.soc" "elec.used" "gas.used" "end.time") ;;;LOG
+    reset-logfile "need-to-charge" ;;;LOG
+    log-data "need-to-charge" (sentence "time" "driver" "vehicle.type" "soc" "trip.distance" "journey.distance" "time.until.depart" "calling.event" "remaining.range" "charging.on.a.whim?" "need.to.charge?") ;;;LOG
+  ][
     print "Already got turtles"
     set batch-setup? true
     ask chargers [
@@ -270,8 +297,18 @@ to setup-in-batch-mode
     ]
     time:clear-schedule
     reset-ticks
+    
+    random-seed 1;
     initialize-drivers
-    ]
+      reset-logfile "charging" ;;;LOG
+    log-data "charging" (sentence "time" "charger.id" "charger.level" "location" "driver" "vehicle.type" "duration" "energy" "begin.soc" "end.soc" "after.end.charge" "charging.on.whim" "time.until.depart") ;;;LOG
+    reset-logfile "pain" ;;;LOG
+    log-data "pain" (sentence "time" "driver" "location" "vehicle.type" "pain.type" "pain.value" "state.of.charge") ;;;LOG
+    reset-logfile "trip" ;;;LOG
+    log-data "trip" (sentence "time" "driver" "vehicle.type" "origin" "destination" "distance" "scheduled" "begin.soc" "end.soc" "elec.used" "gas.used" "end.time") ;;;LOG
+    reset-logfile "need-to-charge" ;;;LOG
+    log-data "need-to-charge" (sentence "time" "driver" "vehicle.type" "soc" "trip.distance" "journey.distance" "time.until.depart" "calling.event" "remaining.range" "charging.on.a.whim?" "need.to.charge?") ;;;LOG
+  ]
 end
 
 to go
@@ -1186,7 +1223,7 @@ SWITCH
 222
 log-charging
 log-charging
-1
+0
 1
 -1000
 
@@ -1208,7 +1245,7 @@ SWITCH
 313
 log-need-to-charge
 log-need-to-charge
-1
+0
 1
 -1000
 
@@ -1330,7 +1367,7 @@ SWITCH
 92
 log-pain
 log-pain
-1
+0
 1
 -1000
 
@@ -1745,7 +1782,7 @@ Polygon -7500403 true true 270 75 225 30 30 225 75 270
 Polygon -7500403 true true 30 75 75 30 270 225 225 270
 
 @#$#@#$#@
-NetLogo 5.0.4
+NetLogo 5.0.1
 @#$#@#$#@
 @#$#@#$#@
 @#$#@#$#@

@@ -206,19 +206,16 @@ end ; setup-drivers
 
 to initialize-drivers
   ; finally initialize driver state variables
-  foreach sort drivers [
-    ask ? [
-    
+  ask drivers [    
     ifelse batch-setup? [
       set itin-to master-itin-to
       set itin-from master-itin-from
       set itin-depart master-itin-depart
       set current-itin-row -1
-      set full-charge-time-need 0
-      set time-until-end-charge 0
-      set gasoline-used 0
       set journey-distance master-journey-distance
       update-itinerary
+      set state-of-charge master-state-of-charge
+      set electric-fuel-consumption master-electric-fuel-consumption
     ][
       set current-itin-row -1
       update-itinerary
@@ -228,39 +225,41 @@ to initialize-drivers
       set is-bev? [is-bev?] of this-vehicle-type
       set battery-capacity [battery-capacity] of this-vehicle-type
       set hybrid-fuel-consumption [hybrid-fuel-consumption] of this-vehicle-type
-    ]  
+      
       let electric-fuel-consumption-mean [electric-fuel-consumption] of this-vehicle-type
       set electric-fuel-consumption random-normal electric-fuel-consumption-mean electric-fuel-consumption-sd
       while [abs (electric-fuel-consumption - electric-fuel-consumption-mean) > electric-fuel-consumption-range / 2][
         set electric-fuel-consumption random-normal electric-fuel-consumption-mean electric-fuel-consumption-sd
       ]
-    ;]
+      set master-electric-fuel-consumption electric-fuel-consumption
 
-    ifelse is-bev? [
-    let rand-draw random-float 1
-    ifelse rand-draw < 0.63 [
-      set state-of-charge 0.9 + random-float 0.1
-    ][
-      ifelse rand-draw < 0.68 [ 
-        set state-of-charge 0.8 + random-float 0.1
+      ifelse is-bev? [
+      let rand-draw random-float 1
+      ifelse rand-draw < 0.63 [
+        set state-of-charge 0.9 + random-float 0.1
       ][
-        ifelse rand-draw < 0.94 [ 
-          set state-of-charge 0.7 + random-float 0.1
+        ifelse rand-draw < 0.68 [ 
+          set state-of-charge 0.8 + random-float 0.1
         ][
-          ifelse rand-draw < 0.97 [ 
-            set state-of-charge 0.6 + random-float 0.1
+          ifelse rand-draw < 0.94 [ 
+            set state-of-charge 0.7 + random-float 0.1
           ][
-            ifelse rand-draw < 0.99 [ 
-              set state-of-charge 0.5 + random-float 0.1
+            ifelse rand-draw < 0.97 [ 
+              set state-of-charge 0.6 + random-float 0.1
             ][
-              ifelse rand-draw < 0.995 [ 
-                set state-of-charge 0.4 + random-float 0.1
+              ifelse rand-draw < 0.99 [ 
+                set state-of-charge 0.5 + random-float 0.1
               ][
-                set state-of-charge 0.3 + random-float 0.1
-     ]]]]]]][
-      set state-of-charge 1
+                ifelse rand-draw < 0.995 [ 
+                  set state-of-charge 0.4 + random-float 0.1
+                ][
+                  set state-of-charge 0.3 + random-float 0.1
+      ]]]]]]][
+        set state-of-charge 1
+      ]
+      set master-state-of-charge state-of-charge
     ]
-
+    
     set state "not-charging"
     set current-charger nobody
     set energy-used 0
@@ -268,10 +267,12 @@ to initialize-drivers
     set expenses 0
     set miles-driven 0
     set num-denials 0
-  
+    set full-charge-time-need 0
+    set time-until-end-charge 0
+    set gasoline-used 0 
     set itin-complete? false
     itinerary-event-scheduler
-  ]]
+  ]
 end ;initialize-drivers
 
 ;;;;;;;;;;;;;;;;;;;;

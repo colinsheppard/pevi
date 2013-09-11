@@ -267,9 +267,10 @@ end
 to setup-in-batch-mode
   ifelse count turtles = 0 [
     clear-all-and-initialize
+    if "yes" = user-one-of "Fix random seed?" ["yes" "no"] [random-seed 1]
     set small-num 1e-11
     set batch-setup? false
-    set seed-list (sentence random 9999999999 random 9999999999 random 9999999999)
+    set seed-list (sentence random 2147483647 random 2147483647 random 2147483647)
     set seed-list-index -1
     if parameter-file = 0 [ set parameter-file "params.txt" ]
     if model-directory = 0 [ set model-directory "./" ]
@@ -1804,7 +1805,7 @@ Polygon -7500403 true true 270 75 225 30 30 225 75 270
 Polygon -7500403 true true 30 75 75 30 270 225 225 270
 
 @#$#@#$#@
-NetLogo 5.0
+NetLogo 5.0.4
 @#$#@#$#@
 @#$#@#$#@
 @#$#@#$#@

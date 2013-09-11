@@ -267,7 +267,7 @@ end
 to setup-in-batch-mode
   ifelse count turtles = 0 [
     clear-all-and-initialize
-    if "yes" = user-one-of "Fix random seed?" ["yes" "no"] [random-seed 1]
+    if fix-seed [random-seed starting-seed]
     set small-num 1e-11
     set batch-setup? false
     set seed-list (sentence random 2147483647 random 2147483647 random 2147483647)
@@ -1475,6 +1475,28 @@ NIL
 NIL
 NIL
 1
+
+INPUTBOX
+677
+193
+832
+253
+starting-seed
+1
+1
+0
+Number
+
+SWITCH
+678
+264
+787
+297
+fix-seed
+fix-seed
+0
+1
+-1000
 
 @#$#@#$#@
 ## ## WHAT IS IT?

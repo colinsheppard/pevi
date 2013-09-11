@@ -2,6 +2,9 @@ extensions [time profiler]
 __includes["setup.nls" "reporters.nls"]
 
 globals [    
+  seed-list
+  seed-list-index
+  
   od-from
   od-to
   od-dist
@@ -74,11 +77,8 @@ drivers-own [
   current-charger           ; nobody if not charging
   
   itin-from 
-  master-itin-from          ; For batch setup
   itin-to
-  master-itin-to            ; For batch setup 
   itin-depart
-  master-itin-depart        ; For batch setup
   itin-trip-type
   itin-change-flag
   itin-delay-amount
@@ -115,6 +115,13 @@ drivers-own [
 ;; CANDIDATE ADDITIONS TO MODEL DESCRIPTION
   energy-received ; a count of how much energy each driver has charged
 
+;; BATCH MODE
+  master-state-of-charge
+  master-electric-fuel-consumption
+  master-journey-distance
+  master-itin-from          
+  master-itin-to             
+  master-itin-depart        
 ]
 
 chargers-own[
@@ -167,9 +174,10 @@ end
 
 to setup-and-fix-seed
     clear-all-and-initialize
-    let seed new-seed
-    print seed
-    random-seed 1 ;
+    set batch-setup? false
+    ;let seed new-seed
+    ;print seed
+    random-seed 1;
     if parameter-file = 0 [ set parameter-file "params.txt" ]
     if model-directory = 0 [ set model-directory "./" ]
     read-parameter-file
@@ -180,9 +188,10 @@ end
 
 to clear-all-and-initialize
   ;print "clear all"
-  __clear-all-and-reset-ticks
+  clear-all
   time:clear-schedule
   create-turtles 1 [ setxy 0 0 set color black] ;This invisible turtle makes sure we start at taz 1 not taz 0
+  reset-ticks
 end
 
 ;;;;;;;;;;;;;;;;;;
@@ -212,6 +221,8 @@ to setup
   convert-enroute-ids
   print "setup-drivers"
   setup-drivers
+  print "initialize-drivers"
+  initialize-drivers
   print "setup-chargers"
   setup-charger-types
   setup-chargers
@@ -255,10 +266,44 @@ end
 
 to setup-in-batch-mode
   ifelse count turtles = 0 [
+    clear-all-and-initialize
+    if fix-seed [random-seed starting-seed]
+    set small-num 1e-11
     set batch-setup? false
-    setup-from-gui][
+    set seed-list (sentence random 2147483647 random 2147483647 random 2147483647)
+    set seed-list-index -1
+    if parameter-file = 0 [ set parameter-file "params.txt" ]
+    if model-directory = 0 [ set model-directory "./" ]
+    read-parameter-file
+    print "setting up...."
+    setup-od-data
+    print "setup-tazs"
+    setup-tazs
+    convert-enroute-ids
+    print "setup-drivers"
+    setup-drivers
+    random-seed next-seed
+    print "initialize-drivers"
+    print random 1000
+    initialize-drivers
+    print random 1000
+    print "setup-chargers"
+    setup-charger-types
+    setup-chargers
+;;;    reset-logfile "charging" ;;;LOG
+;;;    log-data "charging" (sentence "time" "charger.id" "charger.level" "location" "driver" "vehicle.type" "duration" "energy" "begin.soc" "end.soc" "after.end.charge" "charging.on.whim" "time.until.depart") ;;;LOG
+;;;    reset-logfile "pain" ;;;LOG
+;;;    log-data "pain" (sentence "time" "driver" "location" "vehicle.type" "pain.type" "pain.value" "state.of.charge") ;;;LOG
+;;;    reset-logfile "trip" ;;;LOG
+;;;    log-data "trip" (sentence "time" "driver" "vehicle.type" "origin" "destination" "distance" "scheduled" "begin.soc" "end.soc" "elec.used" "gas.used" "end.time") ;;;LOG
+;;;    reset-logfile "need-to-charge" ;;;LOG
+;;;    log-data "need-to-charge" (sentence "time" "driver" "vehicle.type" "soc" "trip.distance" "journey.distance" "time.until.depart" "calling.event" "remaining.range" "charging.on.a.whim?" "need.to.charge?") ;;;LOG
+    random-seed next-seed
+    print random 1000
+  ][
     print "Already got turtles"
     set batch-setup? true
+    set seed-list-index -1
     ask chargers [
       set current-driver nobody
       set energy-delivered 0
@@ -266,8 +311,27 @@ to setup-in-batch-mode
     ]
     time:clear-schedule
     reset-ticks
+    
+    random-seed next-seed
+    print random 1000
     initialize-drivers
-    ]
+    print random 1000
+;;;    reset-logfile "charging" ;;;LOG
+;;;    log-data "charging" (sentence "time" "charger.id" "charger.level" "location" "driver" "vehicle.type" "duration" "energy" "begin.soc" "end.soc" "after.end.charge" "charging.on.whim" "time.until.depart") ;;;LOG
+;;;    reset-logfile "pain" ;;;LOG
+;;;    log-data "pain" (sentence "time" "driver" "location" "vehicle.type" "pain.type" "pain.value" "state.of.charge") ;;;LOG
+;;;    reset-logfile "trip" ;;;LOG
+;;;    log-data "trip" (sentence "time" "driver" "vehicle.type" "origin" "destination" "distance" "scheduled" "begin.soc" "end.soc" "elec.used" "gas.used" "end.time") ;;;LOG
+;;;    reset-logfile "need-to-charge" ;;;LOG
+;;;    log-data "need-to-charge" (sentence "time" "driver" "vehicle.type" "soc" "trip.distance" "journey.distance" "time.until.depart" "calling.event" "remaining.range" "charging.on.a.whim?" "need.to.charge?") ;;;LOG
+    random-seed next-seed
+    print random 1000
+  ]
+end
+
+to-report next-seed
+  set seed-list-index seed-list-index + 1
+  report item seed-list-index seed-list
 end
 
 to go
@@ -1141,7 +1205,7 @@ go-until-time
 go-until-time
 0
 100
-30
+100
 0.5
 1
 NIL
@@ -1182,7 +1246,7 @@ SWITCH
 222
 log-charging
 log-charging
-1
+0
 1
 -1000
 
@@ -1204,7 +1268,7 @@ SWITCH
 313
 log-need-to-charge
 log-need-to-charge
-1
+0
 1
 -1000
 
@@ -1326,7 +1390,7 @@ SWITCH
 92
 log-pain
 log-pain
-1
+0
 1
 -1000
 
@@ -1363,7 +1427,7 @@ SWITCH
 94
 log-trip
 log-trip
-1
+0
 1
 -1000
 
@@ -1411,6 +1475,28 @@ NIL
 NIL
 NIL
 1
+
+INPUTBOX
+677
+193
+832
+253
+starting-seed
+1
+1
+0
+Number
+
+SWITCH
+678
+264
+787
+297
+fix-seed
+fix-seed
+0
+1
+-1000
 
 @#$#@#$#@
 ## ## WHAT IS IT?

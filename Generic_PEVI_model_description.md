@@ -86,11 +86,13 @@ In PEVI, events are principally associated with drivers.  Figure  presents a flo
 In Figure  event schedulers are depicted as attached to states on the upstream side of the process flow.  This placement is intentional and closely tied to the management of PEVI as a DES.  At any time, drivers have complete knowledge about the state of their vehicle (state of charge, fuel consumption, etc.) and their itinerary.  This means, that as drivers enter any state, they can determine the time at which they will exit that state and perform an event.  For example, when the Traveling state is entered, the driver knows where they are going (by virtue of their itinerary) and based on the global origin-destination table, they can determine when they will arrive.  The PEVI model takes advantage of this foresight and model scheduling is structured so that drivers schedule events as they enter a new state. 
 
 
-Let's test our image placement. 
+*Let's test our image placement.*
 
 ![flow chart][1]
 
-[1]: ~Dropbox/serc/pevi/model-desription-graphics/Flowchart
+[1]: ~Dropbox/serc/pevi/model-desription-graphics/Flowchart.png
+
+*Well, that failed.*
 
 ```	
 (Flow chart image here)

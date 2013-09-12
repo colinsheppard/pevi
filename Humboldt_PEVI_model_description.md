@@ -17,7 +17,7 @@ The purpose of this model is to simulate different PEV public charging infrastru
 6. Drivers begin the day with a schedule that determines all TAZs they will attempt to visit (with associated departure times).
 7. Charging stations are assumed to be networked and their state (charging vs. available) is known to all drivers via wireless communications.
 8. Drivers can choose to make a mid-trip stop for level 3 charging, though the choice must be made before they begin their trip.
-9. Once at a destination, drivers only seek available chargers in their current TAZ location.  They do not look for a charger in neighboring TAZs.  TAZs are assumed to be sized large enough that leaving a TAZ to find a charger and walking back to one’s destination is impractical.
+9. ~~Once at a destination, drivers only seek available chargers in their current TAZ location.  They do not look for a charger in neighboring TAZs.  TAZs are assumed to be sized large enough that leaving a TAZ to find a charger and walking back to one’s destination is impractical.~~
 10. Departure is not permitted for a BEV unless it has a minimum acceptable charge for their next trip plus a safety factor.
 11. A fraction of drivers will attempt to charge their vehicle even when a charge is not needed to get to their next destination
 12. Drive times between TAZ pairs are supplied as input and are applied to all vehicles equally, thus all vehicles are assumed to drive at the same speed for a given trip.
@@ -41,7 +41,7 @@ Category | Variable      | Description
 -------- | ------------- | ------------
 Global   | time          | Numeric variable containing the decimal hour of the day, where 0 is midnight, 12 is noon, and 1.5 is 1:30am.
          | schedule      | A compound variable containing the active list of scheduled events (see section Process Overview and Scheduling below).
-         | odTable (Origin-Destination Table)| distance and time between any two TAZs.  The table has the following columns: **(Format a list here)**
+         | odTable (Origin-Destination Table)| distance and time between any two TAZs.  The table has the following columns:          **(Format a list here)**
          | parameters    | A table of parameter values indexed by their name.  See Table ## for a listing of parameters along with their default values.
          
 ## 2.3 Drivers
@@ -62,6 +62,8 @@ Operation (dynamic) | state | A discrete integer value that represents the curre
 | stateOfCharge | The fraction of useable energy remaining in the vehicle’s battery.  A value of 1 indicates a fully charged battery and a value of 0 indicates the battery is effectively empty.  Note, if the vehicle is a PHEV, then 0 indicates charge sustaining mode which does not imply the battery is fully depleted.
 | currentCharger | The charger with which the driver is currently charging.  Set to ‘nobody’ if the driver is not charging.
 | itinerary, currentItinRow | A compound variable containing the intended itinerary of the driver for one day.  Each row of the itinerary represents a single trip and includes the following columns: **(format the list here)**
+- List test 1
+- List test 2 
 | willingToRoam? | Boolean value that indicates whether the driver would consider traveling to a neighboring or en-route TAZ to charge.
 Tracking (dynamic) | numDenials | The number of occurrences when the driver wanted/needed to charge but was unable due to a lack of available chargers.
 
@@ -82,8 +84,10 @@ Scales are used to describe changes in the model’s entities temporally and spa
 
 # 3. Process Overview and Scheduling
 In the PEVI model, time and actions are managed using discrete event simulation (DES).  Model processes are maintained as an ordered schedule of events.  An event consists of a time, an agent, and an action.  After initialization, the first event on the schedule is dispatched, at which point the specified agent performs the specified action; then the next event on the schedule is dispatched, and so on.  Events can be created during initialization or dynamically generated during model execution. 
-In PEVI, events are principally associated with drivers.  Figure  presents a flow chart of the driver decision logic.  The chart contains a representation of the different states that a driver can have (red rectangles), the event schedulers that determine when a driver executes an event (yellow triangles), the events that control process flow (arrows labeled with green rectangles), and the decisions that are evaluated to inform the process flow (blue diamonds).  Descriptions of the states, event schedulers, events, and decisions are listed in Table .
-In Figure  event schedulers are depicted as attached to states on the upstream side of the process flow.  This placement is intentional and closely tied to the management of PEVI as a DES.  At any time, drivers have complete knowledge about the state of their vehicle (state of charge, fuel consumption, etc.) and their itinerary.  This means, that as drivers enter any state, they can determine the time at which they will exit that state and perform an event.  For example, when the Traveling state is entered, the driver knows where they are going (by virtue of their itinerary) and based on the global origin-destination table, they can determine when they will arrive.  The PEVI model takes advantage of this foresight and model scheduling is structured so that drivers schedule events as they enter a new state. 
+
+In PEVI, events are principally associated with drivers.  Figure ## presents a flow chart of the driver decision logic.  The chart contains a representation of the different states that a driver can have (red rectangles), the event schedulers that determine when a driver executes an event (yellow triangles), the events that control process flow (arrows labeled with green rectangles), and the decisions that are evaluated to inform the process flow (blue diamonds).  Descriptions of the states, event schedulers, events, and decisions are listed in Table ##.
+
+In Figure ## event schedulers are depicted as attached to states on the upstream side of the process flow.  This placement is intentional and closely tied to the management of PEVI as a DES.  At any time, drivers have complete knowledge about the state of their vehicle (state of charge, fuel consumption, etc.) and their itinerary.  This means, that as drivers enter any state, they can determine the time at which they will exit that state and perform an event.  For example, when the Traveling state is entered, the driver knows where they are going (by virtue of their itinerary) and based on the global origin-destination table, they can determine when they will arrive.  The PEVI model takes advantage of this foresight and model scheduling is structured so that drivers schedule events as they enter a new state. 
 	
 	(Flow chart image here)
 	
@@ -96,18 +100,18 @@ In Figure  event schedulers are depicted as attached to states on the upstream s
 Type | Name | Description | Results
 -----|------|-------------|--------
 State|Not Charging| This state describes a driver that is parked but not charging.  The driver could be at home or any other TAZ in the model. | N/A
-State|Traveling|Drivers in the Traveling state are on their way from one TAZ to another.  The model does not track drivers along their path, instead they “appear” at their destination when the Arrive event is executed.|N/A
-State|Charging|Drivers in the Charging state are parked and engaged in a charging session.|N/A
-Event Scheduler|Itinerary|As drivers enter the Not Charging state through this path, they schedule the Depart event based on the Itinerary submodel (Section Itinerary). If the next trip on their itinerary was supposed to occur in the past, the driver executes the Depart event immediately.|Depart Event Scheduled
-Event Scheduler|Wait Time|As drivers enter the Not Charging state through this path, they schedule the Depart or Retry Seek event based on the Wait Time submodel (Section Wait Time)|Depart or Retry Seek Event Scheduled
-Event Scheduler|Travel Time|As drivers enter the Traveling state, they schedule the Arrive event based on the Travel Time submodel (Section Travel Time).|Arrive Event Scheduled
-Event Scheduler|Charge Time|As drivers enter the Charging state, they schedule two events to occur based on the Charge Time submodel (Section Charge Time).  Either the End Charge and Retry Seek event are schedule (the latter to immediately follow the former) or the End Charge and Depart events are schedule.Charge Time|End Charge and either Retry Seek or Depart Event Scheduled
-Event|Depart|The driver executes the Need to Charge decision and either transitions to the Traveling state or executes the Seek Charger decision.|Transition to Traveling or Not Charging
-Event|Retry Seek|The driver immediately executes the Seek Charger decision.|Transition to Charging, Not Charging, or Traveling
-Event|Arrive|The driver executes the Need to Charge? decision and transitions to a new state accordingly.  If the driver is at home and has finished her itinerary, then she transitions to charging and schedules the End Charge event, after which she stops.|Transition to Charging or Not Charging
-Event|End Charge|The driver SoC variable is updated to reflect the charging session, then driver transitions to Not Charging.|Transition to Not Charging
-Decision|Need to Charge?|The driver estimates whether she has sufficient charge for her next trip according to the Need to Charge? submodel (Section Need to Charge).|Report Yes or No
-Decision|Seek Charger|The driver seeks an available charger according to the Seek Charger submodel (Section Seek Charger) and responds accordingly by transitioning to any of the possible states.|Transition to Charging, Not Charging, or Traveling
+State|Traveling|Drivers in the *Traveling* state are on their way from one TAZ to another.  The model does not track drivers along their path, instead they “appear” at their destination when the *Arrive* event is executed.|N/A
+State|Charging|Drivers in the *Charging* state are parked and engaged in a charging session.|N/A
+Event Scheduler|Itinerary|As drivers enter the *Not Charging* state through this path, they schedule the *Depart* event based on the *Itinerary* submodel (Section Itinerary). If the next trip on their itinerary was supposed to occur in the past, the driver executes the *Depart* event immediately.|Depart Event Scheduled
+Event Scheduler|Wait Time|As drivers enter the *Not Charging* state through this path, they schedule the *Depart* or *Retry Seek* event based on the *Wait Time* submodel (Section Wait Time)|Depart or Retry Seek Event Scheduled
+Event Scheduler|Travel Time|As drivers enter the *Traveling* state, they schedule the *Arrive* event based on the *Travel Time* submodel (Section Travel Time).|Arrive Event Scheduled
+Event Scheduler|Charge Time|As drivers enter the *Charging* state, they schedule two events to occur based on the *Charge Time* submodel (Section Charge Time).  Either the *End Charge* and *Retry Seek* event are schedule (the latter to immediately follow the former) or the *End Charge* and *Depart *events are schedule.Charge Time|End Charge and either Retry Seek or Depart Event Scheduled
+Event|Depart|The driver executes the *Need to Charge* decision and either transitions to the *Traveling* state or executes the *Seek Charger* decision.|Transition to Traveling or Not Charging
+Event|Retry Seek|The driver immediately executes the *Seek Charger* decision.|Transition to Charging, Not Charging, or Traveling
+Event|Arrive|The driver executes the *Need to Charge?* decision and transitions to a new state accordingly.  If the driver is at home and has finished her itinerary, then she transitions to *Charging* and schedules the *End Charge* event, after which she stops.|Transition to Charging or Not Charging
+Event|End Charge|The driver SoC variable is updated to reflect the charging session, then driver transitions to *Not Charging*.|Transition to Not Charging
+Decision|Need to Charge?|The driver estimates whether she has sufficient charge for her next trip according to the *Need to Charge?* submodel (Section Need to Charge).|Report Yes or No
+Decision|Seek Charger|The driver seeks an available charger according to the *Seek Charger* submodel (Section Seek Charger) and responds accordingly by transitioning to any of the possible states.|Transition to Charging, Not Charging, or Traveling
 
 # 4. Design Concepts
 ## 4.1 Emergence

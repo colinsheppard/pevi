@@ -7,18 +7,18 @@
 ####Schatz Energy Research Center
 
 # 1. Purpose
-The purpose of this model is to simulate different PEV public charging infrastructure alternatives in Humboldt County, CA. The PEV infrastructure alternatives are described by number, type and location of PEV charging stations throughout the county.  For each alternative, a variety of realistic scenarios should be modeled that represent different PEV adoption rates, technologic advances, driver behaviors, and vehicle types. A measure of driver’s satisfaction and amount of use (duty factor) are outputs from the model needed to determine the preferred alternative. The model must incorporate the traffic data provided by Caltrans and spatially represent an aggregated set of their existing traffic analysis zones (TAZs).
+The purpose of this model is to simulate different PEV public charging infrastructure alternatives for the target region. The PEV infrastructure alternatives are described by number, type and location of PEV charging stations throughout the region.  For each alternative, a variety of realistic scenarios should be modeled that represent different PEV adoption rates, technologic advances, driver behaviors, and vehicle types. A measure of driver’s satisfaction and amount of use (duty factor) are outputs from the model needed to determine the preferred alternative. The model must incorporate any relevant traffic data available and spatially represent an aggregated set of existing traffic analysis zones (TAZs), if any.
 ### Assumptions
-1. All PEV owners are assumed to have home chargers and vehicles are assumed to begin each day with a full charge.
+1. All PEV owners are assumed to have home chargers.
 2. All BEV vehicle parameter values are based on those of the Nissan Leaf (24 kWh battery, 0.34 kWh/mi, level 1-3 charging capabilities).
-3. If a scheduled trip is outside the range of an average vehicle, it is assumed that the trip would never be attempted by a BEV.  These vehicles are then modeled as PHEVs with parameters based on the Chevrolet Volt (16 kWh battery, 0.5 kWh/mi, level 1-3 charging capabilities).
-4. PEV adoption rates are assumed to follow the temporal and spatial distribution of hybrid electric vehicles in Humboldt County from 2003-2012.
+3. If a scheduled trip is outside the range of an average vehicle, it is assumed that the trip would never be attempted by a BEV. These vehicles are then modeled as PHEVs with parameters based on the Chevrolet Volt (16 kWh battery, 0.5 kWh/mi, level 1-3 charging capabilities). **(This assumption may change)** 
+4. ~~PEV adoption rates are assumed to follow the temporal and spatial distribution of hybrid electric vehicles in Humboldt County from 2003-2012.~~
 5. All chargers are assumed to have a constant charging rate based on their power specifications. (i.e., no charging algorithms are incorporated).
 6. Drivers begin the day with a schedule that determines all TAZs they will attempt to visit (with associated departure times).
 7. Charging stations are assumed to be networked and their state (charging vs. available) is known to all drivers via wireless communications.
 8. Drivers can choose to make a mid-trip stop for level 3 charging, though the choice must be made before they begin their trip.
 9. Once at a destination, drivers only seek available chargers in their current TAZ location.  They do not look for a charger in neighboring TAZs.  TAZs are assumed to be sized large enough that leaving a TAZ to find a charger and walking back to one’s destination is impractical.
-10. Departure is not permitted for a BEV unless it has a minimum acceptable charge for their next trip plus a safety factor.
+10. Departure is not permitted for a BEV unless it has a minimum acceptable charge for their next trip plus a safety factor. **(Still true?)**
 11. A fraction of drivers will attempt to charge their vehicle even when a charge is not needed to get to their next destination
 12. Drive times between TAZ pairs are supplied as input and are applied to all vehicles equally, thus all vehicles are assumed to drive at the same speed for a given trip.
 
@@ -78,7 +78,7 @@ Operation (dynamic) | current-driver | The driver currently being served by the 
 Tracking (dynamic) | energyDelivered (kWh) | The cumulative amount of energy delivered by the charger up to the current moment.
 | numSessions | Integer count of the number of discrete charging sessions with drivers.
     
-Scales are used to describe changes in the model’s entities temporally and spatially. The PEVI model has a temporal extent of one 24-hour day.  Time is modeled using discrete event simulation (see section Process Overview and Scheduling below).  The spatial extent of the model is defined by the TAZs.  For the Humboldt County implementation, the region is discretized into ## TAZs.
+Scales are used to describe changes in the model’s entities temporally and spatially. The PEVI model has a temporal extent of one 24-hour day.  Time is modeled using discrete event simulation (see section Process Overview and Scheduling below).  The spatial extent of the model is defined by the TAZs.
 
 # 3. Process Overview and Scheduling
 In the PEVI model, time and actions are managed using discrete event simulation (DES).  Model processes are maintained as an ordered schedule of events.  An event consists of a time, an agent, and an action.  After initialization, the first event on the schedule is dispatched, at which point the specified agent performs the specified action; then the next event on the schedule is dispatched, and so on.  Events can be created during initialization or dynamically generated during model execution. 

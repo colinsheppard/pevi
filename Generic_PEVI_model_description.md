@@ -84,14 +84,22 @@ Scales are used to describe changes in the model’s entities temporally and spa
 In the PEVI model, time and actions are managed using discrete event simulation (DES).  Model processes are maintained as an ordered schedule of events.  An event consists of a time, an agent, and an action.  After initialization, the first event on the schedule is dispatched, at which point the specified agent performs the specified action; then the next event on the schedule is dispatched, and so on.  Events can be created during initialization or dynamically generated during model execution. 
 In PEVI, events are principally associated with drivers.  Figure  presents a flow chart of the driver decision logic.  The chart contains a representation of the different states that a driver can have (red rectangles), the event schedulers that determine when a driver executes an event (yellow triangles), the events that control process flow (arrows labeled with green rectangles), and the decisions that are evaluated to inform the process flow (blue diamonds).  Descriptions of the states, event schedulers, events, and decisions are listed in Table .
 In Figure  event schedulers are depicted as attached to states on the upstream side of the process flow.  This placement is intentional and closely tied to the management of PEVI as a DES.  At any time, drivers have complete knowledge about the state of their vehicle (state of charge, fuel consumption, etc.) and their itinerary.  This means, that as drivers enter any state, they can determine the time at which they will exit that state and perform an event.  For example, when the Traveling state is entered, the driver knows where they are going (by virtue of their itinerary) and based on the global origin-destination table, they can determine when they will arrive.  The PEVI model takes advantage of this foresight and model scheduling is structured so that drivers schedule events as they enter a new state. 
-	
-	(Flow chart image here)
-	
-	Figure 1: This flow chart illustrates the three driver states (red rectangles), the events that control transitions between states (arrows labeled with green rectangles), the decision logic used to inform transitions (blue diamonds) and the event schedulers that dictate events are executed (orange triangles). See Table ## for a description of the key elements in the flow chart. 
 
-(Text placed here to break up text block. Must look into a better formatting trick.)
 
-	Table : Overview of driver states, event schedulers, events, and decisions.
+Let's test our image placement. 
+
+![flow chart][1]
+
+[1]: ~Dropbox/serc/pevi/model-desription-graphics/Flowchart
+
+```	
+(Flow chart image here)
+	
+Figure 1: This flow chart illustrates the three driver states (red rectangles), the events that control transitions between states (arrows labeled with green rectangles), the decision logic used to inform transitions (blue diamonds) and the event schedulers that dictate events are executed (orange triangles). See Table ## for a description of the key elements in the flow chart. 
+```
+```
+Table : Overview of driver states, event schedulers, events, and decisions.
+```
 
 Type | Name | Description | Results
 -----|------|-------------|--------

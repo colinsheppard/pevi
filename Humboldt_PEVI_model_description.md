@@ -9,7 +9,7 @@
 # 1. Purpose
 The purpose of this model is to simulate different PEV public charging infrastructure alternatives in Humboldt County, CA. The PEV infrastructure alternatives are described by number, type and location of PEV charging stations throughout the county.  For each alternative, a variety of realistic scenarios should be modeled that represent different PEV adoption rates, technologic advances, driver behaviors, and vehicle types. A measure of driver’s satisfaction and amount of use (duty factor) are outputs from the model needed to determine the preferred alternative. The model must incorporate the traffic data provided by Caltrans and spatially represent an aggregated set of their existing traffic analysis zones (TAZs).
 ### Assumptions
-1. All PEV owners are assumed to have home chargers and vehicles are assumed to begin each day with a full charge.
+1. All PEV owners are assumed to have home chargers. ~~and vehicles are assumed to begin each day with a full charge.~~
 2. All BEV vehicle parameter values are based on those of the Nissan Leaf (24 kWh battery, 0.34 kWh/mi, level 1-3 charging capabilities).
 3. If a scheduled trip is outside the range of an average vehicle, it is assumed that the trip would never be attempted by a BEV.  These vehicles are then modeled as PHEVs with parameters based on the Chevrolet Volt (16 kWh battery, 0.5 kWh/mi, level 1-3 charging capabilities).
 4. PEV adoption rates are assumed to follow the temporal and spatial distribution of hybrid electric vehicles in Humboldt County from 2003-2012.
@@ -35,13 +35,18 @@ Contents          | chargersInTAZ (static)  | A list of chargers contained in th
                   | nLevels       | A 3-value list containing the number of chargers of each level (1, 2, or 3)
 
 ## 2.2 Environment
-The environment is the entity where all the agents live and interact, in this model it is the geographic region described by the input data. The environment is defined by several global state variables and parameters which are available to all agents in the model for reference or use. 
+The environment is the entity where all the agents live and interact. In this model it is the geographic region described by the input data. The environment is defined by several global state variables and parameters which are available to all agents in the model for reference or use. 
 
 Category | Variable      | Description
 -------- | ------------- | ------------
 Global   | time          | Numeric variable containing the decimal hour of the day, where 0 is midnight, 12 is noon, and 1.5 is 1:30am.
          | schedule      | A compound variable containing the active list of scheduled events (see section Process Overview and Scheduling below).
-         | odTable (Origin-Destination Table)| distance and time between any two TAZs.  The table has the following columns:          **(Format a list here)**
+         | odTable (Origin-Destination Table)| distance and time between any two TAZs.  The table has the following columns:
+         | | - *odFrom:* Origin TAZ
+         | | - *odTo:* Destination TAZ
+         | | - *odDist:* Distance in miles
+         | | - *odTime:* Travel time in decimal hours
+         | | - *odEnroute:* List of the TAZs along the route between the origin and destination, used for seeking level 3 charging.
          | parameters    | A table of parameter values indexed by their name.  See Table ## for a listing of parameters along with their default values.
          
 ## 2.3 Drivers
@@ -55,13 +60,21 @@ Vehicle (static)|vehicleType|String variable containing the name of the vehicle 
 | batteryCapacity (kWh) | The default quantity of stored energy by the battery bank when fully charged.  If the vehicle is a PHEV, then the battery capacity indicates the amount of energy available to drive the vehicle in charge depleting mode.
 | electricFuelConsumption (kWh / mile)|The default amount of battery electricity required to travel 1 mile.
 | hybridFuelConsumption (gallon / mile) | The default fuel amount of gasoline required to travel 1 mile for a PHEV in charge sustaining mode.  (N/A for BEVs).
-Demography (static) | homeTAZ | The home TAZ of the driver, this is not necessarily where the driver begins the day, but rather is inferred based upon the trip type column in the drivers itinerary (see below). 
+Demography (static) | homeTAZ | The home TAZ of the driver. this is not necessarily where the driver begins the day, but rather is inferred based upon the trip type column in the drivers itinerary (see below). 
 | probabilityOfUnneededCharge | The probability that the driver will choose to attempt to charge their vehicle despite not actually needing the charge.
 Operation (dynamic) | state | A discrete integer value that represents the current state of a driver (Home, Traveling, Waiting, Charging, Staging or Stranded), and used to decide which procedures to execute.
 | currentTAZ | The TAZ where the driver is currently located, set to “nobody” while in transit.
 | stateOfCharge | The fraction of useable energy remaining in the vehicle’s battery.  A value of 1 indicates a fully charged battery and a value of 0 indicates the battery is effectively empty.  Note, if the vehicle is a PHEV, then 0 indicates charge sustaining mode which does not imply the battery is fully depleted.
 | currentCharger | The charger with which the driver is currently charging.  Set to ‘nobody’ if the driver is not charging.
-| itinerary, currentItinRow | A compound variable containing the intended itinerary of the driver for one day.  Each row of the itinerary represents a single trip and includes the following columns: **(format the list here)**
+| itinerary, currentItinRow | A compound variable containing the intended itinerary of the driver for one day.  Each row of the itinerary represents a single trip and includes the following columns: 
+| | - *itinFrom:* origin TAZ
+| | - *itinTo:* destintion TAZ
+| | - *itinDepart:* departure time (decimal hour of the day)
+| | - *itinTripType:* type of trip (e.g. HW for home to work, WO for work to other, etc.)
+| | - *itinChangeFlag:* (“none”, “delay”, “reroute”)
+| | - *itinDelayAmount:*
+| | The variable currentItinRow is used to keep track of the next trip in the driver’s itinerary (or the current trip if the driver state is “traveling”).  This model description uses the following variable names to describe specific cells in the itinerary table:
+| | - *itinNextDepartTime:* the departure time associated with the next trip in the itinerary
 | willingToRoam? | Boolean value that indicates whether the driver would consider traveling to a neighboring or en-route TAZ to charge.
 Tracking (dynamic) | numDenials | The number of occurrences when the driver wanted/needed to charge but was unable due to a lack of available chargers.
 

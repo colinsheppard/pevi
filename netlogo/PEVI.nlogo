@@ -550,7 +550,11 @@ to seek-charger
               set #min-taz #this-taz
               set #min-charger-type #this-charger-type 
             ]
-            log-data "seek-charger" (sentence ticks seek-charger-index ([id] of current-taz) ([id] of #this-taz) id ([name] of this-vehicle-type) electric-fuel-consumption is-BEV? #charger-in-origin-or-destination #level state-of-charge (item #level #trip-or-journey-energy-need-by-type) (distance-from-to [id] of current-taz [id] of #this-taz) (distance-from-to [id] of #this-taz [id] of destination-taz) (time-from-to [id] of current-taz [id] of #this-taz) (time-from-to [id] of #this-taz [id] of destination-taz) trip-time trip-distance journey-distance charging-on-a-whim? time-until-depart (item #level #trip-charge-time-need-by-type) #this-cost #extra-time-until-end-charge #full-charge-time-need #trip-charge-time-need #mid-journey-charge-time-need #mid-state-of-charge)
+            log-data "seek-charger" (sentence ticks seek-charger-index ([id] of current-taz) ([id] of #this-taz) id ([name] of this-vehicle-type) electric-fuel-consumption is-BEV?       ;;;LOG
+              #charger-in-origin-or-destination #level state-of-charge (item #level #trip-or-journey-energy-need-by-type) (distance-from-to [id] of current-taz [id] of #this-taz)        ;;;LOG
+              (distance-from-to [id] of #this-taz [id] of destination-taz) (time-from-to [id] of current-taz [id] of #this-taz) (time-from-to [id] of #this-taz [id] of destination-taz)  ;;;LOG
+              trip-time trip-distance journey-distance charging-on-a-whim? time-until-depart (item #level #trip-charge-time-need-by-type) #this-cost #extra-time-until-end-charge         ;;;LOG
+              #full-charge-time-need #trip-charge-time-need #mid-journey-charge-time-need #mid-state-of-charge)  ;;;LOG
           ]
         ]
       ]
@@ -562,7 +566,7 @@ to seek-charger
     set num-denials (num-denials + 1)
     wait-time-event-scheduler
   ][
-    log-data "seek-charger-result" (sentence ticks seek-charger-index id ([id] of #min-taz) (#min-taz = current-taz or #min-taz = destination-taz) ([level] of #min-charger-type) #min-cost)
+    log-data "seek-charger-result" (sentence ticks seek-charger-index id ([id] of #min-taz) (#min-taz = current-taz or #min-taz = destination-taz) ([level] of #min-charger-type) #min-cost)  ;;;LOG
     ifelse #min-taz = current-taz [
       set current-charger one-of available-chargers #min-taz [level] of #min-charger-type
       if [level] of #min-charger-type > 0 [
@@ -990,9 +994,9 @@ to arrive
     set energy-used energy-used + #charge-used * battery-capacity
   ]
   
-  let #completed-journey journey-distance
-  let #completed-trip trip-distance
-  let #from-taz [id] of current-taz
+  let #completed-journey journey-distance  ;;;LOG
+  let #completed-trip trip-distance        ;;;LOG
+  let #from-taz [id] of current-taz        ;;;LOG
   set journey-distance journey-distance - trip-distance
   log-driver "arriving" ;;;LOG
   
@@ -1482,7 +1486,7 @@ INPUTBOX
 832
 253
 starting-seed
-1
+2
 1
 0
 Number
@@ -1827,7 +1831,7 @@ Polygon -7500403 true true 270 75 225 30 30 225 75 270
 Polygon -7500403 true true 30 75 75 30 270 225 225 270
 
 @#$#@#$#@
-NetLogo 5.0.4
+NetLogo 5.0.1
 @#$#@#$#@
 @#$#@#$#@
 @#$#@#$#@

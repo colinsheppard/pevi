@@ -79,7 +79,6 @@ drivers-own [
   itin-from 
   itin-to
   itin-depart
-  itin-trip-type
   itin-change-flag
   itin-delay-amount
   max-trip-distance
@@ -268,6 +267,7 @@ to setup-in-batch-mode
   ifelse count turtles = 0 [
     clear-all-and-initialize
     if fix-seed [random-seed starting-seed]
+    ; Can we combine this with the code existing in setup?
     set small-num 1e-11
     set batch-setup? false
     set seed-list (sentence random 2147483647 random 2147483647 random 2147483647)
@@ -290,6 +290,7 @@ to setup-in-batch-mode
     print "setup-chargers"
     setup-charger-types
     setup-chargers
+    ; Make "intialize-logfile" procedure
     reset-logfile "charging" ;;;LOG
     log-data "charging" (sentence "time" "charger.id" "charger.level" "location" "driver" "vehicle.type" "duration" "energy" "begin.soc" "end.soc" "after.end.charge" "charging.on.whim" "time.until.depart") ;;;LOG
     reset-logfile "pain" ;;;LOG
@@ -1250,7 +1251,7 @@ SWITCH
 222
 log-charging
 log-charging
-0
+1
 1
 -1000
 
@@ -1272,7 +1273,7 @@ SWITCH
 313
 log-need-to-charge
 log-need-to-charge
-0
+1
 1
 -1000
 
@@ -1394,7 +1395,7 @@ SWITCH
 92
 log-pain
 log-pain
-0
+1
 1
 -1000
 
@@ -1431,7 +1432,7 @@ SWITCH
 94
 log-trip
 log-trip
-0
+1
 1
 -1000
 
@@ -1831,7 +1832,7 @@ Polygon -7500403 true true 270 75 225 30 30 225 75 270
 Polygon -7500403 true true 30 75 75 30 270 225 225 270
 
 @#$#@#$#@
-NetLogo 5.0.1
+NetLogo 5.0.4
 @#$#@#$#@
 @#$#@#$#@
 @#$#@#$#@

@@ -41,10 +41,10 @@ Category | Variable      | Description
 -------- | ------------- | ------------
 Global   | time          | Numeric variable containing the decimal hour of the day, where 0 is midnight, 12 is noon, and 1.5 is 1:30am.
          | schedule      | A compound variable containing the active list of scheduled events (see section Process Overview and Scheduling below).
-         | odTable (Origin-Destination Table)| distance and time between any two TAZs.  The table has the following columns:
+         | odTable (Origin-Destination Table)| Distance and time between any two TAZs.  The table has the following columns:
          | | - *odFrom:* Origin TAZ
          | | - *odTo:* Destination TAZ
-         | | - *odDist:* Distance in miles
+         | | - *odDist:* Travel distance in miles
          | | - *odTime:* Travel time in decimal hours
          | | - *odEnroute:* List of the TAZs along the route between the origin and destination, used for seeking level 3 charging.
          | parameters    | A table of parameter values indexed by their name.  See Table ## for a listing of parameters along with their default values.
@@ -60,7 +60,7 @@ Vehicle (static)|vehicleType|String variable containing the name of the vehicle 
 | batteryCapacity (kWh) | The default quantity of stored energy by the battery bank when fully charged.  If the vehicle is a PHEV, then the battery capacity indicates the amount of energy available to drive the vehicle in charge depleting mode.
 | electricFuelConsumption (kWh / mile)|The default amount of battery electricity required to travel 1 mile.
 | hybridFuelConsumption (gallon / mile) | The default fuel amount of gasoline required to travel 1 mile for a PHEV in charge sustaining mode.  (N/A for BEVs).
-Demography (static) | homeTAZ | The home TAZ of the driver. this is not necessarily where the driver begins the day, but rather is inferred based upon the trip type column in the drivers itinerary (see below). 
+Demography (static) | homeTAZ | The home TAZ of the driver. This is not necessarily where the driver begins the day, but rather is inferred based upon the trip type column in the drivers itinerary (see below). 
 | probabilityOfUnneededCharge | The probability that the driver will choose to attempt to charge their vehicle despite not actually needing the charge.
 Operation (dynamic) | state | A discrete integer value that represents the current state of a driver (Home, Traveling, Waiting, Charging, Staging or Stranded), and used to decide which procedures to execute.
 | currentTAZ | The TAZ where the driver is currently located, set to “nobody” while in transit.
@@ -70,7 +70,7 @@ Operation (dynamic) | state | A discrete integer value that represents the curre
 | | - *itinFrom:* origin TAZ
 | | - *itinTo:* destintion TAZ
 | | - *itinDepart:* departure time (decimal hour of the day)
-| | - *itinTripType:* type of trip (e.g. HW for home to work, WO for work to other, etc.)
+| | ~~- *itinTripType:* type of trip (e.g. HW for home to work, WO for work to other, etc.)~~
 | | - *itinChangeFlag:* (“none”, “delay”, “reroute”)
 | | - *itinDelayAmount:*
 | | The variable currentItinRow is used to keep track of the next trip in the driver’s itinerary (or the current trip if the driver state is “traveling”).  This model description uses the following variable names to describe specific cells in the itinerary table:
@@ -91,22 +91,22 @@ Operation (dynamic) | current-driver | The driver currently being served by the 
 Tracking (dynamic) | energyDelivered (kWh) | The cumulative amount of energy delivered by the charger up to the current moment.
 | numSessions | Integer count of the number of discrete charging sessions with drivers.
     
-Scales are used to describe changes in the model’s entities temporally and spatially. The PEVI model has a temporal extent of one 24-hour day.  Time is modeled using discrete event simulation (see section Process Overview and Scheduling below).  The spatial extent of the model is defined by the TAZs.  For the Humboldt County implementation, the region is discretized into ## TAZs.
+Scales are used to describe changes in the model’s entities temporally and spatially. The PEVI model has a temporal extent of one 24-hour day.  Time is modeled using discrete event simulation (see section Process Overview and Scheduling below).  The spatial extent of the model is defined by the TAZs.  For the Humboldt County implementation, the region is discretized into 52 TAZs.
 
 # 3. Process Overview and Scheduling
 In the PEVI model, time and actions are managed using discrete event simulation (DES).  Model processes are maintained as an ordered schedule of events.  An event consists of a time, an agent, and an action.  After initialization, the first event on the schedule is dispatched, at which point the specified agent performs the specified action; then the next event on the schedule is dispatched, and so on.  Events can be created during initialization or dynamically generated during model execution. 
 
-In PEVI, events are principally associated with drivers.  Figure ## presents a flow chart of the driver decision logic.  The chart contains a representation of the different states that a driver can have (red rectangles), the event schedulers that determine when a driver executes an event (yellow triangles), the events that control process flow (arrows labeled with green rectangles), and the decisions that are evaluated to inform the process flow (blue diamonds).  Descriptions of the states, event schedulers, events, and decisions are listed in Table ##.
+In PEVI, events are principally associated with drivers.  Figure ## presents a flow chart of the driver decision logic.  The chart contains a representation of the different states that a driver can have (red rectangles), the event schedulers that determine when a driver executes an event (yellow triangles), the events that control process flow (arrows labeled with green rectangles), and the decisions that are evaluated to inform the process flow (blue diamonds).  Descriptions of the states, event schedulers, events, and decisions are listed in Table 1.
 
-In Figure ## event schedulers are depicted as attached to states on the upstream side of the process flow.  This placement is intentional and closely tied to the management of PEVI as a DES.  At any time, drivers have complete knowledge about the state of their vehicle (state of charge, fuel consumption, etc.) and their itinerary.  This means, that as drivers enter any state, they can determine the time at which they will exit that state and perform an event.  For example, when the Traveling state is entered, the driver knows where they are going (by virtue of their itinerary) and based on the global origin-destination table, they can determine when they will arrive.  The PEVI model takes advantage of this foresight and model scheduling is structured so that drivers schedule events as they enter a new state. 
+In Figure 1 event schedulers are depicted as attached to states on the upstream side of the process flow.  This placement is intentional and closely tied to the management of PEVI as a DES.  At any time, drivers have complete knowledge about the state of their vehicle (state of charge, fuel consumption, etc.) and their itinerary.  This means, that as drivers enter any state, they can determine the time at which they will exit that state and perform an event.  For example, when the Traveling state is entered, the driver knows where they are going (by virtue of their itinerary) and based on the global origin-destination table, they can determine when they will arrive.  The PEVI model takes advantage of this foresight and model scheduling is structured so that drivers schedule events as they enter a new state. 
 
 ```	
 (Flow chart image here)
 	
-Figure 1: This flow chart illustrates the three driver states (red rectangles), the events that control transitions between states (arrows labeled with green rectangles), the decision logic used to inform transitions (blue diamonds) and the event schedulers that dictate events are executed (orange triangles). See Table ## for a description of the key elements in the flow chart. 
+Figure 1: This flow chart illustrates the three driver states (red rectangles), the events that control transitions between states (arrows labeled with green rectangles), the decision logic used to inform transitions (blue diamonds) and the event schedulers that dictate events are executed (orange triangles). See Table 1 for a description of the key elements in the flow chart. 
 ```
 ```
-Table : Overview of driver states, event schedulers, events, and decisions.
+Table 1: Overview of driver states, event schedulers, events, and decisions.
 ```
 
 Type | Name | Description | Results
@@ -181,10 +181,24 @@ To make this determination, the following values are estimated:
 - chargerInOriginOrDestination: this Boolean describes whether the charger is located in a TAZ that’s a part of the driver’s itinerary vs. a neighboring TAZ or an en-route TAZ.
 - timeUntilDepart: the amount of time before the next trip in the driver’s itinerary.
 - tripDistance: the number of miles to complete the next trip in the driver’s itinerary
-- tripChargeTimeNeed: the amount of charging time needed to complete the next trip in the itinerary, if isBev is FALSE then set this to 0 to indicate that there is no need for charge to complete the trip, otherwise use the following formula: **Get the formula in here.**
+- tripChargeTimeNeed: the amount of charging time needed to complete the next trip in the itinerary, if isBev is FALSE then set this to 0 to indicate that there is no need for charge to complete the trip, otherwise use the following formula: 
+````
+Equation 1:
+tripChargeTimeNeed = max{0,[(tripDistance * chargeSafetyFactor * electricFuelConsumption - stateOfCharge * batteryCapacity)/chargeRate]}   
+````
 - journeyDistance: the number of miles to complete all of the remaining trips in the driver’s itinerary
-- journeyChargeTimeNeed: the amount of charging time needed to complete the remaining trips in the itinerary, **Another equation**
-- fullChargeTimeNeed: the amount of charging time to complete a full charge, **Equation : if chargerType = 3, then fullChargeTimeNeed = otherwise, fullChargeTimeNeed = **
+- journeyChargeTimeNeed: the amount of charging time needed to complete the remaining trips in the itinerary:
+ ````
+Equation 2:
+journeyChargeTimeNeed = max{0,[(journeyDistance * chargeSafetyFactor * electricFuelConsumption - stateOfCharge * batteryCapacity)/chargeRate]}   
+```` 
+- fullChargeTimeNeed: the amount of charging time to complete a full charge:
+````
+ Equation 3: if chargerType = 3, then fullChargeTimeNeed = 
+max{0,[(0.8 - stateOfCharge) * batteryCapacity]/chargeRate}
+otherwise, fullChargeTimeNeed =
+[(1 - stateOfCharge) * batteryCapacity]/chargeRate
+````
 - timeUntilEndCharge: the anticipated time in hours remaining before the driver chooses to end charging or the vehicle is fully charged.  The following table describes how this value is calculated:
 
 If|Then timeUntilEndCharge = | Additional Actions
@@ -231,17 +245,32 @@ The submodel consists of the following actions:
 3. Calculate the following values: 
 	a. level3AndTooFull? This boolean value is true if the charger under consideration is level III and the driver’s state of charge is >= 0.8 or, for enroute chargers, will be >= 0.8 when the vehicle reaches the intermediate destination.  If this parameter is true, then the alternative is not considered.
 	b. level3TimePenalty  Set this to a value of 1 if the distance to the destination (in the case of enroute charging, from the intermediate TAZ) is greater than vehicle can go on a full level 3 charge (80% state of charge). Otherwise set to 0.  This penalizes level 3 charging when a level 1 or 2 charge might get the driver there without an additional stop or another charging session.
-	c. tripOrJourneyEnergyNeed.  This value depends on the amount of time before the next departure in the driver’s itinerary as well as the current state of charge and the charger type. If timeUntilDepart < willingToRoamThreshold, then only the energy needed for the next trip is considered, otherwise the energy needed for the journey is used. If the energy needed for the trip or journey is greater than the energy needed to fill the battery (or in the case of level 3, achieved 80% state of charger) then tripOrJourneyEnergyNeed is set to the battery limiting value. As a formula, the value is calculated as: if timeUntilDepart < willingToRoamThreshold , distance = tripDistance, otherwise distance = journeyDistance,
-if level == 3: **(FORMULA MISSING IN OPENOFFICE)** otherwise: **(ANOTHER FORMULA MISSING)**
-	d. extraTimeForTraveli, extraDistanceForTraveli: the additional travel time and distance needed to accommodate the detour, equal to the difference between first traveling to the intermediate TAZ, then to the destination TAZ vs. traveling straight to the destination TAZ.
-	e. extraEnergyForTraveli: the energy needed to accommodate the extra travel, calculated by:  * chargeSafetyFactor
-	f. extraTimeUntilEndChargei: if chargerInOriginOrDestinationi is true, then this value is set to the amount of delay in the driver’s itinerary that would be necessary to use the charging alternative, calculate as max(0, tripChargeTimeNeed – timeUntilDepart) if the charger is in the origin and 0 if the charger is in the destination TAZ, if  chargerInOriginOrDestinationi is false, then the value is an estimate of the extra time a driver would spend charging, equal to the value of timeUntilEndCharge as calculated by the Charge Time submodel (Section Charge Time) with the following modifications:
-		f.i. timeUntilDepart is decreased by the time of travel from the origin TAZ to TAZi
-		f.ii. stateOfCharge is decreased by  where tripDistancei is the distance in miles from the origin TAZ to TAZi
-		f.iii. tripDistance and journeyDistance are assumed to begin at TAZi **(RE-FORMAT)**
-4. Estimate the cost of the alternative,	
-Equation : Costi = **(Missing formula)**
-5. Chose the alternative with the minimum cost.  If TAZi  is the current TAZ, call the *ChargeTime* event scheduler.   Otherwise update the driver’s itinerary to include the new destination TAZ (unless TAZi is the destination TAZ) with a depart time equal to now and call the *TravelTime* event scheduler.
+	c. tripOrJourneyEnergyNeed.  This value depends on the amount of time before the next departure in the driver’s itinerary as well as the current state of charge and the charger type. If timeUntilDepart < willingToRoamThreshold, then only the energy needed for the next trip is considered, otherwise the energy needed for the journey is used. If the energy needed for the trip or journey is greater than the energy needed to fill the battery (or in the case of level 3, achieved 80% state of charger) then tripOrJourneyEnergyNeed is set to the battery limiting value. As a formula, the value is calculated as: 
+````	
+if timeUntilDepart < willingToRoamThreshold , distance = tripDistance, otherwise distance = journeyDistance.
+````
+````
+if level == 3: tripOrJourneyEnergyNeed = min{max[0,distance * chargeSafetyFactor * electricFuelConsumption - stateOfCharge * batteryCapacity],max[0,(0.8 - stateOfCharge) * batteryCapacity]} otherwise: 
+min{max[0,distance * chargeSafetyFactor * electricFuelConsumption - stateOfCharge * batteryCapacity],max[0,(1 - stateOfCharge) * batteryCapacity]}
+````
+	d. extraTimeForTravel(i), extraDistanceForTravel(i): the additional travel time and distance needed to accommodate the detour, equal to the difference between first traveling to the intermediate TAZ, then to the destination TAZ vs. traveling straight to the destination TAZ.
+	e. extraEnergyForTravel(i): the energy needed to accommodate the extra travel, calculated by: 
+````
+extraDistanceForTravel(i) * electricFuelConsumption * chargeSafetyFactor
+````
+	f. extraTimeUntilEndCharge(i): if chargerInOriginOrDestination(i) is true, then this value is set to the amount of delay in the driver’s itinerary that would be necessary to use the charging alternative. Calculate as:
+````
+max(0, tripChargeTimeNeed – timeUntilDepart) if the charger is in the origin, and 0 if the charger is in the destination TAZ.
+````
+If chargerInOriginOrDestination(i) is false, then the value is an estimate of the extra time a driver would spend charging, equal to the value of timeUntilEndCharge as calculated by the Charge Time submodel (Section Charge Time) with the following modifications:
+		f.i. timeUntilDepart is decreased by the time of travel from the origin TAZ to TAZ(i)
+		f.ii. stateOfCharge is decreased by  where tripDistancei is the distance in miles from the origin TAZ to TAZ(i)
+		f.iii. tripDistance and journeyDistance are assumed to begin at TAZ(i)
+4. Estimate the cost of the alternative,
+````	
+Equation 4: Cost(i) = timeOpportunityCost * [extraTimeUntilEndCharge(i) + extraTimeForTravel(i) + level3TimePenalty(i)] + energyPrice(i) * [tripOrJourneyEnergyNeed + extraEnergyForTravel(i)])
+````
+5. Chose the alternative with the minimum cost.  If TAZ(i)  is the current TAZ, call the *ChargeTime* event scheduler.   Otherwise update the driver’s itinerary to include the new destination TAZ (unless TAZ(i) is the destination TAZ) with a depart time equal to now and call the *TravelTime* event scheduler.
 
 ## 5.7 Break Up Trip
 - If driver has a full battery and cannot make the next trip (or if the stateOfCharge >= 0.8 and the currentTAZ only has level 3 chargers available), then he attempts to break the trip into smaller trips with intermediate stops for charging.

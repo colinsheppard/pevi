@@ -189,9 +189,6 @@ tripChargeTimeNeed = max{0,[(tripDistance * chargeSafetyFactor * electricFuelCon
 - journeyDistance: the number of miles to complete all of the remaining trips in the driver’s itinerary
 - journeyChargeTimeNeed: the amount of charging time needed to complete the remaining trips in the itinerary:
 
-**Let's test out the math mode - the qudaratic equation should be below.**
-$$x = {-b \pm \sqrt{b^2-4ac} \over 2a}$$
-
  ````
 Equation 2:
 journeyChargeTimeNeed = max{0,[(journeyDistance * chargeSafetyFactor * electricFuelConsumption - stateOfCharge * batteryCapacity)/chargeRate]}   

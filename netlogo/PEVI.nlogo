@@ -135,8 +135,6 @@ chargers-own[
 tazs-own[
   id              ; TAZ id
   chargers-by-type ; list of lists of chargers organized by type, e.g. [ [level-0] [level-1-a level-1-b ....] [level-2-a level-2-b ....] [level-3-a ....] ]
-  home-charger    ; special charger available to all drivers when in their home taz
-  drivers-in-taz  ; list of drivers currently in TAZ
   
   neighbor-tazs   ; list of tazs within charger-search-distance of this taz
   
@@ -848,7 +846,6 @@ end
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 to itinerary-event-scheduler
   set state "not-charging"
-    ask taz 1 [if (drivers-in-taz > 0) [print drivers-in-taz]]
   time:schedule-event self task depart departure-time
 end
 
@@ -1240,7 +1237,7 @@ SWITCH
 176
 log-wait-time
 log-wait-time
-1
+0
 1
 -1000
 
@@ -1251,7 +1248,7 @@ SWITCH
 222
 log-charging
 log-charging
-1
+0
 1
 -1000
 
@@ -1262,7 +1259,7 @@ SWITCH
 268
 log-charge-time
 log-charge-time
-1
+0
 1
 -1000
 
@@ -1273,7 +1270,7 @@ SWITCH
 313
 log-need-to-charge
 log-need-to-charge
-1
+0
 1
 -1000
 
@@ -1284,7 +1281,7 @@ SWITCH
 130
 log-trip-journey-timeuntildepart
 log-trip-journey-timeuntildepart
-1
+0
 1
 -1000
 
@@ -1295,7 +1292,7 @@ SWITCH
 359
 log-seek-charger
 log-seek-charger
-1
+0
 1
 -1000
 
@@ -1306,7 +1303,7 @@ SWITCH
 443
 log-break-up-trip
 log-break-up-trip
-1
+0
 1
 -1000
 
@@ -1317,7 +1314,7 @@ SWITCH
 489
 log-break-up-trip-choice
 log-break-up-trip-choice
-1
+0
 1
 -1000
 
@@ -1328,7 +1325,7 @@ SWITCH
 532
 log-charge-limiting-factor
 log-charge-limiting-factor
-1
+0
 1
 -1000
 
@@ -1339,7 +1336,7 @@ SWITCH
 400
 log-seek-charger-result
 log-seek-charger-result
-1
+0
 1
 -1000
 
@@ -1384,7 +1381,7 @@ SWITCH
 574
 log-drivers
 log-drivers
-1
+0
 1
 -1000
 
@@ -1395,7 +1392,7 @@ SWITCH
 92
 log-pain
 log-pain
-1
+0
 1
 -1000
 
@@ -1406,7 +1403,7 @@ SWITCH
 620
 log-tazs
 log-tazs
-1
+0
 1
 -1000
 
@@ -1432,7 +1429,7 @@ SWITCH
 94
 log-trip
 log-trip
-1
+0
 1
 -1000
 
@@ -1443,7 +1440,7 @@ SWITCH
 180
 log-summary
 log-summary
-1
+0
 1
 -1000
 

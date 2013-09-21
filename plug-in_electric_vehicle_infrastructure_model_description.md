@@ -55,7 +55,7 @@ Global   | time          | Numeric variable containing the decimal hour of the d
          | | - *odDist:* Travel distance in miles
          | | - *odTime:* Travel time in decimal hours
          | | - *odEnroute:* List of the TAZs along the route between the origin and destination, used for seeking level 3 charging.
-         | parameters    | A table of parameter values indexed by their name.  See Table **#HEY!#** for a listing of parameters along with their default values.
+         | parameters    | A table of parameter values indexed by their name.  See Table 11 for a listing of parameters along with their default values.
          
 ## 2.3 Drivers
 Driver agents are used in the model to simulate individual driver and vehicle characteristics combined. These entities are described in the model by the following state variables:
@@ -152,7 +152,11 @@ Interaction between vehicles and chargers is incorporated. The vehicle agents di
 ## 4.6 Stochasticity
 Several pseudorandom processes are used to introduce variability in the model.  ~~The incorporated drive times between zones are represented as the mean of a normal distribution (wish list item).~~  Battery capacity and energy efficiency are normally distributed. ~~anxiety proneness are also normally distributed~~  If multiple vehicles are waiting for a charger when one becomes available, a vehicle is selected randomly.  For simple decisions that a driver must make over the course of a day, a Bernoulli random variable is used.  
 ## 4.7 Initialization
-The input to the PEVI model consists of five data sets, summarized in Table ##:
+The input to the PEVI model consists of five data sets, summarized in Table 6:
+
+````
+Table 6: PEVI Inputs
+````
 
 Input | Description
 ----- | -----------
@@ -193,6 +197,10 @@ To make this determination, four values are estimated:
 
 The following table details how either the decision is made and at what time the corresponding event is to be scheduled:
 
+````
+Table 7: Wait Time Algorithm
+````
+
 If | Then
 ---|----- 
 remainingRange / chargeSafetyFactor < tripDistance | Schedule *Retry Seek* event to occur after a random amount of time based on an exponential distribution with mean of waitTimeMean.
@@ -231,6 +239,11 @@ otherwise, fullChargeTimeNeed =
 ````
 - timeUntilEndCharge: the anticipated time in hours remaining before the driver chooses to end charging or the vehicle is fully charged.  The following table describes how this value is calculated:
 
+````
+Table 8: Calculation for timeUntilEndCharge
+````
+
+
 If|Then timeUntilEndCharge = | Additional Actions
 --|--------------------------|-------------------
 fullChargeTimeNeed <= tripChargeTimeNeed | fullChargeTimeNeed |
@@ -240,6 +253,10 @@ chargerType= 3 | min(timeUntilDepart, fullChargeTimeNeed, journeyChargeTimeNeed)
 otherwise | min(timeUntilDepart, tripChargeTimeNeed) |
 
 The following table details how the decision is made and at what time the corresponding event is to be scheduled:
+
+````
+Table 9: Charge Time Event Scheduling
+````
 
 If | Then
 ---|-----
@@ -254,6 +271,10 @@ First estimate the following values:
 - remainingRange: the number of miles remaining, see Equation 1
 
 Now base the decision on the following table, where chargingOnAWhim? is initialized to false:
+
+````
+Table 10: Need to Charge Decision Algorithm
+````
 
 If | Then
 :---:|:-----:
@@ -309,6 +330,11 @@ Equation 4: Cost(i) = timeOpportunityCost * [extraTimeUntilEndCharge(i) + extraT
 - Each reachable en-route TAZ is assigned a score equal to the number of available chargers or a certain level times the level number (E.g. if two level 3 and one level 2 chargers are available then the score would be 2 * 3 + 1 * 2 = 8).  If the TAZ is the driver’s home, then 8 is added to the score for that TAZ (in other words, a home charger is as valuable as 4 level 2 chargers but not as valuable as 3 level 3 chargers).  
 - The TAZ with the highest score is selected (ties are broken by selecting the furthest taz from the current location).  If no en-route TAZs have any available chargers (i.e. if they all have a score of 0), then the driver selects the most distance reachable TAZ.
 # 6. Parameters
+
+````
+Table 11: Model Parameters
+````
+
 Name | Description | Default Value
 -----|-------------|:--------------:
 chargeSafetyFactor | Multiplier used to approximate the safety factor drivers assume necessary to ensure a trip can be made.|1.1

@@ -7,8 +7,9 @@
 ####Schatz Energy Research Center
 # At the top, we test equations.
 
-$a+b=c$
-$$a+b=c$$
+'$a+b=c$'
+
+'$$a+b=c$$'
 
 
 # 1. Purpose

@@ -6,6 +6,15 @@
 
 ####Schatz Energy Research Center
 # At the top, we test equations.
+Does straight TeX work?:
+
+![equation](\frac{stateOfCharge*batteryCapacity}{electricFuelConumption})
+
+Using the codecogs tool to do the same:
+
+
+![equation](http://latex.codecogs.com/gif.latex?%5Cfrac%7BstateOfCharge*batteryCapacity%7D%7BelectricFuelConumption%7D)
+
 ![equation](http://latex.codecogs.com/gif.latex?1%2Bsin%28mc%5E2%29%0D%0A)
 
 

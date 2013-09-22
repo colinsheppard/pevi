@@ -5,6 +5,11 @@
 ####Colin Sheppard, Allison Campbell, Jim Zoellick, Charles Chamberlin, Andy Harris
 
 ####Schatz Energy Research Center
+# At the top, we test equations.
+
+$a+b=c$
+$$a+b=c$$
+
 
 # 1. Purpose
 The purpose of this model is to simulate different PEV public charging infrastructure alternatives for the target region. The PEV infrastructure alternatives are described by number, type and location of PEV charging stations throughout the region.  For each alternative, a variety of realistic scenarios should be modeled that represent different PEV adoption rates, technologic advances, driver behaviors, and vehicle types. A measure of driver’s satisfaction and amount of use (duty factor) are outputs from the model needed to determine the preferred alternative. The model must incorporate any relevant traffic data available and spatially represent an aggregated set of existing traffic analysis zones (TAZs), if any.

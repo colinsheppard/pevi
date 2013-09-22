@@ -6,10 +6,7 @@
 
 ####Schatz Energy Research Center
 # At the top, we test equations.
-
-\[\]a+b=c
-
-'$$a+b=c$$'
+![equation](http://latex.codecogs.com/gif.latex?1%2Bsin%28mc%5E2%29%0D%0A)
 
 
 # 1. Purpose

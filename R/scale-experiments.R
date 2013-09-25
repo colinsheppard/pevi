@@ -47,3 +47,19 @@ for(n in c(104,208,416)){
 
   write.table(new.chargers,file=pp(path.to.inputs,"/chargers-",n,".txt"),row.names=F,sep="\t",quote=F)
 }
+
+# analysis of scaling results
+prof <- read.csv("~/Dropbox/serc/pev-colin/pev-shared/data/inputs/sensitivity/scale-experiment/scale_experiment_profiling_results.csv",header=F,stringsAsFactors=F)
+prof.names <- prof[,1]
+prof <- data.frame(t(prof[,2:ncol(prof)]))
+names(prof) <- prof.names
+prof.melted <- melt(prof,c("Drivers","TAZs"))
+
+# plot all at once
+ggplot(prof.melted,aes(x=Drivers,y=value/1000,colour=variable))+geom_line()+facet_wrap(~TAZs)
+
+# find the 20 most expensive procedures in the highest scale-out case
+top.20 <- as.character(subset(prof.melted,Drivers==384000 & TAZs==52)$variable[order(subset(prof.melted,Drivers==384000 & TAZs==52)$value)][1:20])
+
+# plot just top 20 
+ggplot(subset(prof.melted,variable %in% top.20),aes(x=Drivers,y=value/1000,colour=variable))+geom_line()+facet_wrap(~TAZs)

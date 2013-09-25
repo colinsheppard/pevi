@@ -30,13 +30,13 @@ The TAZs are entities that describe the atomic geographic regions of the environ
 Table 1: Traffic Analysis Zone Agent Variables
 ````
 
-Category          | Variable      | Description
-------------      | ------------- | ------------
-Identity (static) | ID            | Integer identification code specified in the input data supplied to the model.
-Contents          | ~~chargersInTAZ (static)~~  | ~~A list of chargers contained in the TAZ.~~
-                  | ~~homeCharger~~   | ~~Every TAZ has a Level II charger which is only available to drivers in their home TAZ.~~
-                  | ~~driversInTAZ (dynamic)~~| ~~A list of drivers currently in the TAZ.~~
-                  | nLevels       | A 4-value list containing the number of chargers of each level (0 [home charging], 1, 2, or 3)
+Category          | Variable     				 | Description
+------------------|-----------------------------|-------------
+Identity (static) | ID            				 | Integer identification code 												   specified in the input data 												   supplied to the model.
+Contents          | ~~chargersInTAZ (static)~~  | ~~A list of chargers 												   contained in the TAZ.~~
+                  | ~~homeCharger~~   			 | ~~Every TAZ has a Level II 												   charger which is only 												   available to drivers in 												   their home TAZ.~~
+                  | ~~driversInTAZ (dynamic)~~  | ~~A list of drivers 												   currently in the TAZ.~~
+                  | nLevels       				 | A 4-value list containing 												   the number of chargers of 												   each level (0 [home 												   charging], 1, 2, or 3)
 
 ## 2.2 Environment
 The environment is the entity where all the agents live and interact. In this model it is the geographic region described by the input data. The environment is defined by several global state variables and parameters which are available to all agents in the model for reference or use. 
@@ -193,7 +193,7 @@ To make this determination, four values are estimated:
 - remainingRange: the number of miles remaining (set to a very large number if isBEV? is false),
 
 	![equation](http://latex.codecogs.com/gif.latex?%5Cfrac%7B%5Ctextup%7BstateOfCharge%7D%20*%20%5Ctextup%7BbatteryCapacity%7D%7D%7B%5Ctextup%7BelectricFuelConsumption%7D%7D)
-	<!---\frac{\textup{stateOfCharge} * \textup{batteryCapacity}}{\textup{electricFuelConsumption}}--->
+	<!---$\frac{\textup{stateOfCharge} * \textup{batteryCapacity}}{\textup{electricFuelConsumption}}$--->
 
 - tripDistance: the number of miles to complete the next trip in the driver’s itinerary
 - journeyDistance: the number of miles to complete all of the remaining trips in the driver’s itinerary
@@ -227,7 +227,7 @@ To make this determination, the following values are estimated:
 Equation 1:
 ````
 ![equation](http://latex.codecogs.com/gif.latex?%5Ctextup%7BtripChargeTimeNeed%7D%20%3D%20%5C%5C%5C%5C%5Ctextup%7Bmax%7D%5Cleft%20%5C%7B%200%2C%5Cfrac%7B%5Ctextup%7BtripDistance%7D%20*%20%5Ctextup%7BchargeSafetyFactor%7D%20*%20%5Ctextup%7BelectricFuelConsumption%7D%20-%20%5Ctextup%7BstateOfCharge%7D%20*%20%5Ctextup%7BbatteryCapacity%7D%7D%7B%5Ctextup%7BchargeRate%7D%7D%20%5Cright%20%5C%7D)
-<!---\textup{tripChargeTimeNeed} = \\\\\textup{max}\left \{ 0,\frac{\textup{tripDistance} * \textup{chargeSafetyFactor} * \textup{electricFuelConsumption} - \textup{stateOfCharge} * \textup{batteryCapacity}}{\textup{chargeRate}} \right \}--->
+<!---$\textup{tripChargeTimeNeed} = \\\\\textup{max}\left \{ 0,\frac{\textup{tripDistance} * \textup{chargeSafetyFactor} * \textup{electricFuelConsumption} - \textup{stateOfCharge} * \textup{batteryCapacity}}{\textup{chargeRate}} \right \}$--->
 
 - journeyDistance: the number of miles to complete all of the remaining trips in the driver’s itinerary
 - journeyChargeTimeNeed: the amount of charging time needed to complete the remaining trips in the itinerary:
@@ -237,7 +237,7 @@ Equation 2:
 ````
 
 ![equation](http://latex.codecogs.com/gif.latex?%5Ctextup%7BjourneyChargeTimeNeed%7D%20%3D%20%5C%5C%5C%5C%5Ctextup%7Bmax%7D%5Cleft%20%5C%7B%200%2C%5Cfrac%7B%5Ctextup%7BjourneyDistance%7D%20*%20%5Ctextup%7BchargeSafetyFactor%7D%20*%20%5Ctextup%7BelectricFuelConsumption%7D%20-%20%5Ctextup%7BstateOfCharge%7D%20*%20%5Ctextup%7BbatteryCapacity%7D%7D%7B%5Ctextup%7BchargeRate%7D%7D%20%5Cright%20%5C%7D)
-<!---\textup{journeyChargeTimeNeed} = \\\\\textup{max}\left \{ 0,\frac{\textup{journeyDistance} * \textup{chargeSafetyFactor} * \textup{electricFuelConsumption} - \textup{stateOfCharge} * \textup{batteryCapacity}}{\textup{chargeRate}} \right \}--->
+<!---$\textup{journeyChargeTimeNeed} = \\\\\textup{max}\left \{ 0,\frac{\textup{journeyDistance} * \textup{chargeSafetyFactor} * \textup{electricFuelConsumption} - \textup{stateOfCharge} * \textup{batteryCapacity}}{\textup{chargeRate}} \right \}$--->
  
 - fullChargeTimeNeed: the amount of charging time to complete a full charge,
 
@@ -246,7 +246,7 @@ Equation 2:
 ````
 
 ![equation](http://latex.codecogs.com/gif.latex?%5Ctextup%7Bif%20chargerType%20%3D%203%2C%20then%20fullChargeTimeNeed%20%3D%7D%5C%5C%5C%5C%5Ctextup%7Bmax%7D%5Cleft%20%5C%7B%200%2C%5Cfrac%7B%5Cleft%20%280.8-%5Ctextup%7BstateOfCharge%7D%20%5Cright%20%29%20*%20%5Ctextup%7BbatteryCapacity%7D%7D%7B%5Ctextup%7BchargeRate%7D%7D%20%5Cright%20%5C%7D%5C%5C%5C%5C%5Ctextup%7Botherwise%2C%20fullChargeTimeNeed%20%3D%7D%5C%5C%5C%5C%5Ctextup%7Bmax%7D%5Cleft%20%5C%7B%200%2C%5Cfrac%7B%5Cleft%20%28%201%20-%20%5Ctextup%7BstateOfCharge%7D%20%5Cright%20%29%20*%20%5Ctextup%7BbatteryCapacity%7D%7D%7B%5Ctextup%7BchargeRate%7D%7D%20%5Cright%20%5C%7D)
-<!---\textup{if chargerType = 3, then fullChargeTimeNeed =}\\\\\textup{max}\left \{ 0,\frac{\left (0.8-\textup{stateOfCharge}  \right ) * \textup{batteryCapacity}}{\textup{chargeRate}} \right \}\\\\\textup{otherwise, fullChargeTimeNeed =}\\\\\textup{max}\left \{ 0,\frac{\left ( 1 - \textup{stateOfCharge} \right ) * \textup{batteryCapacity}}{\textup{chargeRate}} \right \}--->
+<!---$\textup{if chargerType = 3, then fullChargeTimeNeed =}\\\\\textup{max}\left \{ 0,\frac{\left (0.8-\textup{stateOfCharge}  \right ) * \textup{batteryCapacity}}{\textup{chargeRate}} \right \}\\\\\textup{otherwise, fullChargeTimeNeed =}\\\\\textup{max}\left \{ 0,\frac{\left ( 1 - \textup{stateOfCharge} \right ) * \textup{batteryCapacity}}{\textup{chargeRate}} \right \}$--->
 - timeUntilEndCharge: the anticipated time in hours remaining before the driver chooses to end charging or the vehicle is fully charged.  The following table describes how this value is calculated:
 
 ````
@@ -308,14 +308,14 @@ The submodel consists of the following actions:
 	b. level3TimePenalty  Set this to a large value if the distance to the destination (in the case of enroute charging, from the intermediate TAZ) is greater than vehicle can go on a full level 3 charge (80% state of charge). Otherwise set to 0.  This penalizes level 3 charging when a level 1 or 2 charge might get the driver there without an additional stop or another charging session.
 	c. tripOrJourneyEnergyNeed.  This value depends on the amount of time before the next departure in the driver’s itinerary as well as the current state of charge and the charger type. If timeUntilDepart < willingToRoamThreshold, then only the energy needed for the next trip is considered, otherwise the energy needed for the journey is used. If the energy needed for the trip or journey is greater than the energy needed to fill the battery (or in the case of level 3, achieved 80% state of charger) then tripOrJourneyEnergyNeed is set to the battery limiting value. As a formula, the value is calculated as:
 	![equation](http://latex.codecogs.com/gif.latex?%5Ctextup%7Bif%20timeUntilDepart%7D%20%3C%20%5Ctextup%7BwillingToRoamThreshold%3A%7D%5C%5C%5Ctextup%7Bdistance%20%3D%20tripDistance%7D%5C%5C%5Ctextup%7Botherwise%3A%7D%5C%5C%5Ctextup%7Bdistance%20%3D%20journeyDistance%7D%5C%5C%5C%5C%5Ctextup%7Bif%20level%20%3D%203%3A%7D%5C%5C%5Ctextup%7BtripOrJourneyEnergyNeed%7D%20%3D%20%5Ctextup%7Bminimum%20of%7D%5C%5C%20%5Ctextup%7Bmax%7D%5Cleft%20%5B%200%2C%5Ctextup%7Bdistance%7D%20*%20%5Ctextup%7BchargeSafetyFactor%7D%20*%20%5Ctextup%7BelectricFuelConsumption%7D%20-%20%5Ctextup%7BstateOfCharge%7D%20*%20%5Ctextup%7BbatteryCapacity%7D%20%5Cright%20%5D%2C%5C%5C%5Ctextup%7Bmax%7D%5Cleft%20%5B%200%2C%20%5Cleft%20%28%200.8%20-%20%5Ctextup%7BstateOfCharge%7D%20%5Cright%20%29%20*%20%5Ctextup%7BbatteryCapacity%7D%20%5Cright%20%5D%5C%5C%5C%5C%5Ctextup%7Botherwise%3A%7D%5C%5C%5Ctextup%7BtripOrJourneyEnergyNeed%20%3D%20minimum%20of%7D%5C%5C%5Ctextup%7Bmax%7D%5Cleft%20%5B%200%2C%5Ctextup%7Bdistance%7D%20*%20%5Ctextup%7BchargeSafetyFactor%7D%20*%20%5Ctextup%7BelectricFuelConsumption%7D%20-%20%5Ctextup%7BstateOfCharge%7D%20*%20%5Ctextup%7BbatteryCapacity%7D%20%5Cright%20%5D%2C%5C%5C%5Ctextup%7Bmax%7D%5Cleft%20%5B%200%2C%20%5Cleft%20%28%201%20-%20%5Ctextup%7BstateOfCharge%7D%20%5Cright%20%29%20*%20%5Ctextup%7BbatteryCapacity%7D%20%5Cright%20%5D)
-	<!---\textup{if timeUntilDepart} < \textup{willingToRoamThreshold:}\\\textup{distance = tripDistance}\\\textup{otherwise:}\\\textup{distance = journeyDistance}\\\\\textup{if level = 3:}\\\textup{tripOrJourneyEnergyNeed} = \textup{minimum of}\\ \textup{max}\left [ 0,\textup{distance} * \textup{chargeSafetyFactor} * \textup{electricFuelConsumption} - \textup{stateOfCharge} * \textup{batteryCapacity} \right ],\\\textup{max}\left [ 0, \left ( 0.8 - \textup{stateOfCharge} \right ) * \textup{batteryCapacity} \right ]\\\\\textup{otherwise:}\\\textup{tripOrJourneyEnergyNeed = minimum of}\\\textup{max}\left [ 0,\textup{distance} * \textup{chargeSafetyFactor} * \textup{electricFuelConsumption} - \textup{stateOfCharge} * \textup{batteryCapacity} \right ],\\\textup{max}\left [ 0, \left ( 1 - \textup{stateOfCharge} \right ) * \textup{batteryCapacity} \right ]--->
+	<!---$\textup{if timeUntilDepart} < \textup{willingToRoamThreshold:}\\\textup{distance = tripDistance}\\\textup{otherwise:}\\\textup{distance = journeyDistance}\\\\\textup{if level = 3:}\\\textup{tripOrJourneyEnergyNeed} = \textup{minimum of}\\ \textup{max}\left [ 0,\textup{distance} * \textup{chargeSafetyFactor} * \textup{electricFuelConsumption} - \textup{stateOfCharge} * \textup{batteryCapacity} \right ],\\\textup{max}\left [ 0, \left ( 0.8 - \textup{stateOfCharge} \right ) * \textup{batteryCapacity} \right ]\\\\\textup{otherwise:}\\\textup{tripOrJourneyEnergyNeed = minimum of}\\\textup{max}\left [ 0,\textup{distance} * \textup{chargeSafetyFactor} * \textup{electricFuelConsumption} - \textup{stateOfCharge} * \textup{batteryCapacity} \right ],\\\textup{max}\left [ 0, \left ( 1 - \textup{stateOfCharge} \right ) * \textup{batteryCapacity} \right ]$--->
 	d. extraTimeForTravel(i), extraDistanceForTravel(i): the additional travel time and distance needed to accommodate the detour, equal to the difference between first traveling to the intermediate TAZ, then to the destination TAZ vs. traveling straight to the destination TAZ.
 	e. extraEnergyForTravel(i): the energy needed to accommodate the extra travel, calculated by: 
 	![equation](http://latex.codecogs.com/gif.latex?%5Ctextup%7BextraDistanceForTravel%7D_%7Bi%7D%20*%20%5Ctextup%7BelectricFuelConsumption%7D%20*%20%5Ctextup%7BchargeSafetyFactor%7D)
-	<!---\textup{extraDistanceForTravel}_{i} * \textup{electricFuelConsumption}  * \textup{chargeSafetyFactor}--->
+	<!---$\textup{extraDistanceForTravel}_{i} * \textup{electricFuelConsumption}  * \textup{chargeSafetyFactor}$--->
 	f. extraTimeUntilEndCharge(i): if chargerInOriginOrDestination(i) is true, then this value is set to the amount of delay in the driver’s itinerary that would be necessary to use the charging alternative. Calculate as:
 	![equation](http://latex.codecogs.com/gif.latex?%5Ctextup%7BCharger%20in%20origin%3F%7D%5C%5C%20%5Ctextup%7BextraTimeUntilEndCharge%7D_%7Bi%7D%20%3D%20%5Ctextup%7Bmax%7D%5Cleft%20%5C%7B%200%2C%20%5Ctextup%7BtripChargeTimeNeed%20-%20timeUntilDepart%7D%20%5Cright%20%5C%7D%5C%5C%20%5Ctextup%7BOtherwise%2C%7D%5C%5C%20%5Ctextup%7BextraTimeUntilEndCharge%20%3D%200%7D)
-	<!---\textup{Charger in origin?}\\\textup{extraTimeUntilEndCharge}_{i} = \textup{max}\left \{ 0, \textup{tripChargeTimeNeed - timeUntilDepart}\right\}\\\textup{Otherwise,}\\\textup{extraTimeUntilEndCharge = 0}-->
+	<!---$\textup{Charger in origin?}\\\textup{extraTimeUntilEndCharge}_{i} = \textup{max}\left \{ 0, \textup{tripChargeTimeNeed - timeUntilDepart}\right\}\\\textup{Otherwise,}\\\textup{extraTimeUntilEndCharge = 0}$-->
 If chargerInOriginOrDestination(i) is false, then the value is an estimate of the extra time a driver would spend charging, equal to the value of timeUntilEndCharge as calculated by the Charge Time submodel (Section Charge Time) with the following modifications:
 		f.i. timeUntilDepart is decreased by the time of travel from the origin TAZ to TAZ(i)
 		f.ii. stateOfCharge is decreased by  where tripDistancei is the distance in miles from the origin TAZ to TAZ(i)
@@ -325,7 +325,7 @@ If chargerInOriginOrDestination(i) is false, then the value is an estimate of th
 Equation 4:
 ````
 	![equation](http://latex.codecogs.com/gif.latex?%5Ctextup%7BCost%7D_%7Bi%7D%20%3D%20%5Ctextup%7BtimeOpportunityCost%7D%20*%20%5Cleft%20%5B%20%5Ctextup%7BextraTimeUntilEndCharge%7D_%7Bi%7D%20&plus;%20%5Ctextup%7BextraTimeForTravel%7D_%7Bi%7D%20&plus;%20%5Ctextup%7Blevel3TimePenalty%7D_%7Bi%7D%20%5Cright%20%5D%5C%5C%20&plus;%20%5Ctextup%7BenergyPrice%7D_%7Bi%7D%20*%20%5Cleft%20%5B%20%5Ctextup%7BtripOrJourneyEnergyNeed%7D%20&plus;%20%5Ctextup%7BextraEnergyForTravel%7D_%7Bi%7D%20%5Cright%20%5D)
-	<!---\textup{Cost}_{i} = \textup{timeOpportunityCost} * \left [ \textup{extraTimeUntilEndCharge}_{i} + \textup{extraTimeForTravel}_{i} + \textup{level3TimePenalty}_{i} \right ]\\ + \textup{energyPrice}_{i} * \left [ \textup{tripOrJourneyEnergyNeed} + \textup{extraEnergyForTravel}_{i} \right ]--->
+	<!---$\textup{Cost}_{i} = \textup{timeOpportunityCost} * \left [ \textup{extraTimeUntilEndCharge}_{i} + \textup{extraTimeForTravel}_{i} + \textup{level3TimePenalty}_{i} \right ]\\ + \textup{energyPrice}_{i} * \left [ \textup{tripOrJourneyEnergyNeed} + \textup{extraEnergyForTravel}_{i} \right ]$--->
 5. Chose the alternative with the minimum cost.  If TAZ(i)  is the current TAZ, call the *ChargeTime* event scheduler.   Otherwise update the driver’s itinerary to include the new destination TAZ (unless TAZ(i) is the destination TAZ) with a depart time equal to now and call the *TravelTime* event scheduler.
 
 ## 5.7 Break Up Trip

@@ -117,7 +117,11 @@ to setup-tazs
     ]
   ]
   [ error (word "Input file '" charger-input-file "' not found!")]
-   
+  ask turtle 0 [
+    set breed tazs
+    set n-levels n-values 4 [0]
+    set chargers-by-type n-values n-charger-types [0]
+  ] 
 end ;setup-tazs
 
 ;;;;;;;;;;;;;;;;;;;;;;;

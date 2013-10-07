@@ -1237,7 +1237,7 @@ SWITCH
 176
 log-wait-time
 log-wait-time
-0
+1
 1
 -1000
 
@@ -1248,7 +1248,7 @@ SWITCH
 222
 log-charging
 log-charging
-0
+1
 1
 -1000
 
@@ -1259,7 +1259,7 @@ SWITCH
 268
 log-charge-time
 log-charge-time
-0
+1
 1
 -1000
 
@@ -1270,7 +1270,7 @@ SWITCH
 313
 log-need-to-charge
 log-need-to-charge
-0
+1
 1
 -1000
 
@@ -1281,7 +1281,7 @@ SWITCH
 130
 log-trip-journey-timeuntildepart
 log-trip-journey-timeuntildepart
-0
+1
 1
 -1000
 
@@ -1292,7 +1292,7 @@ SWITCH
 359
 log-seek-charger
 log-seek-charger
-0
+1
 1
 -1000
 
@@ -1303,7 +1303,7 @@ SWITCH
 443
 log-break-up-trip
 log-break-up-trip
-0
+1
 1
 -1000
 
@@ -1314,7 +1314,7 @@ SWITCH
 489
 log-break-up-trip-choice
 log-break-up-trip-choice
-0
+1
 1
 -1000
 
@@ -1325,7 +1325,7 @@ SWITCH
 532
 log-charge-limiting-factor
 log-charge-limiting-factor
-0
+1
 1
 -1000
 
@@ -1336,7 +1336,7 @@ SWITCH
 400
 log-seek-charger-result
 log-seek-charger-result
-0
+1
 1
 -1000
 
@@ -1381,7 +1381,7 @@ SWITCH
 574
 log-drivers
 log-drivers
-0
+1
 1
 -1000
 
@@ -1392,7 +1392,7 @@ SWITCH
 92
 log-pain
 log-pain
-0
+1
 1
 -1000
 
@@ -1403,7 +1403,7 @@ SWITCH
 620
 log-tazs
 log-tazs
-0
+1
 1
 -1000
 
@@ -1440,7 +1440,7 @@ SWITCH
 180
 log-summary
 log-summary
-0
+1
 1
 -1000
 

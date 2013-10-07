@@ -4,47 +4,56 @@
 ##############################################################################################################################################
 
 ##############################################################################################################################################
-# BOILERPLATE LIBRARY SETUP
-if(length(grep("colinmisc",installed.packages()))==0){
-  if(length(grep("devtools",installed.packages()))==0)install.packages('devtools',repos='http://cran.cnr.Berkeley.edu')
-  library(devtools)
-  install_github('colinmisc','colinsheppard')
-}
-library(colinmisc,quietly=T)
-
-##############################################################################################################################################
 # LOAD LIBRARIES NEED BY THIS SCRIPT
-load.libraries(c('optparse','stringr','yaml'))
+load.libraries(c('optparse','stringr','yaml','plyr','ggplot2','reshape','maptools'))
 
 ##############################################################################################################################################
 # COMMAND LINE OPTIONS 
 option_list <- list(
-  make_option(c("-c", "--config"), default="PEVI_HOME/pevi.conf", help="Path to PEVI config file [default %default]")
+  make_option(c("-c", "--config"), default="PEVI_HOME/pevi.conf", help="Path to PEVI config file [default %default]"),
+  make_option(c("-y", "--years"), default="2011,2012", help="Comma-separated years of raw data to process [default %default]"),
+  make_option(c("-p", "--path"), default="data/UPSTATE", help="Path to Caltrans data relative to pevi.shared [default %default]")
 )
 if(interactive()){
-  setwd('~/Dropbox/serc/pev-colin/pevi/R')
-  args<-c()
+  setwd(pp(pevi.home))
+  args<-c('-y',pp(2004:2012,collapse=","))
   args <- parse_args(OptionParser(option_list = option_list,usage = "count-data.R [options]"),positional_arguments=F,args=args)
 }else{
   args <- parse_args(OptionParser(option_list = option_list,usage = "count-data.R [options]"),positional_arguments=F)
 }
 opts <- data.frame(args,stringsAsFactors=F)
+years <- as.numeric(str_split(opts$years,",")[[1]])
 
-# First test to see if the path has already been set
-r.settings.path <- pp(Sys.getenv("R_HOME"),"/etc/Renviron")
-r.settings <- readLines(r.settings.path)
-pevi.i <- grep("PEVI_HOME",r.settings)
 
-if(length(pevi.i)==0){
-  # Nothing there so add it
-  cat(pp("PEVI_HOME='",opts$pevi,"'"),file=r.settings.path,append=T)
-}else if(length(pevi.i)==1){
-  # One there, replace it
-  r.settings[pevi.i] <- pp("PEVI_HOME='",opts$pevi,"'")
-  writeLines(r.settings,con=r.settings.path)
-}else{
-  # Multiple there, replace first one and delete the rest 
-  r.settings <- r.settings[-pevi.i[2:length(pevi.i)]]
-  r.settings[pevi.i[1]] <- pp("PEVI_HOME='",opts$pevi,"'")
-  writeLines(r.settings,con=r.settings.path)
+##############################################################################################################################################
+# WHAT ROUTES SHOULD WE FOCUS ON
+rts <- c(96,89,5,263,3,97,5,299,273,44,89,36,151,99,172,32)
+rts <- rts[!duplicated(rts)]
+counties <- c('SHA','SIS','TEH')
+
+##############################################################################################################################################
+# SCRIPT CONTENT 
+##############################################################################################################################################
+
+for(yr in years){
+  file.path <- pp(pevi.shared,opts$path,"/",yr,"aadt-raw.csv")
+  if(!file.exists(file.path))error(pp("Cannot find file: ",file.path))
+  tmp <- read.csv(file.path,stringsAsFactors=F)
+  tmp <- subset(tmp,Dist==2 & Route %in% rts & County %in% counties)
+  tmp$Postmile <- as.numeric(tmp$Postmile)
+  tmp$Ahead.AADT <- as.numeric(tmp$Ahead.AADT)
+  tmp$Back.AADT <- as.numeric(tmp$Back.AADT)
+  
+  tmp.m <- melt(tmp,id.vars=c("County","Route","Postmile"),measure.vars=c('Ahead.AADT','Back.AADT'))
+  ggplot(tmp.m,aes(x=Postmile,y=value,colour=variable))+geom_bar(stat="identity",position='dodge')+facet_wrap(County~Route)
 }
+
+##############################################################################################################################################
+# LOAD Road Network
+
+rds <- readShapeLines(pp(pevi.shared,opts$path,'/shapefiles/Upstate_Roads_WGS84',sep=''))
+mm <- readShapePoints(pp(pevi.shared,opts$path,'/shapefiles/MileMarkers',sep=''))
+parse.mm <- str_split(mm$Name,"-")
+mm$county <- sapply(parse.mm,function(l){ l[1] })
+mm$route  <- sapply(parse.mm,function(l){ l[2] })
+mm$post.mile <- sapply(parse.mm,function(l){ l[3] })

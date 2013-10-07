@@ -1,20 +1,11 @@
-#!/usr/bin/Rscript --vanilla 
+#!/usr/bin/Rscript --no-save --no-restore
 ##############################################################################################################################################
-# Script to comment out lines of a file flagged with ";;;LOG"
+# Script to pre-process count data from Caltrans
 ##############################################################################################################################################
-
-##############################################################################################################################################
-# BOILERPLATE LIBRARY SETUP
-if(length(grep("colinmisc",installed.packages()))==0){
-  if(length(grep("devtools",installed.packages()))==0)install.packages('devtools',repos='http://cran.cnr.Berkeley.edu')
-  library(devtools)
-  install_github('colinmisc','colinsheppard')
-}
-library(colinmisc,quietly=T)
 
 ##############################################################################################################################################
 # LOAD LIBRARIES NEED BY THIS SCRIPT
-load.libraries(c('optparse','stringr'))
+load.libraries(c('optparse','stringr'),quietly=T)
 
 ##############################################################################################################################################
 # COMMAND LINE OPTIONS 
@@ -23,7 +14,7 @@ option_list <- list(
   make_option(c("-o", "--outfile"), type="character", default='nolog.out', help="Output file to write the commented code [\"%default\"]",metavar="out-file")
 )
 if(interactive()){
-  setwd('~/Dropbox/serc/pev-colin/pevi/netlogo')
+  setwd(pp(pevi.home,'netlogo'))
   args<-c('-o','PEVI-nolog.nlogo','PEVI.nlogo')
   args <- parse_args(OptionParser(option_list = option_list,usage = "nolog.R [options] INFILE"),positional_arguments=T,args=args)
 }else{

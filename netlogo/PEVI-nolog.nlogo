@@ -79,7 +79,6 @@ drivers-own [
   itin-from 
   itin-to
   itin-depart
-  itin-trip-type
   itin-change-flag
   itin-delay-amount
   max-trip-distance
@@ -136,8 +135,6 @@ chargers-own[
 tazs-own[
   id              ; TAZ id
   chargers-by-type ; list of lists of chargers organized by type, e.g. [ [level-0] [level-1-a level-1-b ....] [level-2-a level-2-b ....] [level-3-a ....] ]
-  home-charger    ; special charger available to all drivers when in their home taz
-  drivers-in-taz  ; list of drivers currently in TAZ
   
   neighbor-tazs   ; list of tazs within charger-search-distance of this taz
   
@@ -268,6 +265,7 @@ to setup-in-batch-mode
   ifelse count turtles = 0 [
     clear-all-and-initialize
     if fix-seed [random-seed starting-seed]
+    ; Can we combine this with the code existing in setup?
     set small-num 1e-11
     set batch-setup? false
     set seed-list (sentence random 2147483647 random 2147483647 random 2147483647)
@@ -290,6 +288,7 @@ to setup-in-batch-mode
     print "setup-chargers"
     setup-charger-types
     setup-chargers
+    ; Make "intialize-logfile" procedure
 ;;;    reset-logfile "charging" ;;;LOG
 ;;;    log-data "charging" (sentence "time" "charger.id" "charger.level" "location" "driver" "vehicle.type" "duration" "energy" "begin.soc" "end.soc" "after.end.charge" "charging.on.whim" "time.until.depart") ;;;LOG
 ;;;    reset-logfile "pain" ;;;LOG
@@ -550,7 +549,11 @@ to seek-charger
               set #min-taz #this-taz
               set #min-charger-type #this-charger-type 
             ]
-            log-data "seek-charger" (sentence ticks seek-charger-index ([id] of current-taz) ([id] of #this-taz) id ([name] of this-vehicle-type) electric-fuel-consumption is-BEV? #charger-in-origin-or-destination #level state-of-charge (item #level #trip-or-journey-energy-need-by-type) (distance-from-to [id] of current-taz [id] of #this-taz) (distance-from-to [id] of #this-taz [id] of destination-taz) (time-from-to [id] of current-taz [id] of #this-taz) (time-from-to [id] of #this-taz [id] of destination-taz) trip-time trip-distance journey-distance charging-on-a-whim? time-until-depart (item #level #trip-charge-time-need-by-type) #this-cost #extra-time-until-end-charge #full-charge-time-need #trip-charge-time-need #mid-journey-charge-time-need #mid-state-of-charge)
+;;;            log-data "seek-charger" (sentence ticks seek-charger-index ([id] of current-taz) ([id] of #this-taz) id ([name] of this-vehicle-type) electric-fuel-consumption is-BEV?       ;;;LOG
+;;;              #charger-in-origin-or-destination #level state-of-charge (item #level #trip-or-journey-energy-need-by-type) (distance-from-to [id] of current-taz [id] of #this-taz)        ;;;LOG
+;;;              (distance-from-to [id] of #this-taz [id] of destination-taz) (time-from-to [id] of current-taz [id] of #this-taz) (time-from-to [id] of #this-taz [id] of destination-taz)  ;;;LOG
+;;;              trip-time trip-distance journey-distance charging-on-a-whim? time-until-depart (item #level #trip-charge-time-need-by-type) #this-cost #extra-time-until-end-charge         ;;;LOG
+;;;              #full-charge-time-need #trip-charge-time-need #mid-journey-charge-time-need #mid-state-of-charge)  ;;;LOG
           ]
         ]
       ]
@@ -562,7 +565,7 @@ to seek-charger
     set num-denials (num-denials + 1)
     wait-time-event-scheduler
   ][
-    log-data "seek-charger-result" (sentence ticks seek-charger-index id ([id] of #min-taz) (#min-taz = current-taz or #min-taz = destination-taz) ([level] of #min-charger-type) #min-cost)
+;;;    log-data "seek-charger-result" (sentence ticks seek-charger-index id ([id] of #min-taz) (#min-taz = current-taz or #min-taz = destination-taz) ([level] of #min-charger-type) #min-cost)  ;;;LOG
     ifelse #min-taz = current-taz [
       set current-charger one-of available-chargers #min-taz [level] of #min-charger-type
       if [level] of #min-charger-type > 0 [
@@ -843,7 +846,6 @@ end
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 to itinerary-event-scheduler
   set state "not-charging"
-    ask taz 1 [if (drivers-in-taz > 0) [print drivers-in-taz]]
   time:schedule-event self task depart departure-time
 end
 
@@ -990,9 +992,9 @@ to arrive
     set energy-used energy-used + #charge-used * battery-capacity
   ]
   
-  let #completed-journey journey-distance
-  let #completed-trip trip-distance
-  let #from-taz [id] of current-taz
+;;;  let #completed-journey journey-distance  ;;;LOG
+;;;  let #completed-trip trip-distance        ;;;LOG
+;;;  let #from-taz [id] of current-taz        ;;;LOG
   set journey-distance journey-distance - trip-distance
 ;;;  log-driver "arriving" ;;;LOG
   
@@ -1235,7 +1237,7 @@ SWITCH
 176
 log-wait-time
 log-wait-time
-1
+0
 1
 -1000
 
@@ -1257,7 +1259,7 @@ SWITCH
 268
 log-charge-time
 log-charge-time
-1
+0
 1
 -1000
 
@@ -1279,7 +1281,7 @@ SWITCH
 130
 log-trip-journey-timeuntildepart
 log-trip-journey-timeuntildepart
-1
+0
 1
 -1000
 
@@ -1290,7 +1292,7 @@ SWITCH
 359
 log-seek-charger
 log-seek-charger
-1
+0
 1
 -1000
 
@@ -1301,7 +1303,7 @@ SWITCH
 443
 log-break-up-trip
 log-break-up-trip
-1
+0
 1
 -1000
 
@@ -1312,7 +1314,7 @@ SWITCH
 489
 log-break-up-trip-choice
 log-break-up-trip-choice
-1
+0
 1
 -1000
 
@@ -1323,7 +1325,7 @@ SWITCH
 532
 log-charge-limiting-factor
 log-charge-limiting-factor
-1
+0
 1
 -1000
 
@@ -1334,7 +1336,7 @@ SWITCH
 400
 log-seek-charger-result
 log-seek-charger-result
-1
+0
 1
 -1000
 
@@ -1379,7 +1381,7 @@ SWITCH
 574
 log-drivers
 log-drivers
-1
+0
 1
 -1000
 
@@ -1401,7 +1403,7 @@ SWITCH
 620
 log-tazs
 log-tazs
-1
+0
 1
 -1000
 
@@ -1438,7 +1440,7 @@ SWITCH
 180
 log-summary
 log-summary
-1
+0
 1
 -1000
 
@@ -1482,7 +1484,7 @@ INPUTBOX
 832
 253
 starting-seed
-1
+2
 1
 0
 Number

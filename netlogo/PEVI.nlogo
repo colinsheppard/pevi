@@ -126,7 +126,7 @@ drivers-own [
 chargers-own[
   location         ; TAZ # for each charger
   current-driver   ; driver currenlty being serviced, nobody indicates charger is available
-  this-charger-type     ; 1, 2, or 3 ***address name later?
+  this-charger-type     ; 0, 1, 2, 3, or 4 ***address name later?
 
   num-sessions     ; count of charging sessions
   energy-delivered ; kWh
@@ -138,11 +138,11 @@ tazs-own[
   
   neighbor-tazs   ; list of tazs within charger-search-distance of this taz
   
-  n-levels        ; list containing the number of chargers for levels 0,1,2,3 at index 0,1,2,3, where 0=home
+  n-levels        ; list containing the number of chargers for levels 0,1,2,3,4 at index 0,1,2,3,4 where 0=home and 4=battery swap
 ]
 
 charger-types-own[
-  level            ; 0,1,2,3, where 0=home
+  level            ; 0,1,2,3,4 where 0=home, 4=battery swap
   charge-rate      ; kWh / hr  
   energy-price     ; $0.14/kWh
   installed-cost   ; $
@@ -187,7 +187,7 @@ to clear-all-and-initialize
   ;print "clear all"
   clear-all
   time:clear-schedule
-  create-turtles 1 [ setxy 0 0 set color black] ;This invisible turtle makes sure we start at taz 1 not taz 0
+  create-turtles 1 [ setxy 0 0 set color black] ;This invisible turtle makes sure we start at taz 1 not taz 0. Tutrle eventually changed to taz 0, for homeless drivers.
   reset-ticks
 end
 
@@ -469,7 +469,7 @@ to seek-charger
   foreach [sentence level charge-rate] of charger-types [
     let #trip-energy-need-limited #trip-energy-need
     let #journey-energy-need-limited #journey-energy-need
-    ifelse item 0 ? < 3 [
+    ifelse item 0 ? != 3 [
       set #trip-energy-need-limited min (sentence ((1 - state-of-charge) * battery-capacity) #trip-energy-need-limited)
       set #journey-energy-need-limited min (sentence ((1 - state-of-charge) * battery-capacity) #journey-energy-need-limited)
     ][
@@ -650,7 +650,7 @@ to charge-time-event-scheduler
                                                     [this-charger-type] of current-charger)
   let next-event-scheduled-at 0 
   ifelse (not charging-on-a-whim?) and (time-until-end-charge > 0) and (time-until-end-charge < full-charge-time-need) and   
-         (level-of current-charger < 3) and 
+         (level-of current-charger < 3) and ;I think we can leave this unchanged with level 4 charging
          ( time-until-end-charge > time-until-depart or 
            ( (time-until-end-charge < journey-charge-time-need) and (time-until-depart > willing-to-roam-time-threshold) )
          ) [
@@ -855,7 +855,7 @@ end
 to depart
 ;  log-data "drivers" (sentence precision ticks 3 [id] of self "departing" state-of-charge)
   ifelse need-to-charge "depart" [  
-    ifelse state-of-charge >= 1 - small-num or (( count (existing-chargers current-taz 1)  = 0) and (count (existing-chargers current-taz 2)  = 0) and state-of-charge >= 0.8 - small-num)[
+    ifelse state-of-charge >= 1 - small-num or (( count (existing-chargers current-taz 1)  = 0) and (count (existing-chargers current-taz 2)  = 0) and (count (existing-chargers current-taz 4)  = 0) and state-of-charge >= 0.8 - small-num)[
       log-data "break-up-trip" (sentence ticks id state-of-charge ([id] of current-taz) ([id] of destination-taz) remaining-range charging-on-a-whim? "break-up-trip") ;;;LOG
       break-up-trip
     ][
@@ -883,7 +883,7 @@ to break-up-trip
     set #this-taz ?
     let #this-score 0
     let #this-dist distance-from-to [id] of current-taz [id] of #this-taz
-    let #only-level-3 (count (existing-chargers #this-taz 1)  = 0) and (count (existing-chargers #this-taz 2)  = 0)
+    let #only-level-3 (count (existing-chargers #this-taz 1)  = 0) and (count (existing-chargers #this-taz 2)  = 0) and (count (existing-chargers #this-taz 4)  = 0)
     if #this-dist <= remaining-range / charge-safety-factor and 
       ( (#only-level-3 and distance-from-to [id] of #this-taz [id] of destination-taz <= 0.8 * battery-capacity / electric-fuel-consumption / charge-safety-factor)
         or (not #only-level-3 and distance-from-to [id] of #this-taz [id] of destination-taz <= battery-capacity / electric-fuel-consumption / charge-safety-factor) ) [
@@ -1292,7 +1292,7 @@ SWITCH
 359
 log-seek-charger
 log-seek-charger
-1
+0
 1
 -1000
 
@@ -1336,7 +1336,7 @@ SWITCH
 400
 log-seek-charger-result
 log-seek-charger-result
-1
+0
 1
 -1000
 
@@ -1429,7 +1429,7 @@ SWITCH
 94
 log-trip
 log-trip
-0
+1
 1
 -1000
 

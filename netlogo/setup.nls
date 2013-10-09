@@ -295,6 +295,7 @@ to setup-vehicle-types
         set electric-fuel-consumption file-read
         set hybrid-fuel-consumption file-read
         set battery-capacity file-read
+        set multi-unit-home file-read
         set frac-of-pevs file-read
         set #cumul-frac-pevs #cumul-frac-pevs + frac-of-pevs
         set is-bev? (hybrid-fuel-consumption <= 0)
@@ -327,7 +328,7 @@ to setup-itinerary
       create-drivers 1 [
         set id this-driver
         set itin-from n-values 1 [file-read]
-        set itin-to n-values 1 [file-read]  
+        set itin-to n-values 1 [file-read]
         set itin-depart n-values 1 [file-read]
         set home-taz taz file-read
         let itin-row 0

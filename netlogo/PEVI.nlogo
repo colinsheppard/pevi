@@ -156,6 +156,7 @@ vehicle-types-own[
   frac-of-pevs
   num-vehicles
   is-bev?
+  multi-unit-home           ; Boolean for if home TAZ has -1 level charger
 ]
 
 to setup-from-gui

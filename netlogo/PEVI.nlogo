@@ -45,6 +45,7 @@ globals [
   electric-fuel-consumption-sd
   electric-fuel-consumption-range
   stranded-delay-threshold
+  multi-unit-search-tolerance
   
   ;; globals needed for testing
   test-driver
@@ -60,7 +61,8 @@ breed [charger-types charger-type]
 drivers-own [
 ;; VEHICLE
   this-vehicle-type              ; e.g. 'leaf' or 'volt'
-  is-bev?                  
+  is-bev?
+  multi-unit?                  
   battery-capacity          ; kwh
   electric-fuel-consumption ; kwh / mile
   hybrid-fuel-consumption   ; gallon / mile, for phev charge sustaining mode
@@ -110,6 +112,7 @@ drivers-own [
   gasoline-used
   miles-driven
   num-denials
+  multi-unit-search-count         ; Counter for how many times a multi-unit driver has tried to charge at the end of the day
   
 ;; CANDIDATE ADDITIONS TO MODEL DESCRIPTION
   energy-received ; a count of how much energy each driver has charged
@@ -499,7 +502,7 @@ to seek-charger
 
       foreach [level] of charger-types [
         let #level ?
-        if (count (available-chargers #this-taz #level) > 0) and (#level > 0 or #this-taz = home-taz) [
+        if (count (available-chargers #this-taz #level) > 0) and ((#level > 0 and #level < 5) or ((#this-taz = home-taz and multi-unit?) and #level = 5) or ((#this-taz = home-taz and (not multi-unit?)) and #level = 0)) [
           let #this-charger-type one-of charger-types with [ level = #level ]
           let #this-charge-rate [charge-rate] of #this-charger-type
           ifelse #charger-in-origin-or-destination [
@@ -1011,14 +1014,19 @@ to arrive
       log-data "trip-journey-timeuntildepart" (sentence ticks departure-time id [name] of this-vehicle-type state-of-charge #from-taz #to-taz #completed-trip #completed-journey (departure-time - ticks) "scheduling-itinerary" remaining-range sum map weight-delay itin-delay-amount) ;;;LOG
     ]
   ][
-    ;; itin is complete and at home? plug-in immediately and charge till full
+    ;; itin is complete and at home? Perform random draw to see if they plug-in immediately and charge till full. If multi-unit, charger may not be available.
     ifelse current-taz = home-taz [
       if (random-float 1) < (1 / (1 + exp(-5 + 6 * state-of-charge))) [
-        set current-charger (one-of item 0 [chargers-by-type] of current-taz)
-        set full-charge-time-need (1 - state-of-charge) * battery-capacity / charge-rate-of current-charger
-        time:schedule-event self task end-charge ticks + full-charge-time-need 
-        set time-until-end-charge full-charge-time-need
-        log-data "charging" (sentence ticks [who] of current-charger level-of current-charger [id] of current-taz [id] of self [name] of this-vehicle-type full-charge-time-need (full-charge-time-need * charge-rate-of current-charger) state-of-charge (state-of-charge + (full-charge-time-need * charge-rate-of current-charger) / battery-capacity ) "stop" false) ;;;LOG
+        ifelse multi-unit? [
+          set multi-unit-search-count 0
+          end-of-day-multi-unit-charge
+        ][
+          set current-charger (one-of item 0 [chargers-by-type] of current-taz)
+          set full-charge-time-need (1 - state-of-charge) * battery-capacity / charge-rate-of current-charger
+          time:schedule-event self task end-charge ticks + full-charge-time-need 
+          set time-until-end-charge full-charge-time-need
+          log-data "charging" (sentence ticks [who] of current-charger level-of current-charger [id] of current-taz [id] of self [name] of this-vehicle-type full-charge-time-need (full-charge-time-need * charge-rate-of current-charger) state-of-charge (state-of-charge + (full-charge-time-need * charge-rate-of current-charger) / battery-capacity ) "stop" false) ;;;LOG
+        ]
       ]
       log-data "trip-journey-timeuntildepart" (sentence ticks ticks id [name] of this-vehicle-type state-of-charge #from-taz #to-taz #completed-trip #completed-journey 0 "home" remaining-range sum map weight-delay itin-delay-amount) ;;;LOG
     ][
@@ -1027,6 +1035,25 @@ to arrive
   ]
 
   
+end
+
+to end-of-day-multi-unit-charge
+  ifelse (count available-chargers current-taz 5) > 0 [
+    set current-charger one-of available-chargers current-taz 5
+    set full-charge-time-need (1 - state-of-charge) * battery-capacity / charge-rate-of current-charger
+    time:schedule-event self task end-charge ticks + full-charge-time-need 
+    set time-until-end-charge full-charge-time-need
+    log-data "charging" (sentence ticks [who] of current-charger level-of current-charger [id] of current-taz [id] of self [name] of this-vehicle-type full-charge-time-need (full-charge-time-need * charge-rate-of current-charger) state-of-charge (state-of-charge + (full-charge-time-need * charge-rate-of current-charger) / battery-capacity ) "stop" false) ;;;LOG
+    ask current-charger[
+      set current-driver myself
+    ]
+  ][
+    set multi-unit-search-count multi-unit-search-count + 1
+    if multi-unit-search-count <= multi-unit-search-tolerance [
+      let event-time-from-now random-exponential wait-time-mean
+      time:schedule-event self task end-of-day-multi-unit-charge ticks + event-time-from-now
+    ]
+  ]
 end
 
 ;;;;;;;;;;;;;;;;;;;;
@@ -1293,7 +1320,7 @@ SWITCH
 359
 log-seek-charger
 log-seek-charger
-0
+1
 1
 -1000
 
@@ -1337,7 +1364,7 @@ SWITCH
 400
 log-seek-charger-result
 log-seek-charger-result
-0
+1
 1
 -1000
 

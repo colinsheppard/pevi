@@ -96,6 +96,7 @@ to setup-tazs
     set size 0.5
     set n-levels n-values 6 [-99] 
     set chargers-by-type n-values n-charger-types [0]
+    set available-chargers-by-type n-values n-charger-types [0]
   ]
   ifelse (file-exists? charger-input-file) [
     file-close
@@ -107,6 +108,7 @@ to setup-tazs
         set #prev-taz-id id
         foreach [0 1 2 3 4 5] [
           set n-levels replace-item ? n-levels file-read ; sets the number of level X chargers in each TAZ
+          set available-chargers-by-type replace-item ? available-chargers-by-type structs:new-stack
         ]
         set neighbor-tazs n-values 0 [0]
         foreach n-values n-tazs [? + 1] [
@@ -118,6 +120,7 @@ to setup-tazs
     ]
   ]
   [ error (word "Input file '" charger-input-file "' not found!")]
+  ; turn tutrle 0 into the TAZ for homeless drivers
   ask turtle 0 [
     set breed tazs
     set n-levels n-values 6 [0]
@@ -410,26 +413,32 @@ to setup-chargers
     create-chargers [item 0 n-levels] of #this-taz [  ; The location of each charger created is then set as the current TAZ location
       set this-charger-type one-of charger-types with [level = 0]
       set location ?
+      ask #this-taz [structs:stack-push item 0 available-chargers-by-type myself]
     ]
     create-chargers [item 1 n-levels] of #this-taz [  ; The location of each charger created is then set as the current TAZ location
       set this-charger-type one-of charger-types with [level = 1]
       set location ?
+      ask #this-taz [structs:stack-push item 1 available-chargers-by-type myself]
     ]
     create-chargers [item 2 n-levels] of #this-taz [  ; The location of each charger created is then set as the current TAZ location
       set this-charger-type one-of charger-types with [level = 2]
       set location ?
+      ask #this-taz [structs:stack-push item 2 available-chargers-by-type myself]
     ]
     create-chargers [item 3 n-levels] of #this-taz [  ; The location of each charger created is then set as the current TAZ location
       set this-charger-type one-of charger-types with [level = 3]
       set location ?
+      ask #this-taz [structs:stack-push item 3 available-chargers-by-type myself]
     ]
     create-chargers [item 4 n-levels] of #this-taz [  ; The location of each charger created is then set as the current TAZ location
       set this-charger-type one-of charger-types with [level = 4]
       set location ?
+      ask #this-taz [structs:stack-push item 4 available-chargers-by-type myself]
     ]
     create-chargers [item 5 n-levels] of #this-taz [  ; The location of each charger created is then set as the current TAZ location
       set this-charger-type one-of charger-types with [level = 5]
       set location ?
+      ask #this-taz [structs:stack-push item 5 available-chargers-by-type myself]
     ]
     foreach n-values n-charger-types [?] [
       ask #this-taz [

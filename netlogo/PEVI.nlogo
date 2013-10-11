@@ -1,4 +1,4 @@
-extensions [time profiler] 
+extensions [time profiler structs] 
 __includes["setup.nls" "reporters.nls"]
 
 globals [    
@@ -138,6 +138,7 @@ chargers-own[
 tazs-own[
   id              ; TAZ id
   chargers-by-type ; list of lists of chargers organized by type, e.g. [ [level-0] [level-1-a level-1-b ....] [level-2-a level-2-b ....] [level-3-a ....] ]
+  available-chargers-by-type ; List of stacks for available chargers
   
   neighbor-tazs   ; list of tazs within charger-search-distance of this taz
   
@@ -1038,6 +1039,8 @@ to arrive
 end
 
 to end-of-day-multi-unit-charge
+  ; If a level 5 charger is available for the multi-unit driver, they begin charging. Otheriwse,
+  ; they will attempt to charge at a later time, until they have reached the maximum search limit.
   ifelse (count available-chargers current-taz 5) > 0 [
     set current-charger one-of available-chargers current-taz 5
     set full-charge-time-need (1 - state-of-charge) * battery-capacity / charge-rate-of current-charger

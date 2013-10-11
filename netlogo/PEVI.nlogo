@@ -360,17 +360,19 @@ to add-charger [ taz-id charger-level ]
     set current-driver nobody
     let #level [level] of this-charger-type
     set energy-delivered 0
-  ]
-  ask taz taz-id [
-    set chargers-by-type replace-item charger-level chargers-by-type chargers with [([level] of this-charger-type = charger-level) and (location = myself)]
-    set n-levels replace-item charger-level n-levels (item charger-level n-levels + 1)
+    ask taz taz-id [
+      structs:stack-push item charger-level available-chargers-by-type myself
+      set chargers-by-type replace-item charger-level chargers-by-type chargers with [([level] of this-charger-type = charger-level) and (location = myself)]
+      set n-levels replace-item charger-level n-levels (item charger-level n-levels + 1)
+    ]
   ]
 end
 
-to remove-charger [taz-id charger-level]
-  ifelse count chargers with [location = taz taz-id and this-charger-type = one-of charger-types with [level = charger-level]] > 0 [
-    ask one-of chargers with [location = taz taz-id and this-charger-type = one-of charger-types with [level = charger-level]] [die]
+to remove-charger [taz-id charger-level]  ifelse available-chargers taz taz-id charger-level > 0 [
+    ;ask one-of chargers with [location = taz taz-id and this-charger-type = one-of charger-types with [level = charger-level]] [die]
     ask taz taz-id [
+      let #dying-charger structs:stack-pop item charger-level available-chargers-by-type
+      ask #dying-charger [die]
       set chargers-by-type replace-item charger-level chargers-by-type chargers with [([level] of this-charger-type = charger-level) and (location = myself)]
       set n-levels replace-item charger-level n-levels (item charger-level n-levels - 1)
   ]

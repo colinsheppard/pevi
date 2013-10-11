@@ -413,32 +413,26 @@ to setup-chargers
     create-chargers [item 0 n-levels] of #this-taz [  ; The location of each charger created is then set as the current TAZ location
       set this-charger-type one-of charger-types with [level = 0]
       set location ?
-      ask #this-taz [structs:stack-push item 0 available-chargers-by-type myself]
     ]
     create-chargers [item 1 n-levels] of #this-taz [  ; The location of each charger created is then set as the current TAZ location
       set this-charger-type one-of charger-types with [level = 1]
       set location ?
-      ask #this-taz [structs:stack-push item 1 available-chargers-by-type myself]
     ]
     create-chargers [item 2 n-levels] of #this-taz [  ; The location of each charger created is then set as the current TAZ location
       set this-charger-type one-of charger-types with [level = 2]
       set location ?
-      ask #this-taz [structs:stack-push item 2 available-chargers-by-type myself]
     ]
     create-chargers [item 3 n-levels] of #this-taz [  ; The location of each charger created is then set as the current TAZ location
       set this-charger-type one-of charger-types with [level = 3]
       set location ?
-      ask #this-taz [structs:stack-push item 3 available-chargers-by-type myself]
     ]
     create-chargers [item 4 n-levels] of #this-taz [  ; The location of each charger created is then set as the current TAZ location
       set this-charger-type one-of charger-types with [level = 4]
       set location ?
-      ask #this-taz [structs:stack-push item 4 available-chargers-by-type myself]
     ]
     create-chargers [item 5 n-levels] of #this-taz [  ; The location of each charger created is then set as the current TAZ location
       set this-charger-type one-of charger-types with [level = 5]
       set location ?
-      ask #this-taz [structs:stack-push item 5 available-chargers-by-type myself]
     ]
     foreach n-values n-charger-types [?] [
       ask #this-taz [
@@ -446,6 +440,7 @@ to setup-chargers
       ]
     ]
   ]  
+  initialize-available-chargers
   ask chargers [
     set shape "Circle 2"
     set color red

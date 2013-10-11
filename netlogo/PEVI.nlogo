@@ -313,6 +313,7 @@ to setup-in-batch-mode
       set energy-delivered 0
       set num-sessions 0
     ]
+    initialize-available-chargers
     time:clear-schedule
     reset-ticks
     
@@ -1084,8 +1085,22 @@ to update-itinerary
   ]
 end
 
+to initialize-available-chargers
+  ask tazs [
+    foreach chargers-by-type [
+      ask-concurrent ? [
+        return-charger myself [level] of this-charger-type self
+      ]
+    ]
+  ]
+end
+
 to return-charger [#taz #level #charger]
-  ask #taz [structs:stack-push item #level available-chargers-by-type #charger]
+  ask #taz [
+    if not structs:stack-contains item #level available-chargers-by-type #charger [
+      structs:stack-push item #level available-chargers-by-type #charger
+    ]
+  ]
 end
 
 to-report available-chargers [#taz #level]
@@ -1294,7 +1309,7 @@ SWITCH
 222
 log-charging
 log-charging
-0
+1
 1
 -1000
 
@@ -1382,7 +1397,7 @@ SWITCH
 400
 log-seek-charger-result
 log-seek-charger-result
-0
+1
 1
 -1000
 
@@ -1475,7 +1490,7 @@ SWITCH
 94
 log-trip
 log-trip
-0
+1
 1
 -1000
 

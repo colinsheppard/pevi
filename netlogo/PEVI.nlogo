@@ -503,7 +503,7 @@ to seek-charger
 
       foreach [level] of charger-types [
         let #level ?
-        if (count (available-chargers #this-taz #level) > 0) and ((#level > 0 and #level < 5) or ((#this-taz = home-taz and multi-unit?) and #level = 5) or ((#this-taz = home-taz and (not multi-unit?)) and #level = 0)) [
+        if (available-chargers #this-taz #level > 0) and ((#level > 0 and #level < 5) or ((#this-taz = home-taz and multi-unit?) and #level = 5) or ((#this-taz = home-taz and (not multi-unit?)) and #level = 0)) [
           let #this-charger-type one-of charger-types with [ level = #level ]
           let #this-charge-rate [charge-rate] of #this-charger-type
           ifelse #charger-in-origin-or-destination [
@@ -572,7 +572,7 @@ to seek-charger
   ][
     log-data "seek-charger-result" (sentence ticks seek-charger-index id ([id] of #min-taz) (#min-taz = current-taz or #min-taz = destination-taz) ([level] of #min-charger-type) #min-cost)  ;;;LOG
     ifelse #min-taz = current-taz [
-      set current-charger one-of available-chargers #min-taz [level] of #min-charger-type
+      set current-charger selected-charger current-taz [level] of #min-charger-type
       if [level] of #min-charger-type > 0 [
         ask current-charger[
           set current-driver myself
@@ -843,6 +843,7 @@ to end-charge
     set energy-delivered energy-delivered + energy-charged
     set current-driver nobody 
   ]
+  return-charger current-taz [level] of [this-charger-type] of current-charger current-charger
   set current-charger nobody
 end
 
@@ -894,11 +895,11 @@ to break-up-trip
         or (not #only-level-3 and distance-from-to [id] of #this-taz [id] of destination-taz <= battery-capacity / electric-fuel-consumption / charge-safety-factor) ) [
       foreach [level] of charger-types [
         let #level ?
-        if (count (available-chargers #this-taz #level) > 0) [
+        if (available-chargers #this-taz #level > 0) [
           ifelse #level = 0 [
             if #this-taz = home-taz [ set #this-score #this-score + 8 ]
           ][
-            set #this-score #this-score + #level * count(available-chargers #this-taz #level)
+            set #this-score #this-score + #level * available-chargers #this-taz #level
           ]  
         ]
       ]
@@ -914,7 +915,7 @@ to break-up-trip
       foreach #cand-taz-list [ ;;;LOG
         set #this-taz ? ;;;LOG
         foreach [level] of charger-types [ ;;;LOG
-          log-data "available-chargers" (sentence ticks id [id] of current-taz [id] of home-taz [id] of #this-taz ? count (available-chargers #this-taz ?)) ;;;LOG
+          log-data "available-chargers" (sentence ticks id [id] of current-taz [id] of home-taz [id] of #this-taz ? available-chargers #this-taz ?) ;;;LOG
         ] ;;;LOG
       ] ;;;LOG
   ] ;;;LOG
@@ -930,11 +931,11 @@ to break-up-trip
       if #this-dist <= remaining-range / charge-safety-factor [
         foreach [level] of charger-types [
           let #level ?
-          if (count (available-chargers #this-taz #level) > 0) [
+          if (available-chargers #this-taz #level > 0) [
             ifelse #level = 0 [ 
               if #this-taz = home-taz [ set #this-score #this-score + 8 ]
             ][
-              set #this-score #this-score + #level * count(available-chargers #this-taz #level)
+              set #this-score #this-score + #level * available-chargers #this-taz #level
             ]  
           ]
         ]
@@ -1041,8 +1042,8 @@ end
 to end-of-day-multi-unit-charge
   ; If a level 5 charger is available for the multi-unit driver, they begin charging. Otheriwse,
   ; they will attempt to charge at a later time, until they have reached the maximum search limit.
-  ifelse (count available-chargers current-taz 5) > 0 [
-    set current-charger one-of available-chargers current-taz 5
+  ifelse available-chargers current-taz 5 > 0 [
+    set current-charger selected-charger current-taz 5
     set full-charge-time-need (1 - state-of-charge) * battery-capacity / charge-rate-of current-charger
     time:schedule-event self task end-charge ticks + full-charge-time-need 
     set time-until-end-charge full-charge-time-need
@@ -1081,12 +1082,24 @@ to update-itinerary
   ]
 end
 
+to return-charger [#taz #level #charger]
+  ask #taz [structs:stack-push item #level available-chargers-by-type #charger]
+end
+
 to-report available-chargers [#taz #level]
   let #found-chargers 0
   ask #taz[
-    set #found-chargers ((item #level chargers-by-type) with [current-driver = nobody])
+    set #found-chargers (structs:stack-count item #level available-chargers-by-type) ; I think this needs the actual chargers, not just how many.
   ]
   report #found-chargers
+end
+
+to-report selected-charger [#taz #level]
+  let #selected-charger 0
+  ask #taz[
+    set #selected-charger structs:stack-pop item #level available-chargers-by-type
+  ]
+  report #selected-charger
 end
 
 to-report existing-chargers [#taz #level]
@@ -1279,7 +1292,7 @@ SWITCH
 222
 log-charging
 log-charging
-1
+0
 1
 -1000
 
@@ -1367,7 +1380,7 @@ SWITCH
 400
 log-seek-charger-result
 log-seek-charger-result
-1
+0
 1
 -1000
 
@@ -1460,7 +1473,7 @@ SWITCH
 94
 log-trip
 log-trip
-1
+0
 1
 -1000
 

@@ -161,7 +161,6 @@ vehicle-types-own[
   frac-of-pevs
   num-vehicles
   is-bev?
-  multi-unit-home           ; Boolean for if home TAZ has -1 level charger
 ]
 
 to setup-from-gui
@@ -231,7 +230,7 @@ to setup
   setup-chargers
   reset-logfile "drivers" ;;;LOG
   reset-logfile "charging" ;;;LOG
-  log-data "charging" (sentence "time" "charger.id" "charger.level" "location" "driver" "vehicle.type" "duration" "energy" "begin.soc" "end.soc" "after.end.charge" "charging.on.whim" "time.until.depart") ;;;LOG
+  log-data "charging" (sentence "time" "charger.id" "charger.level" "location" "driver" "vehicle.type" "multi-unit?" "duration" "energy" "begin.soc" "end.soc" "after.end.charge" "charging.on.whim" "time.until.depart") ;;;LOG
   reset-logfile "pain" ;;;LOG
   log-data "pain" (sentence "time" "driver" "location" "vehicle.type" "pain.type" "pain.value" "state.of.charge") ;;;LOG
   reset-logfile "trip" ;;;LOG
@@ -296,7 +295,7 @@ to setup-in-batch-mode
     setup-chargers
     ; Make "intialize-logfile" procedure
     reset-logfile "charging" ;;;LOG
-    log-data "charging" (sentence "time" "charger.id" "charger.level" "location" "driver" "vehicle.type" "duration" "energy" "begin.soc" "end.soc" "after.end.charge" "charging.on.whim" "time.until.depart") ;;;LOG
+    log-data "charging" (sentence "time" "charger.id" "charger.level" "location" "driver" "vehicle.type" "multi-unit?" "duration" "energy" "begin.soc" "end.soc" "after.end.charge" "charging.on.whim" "time.until.depart") ;;;LOG
     reset-logfile "pain" ;;;LOG
     log-data "pain" (sentence "time" "driver" "location" "vehicle.type" "pain.type" "pain.value" "state.of.charge") ;;;LOG
     reset-logfile "trip" ;;;LOG
@@ -323,7 +322,7 @@ to setup-in-batch-mode
     initialize-drivers
     print random 1000
     reset-logfile "charging" ;;;LOG
-    log-data "charging" (sentence "time" "charger.id" "charger.level" "location" "driver" "vehicle.type" "duration" "energy" "begin.soc" "end.soc" "after.end.charge" "charging.on.whim" "time.until.depart") ;;;LOG
+    log-data "charging" (sentence "time" "charger.id" "charger.level" "location" "driver" "vehicle.type" "multi-unit?" "duration" "energy" "begin.soc" "end.soc" "after.end.charge" "charging.on.whim" "time.until.depart") ;;;LOG
     reset-logfile "pain" ;;;LOG
     log-data "pain" (sentence "time" "driver" "location" "vehicle.type" "pain.type" "pain.value" "state.of.charge") ;;;LOG
     reset-logfile "trip" ;;;LOG
@@ -675,7 +674,7 @@ to charge-time-event-scheduler
     set after-end-charge "depart"
   ]
   log-data "charge-time" (sentence ticks id charger-in-origin-or-destination (level-of current-charger) state-of-charge trip-distance journey-distance time-until-depart after-end-charge (next-event-scheduled-at - ticks)) ;;;LOG
-  log-data "charging" (sentence ticks [who] of current-charger level-of current-charger [id] of current-taz [id] of self [name] of this-vehicle-type (next-event-scheduled-at - ticks) ((next-event-scheduled-at - ticks) * charge-rate-of current-charger) state-of-charge (state-of-charge + ((next-event-scheduled-at - ticks) * charge-rate-of current-charger) / battery-capacity ) after-end-charge charging-on-a-whim? (departure-time - ticks)) ;;;LOG
+  log-data "charging" (sentence ticks [who] of current-charger level-of current-charger [id] of current-taz [id] of self [name] of this-vehicle-type multi-unit? (next-event-scheduled-at - ticks) ((next-event-scheduled-at - ticks) * charge-rate-of current-charger) state-of-charge (state-of-charge + ((next-event-scheduled-at - ticks) * charge-rate-of current-charger) / battery-capacity ) after-end-charge charging-on-a-whim? (departure-time - ticks)) ;;;LOG
   if next-event-scheduled-at > departure-time[
     change-depart-time next-event-scheduled-at
   ]
@@ -1031,7 +1030,7 @@ to arrive
           set full-charge-time-need (1 - state-of-charge) * battery-capacity / charge-rate-of current-charger
           time:schedule-event self task end-charge ticks + full-charge-time-need 
           set time-until-end-charge full-charge-time-need
-          log-data "charging" (sentence ticks [who] of current-charger level-of current-charger [id] of current-taz [id] of self [name] of this-vehicle-type full-charge-time-need (full-charge-time-need * charge-rate-of current-charger) state-of-charge (state-of-charge + (full-charge-time-need * charge-rate-of current-charger) / battery-capacity ) "stop" false) ;;;LOG
+          log-data "charging" (sentence ticks [who] of current-charger level-of current-charger [id] of current-taz [id] of self [name] of this-vehicle-type multi-unit? full-charge-time-need (full-charge-time-need * charge-rate-of current-charger) state-of-charge (state-of-charge + (full-charge-time-need * charge-rate-of current-charger) / battery-capacity ) "stop" false) ;;;LOG
         ]
       ]
       log-data "trip-journey-timeuntildepart" (sentence ticks ticks id [name] of this-vehicle-type state-of-charge #from-taz #to-taz #completed-trip #completed-journey 0 "home" remaining-range sum map weight-delay itin-delay-amount) ;;;LOG
@@ -1051,7 +1050,7 @@ to end-of-day-multi-unit-charge
     set full-charge-time-need (1 - state-of-charge) * battery-capacity / charge-rate-of current-charger
     time:schedule-event self task end-charge ticks + full-charge-time-need 
     set time-until-end-charge full-charge-time-need
-    log-data "charging" (sentence ticks [who] of current-charger level-of current-charger [id] of current-taz [id] of self [name] of this-vehicle-type full-charge-time-need (full-charge-time-need * charge-rate-of current-charger) state-of-charge (state-of-charge + (full-charge-time-need * charge-rate-of current-charger) / battery-capacity ) "stop" false) ;;;LOG
+    log-data "charging" (sentence ticks [who] of current-charger level-of current-charger [id] of current-taz [id] of self [name] of this-vehicle-type multi-unit? full-charge-time-need (full-charge-time-need * charge-rate-of current-charger) state-of-charge (state-of-charge + (full-charge-time-need * charge-rate-of current-charger) / battery-capacity ) "stop" false) ;;;LOG
     ask current-charger[
       set current-driver myself
     ]
@@ -1310,7 +1309,7 @@ SWITCH
 222
 log-charging
 log-charging
-1
+0
 1
 -1000
 

@@ -139,6 +139,7 @@ tazs-own[
   id              ; TAZ id
   chargers-by-type ; list of lists of chargers organized by type, e.g. [ [level-0] [level-1-a level-1-b ....] [level-2-a level-2-b ....] [level-3-a ....] ]
   available-chargers-by-type ; List of stacks for available chargers
+  frac-multi-unit  ; Fraction of drivers with home in TAZ who are multi-unit
   
   neighbor-tazs   ; list of tazs within charger-search-distance of this taz
   

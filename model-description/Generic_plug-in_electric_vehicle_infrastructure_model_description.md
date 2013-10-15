@@ -36,7 +36,7 @@ Identity (static) | ID            				 | Integer identification code 											
 Contents          | ~~chargersInTAZ (static)~~  | ~~A list of chargers 												   contained in the TAZ.~~
                   | ~~homeCharger~~   			 | ~~Every TAZ has a Level II 												   charger which is only 												   available to drivers in 												   their home TAZ.~~
                   | ~~driversInTAZ (dynamic)~~  | ~~A list of drivers 												   currently in the TAZ.~~
-                  | nLevels       				 | A 5-value list containing 												   the number of chargers of 												   each level (0 [home 												   charging], 1, 2, 3 ***or 4 (battery-swapping)***)
+                  | nLevels       				 | A 6-value list containing 												   the number of chargers of 												   each level (0 [home 												   charging], 1, 2, 3, *** 4 (battery-swapping) or 5 (multi-unit home charging)***)
 
 ## 2.2 Environment
 The environment is the entity where all the agents live and interact. In this model it is the geographic region described by the input data. The environment is defined by several global state variables and parameters which are available to all agents in the model for reference or use. 

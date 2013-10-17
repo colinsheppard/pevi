@@ -1162,6 +1162,17 @@ to-report weight-delay [delay]
   ifelse delay >= 0 [report delay][report -0.5 * delay]
 end
 
+to-report interpolate-soc [#rand-draw]
+  foreach draw-bound [
+    let current-index position ? draw-bound
+    let next-index position ? draw-bound + 1
+    if #rand-draw > ? and #rand-draw <= item next-index draw-bound [
+      report (#rand-draw - item current-index draw-bound)*(item next-index start-soc - item current-index start-soc)/(item next-index draw-bound - item current-index draw-bound) + item current-index start-soc
+    ]
+  ]
+  report 1
+end
+
 to summarize ;;;LOG
   reset-logfile "driver-summary" ;;;LOG
   log-data "driver-summary" (sentence "metric" "vehicle-type" "home" "value") ;;;LOG

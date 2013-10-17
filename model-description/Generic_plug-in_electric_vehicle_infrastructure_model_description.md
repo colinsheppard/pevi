@@ -35,6 +35,8 @@ Category          | Variable     				 | Description
 Identity (static) | ID            				 | Integer identification code 												   specified in the input data 												   supplied to the model.
 Contents          | ~~chargersInTAZ (static)~~  | ~~A list of chargers 												   contained in the TAZ.~~
                   | ~~homeCharger~~   			 | ~~Every TAZ has a Level II 												   charger which is only 												   available to drivers in 												   their home TAZ.~~
+                  | ***chargersByType***        | ***A master list of all chargers in the TAZ***
+                  | ***availableChargersByType***     | ***A real-time, stack-type list of chargers in the TAZ that are not currently in use. ***
                   | ~~driversInTAZ (dynamic)~~  | ~~A list of drivers 												   currently in the TAZ.~~
                   | nLevels       				 | A 6-value list containing 												   the number of chargers of 												   each level (0 [home 												   charging], 1, 2, 3, *** 4 (battery-swapping) or 5 (multi-unit home charging)***)
 

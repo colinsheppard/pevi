@@ -9,7 +9,6 @@ to read-parameter-file
     file-open parameter-file
     while [not file-at-end?][
       let param-name file-read
-      ;ifelse param-name = "n-tazs" [ set n-tazs file-read ][  ; TODO, infer this from the od input file
       ifelse param-name = "n-charger-types" [ set n-charger-types file-read ][  ; TODO, infer this from the od input file
       ifelse param-name = "charge-safety-factor" [ set charge-safety-factor file-read ][
       ifelse param-name = "charger-search-distance" [ set charger-search-distance file-read ][
@@ -263,35 +262,14 @@ to initialize-drivers
       ]
       set master-electric-fuel-consumption electric-fuel-consumption
 
-      ifelse is-bev? [
-      let rand-draw random-float 1
+ ;     ifelse is-bev? [
+      let #rand-draw random-float 1
       ifelse file-exists? starting-soc-file [
-        set state-of-charge rand-draw ;Set up the function!
+        set state-of-charge interpolate-soc #rand-draw
       ][
-        set state-of-charge rand-draw 
-;      ifelse rand-draw < 0.63 [
-;        set state-of-charge 0.9 + random-float 0.1
-;      ][
-;        ifelse rand-draw < 0.68 [ 
-;          set state-of-charge 0.8 + random-float 0.1
-;        ][
-;          ifelse rand-draw < 0.94 [ 
-;            set state-of-charge 0.7 + random-float 0.1
-;          ][
-;            ifelse rand-draw < 0.97 [ 
-;              set state-of-charge 0.6 + random-float 0.1
-;            ][
-;              ifelse rand-draw < 0.99 [ 
-;                set state-of-charge 0.5 + random-float 0.1
-;              ][
-;                ifelse rand-draw < 0.995 [ 
-;                  set state-of-charge 0.4 + random-float 0.1
-;                ][
-;                  set state-of-charge 0.3 + random-float 0.1
-;      ]]]]]]][
+        set state-of-charge #rand-draw 
       ]
       set master-state-of-charge state-of-charge
-    ][print("THAT IS SOME STUPID FUCKING BULLSHIT")]
     
     set state "not-charging"
     set current-charger nobody

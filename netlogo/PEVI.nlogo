@@ -17,6 +17,9 @@ globals [
   n-tazs
   n-charger-types
   
+  draw-bound
+  start-soc
+  
   batch-setup?
   
 ;; FILE PATHS
@@ -28,6 +31,7 @@ globals [
   od-input-file
   vehicle-type-input-file
   outputs-directory
+  starting-soc-file
   
 ;; PARAMETERS
   charge-safety-factor

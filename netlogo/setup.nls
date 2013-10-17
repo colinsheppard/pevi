@@ -20,6 +20,7 @@ to read-parameter-file
       ifelse param-name = "electric-fuel-consumption-sd" [ set electric-fuel-consumption-sd file-read ][
       ifelse param-name = "electric-fuel-consumption-range" [ set electric-fuel-consumption-range file-read ][
       ifelse param-name = "multi-unit-search-tolerance" [ set multi-unit-search-tolerance file-read ][
+      ifelse param-name = "starting-soc-file" [set starting-soc-file word model-directory file-read ][
       ifelse param-name = "charger-input-file" [ set charger-input-file word model-directory file-read ][
       ifelse param-name = "charger-type-input-file" [ set charger-type-input-file word model-directory file-read ][
       ifelse param-name = "driver-input-file" [ set driver-input-file word model-directory file-read ][
@@ -28,7 +29,7 @@ to read-parameter-file
       ifelse param-name = "outputs-directory" [ set outputs-directory word model-directory file-read ][
       ifelse param-name = "probability-of-unneeded-charge" [ set probability-of-unneeded-charge file-read ][
       ifelse param-name = "stranded-delay-threshold" [ set stranded-delay-threshold file-read ][  
-      ]]]]]]]]]]]]]]]]]]
+      ]]]]]]]]]]]]]]]]]]]
     ]
     file-close
   ][ 
@@ -221,6 +222,19 @@ to setup-drivers
 end ; setup-drivers
 
 to initialize-drivers
+  set draw-bound   n-values 1 [0] 
+  set start-soc     n-values 1 [0] 
+  ifelse (file-exists? starting-soc-file) [
+    file-close
+    file-open starting-soc-file
+    while [not file-at-end?] [
+     set draw-bound lput file-read draw-bound
+     set start-soc lput file-read start-soc
+    ]
+    file-close
+    set draw-bound   remove-item 0 draw-bound 
+    set start-soc    remove-item 0 start-soc
+  ][print(word "Input file '" starting-soc-file "' not found!")]
   ; finally initialize driver state variables
   ask drivers [    
     ifelse batch-setup? [
@@ -251,30 +265,33 @@ to initialize-drivers
 
       ifelse is-bev? [
       let rand-draw random-float 1
-      ifelse rand-draw < 0.63 [
-        set state-of-charge 0.9 + random-float 0.1
+      ifelse file-exists? starting-soc-file [
+        set state-of-charge rand-draw ;Set up the function!
       ][
-        ifelse rand-draw < 0.68 [ 
-          set state-of-charge 0.8 + random-float 0.1
-        ][
-          ifelse rand-draw < 0.94 [ 
-            set state-of-charge 0.7 + random-float 0.1
-          ][
-            ifelse rand-draw < 0.97 [ 
-              set state-of-charge 0.6 + random-float 0.1
-            ][
-              ifelse rand-draw < 0.99 [ 
-                set state-of-charge 0.5 + random-float 0.1
-              ][
-                ifelse rand-draw < 0.995 [ 
-                  set state-of-charge 0.4 + random-float 0.1
-                ][
-                  set state-of-charge 0.3 + random-float 0.1
-      ]]]]]]][
-        set state-of-charge 1
+        set state-of-charge rand-draw 
+;      ifelse rand-draw < 0.63 [
+;        set state-of-charge 0.9 + random-float 0.1
+;      ][
+;        ifelse rand-draw < 0.68 [ 
+;          set state-of-charge 0.8 + random-float 0.1
+;        ][
+;          ifelse rand-draw < 0.94 [ 
+;            set state-of-charge 0.7 + random-float 0.1
+;          ][
+;            ifelse rand-draw < 0.97 [ 
+;              set state-of-charge 0.6 + random-float 0.1
+;            ][
+;              ifelse rand-draw < 0.99 [ 
+;                set state-of-charge 0.5 + random-float 0.1
+;              ][
+;                ifelse rand-draw < 0.995 [ 
+;                  set state-of-charge 0.4 + random-float 0.1
+;                ][
+;                  set state-of-charge 0.3 + random-float 0.1
+;      ]]]]]]][
       ]
       set master-state-of-charge state-of-charge
-    ]
+    ][print("THAT IS SOME STUPID FUCKING BULLSHIT")]
     
     set state "not-charging"
     set current-charger nobody
@@ -288,6 +305,7 @@ to initialize-drivers
     set gasoline-used 0 
     set itin-complete? false
     itinerary-event-scheduler
+  ]
   ]
   ask (tazs) [
     let #multi-unit-count 0

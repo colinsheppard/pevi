@@ -221,17 +221,17 @@ to setup-drivers
 end ; setup-drivers
 
 to initialize-drivers
-  set draw-bound   n-values 1 [0] 
+  set cumulative-fraction   n-values 1 [0] 
   set start-soc     n-values 1 [0] 
   ifelse (file-exists? starting-soc-file) [
     file-close
     file-open starting-soc-file
     while [not file-at-end?] [
-     set draw-bound lput file-read draw-bound
+     set cumulative-fraction lput file-read cumulative-fraction
      set start-soc lput file-read start-soc
     ]
     file-close
-    set draw-bound   remove-item 0 draw-bound 
+    set cumulative-fraction   remove-item 0 cumulative-fraction 
     set start-soc    remove-item 0 start-soc
   ][print(word "Input file '" starting-soc-file "' not found!")]
   ; finally initialize driver state variables

@@ -17,7 +17,7 @@ globals [
   n-tazs
   n-charger-types
   
-  draw-bound
+  cumulative-fraction
   start-soc
   
   batch-setup?
@@ -1163,11 +1163,11 @@ to-report weight-delay [delay]
 end
 
 to-report interpolate-soc [#rand-draw]
-  foreach draw-bound [
-    let current-index position ? draw-bound
-    let next-index position ? draw-bound + 1
-    if #rand-draw > ? and #rand-draw <= item next-index draw-bound [
-      report (#rand-draw - item current-index draw-bound)*(item next-index start-soc - item current-index start-soc)/(item next-index draw-bound - item current-index draw-bound) + item current-index start-soc
+  foreach cumulative-fraction [
+    let current-index position ? cumulative-fraction
+    let next-index position ? cumulative-fraction + 1
+    if #rand-draw > ? and #rand-draw <= item next-index cumulative-fraction [
+      report (#rand-draw - item current-index cumulative-fraction)*(item next-index start-soc - item current-index start-soc)/(item next-index cumulative-fraction - item current-index cumulative-fraction) + item current-index start-soc
     ]
   ]
   report 1

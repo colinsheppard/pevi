@@ -7,19 +7,17 @@
 ####Schatz Energy Research Center
 
 # 1. Purpose
-The purpose of this model is to simulate different PEV public charging infrastructure alternatives for the target region. The PEV infrastructure alternatives are described by number, type and location of PEV charging stations throughout the region.  For each alternative, a variety of realistic scenarios should be modeled that represent different PEV adoption rates, technologic advances, driver behaviors, and vehicle types. A measure of driver’s satisfaction and amount of use (duty factor) are outputs from the model needed to determine the preferred alternative. The model must incorporate any relevant traffic data available and spatially represent an aggregated set of existing traffic analysis zones (TAZs), if any.
-### Assumptions
-1. ~~All PEV owners are assumed to have home chargers.~~
-2. All BEV vehicle parameter values are based on those of the Nissan Leaf (24 kWh battery, 0.34 kWh/mi, level 1-3 charging capabilities).
-3. If a scheduled trip is outside the range of an average vehicle, it is assumed that the trip would never be attempted by a BEV. These vehicles are then modeled as PHEVs with parameters based on the Chevrolet Volt (16 kWh battery, 0.5 kWh/mi, level 1-3 charging capabilities). ***If quick-charge options such as battery-swapping are available, this assumption is removed.*** **(This assumption may change)** 
-4. ~~PEV adoption rates are assumed to follow the temporal and spatial distribution of hybrid electric vehicles in Humboldt County from 2003-2012.~~
+The purpose of this model is to simulate the interaction between a regional fleet of plug-in electric vehicle drivers with public and private charging infrastructure over any time frame.  The model accepts as input the location, quantity, and type of electric vehicle support equipment (EVSE) throughout the study region.  Drivers and their vehicles are described by inputs that specify driver activity (a departure time and destination for every trip), the distribution of vehicle types, and parameters controlling driver behavior.  PEVI then simulates the drivers as they attempt to follow their trip itinerary and interact with the EVSE throughout the region.  The experience of drivers (individually or in aggregate) and the usage of the EVSE can be summarized at the end of a model run.  The model is intended to be used as tool for analyzing the impacts of alternative EVSE infrastructure scenarios in addition to PEV adoption rates, technology advances, market trends, and driver behaviors.
+
+PEVI is a stochastic model, meaning that a variety of processes and decisions within the model are based on random chance.  The primary purpose of including stochastic processes in PEVI is to avoid reaching conclusions that are overly customized to suit one particular set of circumstanaces.  Instead, the model should be run many times with the same set of initial conditions and performance metrics should be averaged over those runs.
+
+### Key Assumptions
 5. All chargers are assumed to have a constant charging rate based on their power specifications. (i.e., no charging algorithms are incorporated).
-6. Drivers begin the day with a schedule that determines all TAZs they will attempt to visit (with associated departure times).
-7. Charging stations are assumed to be networked and their state (charging vs. available) is known to all drivers via wireless communications.
-8. Drivers can choose to make a mid-trip stop for level 3 charging ***or a battery swap***, **(Do we limit it to level 3?)** though the choice must be made before they begin their trip.
-9. ~~Once at a destination, drivers only seek available chargers in their current TAZ location.  They do not look for a charger in neighboring TAZs.  TAZs are assumed to be sized large enough that leaving a TAZ to find a charger and walking back to one’s destination is impractical.~~
-10. Departure is not permitted for a BEV unless it has a minimum acceptable charge for their next trip plus a safety factor.
-11. A fraction of drivers will attempt to charge their vehicle even when a charge is not needed to get to their next destination
+7. Charging stations are assumed to be networked and their state (in-use vs. available) is known to all drivers via wireless communications.
+8. Drivers can choose to make a mid-trip stop for charging, though the choice must be made before they begin their trip.
+9. After arrival to a destination, drivers only seek available chargers in their current location.  They only search for available chargers in neighboring or enroute TAZs if their next departure is imminent and they lack sufficient charge to make the trip.
+10. Battery electric vehicles (BEVs) do not attempt to travel unless they have the minimum acceptable charge for their next trip plus a factor of safety.
+11. A fraction of drivers will attempt to charge their vehicle even when a charge is not needed to get to their next destination.
 12. Drive times between TAZ pairs are supplied as input and are applied to all vehicles equally, thus all vehicles are assumed to drive at the same speed for a given trip.
 
 # 2. Entities, State Variables, and Scales

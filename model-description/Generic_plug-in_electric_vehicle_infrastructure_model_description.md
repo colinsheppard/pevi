@@ -2,7 +2,8 @@
 
 ####Version 2.0
 
-####Colin Sheppard, Allison Campbell, Jim Zoellick, Charles Chamberlin, Andy Harris
+####Authors: Colin Sheppard, Andy Harris
+####Contributors: Allison Campbell, Jim Zoellick, Charles Chamberlin
 
 ####Schatz Energy Research Center
 
@@ -12,17 +13,17 @@ The purpose of this model is to simulate the interaction between a regional flee
 PEVI is a stochastic model, meaning that a variety of processes and decisions within the model are based on random chance.  The primary purpose of including stochastic processes in PEVI is to avoid reaching conclusions that are overly customized to suit one particular set of circumstanaces.  Instead, the model should be run many times with the same set of initial conditions and performance metrics should be averaged over those runs.
 
 ### Key Assumptions
-5. All chargers are assumed to have a constant charging rate based on their power specifications. (i.e., no charging algorithms are incorporated).
-7. Charging stations are assumed to be networked and their state (in-use vs. available) is known to all drivers via wireless communications.
-8. Drivers can choose to make a mid-trip stop for charging, though the choice must be made before they begin their trip.
-9. After arrival to a destination, drivers only seek available chargers in their current location.  They only search for available chargers in neighboring or enroute TAZs if their next departure is imminent and they lack sufficient charge to make the trip.
-10. Battery electric vehicles (BEVs) do not attempt to travel unless they have the minimum acceptable charge for their next trip plus a factor of safety.
-11. A fraction of drivers will attempt to charge their vehicle even when a charge is not needed to get to their next destination.
-12. Drive times between TAZ pairs are supplied as input and are applied to all vehicles equally, thus all vehicles are assumed to drive at the same speed for a given trip.
+1. All chargers are assumed to have a constant charging rate based on their power specifications. Charging algorithms -- such as trickle charging near the end of the session -- are not simulated.
+2. Charging stations are assumed to be networked and their state (in-use vs. available) is known to all drivers via wireless communications.
+3. Drivers can choose to make a mid-trip stop for charging, though the choice must be made before they begin their trip.
+4. After arrival to a destination, drivers only seek available chargers in their current location.  They search for available chargers in neighboring or enroute TAZs if their next departure is imminent and they lack sufficient charge to make the trip.
+5. Battery electric vehicles (BEVs) do not attempt to travel unless they have the minimum acceptable charge for their next trip plus a factor of safety.
+6. A fraction of drivers will attempt to charge their vehicle even when a charge is not needed to get to their next destination.
+7. Drive times between TAZ pairs are supplied as input and are applied to all vehicles equally, thus all vehicles are assumed to drive at the same speed for a given trip.
 
 # 2. Entities, State Variables, and Scales
 ## 2.1 Traffic Analysis Zones (TAZs)
-The TAZs are entities that describe the atomic geographic regions of the environment. All TAZs are interconnected, so a vehicle in one TAZ may travel to any other.  While they represent spatially explicit regions, the PEVI model does not store or track spatial data (polygons, lines, etc.) for each TAZ.  Instead, the spatial relationships between TAZs are encoded as table (see “Environment – Origin Destination Table” below) describing the distances and travel times between all combinations of TAZs. In this document, TAZs are also referred to as “nodes.”  The TAZ agents are described by following variables:
+The TAZs are entities that describe the atomic geographic regions of the environment. All TAZs are interconnected, so a vehicle in one TAZ may travel to any other.  While they represent spatially explicit regions, the PEVI model does not store or track spatial data (polygons, lines, etc.) for each TAZ.  Instead, the spatial relationships between TAZs are encoded as a table (see “Environment – Origin Destination Table” below) describing the distances and travel times between all combinations of TAZs. In this document, TAZs are also referred to as “nodes.”  The TAZ agents are described by following variables:
 
 ````
 Table 1: Traffic Analysis Zone Agent Variables

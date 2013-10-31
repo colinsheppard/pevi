@@ -9,7 +9,6 @@ to read-parameter-file
     file-open parameter-file
     while [not file-at-end?][
       let param-name file-read
-      ifelse param-name = "n-tazs" [ set n-tazs file-read ][  ; TODO, infer this from the od input file
       ifelse param-name = "n-charger-types" [ set n-charger-types file-read ][  ; TODO, infer this from the od input file
       ifelse param-name = "charge-safety-factor" [ set charge-safety-factor file-read ][
       ifelse param-name = "charger-search-distance" [ set charger-search-distance file-read ][
@@ -20,6 +19,7 @@ to read-parameter-file
       ifelse param-name = "electric-fuel-consumption-sd" [ set electric-fuel-consumption-sd file-read ][
       ifelse param-name = "electric-fuel-consumption-range" [ set electric-fuel-consumption-range file-read ][
       ifelse param-name = "multi-unit-search-tolerance" [ set multi-unit-search-tolerance file-read ][
+      ifelse param-name = "starting-soc-file" [set starting-soc-file word model-directory file-read ][
       ifelse param-name = "charger-input-file" [ set charger-input-file word model-directory file-read ][
       ifelse param-name = "charger-type-input-file" [ set charger-type-input-file word model-directory file-read ][
       ifelse param-name = "driver-input-file" [ set driver-input-file word model-directory file-read ][
@@ -42,25 +42,32 @@ end
 to setup-od-data
   ;print "setup-od-data"
   ; Reads in main driver input file: Origin, destination, # of trips, distance, time
-  set od-from   n-values (n-tazs * n-tazs) [0] 
-  set od-to     n-values (n-tazs * n-tazs) [0] 
-  set od-dist   n-values (n-tazs * n-tazs) [0] 
-  set od-time   n-values (n-tazs * n-tazs) [0] 
-  set od-enroute n-values (n-tazs * n-tazs) [n-values (0) [0]] 
-  set od-performance   n-values (n-tazs * n-tazs) [0]
+  set od-from   n-values 1 [0] 
+  set od-to     n-values 1 [0] 
+  set od-dist   n-values 1 [0] 
+  set od-time   n-values 1 [0] 
+  set od-enroute n-values 1 [n-values (0) [0]] 
+  set od-performance   n-values 1 [0]
   
   ifelse (file-exists? od-input-file) [
     file-close
     file-open od-input-file
-    foreach n-values (n-tazs * n-tazs) [?] [
-     set od-from   replace-item ? od-from file-read 
-     set od-to     replace-item ? od-to   file-read 
-     set od-dist   replace-item ? od-dist file-read 
-     set od-time   replace-item ? od-time file-read
-     set od-enroute replace-item ? od-enroute split file-read ","
-     set od-performance replace-item ? od-performance file-read
+    while [not file-at-end?] [
+     set od-from lput file-read od-from
+     set od-to lput file-read od-to
+     set od-dist lput file-read od-dist 
+     set od-time lput file-read od-time
+     set od-enroute lput split file-read "," od-enroute
+     set od-performance lput file-read od-performance
     ]
     file-close
+    set od-from   remove-item 0 od-from 
+    set od-to     remove-item 0 od-to
+    set od-dist   remove-item 0 od-dist
+    set od-time   remove-item 0 od-time
+    set od-enroute remove-item 0 od-enroute 
+    set od-performance   remove-item 0 od-performance
+    set n-tazs sqrt length od-from
   ][ 
     error (word "Input file '" od-input-file "' not found!") 
   ]
@@ -96,6 +103,7 @@ to setup-tazs
     set size 0.5
     set n-levels n-values 6 [-99] 
     set chargers-by-type n-values n-charger-types [0]
+    set available-chargers-by-type n-values n-charger-types [0]
   ]
   ifelse (file-exists? charger-input-file) [
     file-close
@@ -107,7 +115,9 @@ to setup-tazs
         set #prev-taz-id id
         foreach [0 1 2 3 4 5] [
           set n-levels replace-item ? n-levels file-read ; sets the number of level X chargers in each TAZ
+          set available-chargers-by-type replace-item ? available-chargers-by-type structs:new-stack
         ]
+        set frac-multi-unit file-read
         set neighbor-tazs n-values 0 [0]
         foreach n-values n-tazs [? + 1] [
           if not (? = id) and (distance-from-to id ? <= charger-search-distance) [
@@ -118,6 +128,7 @@ to setup-tazs
     ]
   ]
   [ error (word "Input file '" charger-input-file "' not found!")]
+  ; turn tutrle 0 into the TAZ for homeless drivers
   ask turtle 0 [
     set breed tazs
     set n-levels n-values 6 [0]
@@ -210,6 +221,19 @@ to setup-drivers
 end ; setup-drivers
 
 to initialize-drivers
+  set cumulative-fraction   n-values 1 [0] 
+  set start-soc     n-values 1 [0] 
+  ifelse (file-exists? starting-soc-file) [
+    file-close
+    file-open starting-soc-file
+    while [not file-at-end?] [
+     set cumulative-fraction lput file-read cumulative-fraction
+     set start-soc lput file-read start-soc
+    ]
+    file-close
+    set cumulative-fraction   remove-item 0 cumulative-fraction 
+    set start-soc    remove-item 0 start-soc
+  ][print(word "Input file '" starting-soc-file "' not found!")]
   ; finally initialize driver state variables
   ask drivers [    
     ifelse batch-setup? [
@@ -228,7 +252,6 @@ to initialize-drivers
       set color green
       set size 2
       set is-bev? [is-bev?] of this-vehicle-type
-      set multi-unit? [multi-unit-home] of this-vehicle-type
       set battery-capacity [battery-capacity] of this-vehicle-type
       set hybrid-fuel-consumption [hybrid-fuel-consumption] of this-vehicle-type
       
@@ -239,32 +262,14 @@ to initialize-drivers
       ]
       set master-electric-fuel-consumption electric-fuel-consumption
 
-      ifelse is-bev? [
-      let rand-draw random-float 1
-      ifelse rand-draw < 0.63 [
-        set state-of-charge 0.9 + random-float 0.1
+ ;     ifelse is-bev? [
+      let #rand-draw random-float 1
+      ifelse file-exists? starting-soc-file [
+        set state-of-charge interpolate-soc #rand-draw
       ][
-        ifelse rand-draw < 0.68 [ 
-          set state-of-charge 0.8 + random-float 0.1
-        ][
-          ifelse rand-draw < 0.94 [ 
-            set state-of-charge 0.7 + random-float 0.1
-          ][
-            ifelse rand-draw < 0.97 [ 
-              set state-of-charge 0.6 + random-float 0.1
-            ][
-              ifelse rand-draw < 0.99 [ 
-                set state-of-charge 0.5 + random-float 0.1
-              ][
-                ifelse rand-draw < 0.995 [ 
-                  set state-of-charge 0.4 + random-float 0.1
-                ][
-                  set state-of-charge 0.3 + random-float 0.1
-      ]]]]]]][
-        set state-of-charge 1
+        set state-of-charge #rand-draw 
       ]
       set master-state-of-charge state-of-charge
-    ]
     
     set state "not-charging"
     set current-charger nobody
@@ -278,6 +283,14 @@ to initialize-drivers
     set gasoline-used 0 
     set itin-complete? false
     itinerary-event-scheduler
+  ]
+  ]
+  ask (tazs) [
+    let #multi-unit-count 0
+    while [#multi-unit-count < (count drivers with [home-taz = myself] * frac-multi-unit)] [
+      ask one-of drivers with [home-taz = myself and not multi-unit?] [set multi-unit? true]
+      set #multi-unit-count #multi-unit-count + 1
+    ]
   ]
 end ;initialize-drivers
 
@@ -297,7 +310,6 @@ to setup-vehicle-types
         set electric-fuel-consumption file-read
         set hybrid-fuel-consumption file-read
         set battery-capacity file-read
-        set multi-unit-home file-read
         set frac-of-pevs file-read
         set #cumul-frac-pevs #cumul-frac-pevs + frac-of-pevs
         set is-bev? (hybrid-fuel-consumption <= 0)
@@ -333,6 +345,7 @@ to setup-itinerary
         set itin-to n-values 1 [file-read]
         set itin-depart n-values 1 [file-read]
         set home-taz taz file-read
+        set multi-unit? false
         let itin-row 0
         set journey-distance (distance-from-to item itin-row itin-to item itin-row itin-from)
         set max-trip-distance journey-distance
@@ -437,6 +450,7 @@ to setup-chargers
       ]
     ]
   ]  
+  initialize-available-chargers
   ask chargers [
     set shape "Circle 2"
     set color red

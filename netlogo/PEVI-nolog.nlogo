@@ -45,6 +45,7 @@ globals [
   electric-fuel-consumption-sd
   electric-fuel-consumption-range
   stranded-delay-threshold
+  multi-unit-search-tolerance
   
   ;; globals needed for testing
   test-driver
@@ -60,7 +61,8 @@ breed [charger-types charger-type]
 drivers-own [
 ;; VEHICLE
   this-vehicle-type              ; e.g. 'leaf' or 'volt'
-  is-bev?                  
+  is-bev?
+  multi-unit?                  
   battery-capacity          ; kwh
   electric-fuel-consumption ; kwh / mile
   hybrid-fuel-consumption   ; gallon / mile, for phev charge sustaining mode
@@ -110,6 +112,7 @@ drivers-own [
   gasoline-used
   miles-driven
   num-denials
+  multi-unit-search-count         ; Counter for how many times a multi-unit driver has tried to charge at the end of the day
   
 ;; CANDIDATE ADDITIONS TO MODEL DESCRIPTION
   energy-received ; a count of how much energy each driver has charged
@@ -126,7 +129,7 @@ drivers-own [
 chargers-own[
   location         ; TAZ # for each charger
   current-driver   ; driver currenlty being serviced, nobody indicates charger is available
-  this-charger-type     ; 1, 2, or 3 ***address name later?
+  this-charger-type     ; 0, 1, 2, 3, or 4 ***address name later?
 
   num-sessions     ; count of charging sessions
   energy-delivered ; kWh
@@ -138,11 +141,11 @@ tazs-own[
   
   neighbor-tazs   ; list of tazs within charger-search-distance of this taz
   
-  n-levels        ; list containing the number of chargers for levels 0,1,2,3 at index 0,1,2,3, where 0=home
+  n-levels        ; list containing the number of chargers for levels 0,1,2,3,4 at index 0,1,2,3,4 where 0=home and 4=battery swap
 ]
 
 charger-types-own[
-  level            ; 0,1,2,3, where 0=home
+  level            ; 0,1,2,3,4 where 0=home, 4=battery swap
   charge-rate      ; kWh / hr  
   energy-price     ; $0.14/kWh
   installed-cost   ; $
@@ -156,6 +159,7 @@ vehicle-types-own[
   frac-of-pevs
   num-vehicles
   is-bev?
+  multi-unit-home           ; Boolean for if home TAZ has -1 level charger
 ]
 
 to setup-from-gui
@@ -187,7 +191,7 @@ to clear-all-and-initialize
   ;print "clear all"
   clear-all
   time:clear-schedule
-  create-turtles 1 [ setxy 0 0 set color black] ;This invisible turtle makes sure we start at taz 1 not taz 0
+  create-turtles 1 [ setxy 0 0 set color black] ;This invisible turtle makes sure we start at taz 1 not taz 0. Tutrle eventually changed to taz 0, for homeless drivers.
   reset-ticks
 end
 
@@ -469,7 +473,7 @@ to seek-charger
   foreach [sentence level charge-rate] of charger-types [
     let #trip-energy-need-limited #trip-energy-need
     let #journey-energy-need-limited #journey-energy-need
-    ifelse item 0 ? < 3 [
+    ifelse item 0 ? != 3 [
       set #trip-energy-need-limited min (sentence ((1 - state-of-charge) * battery-capacity) #trip-energy-need-limited)
       set #journey-energy-need-limited min (sentence ((1 - state-of-charge) * battery-capacity) #journey-energy-need-limited)
     ][
@@ -498,7 +502,7 @@ to seek-charger
 
       foreach [level] of charger-types [
         let #level ?
-        if (count (available-chargers #this-taz #level) > 0) and (#level > 0 or #this-taz = home-taz) [
+        if (count (available-chargers #this-taz #level) > 0) and ((#level > 0 and #level < 5) or ((#this-taz = home-taz and multi-unit?) and #level = 5) or ((#this-taz = home-taz and (not multi-unit?)) and #level = 0)) [
           let #this-charger-type one-of charger-types with [ level = #level ]
           let #this-charge-rate [charge-rate] of #this-charger-type
           ifelse #charger-in-origin-or-destination [
@@ -650,7 +654,7 @@ to charge-time-event-scheduler
                                                     [this-charger-type] of current-charger)
   let next-event-scheduled-at 0 
   ifelse (not charging-on-a-whim?) and (time-until-end-charge > 0) and (time-until-end-charge < full-charge-time-need) and   
-         (level-of current-charger < 3) and 
+         (level-of current-charger < 3) and ;I think we can leave this unchanged with level 4 charging
          ( time-until-end-charge > time-until-depart or 
            ( (time-until-end-charge < journey-charge-time-need) and (time-until-depart > willing-to-roam-time-threshold) )
          ) [
@@ -855,7 +859,7 @@ end
 to depart
 ;  log-data "drivers" (sentence precision ticks 3 [id] of self "departing" state-of-charge)
   ifelse need-to-charge "depart" [  
-    ifelse state-of-charge >= 1 - small-num or (( count (existing-chargers current-taz 1)  = 0) and (count (existing-chargers current-taz 2)  = 0) and state-of-charge >= 0.8 - small-num)[
+    ifelse state-of-charge >= 1 - small-num or (( count (existing-chargers current-taz 1)  = 0) and (count (existing-chargers current-taz 2)  = 0) and (count (existing-chargers current-taz 4)  = 0) and state-of-charge >= 0.8 - small-num)[
 ;;;      log-data "break-up-trip" (sentence ticks id state-of-charge ([id] of current-taz) ([id] of destination-taz) remaining-range charging-on-a-whim? "break-up-trip") ;;;LOG
       break-up-trip
     ][
@@ -883,7 +887,7 @@ to break-up-trip
     set #this-taz ?
     let #this-score 0
     let #this-dist distance-from-to [id] of current-taz [id] of #this-taz
-    let #only-level-3 (count (existing-chargers #this-taz 1)  = 0) and (count (existing-chargers #this-taz 2)  = 0)
+    let #only-level-3 (count (existing-chargers #this-taz 1)  = 0) and (count (existing-chargers #this-taz 2)  = 0) and (count (existing-chargers #this-taz 4)  = 0)
     if #this-dist <= remaining-range / charge-safety-factor and 
       ( (#only-level-3 and distance-from-to [id] of #this-taz [id] of destination-taz <= 0.8 * battery-capacity / electric-fuel-consumption / charge-safety-factor)
         or (not #only-level-3 and distance-from-to [id] of #this-taz [id] of destination-taz <= battery-capacity / electric-fuel-consumption / charge-safety-factor) ) [
@@ -1010,14 +1014,19 @@ to arrive
 ;;;      log-data "trip-journey-timeuntildepart" (sentence ticks departure-time id [name] of this-vehicle-type state-of-charge #from-taz #to-taz #completed-trip #completed-journey (departure-time - ticks) "scheduling-itinerary" remaining-range sum map weight-delay itin-delay-amount) ;;;LOG
     ]
   ][
-    ;; itin is complete and at home? plug-in immediately and charge till full
+    ;; itin is complete and at home? Perform random draw to see if they plug-in immediately and charge till full. If multi-unit, charger may not be available.
     ifelse current-taz = home-taz [
       if (random-float 1) < (1 / (1 + exp(-5 + 6 * state-of-charge))) [
-        set current-charger (one-of item 0 [chargers-by-type] of current-taz)
-        set full-charge-time-need (1 - state-of-charge) * battery-capacity / charge-rate-of current-charger
-        time:schedule-event self task end-charge ticks + full-charge-time-need 
-        set time-until-end-charge full-charge-time-need
-;;;        log-data "charging" (sentence ticks [who] of current-charger level-of current-charger [id] of current-taz [id] of self [name] of this-vehicle-type full-charge-time-need (full-charge-time-need * charge-rate-of current-charger) state-of-charge (state-of-charge + (full-charge-time-need * charge-rate-of current-charger) / battery-capacity ) "stop" false) ;;;LOG
+        ifelse multi-unit? [
+          set multi-unit-search-count 0
+          end-of-day-multi-unit-charge
+        ][
+          set current-charger (one-of item 0 [chargers-by-type] of current-taz)
+          set full-charge-time-need (1 - state-of-charge) * battery-capacity / charge-rate-of current-charger
+          time:schedule-event self task end-charge ticks + full-charge-time-need 
+          set time-until-end-charge full-charge-time-need
+;;;          log-data "charging" (sentence ticks [who] of current-charger level-of current-charger [id] of current-taz [id] of self [name] of this-vehicle-type full-charge-time-need (full-charge-time-need * charge-rate-of current-charger) state-of-charge (state-of-charge + (full-charge-time-need * charge-rate-of current-charger) / battery-capacity ) "stop" false) ;;;LOG
+        ]
       ]
 ;;;      log-data "trip-journey-timeuntildepart" (sentence ticks ticks id [name] of this-vehicle-type state-of-charge #from-taz #to-taz #completed-trip #completed-journey 0 "home" remaining-range sum map weight-delay itin-delay-amount) ;;;LOG
     ][
@@ -1026,6 +1035,25 @@ to arrive
   ]
 
   
+end
+
+to end-of-day-multi-unit-charge
+  ifelse (count available-chargers current-taz 5) > 0 [
+    set current-charger one-of available-chargers current-taz 5
+    set full-charge-time-need (1 - state-of-charge) * battery-capacity / charge-rate-of current-charger
+    time:schedule-event self task end-charge ticks + full-charge-time-need 
+    set time-until-end-charge full-charge-time-need
+;;;    log-data "charging" (sentence ticks [who] of current-charger level-of current-charger [id] of current-taz [id] of self [name] of this-vehicle-type full-charge-time-need (full-charge-time-need * charge-rate-of current-charger) state-of-charge (state-of-charge + (full-charge-time-need * charge-rate-of current-charger) / battery-capacity ) "stop" false) ;;;LOG
+    ask current-charger[
+      set current-driver myself
+    ]
+  ][
+    set multi-unit-search-count multi-unit-search-count + 1
+    if multi-unit-search-count <= multi-unit-search-tolerance [
+      let event-time-from-now random-exponential wait-time-mean
+      time:schedule-event self task end-of-day-multi-unit-charge ticks + event-time-from-now
+    ]
+  ]
 end
 
 ;;;;;;;;;;;;;;;;;;;;
@@ -1237,7 +1265,7 @@ SWITCH
 176
 log-wait-time
 log-wait-time
-0
+1
 1
 -1000
 
@@ -1248,7 +1276,7 @@ SWITCH
 222
 log-charging
 log-charging
-0
+1
 1
 -1000
 
@@ -1259,7 +1287,7 @@ SWITCH
 268
 log-charge-time
 log-charge-time
-0
+1
 1
 -1000
 
@@ -1270,7 +1298,7 @@ SWITCH
 313
 log-need-to-charge
 log-need-to-charge
-0
+1
 1
 -1000
 
@@ -1281,7 +1309,7 @@ SWITCH
 130
 log-trip-journey-timeuntildepart
 log-trip-journey-timeuntildepart
-0
+1
 1
 -1000
 
@@ -1292,7 +1320,7 @@ SWITCH
 359
 log-seek-charger
 log-seek-charger
-0
+1
 1
 -1000
 
@@ -1303,7 +1331,7 @@ SWITCH
 443
 log-break-up-trip
 log-break-up-trip
-0
+1
 1
 -1000
 
@@ -1314,7 +1342,7 @@ SWITCH
 489
 log-break-up-trip-choice
 log-break-up-trip-choice
-0
+1
 1
 -1000
 
@@ -1325,7 +1353,7 @@ SWITCH
 532
 log-charge-limiting-factor
 log-charge-limiting-factor
-0
+1
 1
 -1000
 
@@ -1336,7 +1364,7 @@ SWITCH
 400
 log-seek-charger-result
 log-seek-charger-result
-0
+1
 1
 -1000
 
@@ -1381,7 +1409,7 @@ SWITCH
 574
 log-drivers
 log-drivers
-0
+1
 1
 -1000
 
@@ -1392,7 +1420,7 @@ SWITCH
 92
 log-pain
 log-pain
-0
+1
 1
 -1000
 
@@ -1403,7 +1431,7 @@ SWITCH
 620
 log-tazs
 log-tazs
-0
+1
 1
 -1000
 
@@ -1429,7 +1457,7 @@ SWITCH
 94
 log-trip
 log-trip
-0
+1
 1
 -1000
 
@@ -1440,7 +1468,7 @@ SWITCH
 180
 log-summary
 log-summary
-0
+1
 1
 -1000
 

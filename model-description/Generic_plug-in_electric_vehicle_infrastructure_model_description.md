@@ -33,8 +33,10 @@ Category          | Variable     				 | Description
 Identity (static) | ID            				 | Integer identification code 												   specified in the input data 												   supplied to the model.
 Contents          | ~~chargersInTAZ (static)~~  | ~~A list of chargers 												   contained in the TAZ.~~
                   | ~~homeCharger~~   			 | ~~Every TAZ has a Level II 												   charger which is only 												   available to drivers in 												   their home TAZ.~~
+                  | ***chargersByType***        | ***A master list of all chargers in the TAZ***
+                  | ***availableChargersByType***     | ***A real-time, stack-type list of chargers in the TAZ that are not currently in use. ***
                   | ~~driversInTAZ (dynamic)~~  | ~~A list of drivers 												   currently in the TAZ.~~
-                  | nLevels       				 | A 5-value list containing 												   the number of chargers of 												   each level (0 [home 												   charging], 1, 2, 3 ***or 4 (battery-swapping)***)
+                  | nLevels       				 | A 5-value list containing 												   the number of chargers of 												   each level (0 [home 												   charging], 1, 2, 3, ***or 4 (battery-swapping).***)
 
 ## 2.2 Environment
 The environment is the entity where all the agents live and interact. In this model it is the geographic region described by the input data. The environment is defined by several global state variables and parameters which are available to all agents in the model for reference or use. 
@@ -70,7 +72,7 @@ Vehicle (static)|thisVehicleType|String variable containing the name of the vehi
 | batteryCapacity (kWh) | The default quantity of stored energy by the battery bank when fully charged.  If the vehicle is a PHEV, then the battery capacity indicates the amount of energy available to drive the vehicle in charge depleting mode.
 | electricFuelConsumption (kWh / mile)|The default amount of battery electricity required to travel 1 mile.
 | hybridFuelConsumption (gallon / mile) | The default fuel amount of gasoline required to travel 1 mile for a PHEV in charge sustaining mode.  (N/A for BEVs).
-| ***multipleUnitHome*** | ***A Boolean variable that determines whether the vehicle's home charging capacity is limited as a result of sharing with other drivers.***
+| ***chargerPermissions*** | ***An array of lists for each TAZ that contain any chargers the driver has privileged access to (i.e. home charging, multi-unit charging, or workplace charging restricted from the public.)***
 Demography (static) | homeTAZ | The home TAZ of the driver. This is not necessarily where the driver begins the day, nor will all drivers have a home TAZ (to account for corridor travel originating outside target region.) ~~but rather is inferred based upon the trip type column in the drivers itinerary (see below).~~ 
 | probabilityOfUnneededCharge | The probability that the driver will choose to attempt to charge their vehicle despite not actually needing the charge.
 Operation (dynamic) | state | A discrete integer value that represents the current state of a driver (Traveling, Not Charging, Charging), and used to decide which procedures to execute.
@@ -90,7 +92,7 @@ Operation (dynamic) | state | A discrete integer value that represents the curre
 Tracking (dynamic) | numDenials | The number of occurrences when the driver wanted/needed to charge but was unable due to a lack of available chargers.
 
 ## 2.4 Chargers
-Charging agents represent the electric vehicle supply equipment installed at a given TAZ.  Charging stations can either be level ***-1,*** 0, 1, 2, 3 ***or 4***.  Level ***-1 and level*** 0 charging indicate ***multi-unit and single-unit home*** charging ***(respectively)***, which operate at the capacity of a level 2 charger. ***Multi-unit charging, unlike single-unit charging, is limited to a finite number of drivers. Level 4 charging describes battery-swapping.***  In practice, most level 2 chargers will also have level 1 capability, however in this model they are represented as two separate chargers.  The charger agents are currently described by the following state variables: 
+Charging agents represent the electric vehicle supply equipment installed at a given TAZ.  Charging stations can either be level 0, 1, 2, 3 ***or 4***.  Level 0 charging indicates home charging, which operates at the capacity of a level 2 charger. ***Home charging will either be limited to single drivers (single-unit homes) or give permission to multiple drivers (for multi-unit homes). Level 4 charging represents battery-swapping stations.***  In practice, most level 2 chargers will also have level 1 capability, however in this model they are represented as two separate chargers.  The charger agents are currently described by the following state variables: 
 
 ````
 Table 4: Charger Agent Variables
@@ -98,11 +100,11 @@ Table 4: Charger Agent Variables
 
 Category | Variable | Description
 ---------|----------|------------
-Infrastructure (static) | chargerType | Integer variable indicating whether the station is a level ***-1,*** 0, 1, 2, 3, ***or 4***.
+Infrastructure (static) | chargerType | Integer variable indicating whether the station is a level 0, 1, 2, 3, ***or 4***.
 | location | A variable referencing the TAZ where the charger is located.
 | chargeRate (kWh / hr) | The rate at which the charger delivers energy to the vehicle. ***For level 4 chargers, chargeRate is set to approximately replicate the time spent at the swap station.***
 | energyPrice ($/kWh) | The price of energy for charging at this charger
-Operation (dynamic) | current-driver | The driver currently being served by the charger.  If “nobody” then the charger is considered available for beginning a new charging session.  If the charger is a ***level 0*** home charger, then this variable will always have a value of “nobody” to indicate that any driver in their home TAZ can charge at their home. ***Level -1 chargers are only available to multi-unit-home cars in their home TAZ, but not every driver can have access at the same time.***
+Operation (dynamic) | current-driver | The driver currently being served by the charger.  If “nobody” then the charger is considered available for beginning a new charging session.  ~~If the charger is a ***level 0*** home charger, then this variable will always have a value of “nobody” to indicate that any driver in their home TAZ can charge at their home. ***Level -1 chargers are only available to multi-unit-home cars in their home TAZ, but not every driver can have access at the same time.***~~
 Tracking (dynamic) | energyDelivered (kWh) | The cumulative amount of energy delivered by the charger up to the current moment.
 | numSessions | Integer count of the number of discrete charging sessions with drivers. **(currently unused)**
     
@@ -163,6 +165,8 @@ OD Data |  Distance and drive times between each TAZ; used to calculate SoC redu
 Itinerary | Provides vehicles with schedules throughout the day.
 Chargers | Number and type of charging stations at each TAZ.
 Charger Type | The charging rate, energy price, and installation price for each level charger.
+***Starting SoC*** | ***Provides points of a function mapping random draws to the starting SoC for each vehicle; these are used to interpolate starting vehicle SoC during runtime.***
+***privileged access*** | ***Determines which non-public chargers, if any, a driver has access to.***
 Vehicle Type | The electric fuel consumption, hybrid fuel consumption, and fraction of total PEVs represented by each vehicle type (e.g. Leaf or Volt)
 
 ~~The first set includes the distances and drive times between each TAZ, used to calculate the reduction in SoC that occurs when vehicles travel to a new zone.  The second data set is the schedule file which provides vehicles with trip scheduling throughout the day.  The third data set identifies the number and type of charging stations located at each TAZ.~~ 
@@ -211,7 +215,7 @@ tripDistance <= remainingRange / chargeSafetyFactor < journeyDistance | If timeU
 remainingRange / chargeSafetyFactor >= journeyDistance| Schedule *Depart* event to occur after timeUntilDepart hours.
 
 ## 5.3 Travel Time
-**Describe how this is based on OD Table and how that table is created using GIS road network data.**
+**Describe how this is based on OD Table and how that table is created using GIS road network data. Andy will update this with information on how the google API was used.**
 
 ## 5.4 Charge Time
 The charge time submodel is an event scheduler.  It is executed after a driver has performed the *Seek Charge*r decision, selected an available charger, and optionally traveled to that charger.  The submodel decides whether the driver will attempt to retry finding a charger later in the day (necessary to allow drivers to make temporary use of lower level chargers when higher levels are currently unavailable) or to schedule the *End Charge* event.
@@ -345,6 +349,7 @@ chargeSafetyFactor | Multiplier used to approximate the safety factor drivers as
 chargerSearchDistance | The distance in miles used to define what TAZs are considered “neighbors” for the purpose of finding a charger. |5
 willingToRoamTimeThreshold | The amount of time in hours at which point a driver will consider travelling to neighboring or en-route TAZs in order to charge vs. only considering TAZs in their current location. | 1
 timeOpportunityCost | The value of a driver’s time to his or herself in units of $ / hour. | 12.50
+***multiUnitSearchTolerance*** | ***The maximum number of times a driver will check a multi unit charger if the charger is busy.*** | ***8*** 
 fracPHEV | The fractions of PEV vehicles that are PHEV vs BEV. | 0.5
 probabilityOfUnneededCharge | The probability that a driver will choose to charge despite not actually needing it. | 0.1
 electricFuelConsumptionSD | Standard deviation of the truncated normal distribution used to distribute electric fuel consumption amongst the drivers.  In units of kWh/mile. | 0.02

@@ -31,9 +31,11 @@ optim.code <- 'linked2-50-50'
 #optim.code <- 'thresh-1-linked-min-cost-constrained-by-frac-stranded-50-50'
 #optim.code <- 'thresh-2-linked-min-cost-constrained-by-frac-stranded-50-50'
 
-optim.codes <- c('linked2-50-50','linked2-battery-1.25','linked2-battery-1.5','linked2-battery-2.0','linked2-cost-1.5','linked2-cost-2.0','linked2-type','linked2-base-fixed')
+#optim.codes <- c('linked2-50-50','linked2-battery-1.25','linked2-battery-1.5','linked2-battery-2.0','linked2-cost-1.5','linked2-cost-2.0','linked2-type','linked2-base-fixed')
+path.to.inputs <- paste(base.path,'pev-shared/data/inputs/buildout/linked2-50-50-seed1/',sep='')
 
-path.to.inputs <- paste(base.path,'pev-shared/data/inputs/buildout/',optim.codes[1],'-seed1/',sep='')
+optim.codes <- c('linked2-50-50','linked2-sa2-battery-1.25','linked2-sa2-battery','linked2-sa2-battery-2.0','linked2-sa2-cost-1.5','linked2-sa2-cost','linked2-sa2-type')
+
 naming <- yaml.load(readChar(paste(path.to.inputs,'../naming.yaml',sep=''),file.info(paste(path.to.inputs,'../naming.yaml',sep=''))$size))
 
 if(exists('compare'))rm('compare')
@@ -47,6 +49,7 @@ for(optim.code in optim.codes){
   #path.to.outputs <- paste(base.path,'pev-shared/data/outputs/buildout/',optim.code,'/',sep='')
   path.to.outputs.base <- paste(base.path,'pev-shared/data/outputs/sensitivity/',optim.code,sep='')
 
+  make.dir(path.to.inputs)
   make.dir(path.to.outputs.base)
   make.dir(paste(path.to.outputs.base,"/",optim.code.date,sep=''))
   make.dir(paste(path.to.google,"buildout",sep=''))

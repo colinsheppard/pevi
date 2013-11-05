@@ -32,6 +32,16 @@ area.of.union <- function(spatial.polys.list){
   area.poly(result.gpc.poly)
 }
 
+heatmap.kml <- function(x,y,z=NULL,filepath="data",dotsize=150,opacity=128,width=1024,height=1024){
+  dotsize <- ifelse(length(dotsize)==1,dotsize,pp("(",pp(dotsize,collapse=","),")"))
+  python.code <- c("import heatmap",
+    "hm = heatmap.Heatmap()",
+    pp("pts = ",pp("[(",pp(x,",",y,collapse="),("),")]")),
+    pp("hm.heatmap(pts,dotsize=",dotsize,",opacity=",opacity,",size=(",width,",",height,"))"),
+    pp('hm.saveKML("',filepath,'")'))
+  python.exec(python.code)
+}
+
 map.color <- function (x,c.map){
   res <- c.map[round((length(c.map)-1)*(x-min(x,na.rm=T))/diff(range(x,na.rm=T))+1,0)]
   res[is.na(res)] <- "#000000"

@@ -101,7 +101,7 @@ to setup-tazs
     set shape "star"
     set color yellow
     set size 0.5
-    set n-levels n-values 6 [-99] 
+    set n-levels n-values 5 [-99] 
     set chargers-by-type n-values n-charger-types [0]
     set available-chargers-by-type n-values n-charger-types [0]
   ]
@@ -113,7 +113,7 @@ to setup-tazs
         set id file-read
         if id != #prev-taz-id + 1 [ error (word "In setup-tazs, was expecting to read taz #" (#prev-taz-id + 1) " from file but found #" id " instead.") ]
         set #prev-taz-id id
-        foreach [0 1 2 3 4 5] [
+        foreach [0 1 2 3 4] [
           set n-levels replace-item ? n-levels file-read ; sets the number of level X chargers in each TAZ
           set available-chargers-by-type replace-item ? available-chargers-by-type structs:new-stack
         ]
@@ -438,10 +438,6 @@ to setup-chargers
     ]
     create-chargers [item 4 n-levels] of #this-taz [  ; The location of each charger created is then set as the current TAZ location
       set this-charger-type one-of charger-types with [level = 4]
-      set location ?
-    ]
-    create-chargers [item 5 n-levels] of #this-taz [  ; The location of each charger created is then set as the current TAZ location
-      set this-charger-type one-of charger-types with [level = 5]
       set location ?
     ]
     foreach n-values n-charger-types [?] [

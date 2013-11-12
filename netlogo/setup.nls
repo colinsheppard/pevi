@@ -27,8 +27,9 @@ to read-parameter-file
       ifelse param-name = "vehicle-type-input-file" [ set vehicle-type-input-file word model-directory file-read ][
       ifelse param-name = "outputs-directory" [ set outputs-directory word model-directory file-read ][
       ifelse param-name = "probability-of-unneeded-charge" [ set probability-of-unneeded-charge file-read ][
-      ifelse param-name = "stranded-delay-threshold" [ set stranded-delay-threshold file-read ][  
-      ]]]]]]]]]]]]]]]]]]]
+      ifelse param-name = "stranded-delay-threshold" [ set stranded-delay-threshold file-read ][
+      ifelse param-name = "charger-permission-file" [set charger-permission-file file-read ][  
+      ]]]]]]]]]]]]]]]]]]]]
     ]
     file-close
   ][ 
@@ -377,6 +378,7 @@ to setup-itinerary
         set master-itin-to itin-to
         set master-itin-depart itin-depart
         set master-journey-distance journey-distance
+        set permission-list []
       ] ; end create-drivers
     ] ; end while file-at-end
   ] ; end ifelse
@@ -445,7 +447,10 @@ to setup-chargers
         set chargers-by-type replace-item ? chargers-by-type chargers with [([level] of this-charger-type = ?) and (location = myself)]
       ]
     ]
-  ]  
+  ]
+  
+  setup-special-chargers
+    
   initialize-available-chargers
   ask chargers [
     set shape "Circle 2"
@@ -457,6 +462,32 @@ to setup-chargers
   ]
 end ;setup-chargers
 
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;; SETUP SPECIAL PERMISSION CHARGERS
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+to setup-special-chargers
+  ifelse (file-exists? charger-permission-file) [
+    file-close
+    file-open charger-permission-file
+    while [file-at-end? = false] [
+      create-chargers 1 [
+        set location taz file-read
+        let #my-level file-read
+        set this-charger-type one-of charger-types with [level = #my-level]
+        let priviledged-drivers read-from-string (word "[" file-read-line "]") ; handy trick from http://stackoverflow.com/questions/10244850/read-file-lines-with-spaces-into-netlogo-as-lists
+        foreach priviledged-drivers [
+          ask drivers with [id = ?] [
+            set permission-list lput myself permission-list
+          ]
+        ]
+      ]
+    ]
+    file-close
+  ][ 
+    error (word "Input file '" charger-permission-file "' not found!") 
+  ]
+end ;setup-special-chargers
+  
 ;;;;;;;;;;;;;;;;;;;;
 ;; LOG DATA
 ;;;;;;;;;;;;;;;;;;;;

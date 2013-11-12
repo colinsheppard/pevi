@@ -32,6 +32,7 @@ globals [
   vehicle-type-input-file
   outputs-directory
   starting-soc-file
+  charger-permission-file
   
 ;; PARAMETERS
   charge-safety-factor
@@ -67,6 +68,7 @@ drivers-own [
   this-vehicle-type              ; e.g. 'leaf' or 'volt'
   is-bev?
   multi-unit?                  
+  permission-list
   battery-capacity          ; kwh
   electric-fuel-consumption ; kwh / mile
   hybrid-fuel-consumption   ; gallon / mile, for phev charge sustaining mode
@@ -134,7 +136,6 @@ chargers-own[
   location         ; TAZ # for each charger
   current-driver   ; driver currenlty being serviced, nobody indicates charger is available
   this-charger-type     ; 0, 1, 2, 3, or 4 ***address name later?
-
   num-sessions     ; count of charging sessions
   energy-delivered ; kWh
  ]

@@ -1,4 +1,3 @@
-library(colinmisc)
 load.libraries(c('sas7bdat','plyr','ggplot2','gtools','snow','colorspace'))
 
 path.to.geatm <- '~/Dropbox/serc/pev-colin/data/GEATM-2020/'

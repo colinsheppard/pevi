@@ -1,29 +1,23 @@
 Sys.setenv(NOAWT=1)
 options(java.parameters="-Xmx2048m")
-library(colinmisc)
 load.libraries(c('ggplot2','yaml','RNetLogo','plyr','reshape'))
 
-base.path <- '/Users/critter/Dropbox/serc/pev-colin/'
-#base.path <- '/Users/sheppardc/Dropbox/serc/pev-colin/'
-#base.path <- '/Users/Raskolnikovbot3001/Dropbox/'
-
-path.to.pevi <- paste(base.path,'pevi/',sep='')
-path.to.inputs <- paste(base.path,'pev-shared/data/inputs/compare/charge-safety-factor/',sep='')
-path.to.inputs <- paste(base.path,'pev-shared/data/inputs/compare/phev-only/',sep='')
-path.to.inputs <- paste(base.path,'pev-shared/data/inputs/compare/patterns/',sep='')
-path.to.inputs <- paste(base.path,'pev-shared/data/inputs/compare/animation/',sep='')
+path.to.inputs <- paste(pevi.shared,'data/inputs/compare/charge-safety-factor/')
+path.to.inputs <- paste(pevi.shared,'data/inputs/compare/phev-only/')
+path.to.inputs <- paste(pevi.shared,'data/inputs/compare/patterns/')
+path.to.inputs <- paste(pevi.shared,'data/inputs/compare/animation/')
 
 #to.log <- c('pain','charging','need-to-charge')
 to.log <- c('pain','charging','tazs','trip')
 #to.log <- c('pain','charging','trip')
 
 # load the reporters and loggers needed to summarize runs and disable logging
-source(paste(path.to.pevi,"R/reporters-loggers.R",sep=''))
+source(paste(pevi.home,"R/reporters-loggers.R",sep=''))
 
 # read the parameters and values to vary in the experiment
 vary <- yaml.load(readChar(paste(path.to.inputs,'vary.yaml',sep=''),file.info(paste(path.to.inputs,'vary.yaml',sep=''))$size))
 for(file.param in names(vary)[grep("-file",names(vary))]){
-  vary[[file.param]] <- paste(path.to.pevi,'netlogo/',vary[[file.param]],sep='')
+  vary[[file.param]] <- paste(pevi.home,'netlogo/',vary[[file.param]],sep='')
 }
 naming <- yaml.load(readChar(paste(path.to.inputs,'naming.yaml',sep=''),file.info(paste(path.to.inputs,'naming.yaml',sep=''))$size))
 
@@ -58,7 +52,7 @@ if("vehicle.type.input.file" %in% names(vary)){
 # start NL
 nl.path <- "/Applications/NetLogo\ 5.0.3"
 tryCatch(NLStart(nl.path, gui=F),error=function(err){ NA })
-model.path <- paste(path.to.pevi,"netlogo/PEVI.nlogo",sep='')
+model.path <- paste(pevi.home,"netlogo/PEVI.nlogo",sep='')
 NLLoadModel(model.path)
 
 for(cmd in paste('set log-',logfiles,' false',sep='')){ NLCommand(cmd) }
@@ -75,7 +69,7 @@ for(results.i in 1:nrow(results)){
   NLCommand('clear-all-and-initialize')
   NLCommand('random-seed 1')
   NLCommand(paste('set parameter-file "',path.to.inputs,'params.txt"',sep=''))
-  NLCommand(paste('set model-directory "',path.to.pevi,'netlogo/"',sep=''))
+  NLCommand(paste('set model-directory "',pevi.home,'netlogo/"',sep=''))
   NLCommand('read-parameter-file')
   for(param in names(vary.tab)){
     if(is.character(vary.tab[1,param])){

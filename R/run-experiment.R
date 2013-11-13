@@ -1,6 +1,5 @@
 Sys.setenv(NOAWT=1)
 options(java.parameters="-Xmx2048m")
-library(colinmisc)
 load.libraries(c('ggplot2','yaml','RNetLogo','plyr','reshape'))
 
 base.path <- '/Users/critter/Dropbox/serc/pev-colin/'

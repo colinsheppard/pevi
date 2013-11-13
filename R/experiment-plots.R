@@ -1,4 +1,3 @@
-library(colinmisc)
 load.libraries(c('ggplot2','plyr','reshape','stringr'))
 
 base.path <- '/Users/critter/Dropbox/serc/pev-colin/'

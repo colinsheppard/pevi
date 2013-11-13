@@ -5,20 +5,17 @@
 # based on polygons generated in google earth (and converted to shape files in QGIS)
 ######################################################################################################
 
-library(colinmisc)
 load.libraries(c('maptools','plotrix','stats','gpclib','plyr','png','RgoogleMaps','lattice','stringr','ggplot2','rgdal','XML','plotKML'))
+source(paste(pevi.home,'R/gis-functions.R',sep=''))
 gpclibPermit()
 
-base.path <- '/Users/sheppardc/Dropbox/serc/pev-colin/'
-#base.path <- '/Users/critter/Dropbox/serc/pev-colin/'
-path.to.geatm <- paste(base.path,'data/GEATM-2020/',sep='')
-path.to.google <- paste(base.path,'pev-shared/data/google-earth/',sep='')
-path.to.humveh <- '~/Dropbox/serc/pev-colin/data/Vehicle-Registration/'
-path.to.plots  <- '~/Dropbox/serc/pev-colin/plots/'
-path.to.pevi   <- '~/Dropbox/serc/pev-colin/pevi/'
-path.to.parcel <- '~/Dropbox/serc/pev-colin/data/HUM-PARCELS/'
+path.to.geatm <- pp(pevi.shared,'data/GEATM-2020/')
+path.to.google <- pp(pevi.shared,'/data/google-earth/')
+path.to.plots  <- pp(pevi.shared,'plots/')
 
-source(paste(path.to.pevi,'R/gis-functions.R',sep=''))
+######################################################################################################
+# HUMBOLDT TAZs
+######################################################################################################
 
 taz <- readShapePoly(paste(path.to.geatm,'Shape_Files/taz-LATLON.shp',sep=''))
 
@@ -165,6 +162,14 @@ c.map <- paste(map.color(taz@data$total.demand,blue2red(50)),'7F',sep='')
 for.c.map <- log(taz@data$total.demand.per.acre[-which(taz@data$total.demand.per.acre==Inf)])
 for.c.map[for.c.map<=0] <- 0 
 c.map <- paste(map.color(for.c.map,blue2red(50)),'7F',sep='')
- shp.to.kml(taz[-which(taz@data$total.demand.per.acre==Inf),],paste(path.to.pevi,'inputs/development/disaggregated-taz-per-acre.kml',sep=''),'Disaggregated TAZs','Color denotes total daily demand per acre','white',1.5,c.map,name.col='NEWTAZ',description.cols=c('total.demand.per.acre','total.demand','NEWTAZ','ACRES'),id.col='ID')
+ shp.to.kml(taz[-which(taz@data$total.demand.per.acre==Inf),],paste(pevi.home,'inputs/development/disaggregated-taz-per-acre.kml',sep=''),'Disaggregated TAZs','Color denotes total daily demand per acre','white',1.5,c.map,name.col='NEWTAZ',description.cols=c('total.demand.per.acre','total.demand','NEWTAZ','ACRES'),id.col='ID')
+
+######################################################################################################
+# UPSTATE TAZs
+######################################################################################################
+
+load(pp(pevi.shared,'data/UPSTATE/driving-distances/taz_time_distance.Rdata'))
+
+taz
 
 

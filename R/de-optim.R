@@ -1,4 +1,3 @@
-library('colinmisc')
 load.libraries(c('plyr','RNetLogo'))
 Sys.setenv(NOAWT=TRUE) 
 

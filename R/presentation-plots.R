@@ -1,4 +1,3 @@
-library(colinmisc)
 load.libraries(c('maptools','plotrix','stats','gpclib','plyr','png','RgoogleMaps','lattice','stringr','ggplot2','RPostgreSQL'))
 gpclibPermit()
 

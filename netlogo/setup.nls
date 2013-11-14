@@ -474,6 +474,7 @@ to setup-special-chargers
         set location taz file-read
         let #my-level file-read
         set this-charger-type one-of charger-types with [level = #my-level]
+        set alt-energy-price file-read
         let priviledged-drivers read-from-string (word "[" file-read-line "]") ; handy trick from http://stackoverflow.com/questions/10244850/read-file-lines-with-spaces-into-netlogo-as-lists
         foreach priviledged-drivers [
           ask drivers with [id = ?] [

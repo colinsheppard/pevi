@@ -170,6 +170,21 @@ c.map <- paste(map.color(for.c.map,blue2red(50)),'7F',sep='')
 
 load(pp(pevi.shared,'data/UPSTATE/driving-distances/taz_time_distance.Rdata'))
 
-taz
+taz <- readShapePoly(pp(pevi.shared,'data/UPSTATE/shapefiles/Shasta_TAZ'))
 
+# Load the aggregation polygons
+agg.polys <- readShapePoly(pp(pevi.shared,'data/UPSTATE/shapefiles/ProposedAggregatedTAZs'))
 
+# Load the OD data
+od <- read.table(pp(pevi.shared,'data/UPSTATE/Shasta-OD-2010/sh10_adjvehtrips_3per_3occ.txt'),header=T)
+
+taz.centroids <-SpatialPointsDataFrame(coordinates(taz),data=data.frame(longitude= coordinates(taz)[,1],latitude= coordinates(taz)[,2]))
+agg.mapping <- data.frame(name=over(taz.centroids,agg.polys)$Name)
+agg.mapping$agg.id <- as.numeric(agg.mapping$name)
+agg.taz.shp <- unionSpatialPolygons(taz,agg.mapping$agg.id)
+aggregate.data <- function(df){ 
+ return( colSums(df[,c('AREA','ACRES','SHAPE_AREA')]) ) 
+}
+taz@data$agg.id <- agg.mapping$agg.id
+agg.taz.data <- ddply(taz@data[!is.na(taz@data$agg.id),],.(agg.id),aggregate.data)
+agg.taz.shp <- SpatialPolygonsDataFrame(agg.taz.shp,agg.taz.data)

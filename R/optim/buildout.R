@@ -5,7 +5,7 @@ load.libraries(c('ggplot2','yaml','RNetLogo','plyr','reshape','stringr','snow'))
 
 #base.path <- '/Users/critter/Dropbox/serc/pev-colin/'
 base.path <- '/Users/sheppardc/Dropbox/serc/pev-colin/'
-#base.path <- '/Users/Raskolnikovbot3001/Dropbox/'
+#base.path <- '/Users/Raskolnikovbot3001/Dropbox/serc/'
 
 #optim.code <- 'min-cost-constrained-by-frac-stranded-50-50'
 optim.code <- 'min-cost-constrained-by-frac-stranded-50-50-seed9'
@@ -53,7 +53,8 @@ if(!exists('cl')){
 }
 
 # start NL
-nl.path <- "/Applications/NetLogo\ 5.0.3"
+#nl.path <- "/Applications/NetLogo\ 5.0.3"
+nl.path <- "/Applications/NetLogo\ 5.0.4"
 tryCatch(NLStart(nl.path, gui=F),error=function(err){ NA })
 model.path <- paste(path.to.pevi,"netlogo/PEVI-nolog.nlogo",sep='')
 NLLoadModel(model.path)

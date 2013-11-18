@@ -19,7 +19,7 @@ d_ply(combined.place.data,.(county),function(df){
 	}
 	if(length(na.omit(df$tripdur))>0) {
 		pt <- ggplot(df, aes(x=tripdur)) + geom_bar(stat="bin") + ggtitle(pp("Trip duration distribution for ",df$county[1]," county"))
-		ggsave(pt,filename=pp('~/Dropbox/serc/pev-shared/data/CHTS/plots_by_county/Upstate_Trip_Duration_frequency_county_',df$county[1],'.pdf'),width=17,height=11)
+		ggsave(pt,filename=pp(path.to.CHTS,'plots_by_county/Upstate_Trip_Duration_frequency_county_',df$county[1],'.pdf'),width=17,height=11)
 	}
 	if(length(na.omit(df$actdur))>0) {
 		pa <- ggplot(df, aes(x=actdur)) + geom_bar(stat="bin") + ggtitle(pp("Activity duration distribution for ",df$county[1]," county"))

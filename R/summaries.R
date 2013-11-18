@@ -1,4 +1,3 @@
-library(colinmisc)
 load.libraries(c('ggplot2','plyr'))
 
 path.to.plots  <- '~/Dropbox/serc/pev-colin/plots/'

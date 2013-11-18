@@ -6,7 +6,6 @@
 # needed by the itinerary builder
 ######################################################################################################
 
-library(colinmisc)
 load.libraries(c('maptools','plotrix','stats','gpclib','plyr','png','RgoogleMaps','lattice','stringr','ggplot2','rgdal','XML','plotKML','rgeos','doMC'))
 gpclibPermit()
 registerDoMC(7)

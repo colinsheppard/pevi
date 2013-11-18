@@ -1,4 +1,4 @@
-load.libraries(c('maptools','plyr','stringr','ggplot2','gdata','doMC','gpclib','RPostgreSQL','rPython'))
+load.libraries(c('maptools','plyr','stringr','ggplot2','gdata','doMC','gpclib','RPostgreSQL','rPython','reshape'))
 registerDoMC(10)
 gpclibPermit()
 
@@ -181,6 +181,27 @@ for(table.name in c('customer_load','generation')){
 sql <- "UPDATE line_sections SET geom=subquery.newgeom FROM (SELECT line.line_id AS line_id,ST_MakeLine(struc.geom,struc2.geom) AS newgeom FROM line_sections AS line LEFT JOIN structures AS struc ON struc.struc_id=line.src_struc_id LEFT JOIN structures AS struc2 ON struc2.struc_id=line.load_struc_id) AS subquery WHERE line_sections.line_id=subquery.line_id ;"
 dbSendQuery(con,sql)
 
+# now add a geom to load_summary
+sql <- "SELECT AddGeometryColumn('circuit_load_summary','geom',4326,'MULTILINESTRING',2,true);" 
+dbSendQuery(con,sql)
+sql <- "SELECT fdr_num FROM circuit_load_summary"
+circ <- na.omit(dbGetQuery(con,sql))
+for(circ.id in circ$fdr_num){
+  sql <- pp("UPDATE circuit_load_summary SET geom=subquery.newgeom FROM (SELECT ST_Union(line.geom) AS newgeom from line_sections AS line where line.fdr_num=",circ.id,") AS subquery WHERE fdr_num=",circ.id)
+  dbSendQuery(con,sql)
+}
+
+# looks like transformer load factors have different units 
+sql <- "SELECT * FROM transformers"
+tran <- dbGetQuery(con,sql)
+dim(subset(tran, summer_load_factor>1))
+sql <- "UPDATE transformers SET summer_load_factor=summer_load_factor/100.0 WHERE summer_load_factor > 1"
+dbSendQuery(con,sql)
+sql <- "UPDATE transformers SET winter_load_factor=winter_load_factor/100.0 WHERE winter_load_factor > 1"
+dbSendQuery(con,sql)
+sql <- "UPDATE transformers SET winter_load_factor=-winter_load_factor WHERE winter_load_factor < 0"
+dbSendQuery(con,sql)
+
 ############################################################################################################
 # Analysis
 ############################################################################################################
@@ -200,4 +221,32 @@ heatmap.kml(res$long,res$lat,filepath="test.kml",dotsize=round(res$load/max(res$
 
 heatmap.kml(load$df.long,load$df.lat,filepath="test.kml",dotsize=20,opacity=100,width=2048*4,height=2048*4)
 
+# load the line sections
+sql <- "SELECT cust_id, cust_typ AS type, ST_X(geom) AS long, ST_Y(geom) AS lat, sum_aug_kwhr AS load FROM customer_load_sp"
+all.load <- na.omit(dbGetQuery(con,sql))
+
+# transformers & load
+sql <- "SELECT * FROM transformers"
+tran <- dbGetQuery(con,sql)
+names(tran) <- c('trf_id',tail(names(tran),-1))
+
+sql <- "SELECT * FROM customer_load"
+ld <- dbGetQuery(con,sql)
+# test out join
+join(subset(tran,trf_id%in%as.numeric(names(table(ld$trf_id))[table(ld$trf_id)>1][1])),subset(ld,trf_id%in%as.numeric(names(table(ld$trf_id))[table(ld$trf_id)>1][1])),by='trf_id')
+# do join
+tran.ld <- ddply(join(tran,ld,by='trf_id'),.(trf_id,cust_typ),function(df){
+  data.frame(df[1,c('primary_voltage_code','secondary_voltage_code','nameplate_kva','fdr_num','summer_load_factor','winter_load_factor')],cust_count=sum(df$cust_count),sum_aug_kwhr=sum(df$sum_aug_kwhr),sum_jan_kwhr=sum(df$sum_jan_kwhr))
+})
+
+# plot summer vs winter load on transformers
+ggplot(tran.ld,aes(x=sum_jan_kwhr,y=sum_aug_kwhr,colour=factor(nameplate_kva)))+geom_point()+facet_wrap(~cust_typ)+scale_x_log10()+scale_y_log10()+geom_abline(intercept=0,slope=1)
+# mean of values by customer type
+ddply(tran.ld,.(cust_typ),function(df){ ldply(df,mean,na.rm=T) })
+
+ggplot(melt(tran.ld,id.vars='cust_typ',measure.vars=c('sum_aug_kwhr','sum_jan_kwhr')),aes(x=value))+geom_histogram()+facet_grid(cust_typ~variable)+scale_x_log10()
+
+cit <- readShapePoly(pp(pevi.shared,'data/HUMCO/cities-wgs84',sep=''))
+cit$name <- cit$NAME
+cit$name <- cit$NAME
 

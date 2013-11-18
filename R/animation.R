@@ -1,8 +1,4 @@
-library(colinmisc)
 load.libraries(c('sas7bdat','plyr','ggplot2','gtools','doMC','reshape','maptools','animation','colorRamps','DAAG'))
-
-base.path <- '/Users/critter/Dropbox/serc/pev-colin/'
-#base.path <- '/Users/sheppardc/Dropbox/serc/pev-colin/'
 
 ani.code <- '50-50'
 ani.code <- 'base-fixed'
@@ -13,14 +9,13 @@ if(ani.code=="50-50"){
   evses <- 1:5 # which correspond to iters 1 20 24 28 36 or the break points between each pen
 }
 
-path.to.ani <- paste(base.path,'data/animations/',sep='')
-path.to.pevi.outputs <- paste(path.to.ani,'outputs-',ani.code,'/',sep='')
-path.to.geatm <- paste(base.path,'pev-shared/data/GEATM-2020/',sep='')
-path.to.google <- paste(base.path,'pev-shared/data/google-earth/',sep='')
-path.to.shared.inputs <- paste(base.path,'pev-shared/data/inputs/driver-input-file/',sep='')
-path.to.pevi <- paste(base.path,'pevi/',sep='')
+path.to.ani <- paste(pevi.shared,'data/animations/',sep='')
+path.to.outputs <- paste(path.to.ani,'outputs-',ani.code,'/',sep='')
+path.to.geatm <- paste(pevi.shared,'data/GEATM-2020/',sep='')
+path.to.google <- paste(pevi.shared,'data/google-earth/',sep='')
+path.to.shared.inputs <- paste(pevi.shared,'data/inputs/driver-input-file/',sep='')
 
-source(paste(path.to.pevi,"R/gis-functions.R",sep=''))
+source(paste(pevi.home,"R/gis-functions.R",sep=''))
 
 agg.taz <- readShapePoly(paste(path.to.google,'aggregated-taz-with-weights/aggregated-taz-with-weights',sep=''),IDvar="ID")
 load(paste(path.to.google,'aggregated-taz-with-weights/aggregated-taz-with-weights-fieldnames.Rdata',sep=''))
@@ -28,7 +23,7 @@ names(agg.taz@data) <- c("SP_ID",taz.shp.fieldnames)
 rm('taz') 
 
 # load od.24.weighted,od.am.weighted,od.pm.weighted
-load(paste(path.to.pevi,'inputs/routing-corrected.Rdata',sep=''))
+load(paste(pevi.home,'inputs/routing-corrected.Rdata',sep=''))
 
 route.ordered.sub <- route.ordered[,c('from_taz','to_taz','start_lon','start_lat','end_lon','end_lat')]
 
@@ -44,7 +39,7 @@ sched <- read.table(file=paste(path.to.shared.inputs,"driver-schedule-pen",pev.p
 names(sched) <- c('driver','from','to','depart','home')
 sched$ft <- paste(sched$from,sched$to)
 
-tazs <- read.csv(paste("~/Documents/serc/pev/tazs-out.csv",sep=''))
+tazs <- read.csv(pp(pevi.nondrop,"tazs-out.csv"))
 tazs <- subset(tazs,time<=32)
 
 # sort by depart time
@@ -56,7 +51,7 @@ sched <- sched[order(sched$depart),]
 agg.taz.coords <- coordinates(agg.taz)
 home.cexes <- seq(1,4,length.out=40)
 
-path.to.plots <- '~/Dropbox/serc/pev-colin/plots/'
+path.to.plots <- pp(pevi.nondrop,'plots')
 if(!file.exists(paste(path.to.plots,'route-inds-for-animation.Rdata',sep=''))){
   rt.inds <- list()
   for(from.i in 1:52){
@@ -224,10 +219,10 @@ ani.routes <- function(){
 step.size = 2.5/60
 
 for(evse.i in evses){
-  tazs <- read.csv(paste(path.to.pevi.outputs,"tazs-out-",evse.i,".csv",sep=''))
-  sched <- read.csv(paste(path.to.pevi.outputs,"trip-out-",evse.i,".csv",sep=''))
-  pain <- subset(read.csv(paste(path.to.pevi.outputs,"pain-out-",evse.i,".csv",sep='')),pain.type=="delay")
-  ch <- read.csv(paste(path.to.pevi.outputs,"charging-out-",evse.i,".csv",sep=''))
+  tazs <- read.csv(paste(path.to.outputs,"tazs-out-",evse.i,".csv",sep=''))
+  sched <- read.csv(paste(path.to.outputs,"trip-out-",evse.i,".csv",sep=''))
+  pain <- subset(read.csv(paste(path.to.outputs,"pain-out-",evse.i,".csv",sep='')),pain.type=="delay")
+  ch <- read.csv(paste(path.to.outputs,"charging-out-",evse.i,".csv",sep=''))
   max.t <- max(ch$time + ch$duration)
 
   ani.options(ffmpeg="/usr/local/bin/ffmpeg",outdir=paste(path.to.ani,"ani-",ani.code,sep=''),ani.width=750,ani.height=900)
@@ -283,10 +278,10 @@ ani.tours <- function(){
 }
 
 for(evse.i in evses){
-  tazs <- read.csv(paste(path.to.pevi.outputs,"tazs-out-",evse.i,".csv",sep=''))
-  tr <- read.csv(paste(path.to.pevi.outputs,"trip-out-",evse.i,".csv",sep=''))
-  pain <- subset(read.csv(paste(path.to.pevi.outputs,"pain-out-",evse.i,".csv",sep='')),pain.type=="delay")
-  ch <- read.csv(paste(path.to.pevi.outputs,"charging-out-",evse.i,".csv",sep=''))
+  tazs <- read.csv(paste(path.to.outputs,"tazs-out-",evse.i,".csv",sep=''))
+  tr <- read.csv(paste(path.to.outputs,"trip-out-",evse.i,".csv",sep=''))
+  pain <- subset(read.csv(paste(path.to.outputs,"pain-out-",evse.i,".csv",sep='')),pain.type=="delay")
+  ch <- read.csv(paste(path.to.outputs,"charging-out-",evse.i,".csv",sep=''))
   max.t <- max(ch$time + ch$duration)
   tr <- tr[,c('driver','origin','destination','time','vehicle.type')]
   names(tr) <- c('driver','from','to','depart','type')
@@ -322,14 +317,14 @@ for(evse.i in evses){
     })
   }
 
-  if(!file.exists(paste(path.to.pevi.outputs,"locs-",evse.i,".Rdata",sep=''))){
+  if(!file.exists(paste(path.to.outputs,"locs-",evse.i,".Rdata",sep=''))){
     locs <- list()
     for(t in seq(0,max.t,by=step.size)){
       locs[[as.character(t)]] <- location(t)
     }
-    save(locs,file=paste(path.to.pevi.outputs,"locs-",evse.i,".Rdata",sep=''))
+    save(locs,file=paste(path.to.outputs,"locs-",evse.i,".Rdata",sep=''))
   }else{
-    load(paste(path.to.pevi.outputs,"locs-",evse.i,".Rdata",sep=''))
+    load(paste(path.to.outputs,"locs-",evse.i,".Rdata",sep=''))
   }
 
   ani.options(ffmpeg="/usr/local/bin/ffmpeg",outdir=paste(path.to.ani,"ani-",ani.code,sep=''))

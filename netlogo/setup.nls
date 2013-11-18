@@ -101,7 +101,7 @@ to setup-tazs
     set shape "star"
     set color yellow
     set size 0.5
-    set n-levels n-values 6 [-99] 
+    set n-levels n-values n-charger-types [-99] 
     set chargers-by-type n-values n-charger-types [0]
     set available-chargers-by-type n-values n-charger-types [0]
   ]
@@ -113,11 +113,11 @@ to setup-tazs
         set id file-read
         if id != #prev-taz-id + 1 [ error (word "In setup-tazs, was expecting to read taz #" (#prev-taz-id + 1) " from file but found #" id " instead.") ]
         set #prev-taz-id id
-        foreach [0 1 2 3 4 5] [
+        foreach n-values n-charger-types [?] [
           set n-levels replace-item ? n-levels file-read ; sets the number of level X chargers in each TAZ
           set available-chargers-by-type replace-item ? available-chargers-by-type structs:new-stack
         ]
-        set frac-multi-unit file-read
+        ;set frac-multi-unit file-read
         set neighbor-tazs n-values 0 [0]
         foreach n-values n-tazs [? + 1] [
           if not (? = id) and (distance-from-to id ? <= charger-search-distance) [
@@ -285,13 +285,13 @@ to initialize-drivers
     itinerary-event-scheduler
   ]
   ]
-  ask (tazs) [
-    let #multi-unit-count 0
-    while [#multi-unit-count < (count drivers with [home-taz = myself] * frac-multi-unit)] [
-      ask one-of drivers with [home-taz = myself and not multi-unit?] [set multi-unit? true]
-      set #multi-unit-count #multi-unit-count + 1
-    ]
-  ]
+ ; ask (tazs) [
+ ;   let #multi-unit-count 0
+ ;   while [#multi-unit-count < (count drivers with [home-taz = myself] * frac-multi-unit)] [
+ ;     ask one-of drivers with [home-taz = myself and not multi-unit?] [set multi-unit? true]
+ ;     set #multi-unit-count #multi-unit-count + 1
+ ;   ]
+ ; ]
 end ;initialize-drivers
 
 ;;;;;;;;;;;;;;;;;;;;
@@ -440,10 +440,10 @@ to setup-chargers
       set this-charger-type one-of charger-types with [level = 4]
       set location ?
     ]
-    create-chargers [item 5 n-levels] of #this-taz [  ; The location of each charger created is then set as the current TAZ location
-      set this-charger-type one-of charger-types with [level = 5]
-      set location ?
-    ]
+    ;create-chargers [item 5 n-levels] of #this-taz [  ; The location of each charger created is then set as the current TAZ location
+    ;  set this-charger-type one-of charger-types with [level = 5]
+    ;  set location ?
+    ;]
     foreach n-values n-charger-types [?] [
       ask #this-taz [
         set chargers-by-type replace-item ? chargers-by-type chargers with [([level] of this-charger-type = ?) and (location = myself)]

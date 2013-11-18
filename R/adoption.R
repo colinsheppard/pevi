@@ -1,13 +1,11 @@
 ## Gov. Brown Executive Order Has an adoption goal of 10% of new light duty vehicles by 2015 and 25% by 2020.
 
-library(colinmisc)
 load.libraries(c('plyr','ggplot2','gtools','gdata','googleVis'))
-
-path.to.humveh <- '~/Dropbox/serc/pev-colin/data/Vehicle-Registration/'
 
 years <- c(2003,2005,2007,2009,2010,2011,2012)
 
-if(!file.exists(paste(path.to.humveh,'veh.Rdata',sep=''))){
+if(!file.exists(pp(pevi.shared,'data/vehicle-registration/veh.Rdata',sep=''))){
+  path.to.humveh <- '~/Dropbox/serc/pev-colin/data/Vehicle-Registration/'
   first.year <- T
 
   for(yr in years){
@@ -31,14 +29,15 @@ if(!file.exists(paste(path.to.humveh,'veh.Rdata',sep=''))){
   veh$zip.city <- paste(veh$city,veh$ZIP.CODE,sep=' - ')
   veh$make.model <- paste(veh$MAKE,veh$MODEL,sep=' ')
 
-  save(veh,file=paste(path.to.humveh,'veh.Rdata',sep=''))
+  # Load vehicle specs from car query api database
+  specs <- read.csv(paste(path.to.humveh,'car_query.csv',sep=''))
+  specs$make.model <- toupper(paste(specs$model_make_id,specs$model_name,sep=" "))
+
+  save(veh,specs,file=pp(pevi.shared,'data/vehicle-registration/veh.Rdata',sep=''))
 }else{
-  load(paste(path.to.humveh,'veh.Rdata',sep=''))
+  load(pp(pevi.shared,'data/vehicle-registration/veh.Rdata',sep=''))
 }
   
-# Load vehicle specs from car query api database
-specs <- read.csv(paste(path.to.humveh,'car_query.csv',sep=''))
-specs$make.model <- toupper(paste(specs$model_make_id,specs$model_name,sep=" "))
 
 # Hybrid and EV registrations by year and zip
 
@@ -51,7 +50,7 @@ frac.by.year <- ddply(veh,.(FUEL.TYPE,year),function(df){ data.frame(frac=sum(df
 tot.by.zip.year <- ddply(veh,.(zip.city,year),function(df){ data.frame(count=sum(df$COUNT,na.rm=T)) })
 frac.by.zip.year <- ddply(veh,.(FUEL.TYPE,zip.city,year),function(df){ data.frame(zip=df$ZIP.CODE[1],count=sum(df$COUNT,na.rm=T),frac=sum(df$COUNT,na.rm=T)/subset(tot.by.zip.year,zip.city==df$zip.city[1] & year==df$year[1],count)$count) })
 
-save(tot.by.zip.year,frac.by.zip.year,tot.by.year,frac.by.year,file=paste(path.to.humveh,'tot-frac-by-year.Rdata',sep=''))
+save(tot.by.zip.year,frac.by.zip.year,tot.by.year,frac.by.year,file=pp(pevi.shared,'data/vehicle-registration/tot-frac-by-year.Rdata'))
 
 # Just hybrid and electric
 ggplot(subset(frac.by.zip.year,FUEL.TYPE%in%c("GAS/ELEC","ELECTRIC")),aes(x=year,y=frac*100))+geom_bar(stat="identity",aes(fill=FUEL.TYPE))+facet_wrap(~zip.city)+scale_y_continuous(name="% of Vehicles Registered in ZIP")
@@ -83,9 +82,9 @@ frac.by.year.model.ev <- ddply(subset(veh,FUEL.TYPE=="ELECTRIC"),.(MODEL,year),f
 ggplot(subset(frac.by.year.model.ev, MODEL %in% ev.models),aes(x=year,y=frac*100))+geom_bar(stat="identity",aes(fill=MODEL))+scale_y_continuous(name="% of Vehicles Registered in Humboldt")
 ggplot(subset(frac.by.year.model.ev, MODEL %in% ev.models),aes(x=year,y=count))+geom_bar(stat="identity",aes(fill=MODEL))+scale_y_continuous(name="Number of Vehicles Registered in Humboldt")
 
-save.image(file=paste(path.to.humveh,'session.Rdata'))
+save.image(file=pp(pevi.shared,'data/vehicle-registration/session.Rdata'))
 frac.ev.hybrid.by.zip.year <- subset(frac.by.zip.year,FUEL.TYPE%in%c("GAS/ELEC","ELECTRIC"))
-save(frac.ev.hybrid.by.zip.year,file=paste(path.to.humveh,'frac-ev-hybrid-by-zip-year.Rdata'))
+save(frac.ev.hybrid.by.zip.year,file=pp(pevi.shared,'data/vehicle-registration/frac-ev-hybrid-by-zip-year.Rdata'))
 
 # assume PEV total adoption mimics hybrid adoption, what is the yearly penetration levels and total number of PEVs
 fit <- lm('count ~ year',data.frame(year=tot.by.year$year,count=tot.by.year$count/1e3))
@@ -131,7 +130,7 @@ abline(lm('count.plus.10p ~ year',pevs.by.year))
 abline(lm('count.plus.25p ~ year',pevs.by.year))
 
 # Now do an independent calc based on observed vehicle replacements
-k.val <- read.csv(paste(path.to.humveh,'k-values.csv',sep=''))
+k.val <- read.csv(pp(pevi.shared,'data/vehicle-registration/k-values.csv'))
 k.val<-melt(k.val,id.vars='age')
 names(k.val) <- c('age','set','k')
 

@@ -114,4 +114,4 @@ for(extra.line in extra.lines){
 writeLines(r.profile,con=r.profile.path)
 
 my.cat("The file ~/.Rprofile has been added or modified\n\n")
-my.cat(pp("Please also setup the configuration file ",opts$pevi,"pevi-conf-TEMPLATE.R (use a copy of pevi-conf-TEMPLATE.R)."))
+my.cat(pp("Please also setup the configuration file ",opts$pevi,"pevi-conf.R (use a copy of pevi-conf-TEMPLATE.R)."))

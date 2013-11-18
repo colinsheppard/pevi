@@ -1,4 +1,3 @@
-library(colinmisc)
 library('png')
 
 path.to.google <- '~/Dropbox/serc/pev-colin/pev-shared/data/google-earth/'

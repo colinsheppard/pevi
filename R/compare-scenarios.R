@@ -1,29 +1,26 @@
 Sys.setenv(NOAWT=1)
 options(java.parameters="-Xmx2048m")
-library(colinmisc)
-load.libraries(c('ggplot2','yaml','RNetLogo','plyr','reshape'))
+load.libraries(c('ggplot2','yaml','RNetLogo','plyr','reshape','stringr'))
 
-base.path <- '/Users/critter/Dropbox/serc/pev-colin/'
-#base.path <- '/Users/sheppardc/Dropbox/serc/pev-colin/'
-#base.path <- '/Users/Raskolnikovbot3001/Dropbox/'
-
-path.to.pevi <- paste(base.path,'pevi/',sep='')
-path.to.inputs <- paste(base.path,'pev-shared/data/inputs/compare/charge-safety-factor/',sep='')
-path.to.inputs <- paste(base.path,'pev-shared/data/inputs/compare/phev-only/',sep='')
-path.to.inputs <- paste(base.path,'pev-shared/data/inputs/compare/patterns/',sep='')
-path.to.inputs <- paste(base.path,'pev-shared/data/inputs/compare/animation/',sep='')
+#exp.name <- commandArgs(trailingOnly=T)[1]
+#exp.name <- 'animation'
+exp.name <- 'evse-metrics'
+#exp.name <- 'patterns'
+#exp.name <- 'phev-only'
+path.to.inputs <- pp(pevi.shared,'data/inputs/compare/',exp.name,'/')
 
 #to.log <- c('pain','charging','need-to-charge')
-to.log <- c('pain','charging','tazs','trip')
-#to.log <- c('pain','charging','trip')
+#to.log <- c('pain','charging','tazs','trip')
+to.log <- c('pain','charging','trip')
 
 # load the reporters and loggers needed to summarize runs and disable logging
-source(paste(path.to.pevi,"R/reporters-loggers.R",sep=''))
+source(paste(pevi.home,"R/reporters-loggers.R",sep=''))
 
 # read the parameters and values to vary in the experiment
-vary <- yaml.load(readChar(paste(path.to.inputs,'vary.yaml',sep=''),file.info(paste(path.to.inputs,'vary.yaml',sep=''))$size))
+#vary <- yaml.load(readChar(paste(path.to.inputs,'vary.yaml',sep=''),file.info(paste(path.to.inputs,'vary.yaml',sep=''))$size))
+vary <- yaml.load(readChar(paste(path.to.inputs,'vary-noL1.yaml',sep=''),file.info(paste(path.to.inputs,'vary-noL1.yaml',sep=''))$size))
 for(file.param in names(vary)[grep("-file",names(vary))]){
-  vary[[file.param]] <- paste(path.to.pevi,'netlogo/',vary[[file.param]],sep='')
+  vary[[file.param]] <- str_replace_all(str_replace_all(str_replace_all(vary[[file.param]],"pevi.home",pevi.home),"pevi.shared",pevi.shared),"pevi.nondrop",pevi.nondrop)
 }
 naming <- yaml.load(readChar(paste(path.to.inputs,'naming.yaml',sep=''),file.info(paste(path.to.inputs,'naming.yaml',sep=''))$size))
 
@@ -36,12 +33,20 @@ if("driver.input.file" %in% names(vary)){
   results$replicate <- as.numeric(unlist(lapply(strsplit(as.character(results$driver.input.file),'-rep',fixed=T),function(x){ unlist(strsplit(x[2],"-",fixed=T)[[1]][1]) })))
 }
 if("charger.input.file" %in% names(vary)){
-  results$infrastructure.scenario <- as.numeric(unlist(lapply(strsplit(as.character(results$charger.input.file),'-scen',fixed=T),function(x){ unlist(strsplit(x[2],".txt",fixed=T)) })))
+  results$infrastructure.scenario <- unlist(lapply(strsplit(as.character(results$charger.input.file),'-scen',fixed=T),function(x){ unlist(strsplit(x[2],".txt",fixed=T)) }))
   results$infrastructure.scenario.named <- results$infrastructure.scenario
   results$infrastructure.scenario.order <- results$infrastructure.scenario
-  for(scen.i in as.numeric(names(naming$`charger-input-file`))){
-    results$infrastructure.scenario.named[results$infrastructure.scenario == scen.i] <- naming$`charger-input-file`[[as.character(scen.i)]][[1]]
-    results$infrastructure.scenario.order[results$infrastructure.scenario == scen.i] <- as.numeric(naming$`charger-input-file`[[as.character(scen.i)]][[2]])
+  if(all(is.na(results$infrastructure.scenario))){
+    for(scen.i in names(naming$`charger-input-file`)){
+      results$infrastructure.scenario[grep(scen.i,as.character(results$charger.input.file))] <- scen.i
+      results$infrastructure.scenario.named[results$infrastructure.scenario == scen.i] <- naming$`charger-input-file`[[scen.i]][[1]]
+      results$infrastructure.scenario.order[results$infrastructure.scenario == scen.i] <- as.numeric(naming$`charger-input-file`[[scen.i]][[2]])
+    }
+  }else{
+    for(scen.i in as.numeric(names(naming$`charger-input-file`))){
+      results$infrastructure.scenario.named[results$infrastructure.scenario == scen.i] <- naming$`charger-input-file`[[as.character(scen.i)]][[1]]
+      results$infrastructure.scenario.order[results$infrastructure.scenario == scen.i] <- as.numeric(naming$`charger-input-file`[[as.character(scen.i)]][[2]])
+    }
   }
   results$infrastructure.scenario.named  <- reorder(factor(results$infrastructure.scenario.named),results$infrastructure.scenario.order)
 }
@@ -56,9 +61,8 @@ if("vehicle.type.input.file" %in% names(vary)){
 }
 
 # start NL
-nl.path <- "/Applications/NetLogo\ 5.0.3"
 tryCatch(NLStart(nl.path, gui=F),error=function(err){ NA })
-model.path <- paste(path.to.pevi,"netlogo/PEVI.nlogo",sep='')
+model.path <- paste(pevi.home,"netlogo/PEVI.nlogo",sep='')
 NLLoadModel(model.path)
 
 for(cmd in paste('set log-',logfiles,' false',sep='')){ NLCommand(cmd) }
@@ -69,13 +73,15 @@ logs <- list()
 # for every combination of parameters, run the model and capture the summary statistics
 for(results.i in 1:nrow(results)){
   cat(paste(results.i,""))
+  system('sleep 0.01')
   if(results.i%%10 == 0){
     save(logs,file=paste(path.to.inputs,'logs.Rdata',sep=''))
   }
   NLCommand('clear-all-and-initialize')
   NLCommand('random-seed 1')
   NLCommand(paste('set parameter-file "',path.to.inputs,'params.txt"',sep=''))
-  NLCommand(paste('set model-directory "',path.to.pevi,'netlogo/"',sep=''))
+  NLCommand(paste('set model-directory "',pevi.home,'netlogo/"',sep=''))
+  NLCommand('set batch-setup? false')
   NLCommand('read-parameter-file')
   for(param in names(vary.tab)){
     if(is.character(vary.tab[1,param])){
@@ -85,7 +91,7 @@ for(results.i in 1:nrow(results)){
     }
   }
   if("tazs" %in% to.log)NLCommand('set log-taz-time-interval 15')
-  NLCommand('set go-until-time 30')
+  NLCommand('set go-until-time 100')
   NLCommand('setup')
 
   NLCommand('time:go-until go-until-time')
@@ -210,4 +216,36 @@ ggplot(melt(subset(demand.sum,level==0),id.vars=c('time','level','taz')),aes(x=t
 ggplot(logs[['charging']],aes(x=duration))+geom_histogram(binwidth=1)+facet_wrap(~public)
 ggplot(logs[['charging']],aes(x=energy))+geom_histogram(binwidth=0.1)
 
+# Duty factor by TAZ
 
+
+logs[['charging']]$infrastructure.scenario <- NA
+for(scen.i in names(naming$`charger-input-file`)){
+  logs[['charging']]$infrastructure.scenario[grep(scen.i,as.character(logs[['charging']]$charger.input.file))] <- scen.i
+  logs[['charging']]$infrastructure.scenario.named[logs[['charging']]$infrastructure.scenario == scen.i] <- naming$`charger-input-file`[[scen.i]][[1]]
+  logs[['charging']]$infrastructure.scenario.order[logs[['charging']]$infrastructure.scenario == scen.i] <- as.numeric(naming$`charger-input-file`[[scen.i]][[2]])
+}
+logs[['charging']]$penetration <- as.numeric(unlist(lapply(strsplit(as.character(logs[['charging']]$driver.input.file),'-pen',fixed=T),function(x){ unlist(strsplit(x[2],"-rep",fixed=T)[[1]][1]) })))
+logs[['charging']]$replicate <- as.numeric(unlist(lapply(strsplit(as.character(logs[['charging']]$driver.input.file),'-rep',fixed=T),function(x){ unlist(strsplit(x[2],"-",fixed=T)[[1]][1]) })))
+
+num.chargers <- list()
+for(charger.file in unique(as.character(logs[['charging']]$charger.input.file))){
+  scen.named <- logs[['charging']]$infrastructure.scenario.named[which(logs[['charging']]$charger.input.file == charger.file)[1]]
+  num.chargers[[scen.named]] <- read.table(charger.file,skip=1)
+  names(num.chargers[[scen.named]]) <- c('taz','L0','L1','L2','L3','L4')
+}
+
+num.reps <- length(unique(logs[['charging']]$replicate))
+charge.sum <- ddply(logs[['charging']],.(location,charger.level,penetration,infrastructure.scenario.named),function(df){
+  data.frame(duty.factor=sum(df$duration)/(24*num.reps*num.chargers[[df$infrastructure.scenario.named[1]]][df$location[1],pp('L',df$charger.level[1])]))
+})
+
+taz.names <- read.csv(pp(pevi.shared,'data/google-earth/ordering-for-TAZ-table.csv'))
+charge.sum$taz <- taz.names$name[match(charge.sum$location,taz.names$id)]
+
+pdf(pp(pevi.shared,'maps-results/duty-factors-noL1.pdf'),width=11,height=8.5)
+d_ply(subset(charge.sum,charger.level>0),.(infrastructure.scenario.named),function(df){
+  p <- ggplot(df,aes(x=factor(charger.level),fill=factor(penetration),y=duty.factor))+geom_bar(stat='identity',position="dodge")+facet_wrap(~taz)+labs(title=df$infrastructure.scenario.named[1],x="Charger Level",y="Duty Factor")
+  print(p)
+})
+dev.off()

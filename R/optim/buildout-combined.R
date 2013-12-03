@@ -4,13 +4,14 @@ library(colinmisc)
 load.libraries(c('ggplot2','yaml','RNetLogo','plyr','reshape','stringr','snow'))
 
 #base.path <- '/Users/critter/Dropbox/serc/pev-colin/'
-base.path <- '/Users/sheppardc/Dropbox/serc/pev-colin/'
-#base.path <- '/Users/Raskolnikovbot3001/Dropbox/'
+#base.path <- '/Users/sheppardc/Dropbox/serc/pev-colin/'
+base.path <- '/Users/Raskolnikovbot3001/Dropbox/serc/'
 
 seed <- 19
 
 #num.cpu <- 8
-num.cpu <- 12
+#num.cpu <- 12
+num.cpu <- 2
 
 #optim.code <- 'min-cost-constrained-by-frac-stranded-50-50'
 #optim.code <- 'min-cost-constrained-by-frac-stranded-50-50-seed9'
@@ -58,7 +59,8 @@ if(!exists('cl')){
 }
 
 # start NL
-nl.path <- "/Applications/NetLogo\ 5.0.3"
+# nl.path <- "/Applications/NetLogo\ 5.0.3"
+nl.path <- "/Applications/NetLogo\ 5.0.4"
 tryCatch(NLStart(nl.path, gui=F),error=function(err){ NA })
 model.path <- paste(path.to.pevi,"netlogo/PEVI-nolog.nlogo",sep='')
 NLLoadModel(model.path)
@@ -90,15 +92,21 @@ for(pev.penetration in c(0.005,0.01,0.02,0.04)){
   }else{
     begin.build.i <- build.i
   }
+  NLCommand('clear-all')
+  NLCommand(paste('set starting-seed',seed))
   for(build.i in begin.build.i:250){
     print(paste("build iter:",build.i))
     if(build.i == begin.build.i){
+    	print(paste('build.i = ',build.i,sep=''))
       write.charger.file(build.result$chargers[1:104])
       for(results.i in 1:nrow(results)){
-        NLCommand('clear-all-and-initialize')
-        NLCommand(paste('set parameter-file "',path.to.inputs,'params.txt"',sep=''))
-        NLCommand(paste('set model-directory "',path.to.pevi,'netlogo/"',sep=''))
-        NLCommand('read-parameter-file')
+      
+#				 DO these need to be specified here, or can we do that from in NL?
+      
+#        NLCommand('clear-all-and-initialize')
+#        NLCommand(paste('set parameter-file "',path.to.inputs,'params.txt"',sep=''))
+#        NLCommand(paste('set model-directory "',path.to.pevi,'netlogo/"',sep=''))
+#        NLCommand('read-parameter-file')
         for(param in names(vary.tab)){
           if(is.character(vary.tab[1,param])){
             NLCommand(paste('set ',param,' "',vary.tab[results.i,param],'"',sep=''))
@@ -106,12 +114,17 @@ for(pev.penetration in c(0.005,0.01,0.02,0.04)){
             NLCommand(paste('set ',param,' ',vary.tab[results.i,param],'',sep=''))
           }
         }
-        NLCommand(paste('set charger-input-file "',path.to.inputs,'chargers-alt-0.txt"',sep=''))
-        if(!is.na(seed)){
-          NLCommand(paste('random-seed ',seed))
+        
+#				Setup charger-input file once, at beginning,. Add-charger and delete-charger handle the rest.        
+        
+#        NLCommand(paste('set charger-input-file "',path.to.inputs,'chargers-alt-0.txt"',sep=''))
+        if(!is.na(seed)){      
+					NLCommand('set fix-seed TRUE')       
+        } else {
+        	NLCommand('set fix-seed FALSE')
         }
-        NLCommand('setup')
-        NLCommand('dynamic-scheduler:go-until schedule 500')
+        NLCommand('setup-in-batch-mode')
+        NLCommand('go-until')
         results[results.i,names(reporters)] <- tryCatch(NLDoReport(1,"",reporter = paste("(sentence",paste(reporters,collapse=' '),")"),as.data.frame=T,df.col.names=names(reporters)),error=function(e){ NA })
       }
       build.result[105,c('cost','pain')] <- c(mean(as.numeric(results$infrastructure.cost)),mean(as.numeric(results$frac.stranded.by.delay)))
@@ -122,7 +135,15 @@ for(pev.penetration in c(0.005,0.01,0.02,0.04)){
     build.result$marg.cost.of.abatement[build.result$marg.cost.of.abatement<0] <- Inf
     if(all(Inf==build.result$marg.cost.of.abatement[1:104]))break
     winner.i <- which.min(build.result$marg.cost.of.abatement[1:104])
-    build.result$chargers[winner.i] <- build.result$chargers[winner.i] + 1
+    if(winner.i <= 52) {
+    	winner.taz <- winner.i
+    	winner.level <- 2
+    } else {
+    	winner.taz <- winner.i - 52
+    	winner.level <- 3
+    }
+    build.result$chargers[winner.i] <- build.result$chargers[winner.i] + 1  # NEW CHARGER GETS BUILT HERE
+    NLCommand(paste('add-charger',winner.taz,winner.level))
     write.csv(build.result,file=paste(path.to.outputs,'buildout-pen',pev.penetration*100,'-iter',build.i,'-cost',build.result$cost[winner.i],'.csv',sep=''))
     build.result[105,] <- build.result[winner.i,]
     print(paste("winner: ",winner.i,sep=''))

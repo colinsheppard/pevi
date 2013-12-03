@@ -10,7 +10,7 @@
 # 1. Purpose
 The purpose of this model is to simulate the interaction between a regional fleet of plug-in electric vehicle drivers with public and private charging infrastructure over any time frame.  The model accepts as input the location, quantity, and type of electric vehicle support equipment (EVSE) throughout the study region.  Drivers and their vehicles are described by inputs that specify driver activity (a departure time and destination for every trip), the distribution of vehicle types, and parameters controlling driver behavior.  PEVI then simulates the drivers as they attempt to follow their trip itinerary and interact with the EVSE throughout the region.  The experience of drivers (individually or in aggregate) and the usage of the EVSE can be summarized at the end of a model run.  The model is intended to be used as tool for analyzing the impacts of alternative EVSE infrastructure scenarios in addition to PEV adoption rates, technology advances, market trends, and driver behaviors.
 
-PEVI is a stochastic model, meaning that a variety of processes and decisions within the model are based on random chance.  The primary purpose of including stochastic processes in PEVI is to avoid reaching conclusions that are overly customized to suit one particular set of circumstanaces.  Instead, the model should be run many times with the same set of initial conditions and performance metrics should be averaged over those runs.
+PEVI is a stochastic model, meaning that a variety of processes and decisions within the model are based on random chance.  The primary purpose of including stochastic processes in PEVI is to avoid reaching conclusions that are overly customized to suit one particular set of circumstances.  Instead, the model should be run many times with the same set of initial conditions and performance metrics should be averaged over those runs.
 
 ### Key Assumptions
 1. All chargers are assumed to have a constant charging rate based on their power specifications. Charging algorithms -- such as trickle charging near the end of the session -- are not simulated.
@@ -31,7 +31,7 @@ Table 1: Traffic Analysis Zone Agent Variables
 
 Category          | Variable     				 | Description
 ------------------|-----------------------------|-------------
-Identity (static) | ID            				 | Integer identification code 												   specified in the input data 												   supplied to the model.
+Identity (static) | ID            				 | Integer identification code 												   specified in the input data 												   supplied to the model. ***A negative ID signifies a TAZ external to the region of interest, but which drivers may still access.***
 Contents          | ~~chargersInTAZ (static)~~  | ~~A list of chargers 												   contained in the TAZ.~~
                   | ~~homeCharger~~   			 | ~~Every TAZ has a Level II 												   charger which is only 												   available to drivers in 												   their home TAZ.~~
                   | ***chargersByType***        | ***A master list of all chargers in the TAZ***
@@ -76,6 +76,8 @@ Vehicle (static)|thisVehicleType|String variable containing the name of the vehi
 | ***chargerPermissions*** | ***An array of lists for each TAZ that contain any chargers the driver has privileged access to (i.e. home charging, multi-unit charging, or workplace charging restricted from the public.)***
 Demography (static) | homeTAZ | The home TAZ of the driver. This is not necessarily where the driver begins the day, nor will all drivers have a home TAZ (to account for corridor travel originating outside target region.) ~~but rather is inferred based upon the trip type column in the drivers itinerary (see below).~~ 
 | probabilityOfUnneededCharge | The probability that the driver will choose to attempt to charge their vehicle despite not actually needing the charge.
+| ***externalDistance (miles)*** | ***The driving distance from TAZ external to the region of interest to a gateway TAZ within the region of interest. The result of a random draw from an externally supplied distribution function.***  
+| ***externalTime (hours)*** | ***The driving time from TAZ external to the region of interest to a gateway TAZ within the region of interest. The result of a random draw from an externally supplied distribution function.***  
 Operation (dynamic) | state | A discrete integer value that represents the current state of a driver (Traveling, Not Charging, Charging), and used to decide which procedures to execute.
 | currentTAZ | The TAZ where the driver is currently located, set to “nobody” while in transit.
 | stateOfCharge | The fraction of useable energy remaining in the vehicle’s battery.  A value of 1 indicates a fully charged battery and a value of 0 indicates the battery is effectively empty.  Note, if the vehicle is a PHEV, then 0 indicates charge sustaining mode which does not imply the battery is fully depleted.
@@ -167,6 +169,7 @@ Itinerary | Provides vehicles with schedules throughout the day.
 Chargers | Number and type of charging stations at each TAZ.
 Charger Type | The charging rate, energy price, and installation price for each level charger.
 ***Starting SoC*** | ***Provides points of a function mapping random draws to the starting SoC for each vehicle; these are used to interpolate starting vehicle SoC during runtime.***
+***External TAZs*** | ***Provides points of a function mapping random draws for the distance from an external TAZ outside the area of interest to a gateway TAZ within the area of interest***
 ***privileged access*** | ***Determines which non-public chargers, if any, a driver has access to.***
 Vehicle Type | The electric fuel consumption, hybrid fuel consumption, and fraction of total PEVs represented by each vehicle type (e.g. Leaf or Volt)
 
@@ -337,7 +340,11 @@ Equation 4:
 - The driver only considers en-route TAZs that are reachable given their range.
 - The search is first restricted to reachable en-route TAZs that would allow the driver to reach the ultimate destination in one trip after recharging (note that this must be based on a stateOfCharge of 0.8 if only level 3 chargers are available in the candidate TAZ).  If no such TAZs can be found, or all of these TAZs have a score of 0, then all reachable en-route TAZs are considered.
 - Each reachable en-route TAZ is assigned a score equal to the number of available chargers or a certain level times the level number (E.g. if two level 3 and one level 2 chargers are available then the score would be 2 * 3 + 1 * 2 = 8).  If the TAZ is the driver’s home, then 8 is added to the score for that TAZ (in other words, a home charger is as valuable as 4 level 2 chargers but not as valuable as 3 level 3 chargers).  **Do we want to judge multi-unit chargers more harshly? How much?**
-- The TAZ with the highest score is selected (ties are broken by selecting the furthest taz from the current location).  If no en-route TAZs have any available chargers (i.e. if they all have a score of 0), then the driver selects the most distance reachable TAZ.
+- The TAZ with the highest score is selected (ties are broken by selecting the furthest TAZ from the current location).  If no en-route TAZs have any available chargers (i.e. if they all have a score of 0), then the driver selects the most distance reachable TAZ.
+
+## 5.8 Distance From To / Time From To
+The distance-from-to and time-from-to submodels is called for each driver during setup to set that driver's externalDistance and externalTime agent variables.  
+
 # 6. Parameters
 
 ````
@@ -348,7 +355,7 @@ Name | Description | Default Value
 -----|-------------|:--------------:
 chargeSafetyFactor | Multiplier used to approximate the safety factor drivers assume necessary to ensure a trip can be made.|1.1
 chargerSearchDistance | The distance in miles used to define what TAZs are considered “neighbors” for the purpose of finding a charger. |5
-willingToRoamTimeThreshold | The amount of time in hours at which point a driver will consider travelling to neighboring or en-route TAZs in order to charge vs. only considering TAZs in their current location. | 1
+willingToRoamTimeThreshold | The amount of time in hours at which point a driver will consider traveling to neighboring or en-route TAZs in order to charge vs. only considering TAZs in their current location. | 1
 timeOpportunityCost | The value of a driver’s time to his or herself in units of $ / hour. | 12.50
 ***multiUnitSearchTolerance*** | ***The maximum number of times a driver will check a multi unit charger if the charger is busy.*** | ***8*** 
 fracPHEV | The fractions of PEV vehicles that are PHEV vs BEV. | 0.5

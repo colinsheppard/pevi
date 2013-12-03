@@ -117,7 +117,7 @@ to setup-tazs
           set n-levels replace-item ? n-levels file-read ; sets the number of level X chargers in each TAZ
           set available-chargers-by-type replace-item ? available-chargers-by-type structs:new-stack
         ]
-        ;set frac-multi-unit file-read
+        set frac-multi-unit file-read
         set neighbor-tazs n-values 0 [0]
         foreach n-values n-tazs [? + 1] [
           if not (? = id) and (distance-from-to id ? <= charger-search-distance) [

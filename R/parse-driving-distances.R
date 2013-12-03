@@ -1,5 +1,5 @@
 
-path.to.upstate.data <- pp(pevi.shared,'data/UPSTATE/driving-distances/')
+path.to.upstate.data <- pp(path.to.pevi.shared,'data/UPSTATE/driving-distances/')
 
 origin <- vector()
 destination <- vector()
@@ -19,4 +19,75 @@ for(i in 1:length(list.files(path.to.upstate.data))) {
 	}
 }
 
-time.distance <- data.frame(unlist(origin),unlist(destination),unlist(time),unlist(distance))
+update.time.distance <- data.frame(unlist(origin[,6]),unlist(destination[,6]),unlist(time[,6]),unlist(distance[,6]))
+
+update.time.distance$origin.taz <- ''
+update.time.distance$destination.taz <- ''
+
+for(i in 1:nrow(taz.time.distance)) {
+	if(update.time.distance$origin[i] %in% taz.time.distance$origin) {
+		update.time.distance$origin.taz[i] <- taz.time.distance$origin.taz[match(update.time.distance$origin[i],taz.time.distance$origin)]
+	}
+	if(update.time.distance$destination[i] %in% taz.time.distance$destination.address) {
+		update.time.distance$destination.taz[i] <- as.character(taz.time.distance$destination.taz[match(update.time.distance$destination[i],taz.time.distance$destination.address)])
+	}
+}
+
+for(i in 1:nrow(update.time.distance)) {
+# Fix the origin addresses first
+	if(update.time.distance$destination[i]=='2600-2998 Balls Ferry Road, Anderson, CA 96007, USA') {
+		 update.time.distance$destination.taz[i] <- 'AND_Cascade'
+	}
+	if(update.time.distance$destination[i]=='945-1001 Highway 99 W, Corning, CA 96021, USA') {
+ 					 update.time.distance$destination.taz[i] <- 'Corning'
+	}
+	if(update.time.distance$destination[i]=='3571-3591 Park Drive, Cottonwood, CA 96022, USA') {
+			 update.time.distance$destination.taz[i] <- 'COTTON_West'
+	}
+	if(update.time.distance$destination[i]=='Railroad Avenue, Dorris, CA 96023, USA') {
+			 update.time.distance$destination.taz[i] <- 'Dorris'
+	}
+	if(update.time.distance$destination[i]=='327-337 Collier Way, Etna, CA 96027, USA') {
+			 update.time.distance$destination.taz[i] <- 'Etna'
+	}
+	if(update.time.distance$destination[i]=='11819 Main Street, Fort Jones, CA 96032, USA') {
+			 update.time.distance$destination.taz[i] <- 'Fort Jones'
+	}
+	if(update.time.distance$destination[i]=='7918 Railroad Avenue, Los Molinos, CA 96055, USA') {
+			 update.time.distance$destination.taz[i] <- 'Los Molinos'
+	}
+	if(update.time.distance$destination[i]=='11816-11826 Railroad Avenue East, Macdoel, CA 96058, USA') {
+			 update.time.distance$destination.taz[i] <- 'Macdoel'
+	}
+	if(update.time.distance$destination[i]=='480 California 89, McCloud, CA 96057, USA') {
+			 update.time.distance$destination.taz[i] <- 'McCloud'
+	}
+	if(update.time.distance$destination[i]=='4558-4650 California 36, Platina, CA 96076, USA') {
+			 update.time.distance$destination.taz[i] <- 'Platina'
+	}
+	if(update.time.distance$destination[i]=='1001-1199 Churn Creek Road, Redding, CA 96003, USA') {
+			 update.time.distance$destination.taz[i] <- 'RED_BoulderCreek'
+	}
+	if(update.time.distance$destination[i]=='4465 Airport Road, Redding, CA 96002, USA') {
+			 update.time.distance$destination.taz[i] <- 'RED_CloverCreek'
+	}
+	if(update.time.distance$destination[i]=='11537 Ridgewood Road, Redding, CA 96003, USA') {
+			 update.time.distance$destination.taz[i] <- 'RED_GoldHills'
+	}
+	if(update.time.distance$destination[i]=='7223 Churn Creek Road, Redding, CA 96002, USA') {
+			 update.time.distance$destination.taz[i] <- 'RED_Pacheco'
+	}
+	if(update.time.distance$destination[i]=='9874 Old Oregon Trail, Redding, California 96003, USA') {
+			 update.time.distance$destination.taz[i] <- 'RED_SportsComplex'
+	}
+	if(update.time.distance$destination[i]=='3001-3031 Shasta View Drive, Redding, CA 96002, USA') {
+			 update.time.distance$destination.taz[i] <- 'RED_ForestHills'
+	}
+ 	if(update.time.distance$destination[i]=='344 Black Canyon Road, Shasta Lake, CA 96019, USA') {
+ 			 update.time.distance$destination.taz[i] <- 'SHALKE_ShastaDam'
+	}
+	if(update.time.distance$destination[i]=='30659-30667 Whitmore Road, Whitmore, CA 96096, USA') {
+			 update.time.distance$destination.taz[i] <- 'Whitmore'
+	}	
+}
+

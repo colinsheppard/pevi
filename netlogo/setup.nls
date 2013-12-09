@@ -98,7 +98,7 @@ end
 ;;;;;;;;;;;;;;;;;;;;
 to setup-tazs
   ;print "setup-tazs"
-  let #prev-taz-id 0
+  set taz-table table:make
   ;create-tazs n-tazs
   ifelse (file-exists? charger-input-file) [
     file-close
@@ -112,8 +112,7 @@ to setup-tazs
         set chargers-by-type n-values n-charger-types [0]
         set available-chargers-by-type n-values n-charger-types [0]
         set id file-read
-        if id > 0 and id != #prev-taz-id + 1 [ error (word "In setup-tazs, was expecting to read taz #" (#prev-taz-id + 1) " from file but found #" id " instead.") ]
-        set #prev-taz-id id
+        table:put taz-table id self
         foreach n-values n-charger-types [?] [
           set n-levels replace-item ? n-levels file-read ; sets the number of level X chargers in each TAZ
           set available-chargers-by-type replace-item ? available-chargers-by-type structs:new-stack
@@ -123,9 +122,9 @@ to setup-tazs
       ] ; end create-taz commands
     ] ; end while loop
     ask tazs [
-      foreach n-values n-tazs [? + 1] [
-        if not (? = id) and (id > 0) and (distance-from-to id ? <= charger-search-distance) [
-          set neighbor-tazs fput taz ? neighbor-tazs
+      foreach table:keys taz-table [ ;n-values n-tazs [? + 1] [
+        if (id > 0) and (? > 0) and not (? = id) and (distance-from-to id ? <= charger-search-distance) [
+          set neighbor-tazs fput table:get taz-table ? neighbor-tazs;taz ? neighbor-tazs
         ]
       ]
     ]
@@ -134,6 +133,7 @@ to setup-tazs
   ; turn tutrle 0 into the TAZ for homeless drivers
   ask turtle 0 [
     set breed tazs
+    table:put taz-table 0 self
     set n-levels n-values 6 [0]
     set chargers-by-type n-values n-charger-types [0]
   ] 
@@ -430,31 +430,33 @@ to setup-chargers
   ; we do not use "charger level" for anything else.
 
   ; At each taz,  chargers equal to "taz-chargers"are created.
-  foreach sort tazs [
-    let #this-taz ?
+  foreach table:keys taz-table [
+    let #this-taz table:get taz-table ?
+    ; #this-taz is the taz agent #this-taz
+    ; ? is the id
     create-chargers [item 0 n-levels] of #this-taz [  ; The location of each charger created is then set as the current TAZ location
       set this-charger-type one-of charger-types with [level = 0]
-      set location ?
+      set location #this-taz
     ]
     create-chargers [item 1 n-levels] of #this-taz [  ; The location of each charger created is then set as the current TAZ location
       set this-charger-type one-of charger-types with [level = 1]
-      set location ?
+      set location #this-taz
     ]
     create-chargers [item 2 n-levels] of #this-taz [  ; The location of each charger created is then set as the current TAZ location
       set this-charger-type one-of charger-types with [level = 2]
-      set location ?
+      set location #this-taz
     ]
     create-chargers [item 3 n-levels] of #this-taz [  ; The location of each charger created is then set as the current TAZ location
       set this-charger-type one-of charger-types with [level = 3]
-      set location ?
+      set location #this-taz
     ]
     create-chargers [item 4 n-levels] of #this-taz [  ; The location of each charger created is then set as the current TAZ location
       set this-charger-type one-of charger-types with [level = 4]
-      set location ?
+      set location #this-taz
     ]
     ;create-chargers [item 5 n-levels] of #this-taz [  ; The location of each charger created is then set as the current TAZ location
     ;  set this-charger-type one-of charger-types with [level = 5]
-    ;  set location ?
+    ;  set location #this-taz
     ;]
     foreach n-values n-charger-types [?] [
       ask #this-taz [

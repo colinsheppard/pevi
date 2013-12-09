@@ -1160,11 +1160,8 @@ to-report distance-from-to [from-taz to-taz]
     set reporter-distance item ((from-taz - 1) * n-tazs + to-taz - 1 ) od-dist
   ][ ; determine distance from gateway to destination, add extra distance
     let #extra-distance 0
-    ask self [
-      set #extra-distance external-dist
-    ]
     let #gateway-distance item ((abs(from-taz) - 1) * n-tazs + abs(to-taz) - 1 ) od-dist
-    set reporter-distance #gateway-distance + #extra-distance
+    set reporter-distance #gateway-distance + [external-dist] of self
   ]
   report reporter-distance
 end
@@ -1174,11 +1171,8 @@ to-report time-from-to [from-taz to-taz]
     set reporter-time item ((from-taz - 1) * n-tazs + to-taz - 1 ) od-time
   ][ ; determine distance from gateway to destination, add extra distance
     let #extra-time 0
-    ask myself [
-      set #extra-time [external-dist] of self
-    ]
     let #gateway-time item ((abs(from-taz) - 1) * n-tazs + abs(to-taz - 1) ) od-time
-    set reporter-time #gateway-time + #extra-time
+    set reporter-time #gateway-time + [external-time] of self
   ]
   report reporter-time
 end
@@ -1352,7 +1346,7 @@ SWITCH
 176
 log-wait-time
 log-wait-time
-1
+0
 1
 -1000
 
@@ -1363,7 +1357,7 @@ SWITCH
 222
 log-charging
 log-charging
-1
+0
 1
 -1000
 
@@ -1385,7 +1379,7 @@ SWITCH
 313
 log-need-to-charge
 log-need-to-charge
-1
+0
 1
 -1000
 
@@ -1418,7 +1412,7 @@ SWITCH
 443
 log-break-up-trip
 log-break-up-trip
-0
+1
 1
 -1000
 
@@ -1451,7 +1445,7 @@ SWITCH
 400
 log-seek-charger-result
 log-seek-charger-result
-1
+0
 1
 -1000
 
@@ -1544,7 +1538,7 @@ SWITCH
 94
 log-trip
 log-trip
-1
+0
 1
 -1000
 

@@ -17,8 +17,11 @@ globals [
   n-tazs
   n-charger-types
   
-  cumulative-fraction
+  soc-cumulative-fraction
   start-soc
+  ext-taz-cumulative-fraction
+  external-time-bound
+  external-dist-bound
   
   batch-setup?
   
@@ -32,6 +35,7 @@ globals [
   vehicle-type-input-file
   outputs-directory
   starting-soc-file
+  ext-dist-time-file
   
 ;; PARAMETERS
   charge-safety-factor
@@ -91,6 +95,8 @@ drivers-own [
   max-dwell-time
   current-itin-row          ; index of current location in the itinerary (referring to next trip or current trip if traveling)
   current-od-index
+  external-time             ; The time it takes to get from an external TAZ to a gateway TAZ
+  external-dist             ; The distance between an external TAZ to a gateway TAZ
 
 ;; CONVENIENCE VARIABLES
   journey-distance
@@ -1074,16 +1080,23 @@ end
 to update-itinerary
   ifelse (current-itin-row + 1 < length itin-from) [
     set current-itin-row current-itin-row + 1
-    set current-taz taz item current-itin-row itin-from
-    set destination-taz taz item current-itin-row itin-to
+    let #itin-from item current-itin-row itin-from
+    let #itin-to item current-itin-row itin-to
+    set current-taz one-of tazs with [id = #itin-from]
+    set destination-taz one-of tazs with [id = #itin-to]
     update-od-index
     ifelse ((item current-itin-row itin-depart) < ticks)[     
       change-depart-time ticks
     ][
       set departure-time item current-itin-row itin-depart
-    ] 
-    set trip-distance item current-od-index od-dist
-    set trip-time item current-od-index od-time
+    ]
+    ifelse ([id] of destination-taz >= 0) [
+      set trip-distance item current-od-index od-dist
+      set trip-time item current-od-index od-time
+    ][
+      set trip-distance item current-od-index od-dist + [external-dist] of self
+      set trip-time item current-od-index od-time + [external-time] of self
+    ]
   ][
     set current-taz destination-taz  ;; ac 12.20
     set itin-complete? true
@@ -1142,17 +1155,39 @@ to-report level-of [#charger]
   report [level] of ([this-charger-type] of #charger)
 end
 to-report distance-from-to [from-taz to-taz]
-  report item ((from-taz - 1) * n-tazs + to-taz - 1 ) od-dist
+  let reporter-distance 0
+  ifelse ((from-taz >= 0) and (to-taz >= 0)) [
+    set reporter-distance item ((from-taz - 1) * n-tazs + to-taz - 1 ) od-dist
+  ][ ; determine distance from gateway to destination, add extra distance
+    let #extra-distance 0
+    ask self [
+      set #extra-distance external-dist
+    ]
+    let #gateway-distance item ((abs(from-taz) - 1) * n-tazs + abs(to-taz) - 1 ) od-dist
+    set reporter-distance #gateway-distance + #extra-distance
+  ]
+  report reporter-distance
 end
 to-report time-from-to [from-taz to-taz]
-  report item ((from-taz - 1) * n-tazs + to-taz - 1 ) od-time
+  let reporter-time 0
+  ifelse ((from-taz >= 0) and (to-taz >= 0)) [
+    set reporter-time item ((from-taz - 1) * n-tazs + to-taz - 1 ) od-time
+  ][ ; determine distance from gateway to destination, add extra distance
+    let #extra-time 0
+    ask myself [
+      set #extra-time [external-dist] of self
+    ]
+    let #gateway-time item ((abs(from-taz) - 1) * n-tazs + abs(to-taz - 1) ) od-time
+    set reporter-time #gateway-time + #extra-time
+  ]
+  report reporter-time
 end
 to-report od-index [destination source]
-  report ((destination - 1) * n-tazs + source - 1)
+  report ((abs(destination) - 1) * n-tazs + abs(source) - 1)
 end
 
 to update-od-index
-  set current-od-index (([id] of current-taz - 1) * n-tazs + [id] of destination-taz - 1)
+  set current-od-index ((abs([id] of current-taz) - 1) * n-tazs + abs([id] of destination-taz) - 1)
 end
 
 to-report driver-soc [the-driver]
@@ -1163,12 +1198,15 @@ to-report weight-delay [delay]
   ifelse delay >= 0 [report delay][report -0.5 * delay]
 end
 
-to-report interpolate-soc [#rand-draw]
+to-report interpolate-from-draw [#rand-draw cumulative-fraction variable-bounds]
+  
+  ; Input the random-draw, the cumulative-fraction draw-bounds list, and the variable-bounds list.
+  
   foreach cumulative-fraction [
     let current-index position ? cumulative-fraction
     let next-index position ? cumulative-fraction + 1
     if #rand-draw > ? and #rand-draw <= item next-index cumulative-fraction [
-      report (#rand-draw - item current-index cumulative-fraction)*(item next-index start-soc - item current-index start-soc)/(item next-index cumulative-fraction - item current-index cumulative-fraction) + item current-index start-soc
+      report (#rand-draw - item current-index cumulative-fraction)*(item next-index variable-bounds - item current-index variable-bounds)/(item next-index cumulative-fraction - item current-index cumulative-fraction) + item current-index variable-bounds
     ]
   ]
   report 1
@@ -1380,7 +1418,7 @@ SWITCH
 443
 log-break-up-trip
 log-break-up-trip
-1
+0
 1
 -1000
 

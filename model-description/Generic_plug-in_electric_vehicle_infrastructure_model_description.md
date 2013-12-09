@@ -343,7 +343,14 @@ Equation 4:
 - The TAZ with the highest score is selected (ties are broken by selecting the furthest TAZ from the current location).  If no en-route TAZs have any available chargers (i.e. if they all have a score of 0), then the driver selects the most distance reachable TAZ.
 
 ## 5.8 Distance From To / Time From To
-The distance-from-to and time-from-to submodels is called for each driver during setup to set that driver's externalDistance and externalTime agent variables.  
+***The distance-from-to and time-from-to submodels is called for each driver during setup to set that driver's externalDistance and externalTime agent variables. Both submodels require an external file that contains the external distance / external time values pegged to a random draw boundary. ***
+
+***1. When each driver agent is created, perform a random draw.***
+
+***2. Iterate through sequential pairs of random draw boundaries until the pair that bounds the random draw.***
+
+***3. Interpolate the external time or external distance boundary value corresponding to the random draw between the boundaries.***
+
 
 # 6. Parameters
 

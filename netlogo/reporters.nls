@@ -35,3 +35,11 @@ to-report mean-delay
     report 0
   ]
 end
+
+to-report objective-function
+  let total-charger-cost sum [ [installed-cost] of this-charger-type ] of chargers * 1000
+  let total-delay sum [ sum map weight-delay itin-delay-amount  ] of drivers
+  ; Calculate cost of delay figuring there are 260 working days/year, 10 year lifespan of chargers
+  let total-delay-cost total-delay * 260 * 10
+  report total-charger-cost + total-delay-cost 
+end

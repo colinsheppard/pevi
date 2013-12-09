@@ -236,7 +236,7 @@ to initialize-drivers
     file-close
     set soc-cumulative-fraction   remove-item 0 soc-cumulative-fraction 
     set start-soc    remove-item 0 start-soc
-  ][print(word "Input file '" starting-soc-file "' not found!")]
+  ][print(word "Input file '" starting-soc-file "' not found, defaulting to uniform distribution")]
   
   ; finally initialize driver state variables
   ask drivers [    

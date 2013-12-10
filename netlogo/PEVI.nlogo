@@ -1017,12 +1017,11 @@ to arrive
   let #from-taz [id] of current-taz        ;;;LOG
   set journey-distance journey-distance - trip-distance
   log-driver "arriving" ;;;LOG
-  
   update-itinerary 
   let #to-taz [id] of current-taz
       
   ifelse not itin-complete? [
-    ifelse need-to-charge "arrive" [   
+    ifelse need-to-charge "arrive" [
       seek-charger
       log-data "trip-journey-timeuntildepart" (sentence ticks departure-time id [name] of this-vehicle-type state-of-charge #from-taz #to-taz #completed-trip #completed-journey (departure-time - ticks) "seeking-charger" remaining-range sum map weight-delay itin-delay-amount) ;;;LOG
     ][
@@ -1344,7 +1343,7 @@ SWITCH
 176
 log-wait-time
 log-wait-time
-0
+1
 1
 -1000
 
@@ -1443,7 +1442,7 @@ SWITCH
 400
 log-seek-charger-result
 log-seek-charger-result
-0
+1
 1
 -1000
 

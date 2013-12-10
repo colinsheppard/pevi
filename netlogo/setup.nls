@@ -246,6 +246,7 @@ to initialize-drivers
       set itin-to master-itin-to
       set itin-from master-itin-from
       set itin-depart master-itin-depart
+      set itin-complete? false
       set current-itin-row -1
       set journey-distance master-journey-distance
       update-itinerary

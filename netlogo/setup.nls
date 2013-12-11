@@ -3,6 +3,8 @@
 ;;;;;;;;;;;;;;;;;;;;;;;
 to read-parameter-file
   ;print "read-parameter-file"
+  if parameter-file = 0 [ set parameter-file "params.txt" ]
+  if model-directory = 0 [ set model-directory "./" ]
   set stranded-delay-threshold 3
   ifelse (file-exists? parameter-file) [ 
     file-close
@@ -241,6 +243,7 @@ to initialize-drivers
       set itin-from master-itin-from
       set itin-depart master-itin-depart
       set current-itin-row -1
+      set itin-complete? false
       set journey-distance master-journey-distance
       update-itinerary
       set state-of-charge master-state-of-charge

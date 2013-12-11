@@ -1325,7 +1325,7 @@ SWITCH
 222
 log-charging
 log-charging
-1
+0
 1
 -1000
 
@@ -1347,7 +1347,7 @@ SWITCH
 313
 log-need-to-charge
 log-need-to-charge
-1
+0
 1
 -1000
 
@@ -1506,7 +1506,7 @@ SWITCH
 94
 log-trip
 log-trip
-1
+0
 1
 -1000
 

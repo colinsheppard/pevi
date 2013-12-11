@@ -248,6 +248,7 @@ to initialize-drivers
       update-itinerary
       set state-of-charge master-state-of-charge
       set electric-fuel-consumption master-electric-fuel-consumption
+      itinerary-event-scheduler
     ][
       set current-itin-row -1
       update-itinerary

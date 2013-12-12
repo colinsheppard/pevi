@@ -1,0 +1,251 @@
+<!DOCTYPE html>
+<html>
+	<head>
+		<title>Proposed Humboldt County EV Infrastructure in 2% Penetration Scenario</title>
+		<style type="text/css">
+			html { height: 100% }
+			body { height: 100%; margin: 0; padding: 0 }
+			#map-canvas { height: 100% }
+		</style>
+		<script type="text/javascript"
+			src = "https://maps.googleapis.com/maps/api/js?key=AIzaSyAs6By2rj3khd2LjaBLmZ5O9ERlx1Ww-dM&sensor=false">
+		</script> 
+		<script type="text/javascript">
+			var highZoomChargerMarkers = [];
+			var oneChargerMarkers = [];
+			var twoChargerMarkers = [];
+			var arcChargerMarkers = [];
+			var eurChargerMarkers = [];
+			var mckChargerMarkers = [];
+			var forChargerMarkers = [];
+			var willowCreekMarkers = [];
+			var existingChargerMarkers = [];
+			
+			var map;
+		
+			var infowindow = null;
+			
+			function initialize() {
+				var mapOptions = {
+					zoom: 10,
+					center: new google.maps.LatLng(40.8,-123.9),
+					mapTypeId: google.maps.MapTypeId.ROADMAP
+				}
+				
+				map = new google.maps.Map(document.getElementById("map-canvas"),
+						mapOptions);
+						
+				var tazLayer = new google.maps.KmlLayer({
+					url: 'http://www.schatzlab.org/images/pev-charger-icons/humboldt_tazs_colored.kml'
+				});
+				tazLayer.setMap(map);
+				
+			// Must set up markers once for each charger number, since each charger number has a different icon
+				setMarkers(map,highZoomChargerTazs,oneChargerIcon,highZoomChargerMarkers);
+				setMarkers(map,oneChargerTazs,oneChargerIcon,oneChargerMarkers);
+				setMarkers(map,twoChargerTazs,twoChargerIcon,twoChargerMarkers);
+				setMarkers(map,willowCreek,willowCreekIcon,willowCreekMarkers);
+				setMarkers(map,arcataInc,arcataIncIcon,arcChargerMarkers);
+				setMarkers(map,eurekaInc,eurekaIncIcon,eurChargerMarkers);
+				setMarkers(map,mckInc,mckIncIcon,mckChargerMarkers);
+				setMarkers(map,fortunaInc,fortunaIncIcon,forChargerMarkers);
+				setMarkers(map,existingChargers,existingChargerIcon,existingChargerMarkers);
+				changeMarkers(null,highZoomChargerMarkers);
+				google.maps.event.addListener(map, 'zoom_changed', function() {
+					var zoomLevel = map.getZoom();
+						if (zoomLevel>=14){ 
+							changeMarkers(map,highZoomChargerMarkers);
+							changeMarkers(map,oneChargerMarkers);
+							changeMarkers(map,twoChargerMarkers);
+							changeMarkers(map,willowCreekMarkers);
+							changeMarkers(map,existingChargerMarkers);
+							changeMarkers(null,arcChargerMarkers);
+							changeMarkers(null,eurChargerMarkers);
+							changeMarkers(null,mckChargerMarkers);
+							changeMarkers(null,forChargerMarkers);
+						}else{
+							changeMarkers(null,highZoomChargerMarkers);
+							changeMarkers(map,oneChargerMarkers);
+							changeMarkers(map,twoChargerMarkers);
+							changeMarkers(map,willowCreekMarkers);
+							changeMarkers(map,existingChargerMarkers);
+							changeMarkers(map,arcChargerMarkers);
+							changeMarkers(map,eurChargerMarkers);
+							changeMarkers(map,mckChargerMarkers);
+							changeMarkers(map,forChargerMarkers);
+						}
+        });
+			}
+
+			var oneChargerIcon = new google.maps.MarkerImage(
+				'http://www.schatzlab.org/images/pev-charger-icons/charger-icon-1.png',
+				null,
+				null,
+				null,
+				new google.maps.Size(70,80)
+			);
+			var twoChargerIcon = new google.maps.MarkerImage(
+				'http://www.schatzlab.org/images/pev-charger-icons/charger-icon-2.png',
+				null,
+				null,
+				null,
+				new google.maps.Size(70,80)
+			);
+			var arcataIncIcon = new google.maps.MarkerImage(
+				'http://www.schatzlab.org/images/pev-charger-icons/charger-icon-4.png',
+				null,
+				null,
+				null,
+				new google.maps.Size(70,80)
+			);
+			var eurekaIncIcon = new google.maps.MarkerImage(
+				'http://www.schatzlab.org/images/pev-charger-icons/charger-icon-13.png',
+				null,
+				null,
+				null,
+				new google.maps.Size(70,80)
+			);
+			var mckIncIcon = new google.maps.MarkerImage(
+				'http://www.schatzlab.org/images/pev-charger-icons/charger-icon-2.png',
+				null,
+				null,
+				null,
+				new google.maps.Size(70,80)
+			);
+			var fortunaIncIcon = new google.maps.MarkerImage(
+				'http://www.schatzlab.org/images/pev-charger-icons/charger-icon-2.png',
+				null,
+				null,
+				null,
+				new google.maps.Size(70,80)
+			);
+			var willowCreekIcon = new google.maps.MarkerImage(
+				'http://www.schatzlab.org/images/pev-charger-icons/charger-icon-WillowCreek.png',
+				null,
+				null,
+				null,
+				new google.maps.Size(70,80)
+			);
+			var existingChargerIcon = new google.maps.MarkerImage(
+				'http://www.schatzlab.org/images/pev-charger-icons/charger-icon-1-existing.png',
+				null,
+				null,
+				null,
+				new google.maps.Size(70,80)
+			);
+			var highZoomChargerTazs = [
+				['ARC_Giuntoli',-124.080069203624,40.8984925693415,'<div style="line-height:1.35;overflow:hidden;white-space:nowrap;">Arcata: Giuntoli. 1 proposed charging station (as of November 2013).</div>'],
+				['ARC_HSU',-124.079654,40.874179,'<div style="line-height:1.35;overflow:hidden;white-space:nowrap;">Arcata: Humboldt State University. 1 proposed charging station (as of November 2013).</div>'],
+				['ARC_Plaza',-124.085838416264,40.869569316074,'<div style="line-height:1.35;overflow:hidden;white-space:nowrap;">Arcata: Plaza. 1 proposed charging station (as of November 2013).</div>'],
+				['ARC_SunnyBrae',-124.073149,40.856830,'<div style="line-height:1.35;overflow:hidden;white-space:nowrap;">Arcata: Sunny Brae. 1 proposed charging station (as of November 2013).</div>'],
+				['EKA_Harrison',-124.141173,40.784583,'<div style="line-height:1.35;overflow:hidden;white-space:nowrap;">Eureka: Harrison. 1 proposed charging station (as of November 2013).</div>'],
+				['EKA_HendersonCenter',-124.162269,40.775990,'<div style="line-height:1.35;overflow:hidden;white-space:nowrap;">Eureka: Henderson Center. 1 proposed charging station (as of November 2013).</div>'],
+				['EKA_NW101',-124.168360602958,40.8022713688371,'<div style="line-height:1.35;overflow:hidden;white-space:nowrap;">Eureka: NW Highway 101. 1 proposed charging station (as of November 2013).</div>'],
+				['EKA_S_Broadway',-124.190311,40.775568,'<div style="line-height:1.35;overflow:hidden;white-space:nowrap;">Eureka: South Broadway. 1 proposed charging station (as of November 2013).</div>'],
+				['EKA_Slough',-124.116399574933,40.8065740326293,'<div style="line-height:1.35;overflow:hidden;white-space:nowrap;">Eureka: Slough. 1 proposed charging station (as of November 2013).</div>'],
+				['EKA_W_Central',-124.169215,40.791923,'<div style="line-height:1.35;overflow:hidden;white-space:nowrap;">Eureka: West Central. 1 proposed charging station (as of November 2013).</div>'],
+				['EKA_Waterfront',-124.166373,40.805237,'<div style="line-height:1.35;overflow:hidden;white-space:nowrap;">Eureka: Waterfront. 1 proposed charging station (as of November 2013).</div>'],
+				['EKA_E_Central',-124.156882,40.796086,'<div style="line-height:1.35;overflow:hidden;white-space:nowrap;">Eureka: East Central. 1 proposed charging station (as of November 2013).</div>'],
+				['EKA_Harris',-124.154599343366,40.7838286071767,'<div style="line-height:1.35;overflow:hidden;white-space:nowrap;">Eureka: Harris. 1 proposed charging station (as of November 2013).</div>'],
+				['Cutten',-124.142921,40.769829,'<div style="line-height:1.35;overflow:hidden;white-space:nowrap;">Cutten. 1 proposed charging station (as of November 2013).</div>'],
+				['Bayview',-124.177773,40.763616,'<div style="line-height:1.35;overflow:hidden;white-space:nowrap;">Bayview. 1 proposed charging station (as of November 2013).</div>'],
+				['FieldsLanding',-124.199102,40.742174,'<div style="line-height:1.35;overflow:hidden;white-space:nowrap;">Fields Landing. 1 proposed charging station (as of November 2013).</div>'],
+				['Myrtletown',-124.133482,40.789901,'<div style="line-height:1.35;overflow:hidden;white-space:nowrap;">Myrtletown. 1 proposed charging station (as of November 2013).</div>'],
+				['MCK_North',-124.115736,40.956266,'<div style="line-height:1.35;overflow:hidden;white-space:nowrap;">McKinleyville: North. 1 proposed charging station (as of November 2013).</div>'],
+				['MCK_South',-124.085832242344,40.9235392275972,'<div style="line-height:1.35;overflow:hidden;white-space:nowrap;">McKinleyville: South. 1 proposed charging station (as of November 2013).</div>'],
+				['FOR_Central',-124.150579817853,40.5928453455413,'<div style="line-height:1.35;overflow:hidden;white-space:nowrap;">Fortuna: Central. 1 proposed charging station (as of November 2013).</div>'],
+				['FOR_East',-124.138568991135,40.5839735805058,'<div style="line-height:1.35;overflow:hidden;white-space:nowrap;">Fortuna: East. 1 proposed charging station (as of November 2013).</div>']
+			];
+			var oneChargerTazs = [
+				['Bayside',-123.950749,40.722335,'<div style="line-height:1.35;overflow:hidden;white-space:nowrap;">Bayside. 1 proposed charging station (as of November 2013).</div>'],
+				['Ferndale',-124.262349,40.5577817,'<div style="line-height:1.35;overflow:hidden;white-space:nowrap;">Ferndale. 1 proposed charging station (as of November 2013).</div>'],
+				['Fieldbrook',-124.035915,40.964958,'<div style="line-height:1.35;overflow:hidden;white-space:nowrap;">Fieldbrook. 1 proposed charging station (as of November 2013).</div>'],
+				['Garberville',-123.794994,40.099288,'<div style="line-height:1.35;overflow:hidden;white-space:nowrap;">Garberville. 1 proposed charging station (as of November 2013).</div>'],
+				['BlueLake',-123.99411522927,40.8813188452077,'<div style="line-height:1.35;overflow:hidden;white-space:nowrap;">Blue Lake. 1 proposed charging station (as of November 2013).</div>'],
+				['Hydesville',-124.002022105048,40.5751145373043,'<div style="line-height:1.35;overflow:hidden;white-space:nowrap;">Hydesville. 1 proposed charging station (as of November 2013).</div>'],
+				['Loleta',-124.224804,40.641024,'<div style="line-height:1.35;overflow:hidden;white-space:nowrap;">Loleta. 1 proposed charging station (as of November 2013).</div>'],
+				['Orick',-124.059671,41.286483,'<div style="line-height:1.35;overflow:hidden;white-space:nowrap;">Orick. 1 proposed charging station (as of November 2013).</div>'],	
+				['Bottoms',-124.094311,40.896261,'<div style="line-height:1.35;overflow:hidden;white-space:nowrap;">Bottoms. 1 proposed charging station (as of November 2013).</div>'],
+				['RioDell',-124.106048,40.498328,'<div style="line-height:1.35;overflow:hidden;white-space:nowrap;">Rio Dell. 1 proposed charging station (as of November 2013).</div>'],
+				['Scotia',-124.102046,40.484360,'<div style="line-height:1.35;overflow:hidden;white-space:nowrap;">Scotia. 1 proposed charging station (as of November 2013).</div>'],
+				['Trinidad',-124.143433004936,41.0586232148385,'<div style="line-height:1.35;overflow:hidden;white-space:nowrap;">Trinidad. 1 proposed charging station (as of November 2013).</div>'],
+				['WestEnd',-123.993896,40.865482,'<div style="line-height:1.35;overflow:hidden;white-space:nowrap;">West End. 1 proposed charging station (as of November 2013).</div>'],
+				['Bridgeville',-123.798811,40.469650,'<div style="line-height:1.35;overflow:hidden;white-space:nowrap;">Bridgeville. 1 proposed charging station (as of November 2013).</div>'],
+				['CollegeRedwoods',-124.199107,40.695963,'<div style="line-height:1.35;overflow:hidden;white-space:nowrap;">College of the Redwoods. 1 proposed charging station (as of November 2013).</div>']
+			];
+			var twoChargerTazs = [
+					['Redway',-123.823874,40.120979,'<div style="line-height:1.35;overflow:hidden;white-space:nowrap;">Redway. 2 proposed charging stations (as of November 2013).</div>']
+				];
+			var arcataInc = [
+				['Arcata',-124.083368,40.874111,'<div style="line-height:1.35;overflow:hidden;white-space:nowrap;">Arcata. 4 proposed charging stations (as of November 2013).</div>']
+			];
+			var eurekaInc = [
+				['Eureka',-124.160423,40.781597,'<div style="line-height:1.35;overflow:hidden;white-space:nowrap;">Eureka. 13 proposed charging stations (as of November 2013).</div>']
+			];
+			var mckInc = [
+				['McKinleyville',-124.098508,40.944750,'<div style="line-height:1.35;overflow:hidden;white-space:nowrap;">McKinleyville. 2 proposed charging stations (as of November 2013).</div>']
+			];
+			var fortunaInc = [
+				['Fortuna',-124.142736,40.586966,'<div style="line-height:1.35;overflow:hidden;white-space:nowrap;">Fortuna. 2 proposed charging stations (as of November 2013).</div>']
+			];
+			var willowCreek = [
+				['WillowCreek',-123.628073,40.939052,'<div style="line-height:1.35;overflow:hidden;white-space:nowrap;">Willow Creek. 5 proposed charging stations (as of November 2013): 4 level 2 charging stations, 1 level 3 charging station.']
+			];
+			var existingChargers = [
+<<<<<<< HEAD
+				['City of Eureka: 4 C St. #1',-124.170047,40.805090,'<div style="line-height:1.35;overflow:hidden;white-space:nowrap;">City of Eureka: 4 C St. #1. Public ChargePoint charger available for $1/hour (as of November 2013).</div>'],
+				['Caltrans District Office: 1656 Union St.',-124.175343,40.792173,'<div style="line-height:1.35;overflow:hidden;white-space:nowrap;">Caltrans District Office: 1656 Union St. Public charger available 24 hrs/day (as of November 2013).</div>'],
+				['McCrea Nissan: 601 7th St.',-124.163804,40.800556,'<div style="line-height:1.35;overflow:hidden;white-space:nowrap;">McCrea Nissan: 601 7th St. Charger to serve Nissan customers, subject to dealer hours (as of November 2013).</div>'],
+				['Harper Motors: 4800 US 101',-124.114314,40.808374,'<div style="line-height:1.35;overflow:hidden;white-space:nowrap;">Harper Motors: 4800 US 101. Charger subject to dealer hours (as of November 2013).</div>'],
+				['GHD: 718 3rd St. Eureka',-124.163881,40.803799,'<div style="line-height:1.35;overflow:hidden;white-space:nowrap;">GHD: 718 3rd St. Eureka. Public charger available (as of November 2013).</div>'],
+				['Arcata Plaza',-124.086400,40.868528,'<div style="line-height:1.35;overflow:hidden;white-space:nowrap;">Arcata Plaza: Public charger available (as of November 2013).</div>']
+=======
+				['City of Eureka: 4 C St. #1',-124.170047,40.805090,'City of Eureka: 4 C St. #1. Public ChargePoint charger available for $1/hour as of November 2013.'],
+				['Caltrans District Office: 1656 Union St.',-124.175343,40.792173,'Caltrans District Office: 1656 Union St. Public charger available 24 hrs/day as of November 2013.'],
+				['McCrea Nissan: 601 7th St.',-124.163804,40.800556,'McCrea Nissan: 601 7th St. Charger to serve Nissan customers, subject to dealer hours as of November 2013.'],
+				['Harper Motors: 4800 US 101',-124.114314,40.808374,'Harper Motors: 4800 US 101. Charger subject to dealer hours as of November 2013.'],
+				['GHD: 718 3rd St. Eureka',-124.163881,40.803799,'GHD: 718 3rd St. Eureka. Public charger available as of November 2013.'],
+				['City of Arcata',-124.085312,40.868293,'City of Arcata: Public charger available as of November 2013.']
+>>>>>>> 7bfdcb09c5bd6ae22906213118548b0c896784cf
+			];
+				
+			function setMarkers(map,tazs,image,markerArray) {
+				var shape = {
+					coord: [1,1,1,40,40,40,40,1],
+					type: 'poly'
+			};
+				for (var i=0; i<tazs.length; i++) {
+					var taz = tazs[i];
+					var myLatLng = new google.maps.LatLng(taz[2],taz[1]);					
+					var marker = new google.maps.Marker({
+						position: myLatLng,
+						map: map,
+						icon: image,
+						title: taz[0],
+						html: taz[3]
+					});
+					markerArray.push(marker);
+					infowindow = new google.maps.InfoWindow({
+    				content: "This is irrelevant."
+					});
+					google.maps.event.addListener(marker, 'click', function() {
+						infowindow.setContent(this.html);
+						infowindow.open(map,this);
+// This handy multiple-window trick from http://you.arenot.me/2010/06/29/google-maps-api-v3-0-multiple-markers-multiple-infowindows/
+					});
+				}
+			}
+			
+			function changeMarkers(map,markerArray) {
+				for (var i=0; i < markerArray.length; i++) {
+					markerArray[i].setMap(map);
+				}
+			}
+			
+			google.maps.event.addDomListener(window, 'load', initialize);
+		</script>
+	</head>
+	<body>
+		<div id="map-canvas"/>
+	</body>
+</html>

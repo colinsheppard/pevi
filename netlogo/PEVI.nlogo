@@ -36,6 +36,7 @@ globals [
   vehicle-type-input-file
   outputs-directory
   starting-soc-file
+<<<<<<< HEAD
   ext-dist-time-file
 =======
   charger-permission-file
@@ -194,7 +195,8 @@ to setup-and-fix-seed
     set batch-setup? false
     ;let seed new-seed
     ;print seed
-    random-seed 1;
+    ;random-seed 1;
+    random-seed 10
     if parameter-file = 0 [ set parameter-file "params.txt" ]
     if model-directory = 0 [ set model-directory "./" ]
     read-parameter-file

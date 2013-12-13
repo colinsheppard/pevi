@@ -30,10 +30,9 @@ to read-parameter-file
       ifelse param-name = "vehicle-type-input-file" [ set vehicle-type-input-file word model-directory file-read ][
       ifelse param-name = "outputs-directory" [ set outputs-directory word model-directory file-read ][
       ifelse param-name = "probability-of-unneeded-charge" [ set probability-of-unneeded-charge file-read ][
-      ifelse param-name = "stranded-delay-threshold" [ set stranded-delay-threshold file-read ][  
       ifelse param-name = "stranded-delay-threshold" [ set stranded-delay-threshold file-read ][
       ifelse param-name = "charger-permission-file" [set charger-permission-file file-read ][  
-      ]]]]]]]]]]]]]]]]]]]]]]
+      ]]]]]]]]]]]]]]]]]]]]]
     ]
     file-close
   ][ 

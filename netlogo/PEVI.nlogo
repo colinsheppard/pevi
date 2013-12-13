@@ -36,7 +36,11 @@ globals [
   vehicle-type-input-file
   outputs-directory
   starting-soc-file
+<<<<<<< HEAD
   ext-dist-time-file
+=======
+  charger-permission-file
+>>>>>>> permissions
   
 ;; PARAMETERS
   charge-safety-factor
@@ -72,6 +76,7 @@ drivers-own [
   this-vehicle-type              ; e.g. 'leaf' or 'volt'
   is-bev?
   multi-unit?                  
+  permission-list
   battery-capacity          ; kwh
   electric-fuel-consumption ; kwh / mile
   hybrid-fuel-consumption   ; gallon / mile, for phev charge sustaining mode
@@ -141,9 +146,9 @@ chargers-own[
   location         ; TAZ # for each charger
   current-driver   ; driver currenlty being serviced, nobody indicates charger is available
   this-charger-type     ; 0, 1, 2, 3, or 4 ***address name later?
-
   num-sessions     ; count of charging sessions
   energy-delivered ; kWh
+  alt-energy-price ; Used for special permissions chargers
  ]
 
 tazs-own[
@@ -190,7 +195,8 @@ to setup-and-fix-seed
     set batch-setup? false
     ;let seed new-seed
     ;print seed
-    random-seed 1;
+    ;random-seed 1;
+    random-seed 10
     if parameter-file = 0 [ set parameter-file "params.txt" ]
     if model-directory = 0 [ set model-directory "./" ]
     read-parameter-file
@@ -460,6 +466,8 @@ to seek-charger
   let #min-cost 1e99
   let #min-taz -99
   let #min-charger-type -99
+  let #use-permissioned-charger false
+  let #min-priviledged-charger nobody
   let #trip-charge-time-need-by-type n-values count charger-types [-99]
   let #trip-or-journey-energy-need-by-type n-values count charger-types [-99]
   let #level-3-and-too-full false
@@ -519,7 +527,20 @@ to seek-charger
 
       foreach [level] of charger-types [
         let #level ?
-        if (available-chargers #this-taz #level > 0) and ((#level > 0 and #level < 5) or ((#this-taz = home-taz and multi-unit?) and #level = 5) or ((#this-taz = home-taz and (not multi-unit?)) and #level = 0)) [
+        ; check to see if any charger on priviledged lists are available
+        let #min-priviledged-cost 99
+        foreach permission-list [
+          if [location] of ? = current-taz and [current-driver] of ? = nobody and [level] of [this-charger-type] of ? = #level [
+            if [alt-energy-price] of ? < #min-priviledged-cost [
+              set #min-priviledged-charger ?
+              set #min-priviledged-cost [alt-energy-price] of ?
+            ]
+          ]
+        ]
+        
+       ; Need to add in the priviledged chargers to this search, but be sure that if a priviledged charger is available but public is NOT, it will get used. 
+       
+        if (available-chargers #this-taz #level > 0) and ((#level > 0) or ((#this-taz = home-taz and (not multi-unit?)) and #level = 0)) or (#min-priviledged-charger != nobody) [ 
           let #this-charger-type one-of charger-types with [ level = #level ]
           let #this-charge-rate [charge-rate] of #this-charger-type
           ifelse #charger-in-origin-or-destination [
@@ -561,20 +582,40 @@ to seek-charger
                                                                         #charger-in-origin-or-destination
                                                                         #this-charger-type                                                    
           ]
-          if not #level-3-and-too-full [ 
-            let #this-cost (time-opportunity-cost * (#extra-time-for-travel + #extra-time-until-end-charge) + #level-3-time-penalty +
-              ([energy-price] of #this-charger-type) * (item #level #trip-or-journey-energy-need-by-type + #extra-energy-for-travel)) 
+          if not #level-3-and-too-full [
+            ; self is currently the driver
             
-            if #this-cost < #min-cost or (#this-cost = #min-cost and [level] of #this-charger-type > [level] of #min-charger-type) [
-              set #min-cost #this-cost
-              set #min-taz #this-taz
-              set #min-charger-type #this-charger-type 
+            ifelse #min-priviledged-cost < [energy-price] of #this-charger-type or available-chargers #this-taz #level = 0 [ ;If the priviledged charger is cheaper, or the only charger 
+              let #this-cost (time-opportunity-cost * (#extra-time-for-travel + #extra-time-until-end-charge) + #level-3-time-penalty +
+              (#min-priviledged-cost) * (item #level #trip-or-journey-energy-need-by-type + #extra-energy-for-travel))
+              if #this-cost < #min-cost or (#this-cost = #min-cost and [level] of #this-charger-type > [level] of #min-charger-type) [
+                set #min-cost #this-cost
+                set #min-taz #this-taz
+                set #min-charger-type #this-charger-type 
+                set #use-permissioned-charger true 
+                log-data "seek-charger" (sentence ticks seek-charger-index ([id] of current-taz) ([id] of #this-taz) id ([name] of this-vehicle-type) electric-fuel-consumption is-BEV?       ;;;LOG
+                  #charger-in-origin-or-destination #level state-of-charge (item #level #trip-or-journey-energy-need-by-type) (distance-from-to [id] of current-taz [id] of #this-taz)        ;;;LOG
+                  (distance-from-to [id] of #this-taz [id] of destination-taz) (time-from-to [id] of current-taz [id] of #this-taz) (time-from-to [id] of #this-taz [id] of destination-taz)  ;;;LOG
+                  trip-time trip-distance journey-distance charging-on-a-whim? time-until-depart (item #level #trip-charge-time-need-by-type) #this-cost #extra-time-until-end-charge         ;;;LOG
+                  #full-charge-time-need #trip-charge-time-need #mid-journey-charge-time-need #mid-state-of-charge)  ;;;LOG
+
+              ]
+            ][
+              let #this-cost (time-opportunity-cost * (#extra-time-for-travel + #extra-time-until-end-charge) + #level-3-time-penalty +
+              ([energy-price] of #this-charger-type) * (item #level #trip-or-journey-energy-need-by-type + #extra-energy-for-travel))
+              if #this-cost < #min-cost or (#this-cost = #min-cost and [level] of #this-charger-type > [level] of #min-charger-type) [
+                set #min-cost #this-cost
+                set #min-taz #this-taz
+                set #min-charger-type #this-charger-type 
+                set #use-permissioned-charger false
+                log-data "seek-charger" (sentence ticks seek-charger-index ([id] of current-taz) ([id] of #this-taz) id ([name] of this-vehicle-type) electric-fuel-consumption is-BEV?       ;;;LOG
+                #charger-in-origin-or-destination #level state-of-charge (item #level #trip-or-journey-energy-need-by-type) (distance-from-to [id] of current-taz [id] of #this-taz)        ;;;LOG
+                (distance-from-to [id] of #this-taz [id] of destination-taz) (time-from-to [id] of current-taz [id] of #this-taz) (time-from-to [id] of #this-taz [id] of destination-taz)  ;;;LOG
+                trip-time trip-distance journey-distance charging-on-a-whim? time-until-depart (item #level #trip-charge-time-need-by-type) #this-cost #extra-time-until-end-charge         ;;;LOG
+                #full-charge-time-need #trip-charge-time-need #mid-journey-charge-time-need #mid-state-of-charge)  ;;;LOG
+
+              ]
             ]
-            log-data "seek-charger" (sentence ticks seek-charger-index ([id] of current-taz) ([id] of #this-taz) id ([name] of this-vehicle-type) electric-fuel-consumption is-BEV?       ;;;LOG
-              #charger-in-origin-or-destination #level state-of-charge (item #level #trip-or-journey-energy-need-by-type) (distance-from-to [id] of current-taz [id] of #this-taz)        ;;;LOG
-              (distance-from-to [id] of #this-taz [id] of destination-taz) (time-from-to [id] of current-taz [id] of #this-taz) (time-from-to [id] of #this-taz [id] of destination-taz)  ;;;LOG
-              trip-time trip-distance journey-distance charging-on-a-whim? time-until-depart (item #level #trip-charge-time-need-by-type) #this-cost #extra-time-until-end-charge         ;;;LOG
-              #full-charge-time-need #trip-charge-time-need #mid-journey-charge-time-need #mid-state-of-charge)  ;;;LOG
           ]
         ]
       ]
@@ -588,7 +629,11 @@ to seek-charger
   ][
     log-data "seek-charger-result" (sentence ticks seek-charger-index id ([id] of #min-taz) (#min-taz = current-taz or #min-taz = destination-taz) ([level] of #min-charger-type) #min-cost)  ;;;LOG
     ifelse #min-taz = current-taz [
-      set current-charger selected-charger current-taz [level] of #min-charger-type
+      ifelse #use-permissioned-charger [
+        set current-charger #min-priviledged-charger
+      ][
+        set current-charger selected-charger current-taz [level] of #min-charger-type
+      ]
       if [level] of #min-charger-type > 0 [
         ask current-charger[
           set current-driver myself
@@ -739,6 +784,7 @@ to-report calc-time-until-end-charge-with-logging [#full-charge-time-need #trip-
     ] ;;;LOG
   ] ;;;LOG
 end ;;;LOG
+
 to-report calc-time-until-end-charge [#full-charge-time-need #trip-charge-time-need #journey-charge-time-need #time-until-depart #charger-in-origin-or-destination #this-charger-type]
   ifelse #full-charge-time-need <= #trip-charge-time-need [  ;; if sufficent time to charge to full
     report #full-charge-time-need
@@ -1149,6 +1195,7 @@ end
 to-report charge-rate-of [#charger]
   report [charge-rate] of ([this-charger-type] of #charger)
 end
+
 to-report energy-price-of [#charger]
   report [energy-price] of ([this-charger-type] of #charger)
 end

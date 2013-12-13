@@ -30,7 +30,12 @@ to read-parameter-file
       ifelse param-name = "vehicle-type-input-file" [ set vehicle-type-input-file word model-directory file-read ][
       ifelse param-name = "outputs-directory" [ set outputs-directory word model-directory file-read ][
       ifelse param-name = "probability-of-unneeded-charge" [ set probability-of-unneeded-charge file-read ][
+<<<<<<< HEAD
       ifelse param-name = "stranded-delay-threshold" [ set stranded-delay-threshold file-read ][  
+=======
+      ifelse param-name = "stranded-delay-threshold" [ set stranded-delay-threshold file-read ][
+      ifelse param-name = "charger-permission-file" [set charger-permission-file file-read ][  
+>>>>>>> permissions
       ]]]]]]]]]]]]]]]]]]]]
     ]
     file-close
@@ -98,8 +103,21 @@ end
 ;;;;;;;;;;;;;;;;;;;;
 to setup-tazs
   ;print "setup-tazs"
+<<<<<<< HEAD
   set taz-table table:make
   ;create-tazs n-tazs
+=======
+  let #prev-taz-id 0
+  create-tazs n-tazs
+  ask tazs [
+    set shape "star"
+    set color yellow
+    set size 0.5
+    set n-levels n-values 5 [-99] 
+    set chargers-by-type n-values n-charger-types [0]
+    set available-chargers-by-type n-values n-charger-types [0]
+  ]
+>>>>>>> permissions
   ifelse (file-exists? charger-input-file) [
     file-close
     file-open charger-input-file
@@ -112,8 +130,14 @@ to setup-tazs
         set chargers-by-type n-values n-charger-types [0]
         set available-chargers-by-type n-values n-charger-types [0]
         set id file-read
+<<<<<<< HEAD
         table:put taz-table id self
         foreach n-values n-charger-types [?] [
+=======
+        if id != #prev-taz-id + 1 [ error (word "In setup-tazs, was expecting to read taz #" (#prev-taz-id + 1) " from file but found #" id " instead.") ]
+        set #prev-taz-id id
+        foreach [0 1 2 3 4] [
+>>>>>>> permissions
           set n-levels replace-item ? n-levels file-read ; sets the number of level X chargers in each TAZ
           set available-chargers-by-type replace-item ? available-chargers-by-type structs:new-stack
         ]
@@ -391,6 +415,7 @@ to setup-itinerary
         set master-itin-to itin-to
         set master-itin-depart itin-depart
         set master-journey-distance journey-distance
+        set permission-list []
       ] ; end create-drivers
     ] ; end while file-at-end
   ] ; end ifelse
@@ -454,18 +479,26 @@ to setup-chargers
     ]
     create-chargers [item 4 n-levels] of #this-taz [  ; The location of each charger created is then set as the current TAZ location
       set this-charger-type one-of charger-types with [level = 4]
+<<<<<<< HEAD
       set location #this-taz
     ]
     ;create-chargers [item 5 n-levels] of #this-taz [  ; The location of each charger created is then set as the current TAZ location
     ;  set this-charger-type one-of charger-types with [level = 5]
     ;  set location #this-taz
     ;]
+=======
+      set location ?
+    ]
+>>>>>>> permissions
     foreach n-values n-charger-types [?] [
       ask #this-taz [
         set chargers-by-type replace-item ? chargers-by-type chargers with [([level] of this-charger-type = ?) and (location = myself)]
       ]
     ]
-  ]  
+  ]
+  
+  setup-special-chargers
+    
   initialize-available-chargers
   ask chargers [
     set shape "Circle 2"
@@ -477,6 +510,33 @@ to setup-chargers
   ]
 end ;setup-chargers
 
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;; SETUP SPECIAL PERMISSION CHARGERS
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+to setup-special-chargers
+  ifelse (file-exists? charger-permission-file) [
+    file-close
+    file-open charger-permission-file
+    while [file-at-end? = false] [
+      create-chargers 1 [
+        set location taz file-read
+        let #my-level file-read
+        set this-charger-type one-of charger-types with [level = #my-level]
+        set alt-energy-price file-read
+        let priviledged-drivers read-from-string (word "[" file-read-line "]") ; handy trick from http://stackoverflow.com/questions/10244850/read-file-lines-with-spaces-into-netlogo-as-lists
+        foreach priviledged-drivers [
+          ask drivers with [id = ?] [
+            set permission-list lput myself permission-list
+          ]
+        ]
+      ]
+    ]
+    file-close
+  ][ 
+    error (word "Input file '" charger-permission-file "' not found!") 
+  ]
+end ;setup-special-chargers
+  
 ;;;;;;;;;;;;;;;;;;;;
 ;; LOG DATA
 ;;;;;;;;;;;;;;;;;;;;

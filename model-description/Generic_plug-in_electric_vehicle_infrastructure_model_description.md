@@ -351,6 +351,16 @@ Equation 4:
 
 ***3. Interpolate the external time or external distance boundary value corresponding to the random draw between the boundaries.***
 
+## 5.9 Interpolate From Draw
+***This reporter sub model is used in the distance-from-to/time-from-to subroutines (5.8) and to establish each driver's starting state of charge. It requires as inputs a list of value bounds, the values associated with each bound, and the random draw result.***
+
+1. Starting with the lowest bound, check each combination bound(i) and bound(i+1) to see if the random draw result is greater than or equal to bound(i) but less than bound(i+1)
+2. With value(i) and value(i+1) corresponding to bound(i) and bound(i+1) respectively, calculate the  reporter value using 
+````
+Equation 4:
+````
+![equation](http://latex.codecogs.com/gif.latex?%5Ctextup%7BReporter%7D%20%3D%20%5Cfrac%7Bvalue_%7Bi&plus;1%7D-value_%7Bi%7D%7D%7Bbound_%7Bi&plus;1%7D-bound_%7Bi%7D%7D%5Cast%20%5Cleft%20%28%20random.draw%20-%20bound_%7Bi%7D%20%5Cright%20%29)
+
 
 # 6. Parameters
 

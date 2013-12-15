@@ -308,15 +308,16 @@ to setup-in-batch-mode
     print "setup-chargers"
     setup-charger-types
     setup-chargers
+    initialize-logfile
     ; Make "intialize-logfile" procedure
-    reset-logfile "charging" ;;;LOG
-    log-data "charging" (sentence "time" "charger.id" "charger.level" "location" "driver" "vehicle.type" "multi-unit?" "duration" "energy" "begin.soc" "end.soc" "after.end.charge" "charging.on.whim" "time.until.depart") ;;;LOG
-    reset-logfile "pain" ;;;LOG
-    log-data "pain" (sentence "time" "driver" "location" "vehicle.type" "pain.type" "pain.value" "state.of.charge") ;;;LOG
-    reset-logfile "trip" ;;;LOG
-    log-data "trip" (sentence "time" "driver" "vehicle.type" "origin" "destination" "distance" "scheduled" "begin.soc" "end.soc" "elec.used" "gas.used" "end.time") ;;;LOG
-    reset-logfile "need-to-charge" ;;;LOG
-    log-data "need-to-charge" (sentence "time" "driver" "vehicle.type" "soc" "trip.distance" "journey.distance" "time.until.depart" "calling.event" "remaining.range" "charging.on.a.whim?" "need.to.charge?") ;;;LOG
+;    reset-logfile "charging" ;;;LOG
+;    log-data "charging" (sentence "time" "charger.id" "charger.level" "location" "driver" "vehicle.type" "multi-unit?" "duration" "energy" "begin.soc" "end.soc" "after.end.charge" "charging.on.whim" "time.until.depart") ;;;LOG
+;    reset-logfile "pain" ;;;LOG
+;    log-data "pain" (sentence "time" "driver" "location" "vehicle.type" "pain.type" "pain.value" "state.of.charge") ;;;LOG
+;    reset-logfile "trip" ;;;LOG
+;    log-data "trip" (sentence "time" "driver" "vehicle.type" "origin" "destination" "distance" "scheduled" "begin.soc" "end.soc" "elec.used" "gas.used" "end.time") ;;;LOG
+;    reset-logfile "need-to-charge" ;;;LOG
+;    log-data "need-to-charge" (sentence "time" "driver" "vehicle.type" "soc" "trip.distance" "journey.distance" "time.until.depart" "calling.event" "remaining.range" "charging.on.a.whim?" "need.to.charge?") ;;;LOG
     random-seed next-seed
     print random 1000
   ][
@@ -339,17 +340,58 @@ to setup-in-batch-mode
     print random 1000
     initialize-drivers
     print random 1000
-    reset-logfile "charging" ;;;LOG
-    log-data "charging" (sentence "time" "charger.id" "charger.level" "location" "driver" "vehicle.type" "multi-unit?" "duration" "energy" "begin.soc" "end.soc" "after.end.charge" "charging.on.whim" "time.until.depart") ;;;LOG
-    reset-logfile "pain" ;;;LOG
-    log-data "pain" (sentence "time" "driver" "location" "vehicle.type" "pain.type" "pain.value" "state.of.charge") ;;;LOG
-    reset-logfile "trip" ;;;LOG
-    log-data "trip" (sentence "time" "driver" "vehicle.type" "origin" "destination" "distance" "scheduled" "begin.soc" "end.soc" "elec.used" "gas.used" "end.time") ;;;LOG
-    reset-logfile "need-to-charge" ;;;LOG
-    log-data "need-to-charge" (sentence "time" "driver" "vehicle.type" "soc" "trip.distance" "journey.distance" "time.until.depart" "calling.event" "remaining.range" "charging.on.a.whim?" "need.to.charge?") ;;;LOG
+    initialize-logfile
+;    reset-logfile "charging" ;;;LOG
+;    log-data "charging" (sentence "time" "charger.id" "charger.level" "location" "driver" "vehicle.type" "multi-unit?" "duration" "energy" "begin.soc" "end.soc" "after.end.charge" "charging.on.whim" "time.until.depart") ;;;LOG
+;    reset-logfile "pain" ;;;LOG
+;    log-data "pain" (sentence "time" "driver" "location" "vehicle.type" "pain.type" "pain.value" "state.of.charge") ;;;LOG
+;    reset-logfile "trip" ;;;LOG
+;    log-data "trip" (sentence "time" "driver" "vehicle.type" "origin" "destination" "distance" "scheduled" "begin.soc" "end.soc" "elec.used" "gas.used" "end.time") ;;;LOG
+;    reset-logfile "need-to-charge" ;;;LOG
+;    log-data "need-to-charge" (sentence "time" "driver" "vehicle.type" "soc" "trip.distance" "journey.distance" "time.until.depart" "calling.event" "remaining.range" "charging.on.a.whim?" "need.to.charge?") ;;;LOG
     random-seed next-seed
     print random 1000
   ]
+end
+
+to initialize-logfile
+  reset-logfile "drivers" ;;;LOG
+  reset-logfile "charging" ;;;LOG
+  log-data "charging" (sentence "time" "charger.id" "charger.level" "location" "driver" "vehicle.type" "multi-unit?" "duration" "energy" "begin.soc" "end.soc" "after.end.charge" "charging.on.whim" "time.until.depart") ;;;LOG
+  reset-logfile "pain" ;;;LOG
+  log-data "pain" (sentence "time" "driver" "location" "vehicle.type" "pain.type" "pain.value" "state.of.charge") ;;;LOG
+  reset-logfile "trip" ;;;LOG
+  log-data "trip" (sentence "time" "driver" "vehicle.type" "origin" "destination" "distance" "scheduled" "begin.soc" "end.soc" "elec.used" "gas.used" "end.time") ;;;LOG
+  reset-logfile "tazs" ;;;LOG
+  log-data "tazs" (sentence "time" "taz" "num-bevs" "num-phevs" "num-L0" "num-L1" "num-L2" "num-L3" "num-avail-L0"  "num-avail-L1" "num-avail-L2" "num-avail-L3") ;;;LOG
+  if log-tazs [ ;;;LOG
+    time:schedule-repeating-event tazs task log-taz-data 0.0 (log-taz-time-interval / 60) ;;;LOG
+  ] ;;;LOG
+  if log-summary [ ;;;LOG
+     time:schedule-event one-of drivers task summarize go-until-time - 0.01 ;;;LOG
+  ] ;;;LOG
+  reset-logfile "wait-time" ;;;LOG
+  log-data "wait-time" (sentence "time" "driver" "vehicle.type" "soc" "trip.distance" "journey.distance" "time.until.depart" "result.action" "time.from.now") ;;;LOG
+  reset-logfile "charge-time" ;;;LOG
+  log-data "charge-time" (sentence "time" "driver" "charger.in.origin.dest" "level" "soc" "trip.distance" "journey.distance" "time.until.depart" "result.action" "time.from.now") ;;;LOG
+  reset-logfile "need-to-charge" ;;;LOG
+  log-data "need-to-charge" (sentence "time" "driver" "vehicle.type" "soc" "trip.distance" "journey.distance" "time.until.depart" "calling.event" "remaining.range" "charging.on.a.whim?" "need.to.charge?") ;;;LOG
+  reset-logfile "trip-journey-timeuntildepart" ;;;LOG
+  log-data "trip-journey-timeuntildepart" (sentence "time" "departure.time" "driver" "vehicle.type" "soc" "from.taz" "to.taz" "trip.distance" "journey.distance" "time.until.depart" "next.event" "remaining.range" "delay.sum") ;;;LOG
+  reset-logfile "seek-charger" ;;;LOG
+  log-data "seek-charger" (sentence "time" "seek-charger-index" "current.taz" "charger.taz" "driver" "vehicle.type" "electric.fuel.consumption" "is.BEV" "charger.in.origin.dest" "level" "soc" "trip.or.journey.energy.need" "distance.o.to.c" "distance.c.to.d" "time.o.to.c" "time.c.to.d" "trip.time" "trip.distance" "journey.distance" "charging.on.a.whim." "time.until.depart" "trip.charge.time.need" "cost" "extra.time.until.end.charge" "full.charge.time.need" "trip.charge.time.need" "mid.journey.charge.time.need" "mid.state.of.charge") ;;;LOG
+  reset-logfile "seek-charger-result" ;;;LOG
+  log-data "seek-charger-result" (sentence "time" "seek.charger.index" "driver" "chosen.taz" "charger.in.origin.dest" "chosen.level" "cost") ;;;LOG
+  set seek-charger-index 0 ;;;LOG
+  reset-logfile "break-up-trip" ;;;LOG
+  log-data "break-up-trip" (sentence "time" "driver" "state.of.charge" "current.taz" "destination.taz" "remaining.range" "charging.on.a.whim?" "result.action") ;;;LOG
+  reset-logfile "break-up-trip-choice" ;;;LOG
+  log-data "break-up-trip-choice" (sentence "time" "driver" "current.taz" "destination.taz" "result.action" "new.destination" "max.score.or.distance") ;;;LOG
+  reset-logfile "available-chargers" ;;;LOG
+  log-data "available-chargers" (sentence "time" "driver" "current.taz" "home.taz" "taz" "level" "num.available.chargers") ;;;LOG
+  reset-logfile "charge-limiting-factor" ;;;LOG
+  log-data "charge-limiting-factor" (sentence "time" "driver" "vehicle.type" "state.of.charge" "result.action" "full-charge-time-need" "trip-charge-time-need" "journey-charge-time-need" "time-until-depart" "charger-in-origin-or-destination" "this-charger-type") ;;;LOG
+
 end
 
 to-report next-seed
@@ -1425,7 +1467,7 @@ SWITCH
 313
 log-need-to-charge
 log-need-to-charge
-0
+1
 1
 -1000
 
@@ -1447,7 +1489,7 @@ SWITCH
 359
 log-seek-charger
 log-seek-charger
-1
+0
 1
 -1000
 
@@ -1491,7 +1533,7 @@ SWITCH
 400
 log-seek-charger-result
 log-seek-charger-result
-0
+1
 1
 -1000
 

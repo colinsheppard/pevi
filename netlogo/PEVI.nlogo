@@ -309,15 +309,6 @@ to setup-in-batch-mode
     setup-charger-types
     setup-chargers
     initialize-logfile
-    ; Make "intialize-logfile" procedure
-;    reset-logfile "charging" ;;;LOG
-;    log-data "charging" (sentence "time" "charger.id" "charger.level" "location" "driver" "vehicle.type" "multi-unit?" "duration" "energy" "begin.soc" "end.soc" "after.end.charge" "charging.on.whim" "time.until.depart") ;;;LOG
-;    reset-logfile "pain" ;;;LOG
-;    log-data "pain" (sentence "time" "driver" "location" "vehicle.type" "pain.type" "pain.value" "state.of.charge") ;;;LOG
-;    reset-logfile "trip" ;;;LOG
-;    log-data "trip" (sentence "time" "driver" "vehicle.type" "origin" "destination" "distance" "scheduled" "begin.soc" "end.soc" "elec.used" "gas.used" "end.time") ;;;LOG
-;    reset-logfile "need-to-charge" ;;;LOG
-;    log-data "need-to-charge" (sentence "time" "driver" "vehicle.type" "soc" "trip.distance" "journey.distance" "time.until.depart" "calling.event" "remaining.range" "charging.on.a.whim?" "need.to.charge?") ;;;LOG
     random-seed next-seed
     print random 1000
   ][
@@ -341,14 +332,6 @@ to setup-in-batch-mode
     initialize-drivers
     print random 1000
     initialize-logfile
-;    reset-logfile "charging" ;;;LOG
-;    log-data "charging" (sentence "time" "charger.id" "charger.level" "location" "driver" "vehicle.type" "multi-unit?" "duration" "energy" "begin.soc" "end.soc" "after.end.charge" "charging.on.whim" "time.until.depart") ;;;LOG
-;    reset-logfile "pain" ;;;LOG
-;    log-data "pain" (sentence "time" "driver" "location" "vehicle.type" "pain.type" "pain.value" "state.of.charge") ;;;LOG
-;    reset-logfile "trip" ;;;LOG
-;    log-data "trip" (sentence "time" "driver" "vehicle.type" "origin" "destination" "distance" "scheduled" "begin.soc" "end.soc" "elec.used" "gas.used" "end.time") ;;;LOG
-;    reset-logfile "need-to-charge" ;;;LOG
-;    log-data "need-to-charge" (sentence "time" "driver" "vehicle.type" "soc" "trip.distance" "journey.distance" "time.until.depart" "calling.event" "remaining.range" "charging.on.a.whim?" "need.to.charge?") ;;;LOG
     random-seed next-seed
     print random 1000
   ]

@@ -310,7 +310,9 @@ The submodel consists of the following actions:
 
 2. Find the number of available chargers by type and location within range of the driver.  If willingToRoam? is set to false, then only consider charges in currentTAZ.  Otherwise, include any chargers in currentTAZ, neighboring TAZs (all TAZs within a driving distance set by chargerSearchDistance), and en-route TAZs between the current TAZ and the next destination TAZ in the driver’s itinerary.  The index ‘i’ will be used below to reference each combination of TAZ and charger type with at least one available charger.  Note that some of the variables with the prefix “extra” will be zero for chargers in the current TAZ or en-route as they only apply to travel that’s additional to the driver’s itinerary.  The one exception to this is extraTimeForCharging, which will be non-zero for en-route TAZs because the time spent is an opportunity cost to the driver. If no available chargers are found, then increment the driver variable numDenials, transition to the state *Not Charging* and stop this action.
 
-3. Calculate the following values: 
+***3. If the driver has access to any special-permission chargers within driving range, determine if the alt-energy-price of the special-permission charger is less than the public charger of the ams TAZ and charger level. If the alt-energy-price is cheaper (or if no public chargers are available), use the special-permission chargers (and the alt energy price) in the following calculations.***
+
+4. Calculate the following values: 
 	a. level3AndTooFull? This boolean value is true if the charger under consideration is level 3 and the driver’s state of charge is >= 0.8 or, for enroute chargers, will be >= 0.8 when the vehicle reaches the intermediate destination.  If this parameter is true, then the alternative is not considered.
 	b. level3TimePenalty  Set this to a large value if the distance to the destination (in the case of enroute charging, from the intermediate TAZ) is greater than vehicle can go on a full level 3 charge (80% state of charge). Otherwise set to 0.  This penalizes level 3 charging when a level 1 or 2 charge might get the driver there without an additional stop or another charging session.
 	c. tripOrJourneyEnergyNeed.  This value depends on the amount of time before the next departure in the driver’s itinerary as well as the current state of charge and the charger type. If timeUntilDepart < willingToRoamThreshold, then only the energy needed for the next trip is considered, otherwise the energy needed for the journey is used. If the energy needed for the trip or journey is greater than the energy needed to fill the battery (or in the case of level 3, achieved 80% state of charger) then tripOrJourneyEnergyNeed is set to the battery limiting value. As a formula, the value is calculated as:
@@ -327,13 +329,13 @@ If chargerInOriginOrDestination(i) is false, then the value is an estimate of th
 		f.i. timeUntilDepart is decreased by the time of travel from the origin TAZ to TAZ(i)
 		f.ii. stateOfCharge is decreased by  where tripDistancei is the distance in miles from the origin TAZ to TAZ(i)
 		f.iii. tripDistance and journeyDistance are assumed to begin at TAZ(i)
-4. Estimate the cost of the alternative,
+5. Estimate the cost of the alternative,
 ````	
 Equation 4:
 ````
 	![equation](http://latex.codecogs.com/gif.latex?%5Ctextup%7BCost%7D_%7Bi%7D%20%3D%20%5Ctextup%7BtimeOpportunityCost%7D%20*%20%5Cleft%20%5B%20%5Ctextup%7BextraTimeUntilEndCharge%7D_%7Bi%7D%20&plus;%20%5Ctextup%7BextraTimeForTravel%7D_%7Bi%7D%20&plus;%20%5Ctextup%7Blevel3TimePenalty%7D_%7Bi%7D%20%5Cright%20%5D%5C%5C%20&plus;%20%5Ctextup%7BenergyPrice%7D_%7Bi%7D%20*%20%5Cleft%20%5B%20%5Ctextup%7BtripOrJourneyEnergyNeed%7D%20&plus;%20%5Ctextup%7BextraEnergyForTravel%7D_%7Bi%7D%20%5Cright%20%5D)<!---markdown_formula--->
 	<!---$\textup{Cost}_{i} = \textup{timeOpportunityCost} * \left [ \textup{extraTimeUntilEndCharge}_{i} + \textup{extraTimeForTravel}_{i} + \textup{level3TimePenalty}_{i} \right ]\\ + \textup{energyPrice}_{i} * \left [ \textup{tripOrJourneyEnergyNeed} + \textup{extraEnergyForTravel}_{i} \right ]$---><!---pandoc_formula--->
-5. Chose the alternative with the minimum cost.  If TAZ(i)  is the current TAZ, call the *ChargeTime* event scheduler.   Otherwise update the driver’s itinerary to include the new destination TAZ (unless TAZ(i) is the destination TAZ) with a depart time equal to now and call the *TravelTime* event scheduler.
+6. Chose the alternative with the minimum cost.  If TAZ(i)  is the current TAZ, call the *ChargeTime* event scheduler.   Otherwise update the driver’s itinerary to include the new destination TAZ (unless TAZ(i) is the destination TAZ) with a depart time equal to now and call the *TravelTime* event scheduler.
 
 ## 5.7 Break Up Trip
 - If a driver has a full battery and cannot make the next trip (or if the stateOfCharge >= 0.8 and the currentTAZ only has level 3 chargers available), then they attempt to break the trip into smaller trips with intermediate stops for charging.
@@ -343,7 +345,24 @@ Equation 4:
 - The TAZ with the highest score is selected (ties are broken by selecting the furthest TAZ from the current location).  If no en-route TAZs have any available chargers (i.e. if they all have a score of 0), then the driver selects the most distance reachable TAZ.
 
 ## 5.8 Distance From To / Time From To
-The distance-from-to and time-from-to submodels is called for each driver during setup to set that driver's externalDistance and externalTime agent variables.  
+***The distance-from-to and time-from-to submodels is called for each driver during setup to set that driver's externalDistance and externalTime agent variables. Both submodels require an external file that contains the external distance / external time values pegged to a random draw boundary. ***
+
+***1. When each driver agent is created, perform a random draw.***
+
+***2. Iterate through sequential pairs of random draw boundaries until the pair that bounds the random draw.***
+
+***3. Interpolate the external time or external distance boundary value corresponding to the random draw between the boundaries.***
+
+## 5.9 Interpolate From Draw
+***This reporter sub model is used in the distance-from-to/time-from-to subroutines (5.8) and to establish each driver's starting state of charge. It requires as inputs a list of value bounds, the values associated with each bound, and the random draw result.***
+
+1. Starting with the lowest bound, check each combination bound(i) and bound(i+1) to see if the random draw result is greater than or equal to bound(i) but less than bound(i+1)
+2. With value(i) and value(i+1) corresponding to bound(i) and bound(i+1) respectively, calculate the  reporter value using 
+````
+Equation 4:
+````
+![equation](http://latex.codecogs.com/gif.latex?%5Ctextup%7BReporter%7D%20%3D%20%5Cfrac%7Bvalue_%7Bi&plus;1%7D-value_%7Bi%7D%7D%7Bbound_%7Bi&plus;1%7D-bound_%7Bi%7D%7D%5Cast%20%5Cleft%20%28%20random.draw%20-%20bound_%7Bi%7D%20%5Cright%20%29)
+
 
 # 6. Parameters
 

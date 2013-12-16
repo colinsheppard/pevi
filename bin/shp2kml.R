@@ -11,16 +11,26 @@ load.libraries(c('optparse','maptools','stringr','ggplot2','rgdal','plotKML'),qu
 # COMMAND LINE OPTIONS 
 option_list <- list(
   make_option(c("-s", "--shapefile"), type="character", default='input_shapefile', help="Path to polygon shape file with no extension [\"%default\"]"),
+  make_option(c("-t", "--shapetype"), type="character", default='polygon', help="Shape type: polygon line point [\"%default\"]"),
   make_option(c("-k", "--kmlfile"), type="character", default='converted_shapefile', help="Path to kml output file with no extension [\"%default\"]"),
-  make_option(c("-n", "--shapename"), type="character", default='shapename', help="Name of polygon set as it should appear in kml file with no extension [\"%default\"]")
+  make_option(c("-n", "--name"), type="character", default='shapename', help="Name of polygon set as it should appear in kml file with no extension [\"%default\"]"),
+  make_option(c("-p", "--projstring"), type="character", default='+proj=longlat +zone=15 +ellps=WGS84 +datum=WGS84 +no_defs +towgs84=0,0,0', help="Projection string of input [\"%default\"]")
 )
 if(interactive()){
-  setwd(pp(pevi.shared,'../ExampleDataSets/Land-Use/'))
-  args<-c('-s','Land-Use.shp','-k','Land-Use.kml','-n','Land Use')
-  args <- parse_args(OptionParser(option_list = option_list,usage = "shp-to-kml.R [options]"),positional_arguments=F,args=args)
+  setwd(pp(pevi.shared,'data/UPSTATE/ExampleDataSets/'))
+  args<-c('-s','AggregatedTAZs.shp','-k','AggregatedTAZs.kml','-n','Aggregated TAZs')
+  args<-c('-s','Fake_Roads.shp','-k','Fake_Roads.kml','-n','Fake Roads','-t','line')
+  args <- parse_args(OptionParser(option_list = option_list,usage = "shp2kml.R [options]"),positional_arguments=F,args=args)
 }else{
-  args <- parse_args(OptionParser(option_list = option_list,usage = "shp-to-kml.R [options]"),positional_arguments=F)
+  args <- parse_args(OptionParser(option_list = option_list,usage = "shp2kml.R [options]"),positional_arguments=F)
 }
+
+# Make shapetype a bit more user-friendly
+args$shapetype <- tolower(args$shapetype)
+if(substr(args$shapetype,nchar(args$shapetype), nchar(args$shapetype)) == "s"){
+  args$shapetype <- substr(args$shapetype,1,nchar(args$shapetype)-1)
+}
+
 
 ######################################################################################################
 # SITE ATTRIBUTES
@@ -28,14 +38,11 @@ if(interactive()){
 ######################################################################################################
 #gpclibPermit()
 
-shapes <- readShapePoly(args$shapefile,proj4string=CRS('+proj=longlat +zone=15 +ellps=WGS84 +datum=WGS84 +no_defs +towgs84=0,0,0'))
-writePolyShape(shapes,pp(args$shapefile,"-new"))
+if(args$shapetype == "polygon"){
+  shapes <- readShapePoly(args$shapefile,proj4string=CRS(args$projstring))
+}else if(args$shapetype == "line"){
+  shapes <- readShapeLines(args$shapefile,proj4string=CRS(args$projstring))
+}
 
-#c.map <- paste(map.color(agg.taz$total.demand,blue2red(50)),'7F',sep='')
-#shp.to.kml(agg.taz,pp(pevi.shared,'data/UPSTATE/kml/AggregatedTAZs.kml'),'Aggregated TAZs','','white',2,c.map,'shp.id','name',c('name','agg.id','total.demand'))
+writeOGR(spTransform(shapes, CRS("+proj=longlat +ellps=WGS84 +datum=WGS84 +no_defs +towgs84=0,0,0")),args$kmlfile,args$name,"KML",overwrite_layer=T)
 
-writeOGR(spTransform(shapes, CRS("+proj=longlat +ellps=WGS84 +datum=WGS84 +no_defs +towgs84=0,0,0")),args$kmlfile,"shapes","KML",overwrite_layer=T)
-
-# the following would later read the poly's back in, but they won't have the attribute data but we don't actually need that if we are maintaining a separate table with the
-# custom attributes
-#from.kml <- readOGR('sites-from-R.kml','sites')

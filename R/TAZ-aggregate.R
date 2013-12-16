@@ -5,7 +5,7 @@
 # based on polygons generated in google earth (and converted to shape files in QGIS)
 ######################################################################################################
 
-load.libraries(c('maptools','plotrix','stats','gpclib','plyr','png','RgoogleMaps','lattice','stringr','ggplot2','rgdal','XML','plotKML'))
+load.libraries(c('maptools','plotrix','stats','gpclib','plyr','png','RgoogleMaps','lattice','stringr','ggplot2','rgdal','XML','plotKML','colorRamps'))
 source(paste(pevi.home,'R/gis-functions.R',sep=''))
 gpclibPermit()
 
@@ -167,24 +167,66 @@ c.map <- paste(map.color(for.c.map,blue2red(50)),'7F',sep='')
 ######################################################################################################
 # UPSTATE TAZs
 ######################################################################################################
-
-load(pp(pevi.shared,'data/UPSTATE/driving-distances/taz_time_distance.Rdata'))
-
 taz <- readShapePoly(pp(pevi.shared,'data/UPSTATE/shapefiles/Shasta_TAZ'))
 
 # Load the aggregation polygons
 agg.polys <- readShapePoly(pp(pevi.shared,'data/UPSTATE/shapefiles/ProposedAggregatedTAZs'))
-
-# Load the OD data
-od <- read.table(pp(pevi.shared,'data/UPSTATE/Shasta-OD-2010/sh10_adjvehtrips_3per_3occ.txt'),header=T)
+agg.polys$Name <- as.character(agg.polys$Name)
+agg.polys$Name[agg.polys$Name=="BigBen"] <- "BigBend"
 
 taz.centroids <-SpatialPointsDataFrame(coordinates(taz),data=data.frame(longitude= coordinates(taz)[,1],latitude= coordinates(taz)[,2]))
 agg.mapping <- data.frame(name=over(taz.centroids,agg.polys)$Name)
-agg.mapping$agg.id <- as.numeric(agg.mapping$name)
+agg.mapping$agg.id <- as.numeric(agg.mapping$name)+100
 agg.taz.shp <- unionSpatialPolygons(taz,agg.mapping$agg.id)
-aggregate.data <- function(df){ 
- return( colSums(df[,c('AREA','ACRES','SHAPE_AREA')]) ) 
-}
-taz@data$agg.id <- agg.mapping$agg.id
-agg.taz.data <- ddply(taz@data[!is.na(taz@data$agg.id),],.(agg.id),aggregate.data)
+taz$agg.id <- agg.mapping$agg.id
+taz$name <- agg.mapping$name
+# here I had to correct for fact that a proposed polygon didn't catch the centroid of the original TAZ
+taz$agg.id[which(taz$TAZ==904)] <- 104
+taz$name[which(taz$TAZ==904)] <- "AND_OxYoke"
+agg.taz.data <- ddply(taz@data[!is.na(taz@data$agg.id),],.(agg.id),function(df){ 
+  data.frame(name=df$name[1],area=sum(df$AREA),jurisdiction=pp(unique(df$JURISDCTN),collapse=","),stringsAsFactors=F)
+})
 agg.taz.shp <- SpatialPolygonsDataFrame(agg.taz.shp,agg.taz.data)
+agg.taz.shp$name <- as.character(agg.taz.shp$name)
+agg.taz.shp$shp.id <- unlist(lapply(agg.taz.shp@polygons,function(x){slot(x,'ID')}))
+writePolyShape(agg.taz.shp,pp(pevi.shared,'data/UPSTATE/shapefiles/AggregatedTAZs'))
+shp.to.kml(agg.taz.shp,pp(pevi.shared,'data/UPSTATE/kml/AggregatedTAZs.kml'),'Aggregated TAZs','','red',2,'#00000000','agg.id','name',c('name','agg.id'))
+
+# Here I manually cleaned up the polygons (inner rings were scattered throughout) and re-saved to AggregatedTAZs.kml/AggregatedTAZs.shp
+agg.taz <- readShapePoly(pp(pevi.shared,'data/UPSTATE/shapefiles/AggregatedTAZs'))
+
+# Load distance-time
+load(pp(pevi.shared,'data/UPSTATE/driving-distances/taz_time_distance.Rdata'))
+# Load the OD data
+load(file=pp(pevi.shared,'data/UPSTATE/Shasta-OD-2020/od-by-purpose.Rdata'))
+
+odp$from.agg <- taz$agg.id[match(odp$from,taz$TAZ)]
+odp$to.agg <- taz$agg.id[match(odp$to,taz$TAZ)]
+odp$from.agg[is.na(odp$from.agg)] <- odp$from[is.na(odp$from.agg)]
+odp$to.agg[is.na(odp$to.agg)] <- odp$to[is.na(odp$to.agg)]
+
+od.agg <- ddply(odp,.(from.agg,to.agg),function(df){
+  colSums(df[,3:(ncol(df)-2)]) 
+})
+names(od.agg) <- c('from','to',names(od.agg)[3:ncol(od.agg)])
+
+purp.cols <- c('com','ho','hs','hsc','hw','oo','wo')
+tot.demand <- ddply(od.agg,.(from),function(df){ data.frame(demand=sum(df[,purp.cols])) })
+agg.taz$total.demand <- tot.demand$demand[match(agg.taz$agg.id,tot.demand$from)]
+
+c.map <- paste(map.color(agg.taz$total.demand,blue2red(50)),'7F',sep='')
+shp.to.kml(agg.taz,pp(pevi.shared,'data/UPSTATE/kml/AggregatedTAZs.kml'),'Aggregated TAZs','','white',2,c.map,'shp.id','name',c('name','agg.id','total.demand'))
+
+# Save as Rdata to minimize issues with converting formats
+save(agg.taz,file=pp(pevi.shared,'data/UPSTATE/shapefiles/AggregatedTAZs.Rdata'))
+# Save od data
+save(od.agg,file=pp(pevi.shared,'data/UPSTATE/Shasta-OD-2020/od-aggregated.Rdata'))
+
+# Now add point TAZs to taz spatial data as lat/lon circles
+load(pt.taz,file=pp(pevi.shared,'data/UPSTATE/shapefiles/PointTAZs.Rdata'))
+pt.tazs.coords <- data.frame(row=1:nrow(pt.taz@data),coordinates(pt.taz))
+pt.tazs.poly <- dlply(pt.tazs.coords,.(row),function(df){ 
+  coords <- data.frame( lon=df$coords.x1 + 0.01 * sin(seq(0,2*pi,by=pi/8)),
+              lat=df$coords.x2 + 0.01 * cos(seq(0,2*pi,by=pi/8)))
+  SpatialPolygons(list(Polygons(list(Polygon(coords)),1)))
+})

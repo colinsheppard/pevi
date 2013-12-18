@@ -218,15 +218,45 @@ c.map <- paste(map.color(agg.taz$total.demand,blue2red(50)),'7F',sep='')
 shp.to.kml(agg.taz,pp(pevi.shared,'data/UPSTATE/kml/AggregatedTAZs.kml'),'Aggregated TAZs','','white',2,c.map,'shp.id','name',c('name','agg.id','total.demand'))
 
 # Save as Rdata to minimize issues with converting formats
-save(agg.taz,file=pp(pevi.shared,'data/UPSTATE/shapefiles/AggregatedTAZs.Rdata'))
+#save(agg.taz,file=pp(pevi.shared,'data/UPSTATE/shapefiles/AggregatedTAZs.Rdata'))
+load(file=pp(pevi.shared,'data/UPSTATE/shapefiles/AggregatedTAZs.Rdata'))
 # Save od data
-save(od.agg,file=pp(pevi.shared,'data/UPSTATE/Shasta-OD-2020/od-aggregated.Rdata'))
+#save(od.agg,file=pp(pevi.shared,'data/UPSTATE/Shasta-OD-2020/od-aggregated.Rdata'))
+load(file=pp(pevi.shared,'data/UPSTATE/Shasta-OD-2020/od-aggregated.Rdata'))
 
-# Now add point TAZs to taz spatial data as lat/lon circles
-load(pt.taz,file=pp(pevi.shared,'data/UPSTATE/shapefiles/PointTAZs.Rdata'))
-pt.tazs.coords <- data.frame(row=1:nrow(pt.taz@data),coordinates(pt.taz))
-pt.tazs.poly <- dlply(pt.tazs.coords,.(row),function(df){ 
+# Now add point TAZs to taz spatial data as lat/lon circles, note that the ID we choose should not collide with agg.taz polygon IDs
+load(file=pp(pevi.shared,'data/UPSTATE/shapefiles/PointTAZs.Rdata'))
+id.start <- tail(as.numeric(unlist(lapply(agg.taz@polygons,function(l){ slot(l,"ID") }))),1) + 1
+pt.tazs.coords <- data.frame(row=id.start:(id.start-1+nrow(pt.taz@data)),coordinates(pt.taz))
+pt.tazs.poly <- SpatialPolygons(dlply(pt.tazs.coords,.(row),function(df){ 
   coords <- data.frame( lon=df$coords.x1 + 0.01 * sin(seq(0,2*pi,by=pi/8)),
               lat=df$coords.x2 + 0.01 * cos(seq(0,2*pi,by=pi/8)))
-  SpatialPolygons(list(Polygons(list(Polygon(coords)),1)))
-})
+  Polygons(list(Polygon(coords)),df$row[1])
+}),1:nrow(pt.tazs.coords))
+blank.df <- data.frame(matrix(NA,nrow(pt.tazs.coords),ncol(agg.taz@data)))
+names(blank.df) <- names(agg.taz@data)
+rownames(blank.df) <- pt.tazs.coords$row
+pt.tazs.df <- SpatialPolygonsDataFrame(pt.tazs.poly,blank.df)
+agg.taz <- rbind(agg.taz,pt.tazs.df)
+pt.rows <- which(is.na(agg.taz$agg.id))
+agg.taz$agg.id[pt.rows] <- 200 + 1:(length(pt.rows))
+agg.taz$name <- as.character(agg.taz$name)
+agg.taz$name[pt.rows] <- pt.taz$Name
+agg.taz$total.demand[pt.rows] <- pt.taz$trips_from
+agg.taz$population <- NA
+agg.taz$population[pt.rows] <- pt.taz$population
+agg.taz$employment <- NA
+agg.taz$employment[pt.rows] <- pt.taz$employment
+agg.taz$shp.id[pt.rows] <- pt.tazs.coords$row
+agg.taz$point <- agg.taz$agg.id > 200
+
+# Load the Greater Redding area to use as an exclusion criterion
+redding <- readOGR(pp(pevi.shared,'data/UPSTATE/kml/GreaterReddingArea.kml'),'GreaterReddingArea.kml')
+proj4string(agg.taz) <- CRS('+proj=longlat +ellps=WGS84 +towgs84=0,0,0,0,0,0,0 +no_defs')
+agg.taz.centroids <-SpatialPointsDataFrame(coordinates(agg.taz),data=data.frame(longitude=coordinates(agg.taz)[,1],latitude=coordinates(agg.taz)[,2]),proj4string=CRS(proj4string(agg.taz)))
+agg.mapping <- data.frame(name=over(agg.taz.centroids,redding)$Name)
+agg.taz$near.redding <- !is.na(agg.mapping$name)
+
+#save(agg.taz,file=pp(pevi.shared,'data/UPSTATE/shapefiles/AggregatedTAZsWithPointTAZs.Rdata'))
+load(file=pp(pevi.shared,'data/UPSTATE/shapefiles/AggregatedTAZsWithPointTAZs.Rdata'))
+

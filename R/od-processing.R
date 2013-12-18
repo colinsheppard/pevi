@@ -104,23 +104,60 @@ names(dem.sub) <- str_replace(str_replace(names(dem.sub),"Population","populatio
 #summary(lm('trips.from ~ Population + Service.Commercial + Office + School + Restaurant + TOTAL + TOTAL.1 + Pop.HU',dem.sub))
 
 # load the pointTAZS
-pt.taz <- readShapePoints(pp(pevi.shared,'data/UPSTATE/shapefiles/PointTAZs'))
-if(!"trips_from" %in% names(pt.taz@data)){
-  #write.csv(pt.taz@data,pp(pevi.shared,'data/UPSTATE/demographics/pt-tazs.csv'))
-  # in here I manually added demog data
-  pt.taz.data <- read.csv(pp(pevi.shared,'data/UPSTATE/demographics/pt-tazs.csv'))
-  fit.from <- lm('trips.from ~ population + employment',dem.sub)
-  fit.to <- lm('trips.to ~ population + employment',dem.sub)
-  pt.taz$population <- pt.taz.data$population[match(pt.taz$Name,pt.taz.data$Name)]
-  pt.taz$employment <- pt.taz.data$employment[match(pt.taz$Name,pt.taz.data$Name)]
-  pt.taz$trips_from <- predict(fit.from,newdata=pt.taz@data)
-  pt.taz$trips_to <- predict(fit.to,newdata=pt.taz@data)
-  pt.taz$Name <- as.character(pt.taz$Name)
-  pt.taz$Name[pt.taz$Name=="Platina Center"] <- "Platina"
-  pt.taz@data <- pt.taz@data[,c(1,(ncol(pt.taz@data)-3):ncol(pt.taz@data))]
-  write.csv(pt.taz@data,pp(pevi.shared,'data/UPSTATE/demographics/pt-tazs.csv'))
-  writePointsShape(pt.taz,pp(pevi.shared,'data/UPSTATE/shapefiles/PointTAZs'))
+if(file.exists(pp(pevi.shared,'data/UPSTATE/shapefiles/PointTAZs.Rdata'))){
+  pt.taz <- readShapePoints(pp(pevi.shared,'data/UPSTATE/shapefiles/PointTAZs'))
+  if(!"trips_from" %in% names(pt.taz@data)){
+    #write.csv(pt.taz@data,pp(pevi.shared,'data/UPSTATE/demographics/pt-tazs.csv'))
+    # in here I manually added demog data
+    pt.taz.data <- read.csv(pp(pevi.shared,'data/UPSTATE/demographics/pt-tazs.csv'))
+    fit.from <- lm('trips.from ~ population + employment',dem.sub)
+    fit.to <- lm('trips.to ~ population + employment',dem.sub)
+    pt.taz$population <- pt.taz.data$population[match(pt.taz$Name,pt.taz.data$Name)]
+    pt.taz$employment <- pt.taz.data$employment[match(pt.taz$Name,pt.taz.data$Name)]
+    pt.taz$trips_from <- predict(fit.from,newdata=pt.taz@data)
+    pt.taz$trips_to <- predict(fit.to,newdata=pt.taz@data)
+    pt.taz$Name <- as.character(pt.taz$Name)
+    pt.taz$Name[pt.taz$Name=="Platina Center"] <- "Platina"
+    pt.taz@data <- pt.taz@data[,c(1,(ncol(pt.taz@data)-3):ncol(pt.taz@data))]
+    write.csv(pt.taz@data,pp(pevi.shared,'data/UPSTATE/demographics/pt-tazs.csv'))
+    writePointsShape(pt.taz,pp(pevi.shared,'data/UPSTATE/shapefiles/PointTAZs'))
+  }
+  save(pt.taz,file=pp(pevi.shared,'data/UPSTATE/shapefiles/PointTAZs.Rdata'))
+}else{
+  load(file=pp(pevi.shared,'data/UPSTATE/shapefiles/PointTAZs.Rdata'))
 }
-save(pt.taz,file=pp(pevi.shared,'data/UPSTATE/shapefiles/PointTAZs.Rdata'))
+
+# load the agg.taz that include the pt TAZs 
+# (these are created by TAZ-aggregate.R which requires the point TAZs developed above)
+load(file=pp(pevi.shared,'data/UPSTATE/shapefiles/AggregatedTAZsWithPointTAZs.Rdata'))
+
+# Load od.agg, the aggregated OD matrix
+load(file=pp(pevi.shared,'data/UPSTATE/Shasta-OD-2020/od-aggregated.Rdata'))
+
+# Load taz.time.distance
+load(pp(pevi.shared,'data/UPSTATE/driving-distances/taz_time_distance.Rdata'))
+
+# add ids to dist/time matrix
+taz.time.distance$origin.id <- agg.taz$agg.id[match(taz.time.distance$origin.taz,agg.taz$name)] 
+taz.time.distance$destination.id <- agg.taz$agg.id[match(taz.time.distance$destination.taz,agg.taz$name)] 
+
+#fric.ids <- subset(agg.taz,!point & !near.redding)$agg.id
+fric.ids <- subset(agg.taz,!point)$agg.id
+fric.dts <- subset(taz.time.distance,origin.id %in% fric.ids & destination.id %in% fric.ids)[,c('origin.id','destination.id','miles')]
+fric.dts$key <- pp(fric.dts$origin.id,"_",fric.dts$destination.id)
+fric.od <- subset(od.agg,from %in% fric.ids & to %in% fric.ids)
+fric.od$key <- pp(fric.od$from,"_",fric.od$to)
+fric.m <- melt(fric.od[,c(ncol(fric.od),3:(ncol(fric.od)-1))],id.vars='key')
+fric.m$dist <- fric.dts$miles[match(fric.m$key,fric.dts$key)]
+fric.m$value <- round(fric.m$value)
+fric.mm <- ddply(fric.m,.(key,variable),function(df){ data.frame(dist=rep(df$dist,df$value)) })
+
+ggplot(fric.m,aes(x=dist))+geom_histogram()+facet_wrap(~variable)
+
+# Load CHTS for NSSR
+load(file=pp(pevi.shared,'data/CHTS/nssr-subset.Rdata'))
+
+
+dist.ecdf <- ecdf(subset(nssr.place,tripdistance<400)$tripdistance)
 
 

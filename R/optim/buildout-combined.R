@@ -3,15 +3,7 @@ options(java.parameters="-Xmx2048m")
 library(colinmisc)
 load.libraries(c('ggplot2','yaml','RNetLogo','plyr','reshape','stringr','snow'))
 
-#base.path <- '/Users/critter/Dropbox/serc/pev-colin/'
-#base.path <- '/Users/sheppardc/Dropbox/serc/pev-colin/'
-base.path <- '/Users/Raskolnikovbot3001/Dropbox/serc/'
-
 seed <- 19
-
-#num.cpu <- 8
-#num.cpu <- 12
-num.cpu <- 2
 
 #optim.code <- 'min-cost-constrained-by-frac-stranded-50-50'
 #optim.code <- 'min-cost-constrained-by-frac-stranded-50-50-seed9'
@@ -25,25 +17,24 @@ optim.code <- paste('linked2-50-50-seed',seed,sep='')
 link.pens <- str_detect(optim.code,"linked")  # should the infrastructure from lower pens be used as starting place for higher? otherwise,
                 # infrastructure is reset to zero
 
-path.to.pevi <- paste(base.path,'pevi/',sep='')
-path.to.inputs <- paste(base.path,'pev-shared/data/inputs/buildout/',optim.code,'/',sep='')
-path.to.outputs <- paste(base.path,'pev-shared/data/outputs/buildout/',optim.code,'/',sep='')
+path.to.inputs <- pp(pevi.shared,'data/inputs/buildout/',optim.code,'/')
+path.to.outputs <- pp(pevi.shared,'data/outputs/buildout/',optim.code,'/')
 
-source(paste(path.to.pevi,"R/optim/buildout-functions.R",sep=''))
-source(paste(path.to.pevi,"R/reporters-loggers.R",sep=''))
+source(pp(pevi.home,"R/optim/buildout-functions.R"))
+source(pp(pevi.home,"R/reporters-loggers.R"))
 
 make.dir(path.to.inputs)
-if(!file.exists(paste(path.to.inputs,'params.txt',sep=''))){
-  system(paste("cp ",path.to.inputs,'../linked2-50-50-seed1/params.txt ',path.to.inputs,sep=''))
+if(!file.exists(pp(path.to.inputs,'params.txt'))){
+  system(pp("cp ",path.to.inputs,'../linked2-50-50-seed1/params.txt ',path.to.inputs))
 }
 make.dir(path.to.outputs)
 
 # read the parameters and values to vary in the experiment
-vary <- yaml.load(readChar(paste(path.to.inputs,'../vary-linked2.yaml',sep=''),file.info(paste(path.to.inputs,'../vary-linked2.yaml',sep=''))$size))
+vary <- yaml.load(readChar(pp(path.to.inputs,'../vary-linked2.yaml'),file.info(pp(path.to.inputs,'../vary-linked2.yaml'))$size))
 for(file.param in names(vary)[grep("-file",names(vary))]){
-  vary[[file.param]] <- paste(path.to.pevi,'netlogo/',vary[[file.param]],sep='')
+  vary[[file.param]] <- pp(pevi.home,'netlogo/',vary[[file.param]])
 }
-naming <- yaml.load(readChar(paste(path.to.inputs,'../naming.yaml',sep=''),file.info(paste(path.to.inputs,'../naming.yaml',sep=''))$size))
+naming <- yaml.load(readChar(pp(path.to.inputs,'../naming.yaml'),file.info(pp(path.to.inputs,'../naming.yaml'))$size))
 
 # setup the data frame containing all combinations of those parameter values
 vary.tab.original <- expand.grid(vary,stringsAsFactors=F)
@@ -59,17 +50,15 @@ if(!exists('cl')){
 }
 
 # start NL
-# nl.path <- "/Applications/NetLogo\ 5.0.3"
-nl.path <- "/Applications/NetLogo\ 5.0.4"
 tryCatch(NLStart(nl.path, gui=F),error=function(err){ NA })
-model.path <- paste(path.to.pevi,"netlogo/PEVI-nolog.nlogo",sep='')
+model.path <- pp(pevi.home,"netlogo/PEVI-nolog.nlogo")
 NLLoadModel(model.path)
 
-for(cmd in paste('set log-',logfiles,' false',sep='')){ NLCommand(cmd) }
+for(cmd in pp('set log-',logfiles,' false')){ NLCommand(cmd) }
 
 #pev.penetration <- 0.01
 for(pev.penetration in c(0.005,0.01,0.02,0.04)){
-  print(paste("pen",pev.penetration))
+  print(pp("pen ",pev.penetration))
   if(pev.penetration <= 0.0051){
     vary.tab <- vary.tab.original
   }else if(pev.penetration <= 0.0101){
@@ -80,7 +69,7 @@ for(pev.penetration in c(0.005,0.01,0.02,0.04)){
     vary.tab <- data.frame(vary.tab.original[1:10,])
   }
   names(vary.tab) <- "driver-input-file"
-  vary.tab$`driver-input-file` <- str_replace(vary.tab$`driver-input-file`,"penXXX",paste("pen",pev.penetration*100,sep=""))
+  vary.tab$`driver-input-file` <- str_replace(vary.tab$`driver-input-file`,"penXXX",pp("pen ",pev.penetration*100))
   results <- data.frame(vary.tab,reporters)
   results$penetration <- as.numeric(unlist(lapply(strsplit(as.character(results$driver.input.file),'-pen',fixed=T),function(x){ unlist(strsplit(x[2],"-rep",fixed=T)[[1]][1]) })))
   results$replicate <- as.numeric(unlist(lapply(strsplit(as.character(results$driver.input.file),'-rep',fixed=T),function(x){ unlist(strsplit(x[2],"-",fixed=T)[[1]][1]) })))
@@ -93,11 +82,11 @@ for(pev.penetration in c(0.005,0.01,0.02,0.04)){
     begin.build.i <- build.i
   }
   NLCommand('clear-all')
-  NLCommand(paste('set starting-seed',seed))
+  NLCommand(pp('set starting-seed ',seed))
   for(build.i in begin.build.i:250){
-    print(paste("build iter:",build.i))
+    print(pp("build iter: ",build.i))
     if(build.i == begin.build.i){
-    	print(paste('build.i = ',build.i,sep=''))
+    	print(pp('build.i = ',build.i))
       write.charger.file(build.result$chargers[1:104])
       for(results.i in 1:nrow(results)){
       
@@ -105,13 +94,13 @@ for(pev.penetration in c(0.005,0.01,0.02,0.04)){
       
 #        NLCommand('clear-all-and-initialize')
 #        NLCommand(paste('set parameter-file "',path.to.inputs,'params.txt"',sep=''))
-#        NLCommand(paste('set model-directory "',path.to.pevi,'netlogo/"',sep=''))
+#        NLCommand(paste('set model-directory "',pevi.home,'netlogo/"',sep=''))
 #        NLCommand('read-parameter-file')
         for(param in names(vary.tab)){
           if(is.character(vary.tab[1,param])){
-            NLCommand(paste('set ',param,' "',vary.tab[results.i,param],'"',sep=''))
+            NLCommand(pp('set ',param,' "',vary.tab[results.i,param],'"'))
           }else{
-            NLCommand(paste('set ',param,' ',vary.tab[results.i,param],'',sep=''))
+            NLCommand(pp('set ',param,' ',vary.tab[results.i,param],''))
           }
         }
         
@@ -143,10 +132,10 @@ for(pev.penetration in c(0.005,0.01,0.02,0.04)){
     	winner.level <- 3
     }
     build.result$chargers[winner.i] <- build.result$chargers[winner.i] + 1  # NEW CHARGER GETS BUILT HERE
-    NLCommand(paste('add-charger',winner.taz,winner.level))
-    write.csv(build.result,file=paste(path.to.outputs,'buildout-pen',pev.penetration*100,'-iter',build.i,'-cost',build.result$cost[winner.i],'.csv',sep=''))
+    NLCommand(pp('add-charger ',winner.taz,winner.level))
+    write.csv(build.result,file=pp(path.to.outputs,'buildout-pen',pev.penetration*100,'-iter',build.i,'-cost',build.result$cost[winner.i],'.csv'))
     build.result[105,] <- build.result[winner.i,]
-    print(paste("winner: ",winner.i,sep=''))
-    save.image(file=paste(path.to.outputs,'buildout-pen',pev.penetration*100,'.Rdata',sep=''))
+    print(pp("winner: ",winner.i))
+    save.image(file=pp(path.to.outputs,'buildout-pen',pev.penetration*100,'.Rdata'))
   }
 }

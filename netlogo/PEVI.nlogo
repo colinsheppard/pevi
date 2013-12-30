@@ -258,7 +258,7 @@ to setup
      time:schedule-event one-of drivers task summarize go-until-time - 0.01 ;;;LOG
   ] ;;;LOG
   reset-logfile "wait-time" ;;;LOG
-  log-data "wait-time" (sentence "time" "driver" "vehicle.type" "soc" "trip.distance" "journey.distance" "time.until.depart" "result.action" "time.from.now") ;;;LOG
+  log-data "wait-time" (sentence "time" "driver" "vehicle.type" "soc" "trip.distance" "journey.distance" "time.until.depart" "result.action" "time.from.now" "electric.fuel.consumption") ;;;LOG
   reset-logfile "charge-time" ;;;LOG
   log-data "charge-time" (sentence "time" "driver" "charger.in.origin.dest" "level" "soc" "trip.distance" "journey.distance" "time.until.depart" "result.action" "time.from.now") ;;;LOG
   reset-logfile "need-to-charge" ;;;LOG
@@ -351,7 +351,7 @@ to initialize-logfile
      time:schedule-event one-of drivers task summarize go-until-time - 0.01 ;;;LOG
   ] ;;;LOG
   reset-logfile "wait-time" ;;;LOG
-  log-data "wait-time" (sentence "time" "driver" "vehicle.type" "soc" "trip.distance" "journey.distance" "time.until.depart" "result.action" "time.from.now") ;;;LOG
+  log-data "wait-time" (sentence "time" "driver" "vehicle.type" "soc" "trip.distance" "journey.distance" "time.until.depart" "result.action" "time.from.now" "electric.fuel.consumption") ;;;LOG
   reset-logfile "charge-time" ;;;LOG
   log-data "charge-time" (sentence "time" "driver" "charger.in.origin.dest" "level" "soc" "trip.distance" "journey.distance" "time.until.depart" "result.action" "time.from.now") ;;;LOG
   reset-logfile "need-to-charge" ;;;LOG
@@ -361,7 +361,7 @@ to initialize-logfile
   reset-logfile "seek-charger" ;;;LOG
   log-data "seek-charger" (sentence "time" "seek-charger-index" "current.taz" "charger.taz" "driver" "vehicle.type" "electric.fuel.consumption" "is.BEV" "charger.in.origin.dest" "level" "soc" "trip.or.journey.energy.need" "distance.o.to.c" "distance.c.to.d" "time.o.to.c" "time.c.to.d" "trip.time" "trip.distance" "journey.distance" "charging.on.a.whim." "time.until.depart" "trip.charge.time.need" "cost" "extra.time.until.end.charge" "full.charge.time.need" "trip.charge.time.need" "mid.journey.charge.time.need" "mid.state.of.charge") ;;;LOG
   reset-logfile "seek-charger-result" ;;;LOG
-  log-data "seek-charger-result" (sentence "time" "seek.charger.index" "driver" "chosen.taz" "charger.in.origin.dest" "chosen.level" "cost") ;;;LOG
+  log-data "seek-charger-result" (sentence "time" "seek.charger.index" "driver" "chosen.taz" "charger.in.origin.dest" "chosen.level" "cost" "alt.price?") ;;;LOG
   set seek-charger-index 0 ;;;LOG
   reset-logfile "break-up-trip" ;;;LOG
   log-data "break-up-trip" (sentence "time" "driver" "state.of.charge" "current.taz" "destination.taz" "remaining.range" "charging.on.a.whim?" "result.action") ;;;LOG
@@ -425,7 +425,7 @@ end
 ;;;;;;;;;;;;;;;;;;;;
 to-report need-to-charge [calling-event]
   set charging-on-a-whim? false
-  set trip-distance item current-od-index od-dist
+  ;set trip-distance item current-od-index od-dist ; drivers hould already have trip-distance calculated
   set time-until-depart departure-time - ticks
   set departure-time item current-itin-row itin-depart
   ifelse is-bev? [
@@ -499,9 +499,14 @@ to seek-charger
   let #mid-state-of-charge 0
   let #level-3-time-penalty 0
   let #level-3-time-penalty-for-origin-or-destination 0
+  
+  ;WRONG DISTANCE
+  
   if trip-distance * charge-safety-factor > 0.8 * battery-capacity / electric-fuel-consumption [
     set #level-3-time-penalty-for-origin-or-destination 999
   ]
+  
+  ; WRONG DISTANCE
   
   ifelse not charging-on-a-whim? and is-bev? and time-until-depart < willing-to-roam-time-threshold [  
     set willing-to-roam? true  
@@ -516,7 +521,7 @@ to seek-charger
   ]
   let #trip-energy-need  max (sentence 0 (trip-distance * charge-safety-factor * electric-fuel-consumption - state-of-charge * battery-capacity))
   let #journey-energy-need  max (sentence 0 (journey-distance * charge-safety-factor * electric-fuel-consumption - state-of-charge * battery-capacity))
-  
+
   foreach [sentence level charge-rate] of charger-types [
     let #trip-energy-need-limited #trip-energy-need
     let #journey-energy-need-limited #journey-energy-need
@@ -619,7 +624,7 @@ to seek-charger
                   #charger-in-origin-or-destination #level state-of-charge (item #level #trip-or-journey-energy-need-by-type) (distance-from-to [id] of current-taz [id] of #this-taz)        ;;;LOG
                   (distance-from-to [id] of #this-taz [id] of destination-taz) (time-from-to [id] of current-taz [id] of #this-taz) (time-from-to [id] of #this-taz [id] of destination-taz)  ;;;LOG
                   trip-time trip-distance journey-distance charging-on-a-whim? time-until-depart (item #level #trip-charge-time-need-by-type) #this-cost #extra-time-until-end-charge         ;;;LOG
-                  #full-charge-time-need #trip-charge-time-need #mid-journey-charge-time-need #mid-state-of-charge)  ;;;LOG
+                  #full-charge-time-need #trip-charge-time-need #mid-journey-charge-time-need #mid-state-of-charge #use-permissioned-charger)  ;;;LOG
 
               ]
             ][
@@ -634,7 +639,7 @@ to seek-charger
                 #charger-in-origin-or-destination #level state-of-charge (item #level #trip-or-journey-energy-need-by-type) (distance-from-to [id] of current-taz [id] of #this-taz)        ;;;LOG
                 (distance-from-to [id] of #this-taz [id] of destination-taz) (time-from-to [id] of current-taz [id] of #this-taz) (time-from-to [id] of #this-taz [id] of destination-taz)  ;;;LOG
                 trip-time trip-distance journey-distance charging-on-a-whim? time-until-depart (item #level #trip-charge-time-need-by-type) #this-cost #extra-time-until-end-charge         ;;;LOG
-                #full-charge-time-need #trip-charge-time-need #mid-journey-charge-time-need #mid-state-of-charge)  ;;;LOG
+                #full-charge-time-need #trip-charge-time-need #mid-journey-charge-time-need #mid-state-of-charge #use-permissioned-charger)  ;;;LOG
 
               ]
             ]
@@ -686,23 +691,23 @@ to wait-time-event-scheduler
   ifelse remaining-range / charge-safety-factor < trip-distance [
     ifelse ticks > 24 [
       set state "stranded"
-      log-data "wait-time" (sentence ticks id [name] of this-vehicle-type state-of-charge trip-distance journey-distance time-until-depart "stranded" -1) ;;;LOG
+      log-data "wait-time" (sentence ticks id [name] of this-vehicle-type state-of-charge trip-distance journey-distance time-until-depart "stranded" -1 electric-fuel-consumption) ;;;LOG
       log-data "trip-journey-timeuntildepart" (sentence ticks departure-time id [name] of this-vehicle-type state-of-charge [id] of current-taz [id] of destination-taz true false (departure-time - ticks) "stranded" remaining-range sum map weight-delay itin-delay-amount) ;;;LOG
       log-data "pain" (sentence ticks id [id] of current-taz [name] of this-vehicle-type "stranded" "" state-of-charge) ;;;LOG
     ][
       let event-time-from-now random-exponential wait-time-mean
       time:schedule-event self task retry-seek ticks + event-time-from-now
-      log-data "wait-time" (sentence ticks id [name] of this-vehicle-type state-of-charge trip-distance journey-distance time-until-depart "retry-seek" event-time-from-now) ;;;LOG
+      log-data "wait-time" (sentence ticks id [name] of this-vehicle-type state-of-charge trip-distance journey-distance time-until-depart "retry-seek" event-time-from-now electric-fuel-consumption) ;;;LOG
     ]
   ][
     ifelse remaining-range / charge-safety-factor >= journey-distance or time-until-depart <= willing-to-roam-time-threshold [
       time:schedule-event self task depart departure-time
-      log-data "wait-time" (sentence ticks id [name] of this-vehicle-type state-of-charge trip-distance journey-distance time-until-depart "depart" departure-time) ;;;LOG
+      log-data "wait-time" (sentence ticks id [name] of this-vehicle-type state-of-charge trip-distance journey-distance time-until-depart "depart" departure-time electric-fuel-consumption) ;;;LOG
     ][
       let event-time-from-now min(sentence (random-exponential wait-time-mean) (time-until-depart - willing-to-roam-time-threshold))
       if event-time-from-now < 0 [ set event-time-from-now 0 ]
       time:schedule-event self task retry-seek ticks + event-time-from-now
-      log-data "wait-time" (sentence ticks id [name] of this-vehicle-type state-of-charge trip-distance journey-distance time-until-depart "retry-seek" event-time-from-now) ;;;LOG
+      log-data "wait-time" (sentence ticks id [name] of this-vehicle-type state-of-charge trip-distance journey-distance time-until-depart "retry-seek" event-time-from-now electric-fuel-consumption) ;;;LOG
     ]
   ]
 end
@@ -1089,10 +1094,12 @@ to arrive
   log-driver "arriving" ;;;LOG
   update-itinerary 
   let #to-taz [id] of current-taz
-      
+; STILL THE RIGHT TRIP DISTANCE
   ifelse not itin-complete? [
+; RIGHT DISTANCE
     ifelse need-to-charge "arrive" [
-      seek-charger
+; WRONG DISTANCE
+      seek-charger   
       log-data "trip-journey-timeuntildepart" (sentence ticks departure-time id [name] of this-vehicle-type state-of-charge #from-taz #to-taz #completed-trip #completed-journey (departure-time - ticks) "seeking-charger" remaining-range sum map weight-delay itin-delay-amount) ;;;LOG
     ][
       itinerary-event-scheduler  
@@ -1159,7 +1166,7 @@ to update-itinerary
     ][
       set departure-time item current-itin-row itin-depart
     ]
-    ifelse ([id] of destination-taz >= 0) [
+    ifelse ([id] of destination-taz >= 0 and [id] of current-taz >= 0) [
       set trip-distance item current-od-index od-dist
       set trip-time item current-od-index od-time
     ][
@@ -1414,7 +1421,7 @@ SWITCH
 176
 log-wait-time
 log-wait-time
-0
+1
 1
 -1000
 
@@ -1458,7 +1465,7 @@ SWITCH
 130
 log-trip-journey-timeuntildepart
 log-trip-journey-timeuntildepart
-1
+0
 1
 -1000
 
@@ -1469,7 +1476,7 @@ SWITCH
 359
 log-seek-charger
 log-seek-charger
-0
+1
 1
 -1000
 

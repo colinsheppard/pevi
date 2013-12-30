@@ -1,9 +1,8 @@
 Sys.setenv(NOAWT=1)
 options(java.parameters="-Xmx2048m")
-library(colinmisc)
 load.libraries(c('ggplot2','yaml','RNetLogo','plyr','reshape','stringr','snow'))
 
-seed <- 19
+seed <- 20
 
 #optim.code <- 'min-cost-constrained-by-frac-stranded-50-50'
 #optim.code <- 'min-cost-constrained-by-frac-stranded-50-50-seed9'

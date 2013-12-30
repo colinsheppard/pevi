@@ -1,166 +1,221 @@
-# setwd('~/Dropbox/serc/pev-colin/aws/')
+#!/usr/bin/Rscript --no-save --no-restore
+##############################################################################################################################################
+# Script to conduct the buildout optimization
+##############################################################################################################################################
+
+##############################################################################################################################################
+# LOAD LIBRARIES NEED BY THIS SCRIPT
+load.libraries(c('optparse','yaml','RNetLogo','plyr','reshape','stringr','doMC'),quietly=T)
+
+##############################################################################################################################################
+# COMMAND LINE OPTIONS 
+option_list <- list(
+  make_option(c("-d", "--experimentdir"), type="character", default='.', help="Path to the directory containing the files needed to run the optimization (params.txt, vary.yaml, paths.yaml) [\"%default\"]")
+)
+if(interactive()){
+  setwd(pp(pevi.shared,'data/inputs/optim-new/'))
+  args<-c()
+  args <- parse_args(OptionParser(option_list = option_list,usage = "shp2kml.R [options]"),positional_arguments=F,args=args)
+}else{
+  args <- parse_args(OptionParser(option_list = option_list,usage = "shp2kml.R [options]"),positional_arguments=F)
+}
+
+if(substr(args$experimentdir,1,1)!="/")args$experimentdir <- pp(getwd(),"/",args$experimentdir)
+if(substr(args$experimentdir,nchar(args$experimentdir),nchar(args$experimentdir)) != "/")args$experimentdir <- pp(args$experimentdir,"/")
+
 Sys.setenv(NOAWT=1)
 options(java.parameters="-Xmx2048m")
-library(colinmisc)
-load.libraries(c('yaml','RNetLogo','plyr','reshape','stringr','snow'))
-source('params.R')
+registerDoMC(num.cpu)
+source(pp(args$experimentdir,'params.R'))
 
-zz <- file("log.out", open="at")
-sink(zz, type="message")
+# The params file will need to be set in R, so we can edit it mid-run. 
+# Otherwise, batch setup is impossible.
 
-touch.and.stop <- function(msg){
-  system(paste("touch ",base.path,"/ERROR",sep=""))
-  stop(msg)
-}
+param.file <- pp(args$experimentdir,'params.txt')
+param.file.data <- read.table(param.file,sep='\t')
+charger.file <- pp(path.to.vary.files,param.file.data[grep('charger-input-file',param.file.data$V1),2])
 
-# infer if it's a hot start
-dirs <- list.files(path.to.outputs.base)
-relevant.dirs <- grep(optim.scenario,dirs[grep("linked2",dirs)],value=T)
-latest.run <- tail(relevant.dirs,1)
-path.to.latest.run <- paste(path.to.outputs.base,latest.run,sep='')
-run.file <- tail(list.files(path.to.latest.run,'*.Rdata'),1)
-if(length(run.file)==0){
-  hot.start <- F
-  seed.start <- 1
-}else{
-  load(paste(path.to.latest.run,'/',run.file,sep=''))
-  source('params.R')
-  hot.start <- T
-  seed.start <- seed
-  rm('cl')
-}
+# For the current optimization, we need to know the installation costs of the chargers. Assuming that we won't want to vary
+# those costs within an optimization run, we read them in here. If we do want to vary those costs, this would need to be 
+# moved to the driver-file for loop.
 
-for(seed in seed.start:10){
-  optim.code <- paste('linked2-',optim.scenario,'-seed',seed,sep='')
+charger.info <- read.table(pp(path.to.vary.files,param.file.data[grep('charger-type-input-file',param.file.data$V1),2]),row.names=NULL,header=T,sep='\t')
+names(charger.info) <- c('level','charge.rate','energy.price','installed.cost')
+
+#for(seed in seeds){
+seed <- 1 
+  optim.code <- paste(optim.scenario,'-seed',seed,sep='')
   print(optim.code)
 
   # setup the paths
-  path.to.pevi <- paste(base.path,'pevi/',sep='')
-  path.to.inputs <- paste(base.path,'pevi/inputs/',optim.code,'/',sep='')
+  path.to.inputs <- paste(args$experimentdir,optim.code,'/',sep='')
   make.dir(path.to.inputs)
-  if(!file.exists(paste(path.to.inputs,'params.txt',sep=''))){
-    system(paste("cp ",path.to.inputs,'../linked2-',optim.scenario,'-seed1/params.txt ',path.to.inputs,sep=''))
-  }
+  system(paste("cp ",args$experimentdir,'params.txt ',path.to.inputs,sep=''))
+  system(paste("cp ",args$experimentdir,'vary.yaml ',path.to.inputs,sep=''))
   path.to.outputs <- paste(path.to.outputs.base,optim.code,'/',sep='')
   make.dir(path.to.outputs)
 
-  source(paste(path.to.pevi,"R/optim/buildout-functions.R",sep=''))
-  source(paste(path.to.pevi,"R/reporters-loggers.R",sep=''))
+  source(pp(pevi.home,"R/reporters-loggers.R",sep=''))
 
   # read the parameters and values to vary in the experiment
-  vary <- yaml.load(readChar(paste(path.to.inputs,'../vary-aws.yaml',sep=''),file.info(paste(path.to.inputs,'../vary-aws.yaml',sep=''))$size))
+  vary <- yaml.load(readChar(pp(path.to.inputs,'vary.yaml',sep=''),file.info(pp(path.to.inputs,'/vary.yaml',sep=''))$size))
   for(file.param in names(vary)[grep("-file",names(vary))]){
-    vary[[file.param]] <- paste(path.to.pevi,'netlogo/',vary[[file.param]],sep='')
+    vary[[file.param]] <- pp(path.to.vary.files,vary[[file.param]],sep='')
   }
 
   # setup the data frame containing all combinations of those parameter values
   vary.tab.original <- expand.grid(vary,stringsAsFactors=F)
+  vary.tab.original$row <- 1:nrow(vary.tab.original)
 
-  # load the reporters and loggers needed to summarize runs and disable logging
-  if(!exists('cl')){
-    print('starting new cluster')
-    cl <- makeCluster(c(rep(list(list(host="localhost")),num.cpu)),type="SOCK")
-    clusterEvalQ(cl,options(java.parameters="-Xmx2048m"))
-    clusterEvalQ(cl,Sys.setenv(NOAWT=1))
-    clusterEvalQ(cl,library('RNetLogo'))
-  }
+	init.charger.buildout <- read.table(charger.file,header=T,sep='\t')
+	current.obj <- 0
+	taz.charger.combos <- expand.grid(init.charger.buildout$X.TAZ,subset(charger.info,level != 0)$level)
+	names(taz.charger.combos) <- c('taz','level')   
 
-  if(seed==seed.start){
-    # start NL
-    nl.path <- "NetLogo\ 5.0.3"
-    tryCatch(NLStart(nl.path, gui=F),error=function(err){ NA })
-    model.path <- paste(path.to.pevi,"netlogo/PEVI-nolog.nlogo",sep='')
-    NLLoadModel(model.path)
-
-    for(cmd in paste('set log-',logfiles,' false',sep='')){ NLCommand(cmd) }
-  }
-
-  pev.penetrations <- c(0.005,0.01,0.02,0.04)
-  if(hot.start){
-    pev.penetrations <- pev.penetrations[pev.penetrations>=pev.penetration]
-  }
-
-  for(pev.penetration in pev.penetrations){
+  #for(pev.penetration in pev.penetrations){
+  pev.penetration <- pev.penetrations[1]
     print(paste("pen",pev.penetration))
-    if(pev.penetration <= 0.0051){
+    
+    # Note that the expectation is that all pev penetrations beyond the first are even multiples of the first
+    if(pev.penetration == pev.penetrations[1]){
       vary.tab <- vary.tab.original
-    }else if(pev.penetration <= 0.0101){
-      vary.tab <- data.frame(vary.tab.original[1:40,])
-    }else if(pev.penetration <= 0.0201){
-      vary.tab <- data.frame(vary.tab.original[1:20,])
-    }else if(pev.penetration <= 0.0401){
-      vary.tab <- data.frame(vary.tab.original[1:10,])
-    }
-    names(vary.tab) <- "driver-input-file"
-    vary.tab$`driver-input-file` <- str_replace(vary.tab$`driver-input-file`,"penXXX",paste("pen",pev.penetration*100,sep=""))
-    if(!hot.start){
-      results <- data.frame(vary.tab,reporters)
-      results$penetration <- as.numeric(unlist(lapply(strsplit(as.character(results$driver.input.file),'-pen',fixed=T),function(x){ unlist(strsplit(x[2],"-rep",fixed=T)[[1]][1]) })))
-      results$replicate <- as.numeric(unlist(lapply(strsplit(as.character(results$driver.input.file),'-rep',fixed=T),function(x){ unlist(strsplit(x[2],"-",fixed=T)[[1]][1]) })))
-    }
-
-    if(!hot.start & pev.penetration==0.005){
-      #build.result <- data.frame(cost=rep(NA,105),pain=rep(NA,105),chargers=0)  # No chargers
-      build.result <- data.frame(cost=rep(NA,105),pain=rep(NA,105),chargers=c(rep(0,5),1,rep(0,16),1,rep(0,3),1,rep(0,105-27))) # Existing, 1 in EKA_Waterfront, 1 in EKA_NW101, 1 in ARC_Plaza
-      begin.build.i <- 1
-      begin.build.i.save <- begin.build.i
     }else{
-      if(hot.start){
-        begin.build.i.save <- begin.build.i
-        # load the build.results data frame from the previous iteration to ensure that we are starting in the same place we left off
-        if(build.i>1){
-          # the special case / exception to this is when the first iteration of a new penetration was completed, let this go
-          if(length(grep(paste("buildout-pen",pev.penetration*100,'-iter',build.i-1,sep=''),list.files(path.to.outputs),value=T))==0){
-            build.i <- build.i + 1
-          }
-          print(paste("hot start, loading file ",paste(path.to.outputs,tail(grep(paste("buildout-pen",pev.penetration*100,'-iter',build.i-1,sep=''),list.files(path.to.outputs),value=T),1),sep='')))
-          build.results <- read.csv(paste(path.to.outputs,tail(grep(paste("buildout-pen",pev.penetration*100,'-iter',build.i-1,sep=''),list.files(path.to.outputs),value=T),1),sep=''))
-        }
-      }
-      begin.build.i <- build.i
+      pen.ratio <- pev.penetration/pev.penetrations[1]
+    	new.vary <- vary
+    	new.vary$'driver-input-file' <- new.vary$'driver-input-file'[1:round(length(vary$'driver-input-file')/pen.ratio)]
+    	vary.tab <- expand.grid(new.vary,stringsAsFactors=F)
     }
-    for(build.i in begin.build.i:250){
-      print(paste("build iter:",build.i))
-      if((!hot.start & build.i == begin.build.i) | (hot.start & begin.build.i.save == begin.build.i)){
-        write.charger.file(build.result$chargers[1:104])
-        for(results.i in 1:nrow(results)){
-          NLCommand('clear-all-and-initialize')
-          NLCommand(paste('set parameter-file "',path.to.inputs,'params.txt"',sep=''))
-          NLCommand(paste('set model-directory "',path.to.pevi,'netlogo/"',sep=''))
-          NLCommand('read-parameter-file')
-          for(param in names(vary.tab)){
-            if(is.character(vary.tab[1,param])){
-              NLCommand(paste('set ',param,' "',vary.tab[results.i,param],'"',sep=''))
-            }else{
-              NLCommand(paste('set ',param,' ',vary.tab[results.i,param],'',sep=''))
-            }
+    vary.tab$`driver-input-file` <- str_replace(vary.tab$`driver-input-file`,"penXXX",paste("pen",pev.penetration*100,sep=""))
+		
+    #	Read in the starting infrastructure. If we want linked buildout, out in an if statement to only set at the start.
+		charger.buildout <- init.charger.buildout
+		names(charger.buildout) <- c(';TAZ','L0','L1','L2','L3','L4')
+    #	num.charger.type <- ncol(charger.buildout)-3
+		
+		begin.build.i <- 1
+
+    # Start for loop for overall penetration level optimization
+		#for(build.i in begin.build.i:250){
+		build.i <- 1 
+			print(paste('build.i = ',build.i))
+
+      #	Next is the loop through driver files. We'll want to do a ddply here, which means we'll need a way to
+      #	switch parameter files without hacking into another param file, as well as a new NL instance for each file.
+      #	Here is where we are going to use parallel=T to take advantage of extra cores.
+	
+			#build.result <- ddply(vary.tab,.(row),function(vary.row) {
+			vary.row <- vary.tab[1,]
+							
+        # start NL
+    		tryCatch(NLStart(nl.path, gui=F),error=function(err){ NA })
+    		model.path <- paste(pevi.home,"netlogo/PEVI-nolog.nlogo",sep='')
+    		NLLoadModel(model.path)
+    		for(cmd in paste('set log-',logfiles,' false',sep='')){ NLCommand(cmd) }
+
+        #	We can setup a batch-run for each iteration (each new input file).
+				NLCommand('clear-all-and-initialize') # Clear out the old file
+
+        # Set to fixed-seed if applicable.
+      	if(!is.na(seed)){
+      		NLCommand(paste('set starting-seed',seed))      
+					NLCommand('set fix-seed TRUE')
+      	} else {
+        	NLCommand('set fix-seed FALSE')
+      	}
+      	NLCommand(paste('set parameter-file "',path.to.inputs,'params.txt"',sep=''))
+      	NLCommand('read-parameter-file')
+      	
+        # If a parameter change exists in vary.tab, we go through and read in the new parameters.
+      	for(param in grep("row",names(vary.tab),value=T,invert=T)){
+          if(is.character(vary.tab[1,param])){
+            NLCommand(pp('set ',param,' "',vary.row[[param]],'"'))
+          }else{
+            NLCommand(pp('set ',param,' ',vary.row[[param]],''))
           }
-          NLCommand(paste('set charger-input-file "',path.to.inputs,'chargers-alt-0.txt"',sep=''))
-          if(!is.na(seed)){
-            NLCommand(paste('random-seed ',seed))
-          }
-          NLCommand('setup')
-          NLCommand('dynamic-scheduler:go-until schedule 500')
-          results[results.i,names(reporters)] <- tryCatch(NLDoReport(1,"",reporter = paste("(sentence",paste(reporters,collapse=' '),")"),as.data.frame=T,df.col.names=names(reporters)),error=function(e){ NA })
         }
-        build.result[105,c('cost','pain')] <- c(mean(as.numeric(results$infrastructure.cost)),mean(as.numeric(results$frac.stranded.by.delay)))
-      }
-      # we're no longer in a hot start
-      hot.start <- F
-      
-      tryCatch(build.result <- evaluate.fitness(build.result),error=function(e) touch.and.stop(e))
-      
-      build.result$marg.cost.of.abatement <- (build.result$cost - build.result$cost[105])*1000/(build.result$pain[105] - build.result$pain)/100
-      build.result$marg.cost.of.abatement[build.result$marg.cost.of.abatement<0] <- Inf
-      if(all(Inf==build.result$marg.cost.of.abatement[1:104]))break
-      winner.i <- which.min(build.result$marg.cost.of.abatement[1:104])
-      build.result$chargers[winner.i] <- build.result$chargers[winner.i] + 1
-      write.csv(build.result,file=paste(path.to.outputs,'buildout-pen',pev.penetration*100,'-iter',build.i,'-cost',build.result$cost[winner.i],'.csv',sep=''))
-      build.result[105,] <- build.result[winner.i,]
-      print(paste("winner: ",winner.i,sep=''))
-      save.image(file=paste(path.to.outputs,'buildout-pen',pev.penetration*100,'.Rdata',sep=''))
-    }
-  }
-  #stopCluster(cl)
-  #rm('cl')
-}
+
+        # set the charger input file
+        NLCommand(pp('set charger-input-file "',charger.file,'"'))
+
+        # Now we start a batch-run, and iterate through potential infrastructures.
+				NLCommand('setup-in-batch-mode')
+				
+        #	Do a dry run (adding no chargers) to set an initial objective function value
+				NLCommand('time:go-until 500')
+				current.obj <<- NLReport('objective-function')
+				
+				NLCommand('setup-in-batch-mode')
+				
+        #	Iterate through every taz/charger combo
+				input.i.result <- ddply(taz.charger.combos,.(taz),function(df) {
+					charger.results <- ddply(df,.(level),function(df1) {
+						
+            #	Add the candidate charger, then run the model.
+						NLCommand(paste('add-charger',df1$taz,df1$level))
+						NLCommand('time:go-until 500')
+						
+						objective <-  tryCatch(NLReport('objective-function'),error=function(e){ NA })
+
+            #	Set the counter + 1, reset for the next run, and delete the charger we added.
+						NLCommand('setup-in-batch-mode')	
+						NLCommand(paste('remove-charger',df1$taz,df1$level))
+						data.frame(obj = objective)
+					}) # end infrastructure testing - charger type count
+					data.frame(level = charger.results$level,
+										 obj = charger.results$obj)
+				}) #end infrastructure testing - taz count
+				
+        #	Quit our NetLogo instance
+				NLQuit()
+				
+				data.frame(taz = input.i.result$taz,
+									 level = input.i.result$level,
+									 obj = input.i.result$obj)
+			},.parallel=(num.cpu>1),.progress=ifelse(num.cpu>1,'none','text')) # end build.result ldply
+			
+      #	We've run every combination of tazs/chargers for each driver file. Now we asses which charger to place
+      #	by averaging the objective function results across all replicates.
+			taz.charger.obj <- ddply(build.result,.(taz,level),function(df){
+				obj.average <- mean(df$obj)
+				data.frame(obj = obj.average)
+			})
+			
+			print(taz.charger.obj)
+			
+      #	Winner determined by lowest objective function (currently cost)
+			winner <- which.min(taz.charger.obj$obj)
+			print(paste('winner =',winner))
+
+      #	How will adding the winning charger improve the objective?
+			charger.objective.benefit <- (current.obj-taz.charger.obj$obj[winner]) 
+
+      #	Items from taz.charger.obj can't be multiplied without factor errors. We handle that by assigning them to variables here.
+			new.charger.cost.unadjusted <- charger.info$installed.cost[match(taz.charger.obj$level[winner],charger.info$level)]
+
+      # How will adding the winning harm the objective?
+			charger.objective.cost <- new.charger.cost.unadjusted * 1000
+			
+      # If the decrease in our objective function benefit is less than the objective function cost of installing the next charger, we're done.
+			if(charger.objective.benefit > charger.objective.cost) {
+				current.obj <- taz.charger.obj$obj[winner]
+			} else {
+				current.obj <- 0
+				break
+			}
+			
+      #	Now update our infrastructure file for the next round
+			charger.buildout[taz.charger.obj$taz[winner],grep(taz.charger.obj$level[winner],names(charger.buildout))] <- charger.buildout[taz.charger.obj$taz[winner],grep(taz.charger.obj$level[winner],names(charger.buildout))] + 1
+			write.table(charger.buildout,charger.file,quote=FALSE,sep='\t',row.names=FALSE)
+						
+    } # end iteration loop
+    
+    # Write out our final infrastructure to a new file.
+		final.output.filepath <- pp(path.to.outputs,optim.code,'-pen',pev.penetration*100,'-final-infrastructure.txt')
+    write.table(charger.buildout,final.output.filepath,quote=FALSE,sep='\t',row.names=FALSE)    
+    
+  } # end penetration-level loop
+  
+  #	Reset the initial charger file.
+	write.table(init.charger.buildout,charger.file,header=T,sep='\t',row.names=FALSE)    
+    
+} # end seed loop

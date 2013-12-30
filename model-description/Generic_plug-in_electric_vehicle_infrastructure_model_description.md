@@ -325,6 +325,7 @@ The submodel consists of the following actions:
 	f. extraTimeUntilEndCharge(i): if chargerInOriginOrDestination(i) is true, then this value is set to the amount of delay in the driver’s itinerary that would be necessary to use the charging alternative. Calculate as:
 	![equation](http://latex.codecogs.com/gif.latex?%5Ctextup%7BCharger%20in%20origin%3F%7D%5C%5C%20%5Ctextup%7BextraTimeUntilEndCharge%7D_%7Bi%7D%20%3D%20%5Ctextup%7Bmax%7D%5Cleft%20%5C%7B%200%2C%20%5Ctextup%7BtripChargeTimeNeed%20-%20timeUntilDepart%7D%20%5Cright%20%5C%7D%5C%5C%20%5Ctextup%7BOtherwise%2C%7D%5C%5C%20%5Ctextup%7BextraTimeUntilEndCharge%20%3D%200%7D)<!---markdown_formula--->
 	<!---$\textup{Charger in origin?}\\\textup{extraTimeUntilEndCharge}_{i} = \textup{max}\left \{ 0, \textup{tripChargeTimeNeed - timeUntilDepart}\right\}\\\textup{Otherwise,}\\\textup{extraTimeUntilEndCharge = 0}$---><!---pandoc_formula--->
+***(ADD IN TO THE "OTHERWISE" STATEMENT THAT THIS MEANS THE CHARGER IS IN THE DESTINATION. IT'S NOT CLEAR RIGHT NOW.)***
 If chargerInOriginOrDestination(i) is false, then the value is an estimate of the extra time a driver would spend charging, equal to the value of timeUntilEndCharge as calculated by the Charge Time submodel (Section Charge Time) with the following modifications:
 		f.i. timeUntilDepart is decreased by the time of travel from the origin TAZ to TAZ(i)
 		f.ii. stateOfCharge is decreased by  where tripDistancei is the distance in miles from the origin TAZ to TAZ(i)

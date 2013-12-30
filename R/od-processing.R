@@ -5,7 +5,7 @@
 # creation of travel demand data based on CHTS
 ######################################################################################################
 
-load.libraries(c('maptools','plotrix','stats','gpclib','plyr','png','RgoogleMaps','lattice','stringr','ggplot2','rgdal','XML','plotKML','rgeos','doMC','reshape'))
+load.libraries(c('maptools','plotrix','stats','gpclib','plyr','png','RgoogleMaps','lattice','stringr','ggplot2','rgdal','XML','plotKML','rgeos','doMC','reshape','data.table'))
 gpclibPermit()
 registerDoMC(num.cpu)
 
@@ -142,22 +142,20 @@ taz.time.distance$origin.id <- agg.taz$agg.id[match(taz.time.distance$origin.taz
 taz.time.distance$destination.id <- agg.taz$agg.id[match(taz.time.distance$destination.taz,agg.taz$name)] 
 
 #fric.ids <- subset(agg.taz,!point & !near.redding)$agg.id
-fric.ids <- subset(agg.taz,!point)$agg.id
-fric.dts <- subset(taz.time.distance,origin.id %in% fric.ids & destination.id %in% fric.ids)[,c('origin.id','destination.id','miles')]
-fric.dts$key <- pp(fric.dts$origin.id,"_",fric.dts$destination.id)
-fric.od <- subset(od.agg,from %in% fric.ids & to %in% fric.ids)
-fric.od$key <- pp(fric.od$from,"_",fric.od$to)
-fric.m <- melt(fric.od[,c(ncol(fric.od),3:(ncol(fric.od)-1))],id.vars='key')
-fric.m$dist <- fric.dts$miles[match(fric.m$key,fric.dts$key)]
-fric.m$value <- round(fric.m$value)
-fric.mm <- ddply(fric.m,.(key,variable),function(df){ data.frame(dist=rep(df$dist,df$value)) })
-
-ggplot(fric.m,aes(x=dist))+geom_histogram()+facet_wrap(~variable)
+#fric.ids <- subset(agg.taz,!point)$agg.id
+#fric.dts <- subset(taz.time.distance,origin.id %in% fric.ids & destination.id %in% fric.ids)[,c('origin.id','destination.id','miles')]
+#fric.dts$key <- pp(fric.dts$origin.id,"_",fric.dts$destination.id)
+#fric.od <- subset(od.agg,from %in% fric.ids & to %in% fric.ids)
+#fric.od$key <- pp(fric.od$from,"_",fric.od$to)
+#fric.m <- melt(fric.od[,c(ncol(fric.od),3:(ncol(fric.od)-1))],id.vars='key')
+#fric.m$dist <- fric.dts$miles[match(fric.m$key,fric.dts$key)]
+#fric.m$value <- round(fric.m$value)
+#fric.mm <- ddply(fric.m,.(key,variable),function(df){ data.frame(dist=rep(df$dist,df$value)) })
+#ggplot(fric.m,aes(x=dist))+geom_histogram()+facet_wrap(~variable)
 
 # Load CHTS for NSSR
 load(file=pp(pevi.shared,'data/CHTS/nssr-subset.Rdata'))
-
-
-dist.ecdf <- ecdf(subset(nssr.place,tripdistance<400)$tripdistance)
+setkey(nssr.place,"td.purpose")
+dist.by.purp <- dlply(subset(nssr.place,tripdistance<400),.(td.purpose),function(df){ df$tripdistance})
 
 

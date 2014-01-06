@@ -118,7 +118,6 @@ to setup-tazs
           set n-levels replace-item ? n-levels file-read ; sets the number of level X chargers in each TAZ
           set available-chargers-by-type replace-item ? available-chargers-by-type structs:new-stack
         ]
-        set frac-multi-unit file-read
         set neighbor-tazs n-values 0 [0]
       ] ; end create-taz commands
     ] ; end while loop
@@ -296,13 +295,6 @@ to initialize-drivers
       itinerary-event-scheduler
     ]
   ]
- ; ask (tazs) [
- ;   let #multi-unit-count 0
- ;   while [#multi-unit-count < (count drivers with [home-taz = myself] * frac-multi-unit)] [
- ;     ask one-of drivers with [home-taz = myself and not multi-unit?] [set multi-unit? true]
- ;     set #multi-unit-count #multi-unit-count + 1
- ;   ]
- ; ]
 end ;initialize-drivers
 
 ;;;;;;;;;;;;;;;;;;;;
@@ -357,7 +349,6 @@ to setup-itinerary
         set itin-to n-values 1 [file-read]
         set itin-depart n-values 1 [file-read]
         set home-taz taz file-read
-        set multi-unit? false
         let #rand-draw random-float 1
         set external-time interpolate-from-draw #rand-draw ext-taz-cumulative-fraction external-time-bound
         set external-dist interpolate-from-draw #rand-draw ext-taz-cumulative-fraction external-dist-bound

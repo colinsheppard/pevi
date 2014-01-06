@@ -280,14 +280,14 @@ end
 
 to setup-in-batch-mode
   ifelse count turtles = 1 [
-    ;expecting that clear-all-and-initialize has been run
+    ; expecting that clear-all-and-initialize has been run
     if fix-seed [random-seed starting-seed]
     ; Can we combine this with the code existing in setup?
     set small-num 1e-11
     set batch-setup? false
     set seed-list (sentence random 2147483647 random 2147483647 random 2147483647)
     set seed-list-index -1
-;    read-parameter-file ;We want to control parameter file settings externally
+    ; read-parameter-file ;We want to control parameter file settings externally
     print "setting up...."
     setup-od-data
     print "setup-tazs"

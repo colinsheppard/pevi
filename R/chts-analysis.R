@@ -1,7 +1,10 @@
 
-load.libraries(c('stringr','ggplot2','reshape','data.table'))
+load.libraries(c('stringr','ggplot2','reshape','data.table','doMC'))
+registerDoMC(num.cpu)
 
 activity <- read.csv(pp(pevi.shared,'data/CHTS/activity.csv'))
+act.codes <- data.table(read.csv(pp(pevi.shared,'data/CHTS/activity-code-mappings.csv')))
+setnames(act.codes,"code","purpose.code")
 place <- read.csv(pp(pevi.shared,'data/CHTS/place.csv'))
 ld <- read.csv(pp(pevi.shared,'data/CHTS/long_distance_trips.csv'))
 households <- read.csv(pp(pevi.shared,'data/CHTS/households.csv'))
@@ -13,7 +16,6 @@ households$county <- nssr$COUNTY[match(households$ctfip,nssr$CTFIP)]
 nssr.households <- subset(households,!is.na(county))
 
 # Generate the necessary place data from household data
-place$activity.purpose <- activity$apurp[match(place$tripno,activity$tripno)]
 nssr.place <- subset(place,sampn%in%nssr.households$sampno)
 nssr.place$samp.per.place <- pp(nssr.place$sampn,"_",nssr.place$perno,"_",nssr.place$plano)
 nssr.activity <- subset(activity,sampno%in%nssr.households$sampno)
@@ -24,16 +26,31 @@ nssr.activity$duration <- nssr.activity$etime.hr - nssr.activity$stime.hr
 nssr.activity$duration[nssr.activity$duration<0] <- nssr.activity$duration[nssr.activity$duration<0] + 24 
 # let's ignore activity that lasts all day (1439 minutes) 
 nssr.activity <- subset(nssr.activity,duration < 23.9)
-nssr.place.acts <- ddply(merge(nssr.place,nssr.activity[,c('samp.per.place','duration','apurp')],by="samp.per.place"),.(samp.per.place),function(df){
-  durs <- aggregate(duration~apurp,df,sum)
-  data.frame(df[1,1:ncol(nssr.place)],purp=durs$apurp[which.max(durs$duration)])
-})
-
+# use a data table to pull out the principal purpose for each trip
 nssr.place.activity.merged <- as.data.table(merge(nssr.place,nssr.activity[,c('samp.per.place','duration','apurp')],by="samp.per.place"))
-
-
-#purp.mapping <- data.frame(id=c(1,2,21,22,27,30,31,34,37),purp=c('
-#place$purpose <- 
+setkey(nssr.place.activity.merged,samp.per.place,apurp)
+nssr.place.act.dur.summed <- nssr.place.activity.merged[,sum(duration),by=list(samp.per.place,apurp)]
+setkey(nssr.place.act.dur.summed,samp.per.place)
+nssr.place.max.dur <- nssr.place.act.dur.summed[,apurp[which.max(V1)],by=samp.per.place]
+setnames(nssr.place.max.dur,"V1",'purpose.code')
+nssr.place <- as.data.table(nssr.place)
+setkey(nssr.place,samp.per.place)
+nssr.place <- merge(nssr.place,nssr.place.max.dur)
+nssr.place <- merge(nssr.place,act.codes,by='purpose.code')
+# now set the key for each unique person and create the trip purposes
+setkey(nssr.place,'sampn','perno','tripno')
+trip.purps <- nssr.place[,data.frame(tripno=tripno,trip.purpose=c(NA,pp(head(purpose,-1),tail(purpose,-1))),stringsAsFactors=F),by=list(sampn,perno)]
+nssr.place <- merge(nssr.place,trip.purps,by=c('sampn','perno','tripno'))
+# overwrite the NA's with a proper NA
+setkey(nssr.place,'trip.purpose')
+nssr.place[c("HNA","NAH","NANA","NAO","NAS","NASC","NAW","ONA","SCNA","SNA","WNA"),trip.purpose:="NA"]
+setkey(nssr.place,'trip.purpose')
+nssr.place[c("HW","WH"),td.purpose:="hw"]
+nssr.place[c("HO","OH","HH"),td.purpose:="ho"]
+nssr.place[c("HS","SH"),td.purpose:="hs"]
+nssr.place[c("HSC","SCH"),td.purpose:="hsc"]
+nssr.place[c("WO","OW","WW","WS","SW","WSC","SCW"),td.purpose:="wo"]
+nssr.place[c("OO","SCSC","SS","SCS","SSC","SCO","OSC","SO","OS"),td.purpose:="oo"]
 
 # Link county name to sample number in the place data
 nssr.place$county <- nssr.households$county[match(nssr.place$sampn,nssr.households$sampno)]
@@ -44,9 +61,11 @@ nssr.place$mode.name <- car.modes$TRANSPORT[match(nssr.place$mode,car.modes$MODE
 
 save(nssr.place,nssr.households,file=pp(pevi.shared,'data/CHTS/nssr-subset.Rdata'))
 
-#Travel attributes by county
+#Travel attributes 
 #ggplot(subset(nssr.place,tripdistance<200), aes(x=tripdistance)) + geom_histogram(aes(y = ..density..),binwidth=5) + ggtitle(pp("Trip distance distribution by county"))+facet_wrap(~county)+scale_y_log10()
 #ggplot(subset(nssr.place,tripdistance<500), aes(x=log10(tripdistance))) + geom_histogram(binwidth=0.1) + ggtitle(pp("Trip distance distribution by county"))
+#ggplot(subset(nssr.place,!(dep_hr==2 & dep_min==59)), aes(x=dep_hr+dep_min/60)) + geom_histogram(binwidth=0.25) + ggtitle(pp("Departure time distribution by purpose"))+facet_wrap(~td.purpose)
+#ggplot(subset(nssr.place,tripdistance<200), aes(x=tripdistance)) + geom_histogram(binwidth=0.1) + ggtitle(pp("Trip distance distribution by county"))+facet_wrap(~td.purpose)+scale_x_log10()
 
 d_ply(nssr.place,.(county),function(df){
 	if(length(na.omit(df$tripdistance))>0) {

@@ -13,3 +13,6 @@ headless/bin
 headless/.classpath
 headless/lib/*.jar
 pevi-conf.R
+netlogo/profiler
+netlogo/structs
+netlogo/table

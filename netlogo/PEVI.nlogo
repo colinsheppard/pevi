@@ -36,11 +36,8 @@ globals [
   vehicle-type-input-file
   outputs-directory
   starting-soc-file
-<<<<<<< HEAD
   ext-dist-time-file
-=======
   charger-permission-file
->>>>>>> permissions
   
 ;; PARAMETERS
   charge-safety-factor
@@ -75,7 +72,6 @@ drivers-own [
 ;; VEHICLE
   this-vehicle-type              ; e.g. 'leaf' or 'volt'
   is-bev?
-  multi-unit?                  
   permission-list
   battery-capacity          ; kwh
   electric-fuel-consumption ; kwh / mile
@@ -155,7 +151,6 @@ tazs-own[
   id              ; TAZ id
   chargers-by-type ; list of lists of chargers organized by type, e.g. [ [level-0] [level-1-a level-1-b ....] [level-2-a level-2-b ....] [level-3-a ....] ]
   available-chargers-by-type ; List of stacks for available chargers
-  frac-multi-unit  ; Fraction of drivers with home in TAZ who are multi-unit
   
   neighbor-tazs   ; list of tazs within charger-search-distance of this taz
   
@@ -247,7 +242,7 @@ to setup
   setup-chargers
   reset-logfile "drivers" ;;;LOG
   reset-logfile "charging" ;;;LOG
-  log-data "charging" (sentence "time" "charger.id" "charger.level" "location" "driver" "vehicle.type" "multi-unit?" "duration" "energy" "begin.soc" "end.soc" "after.end.charge" "charging.on.whim" "time.until.depart") ;;;LOG
+  log-data "charging" (sentence "time" "charger.id" "charger.level" "location" "driver" "vehicle.type" "duration" "energy" "begin.soc" "end.soc" "after.end.charge" "charging.on.whim" "time.until.depart") ;;;LOG
   reset-logfile "pain" ;;;LOG
   log-data "pain" (sentence "time" "driver" "location" "vehicle.type" "pain.type" "pain.value" "state.of.charge") ;;;LOG
   reset-logfile "trip" ;;;LOG
@@ -265,7 +260,7 @@ to setup
   reset-logfile "charge-time" ;;;LOG
   log-data "charge-time" (sentence "time" "driver" "charger.in.origin.dest" "level" "soc" "trip.distance" "journey.distance" "time.until.depart" "result.action" "time.from.now") ;;;LOG
   reset-logfile "need-to-charge" ;;;LOG
-  log-data "need-to-charge" (sentence "time" "driver" "vehicle.type" "soc" "trip.distance" "journey.distance" "time.until.depart" "calling.event" "remaining.range" "charging.on.a.whim?" "need.to.charge?") ;;;LOG
+  log-data "need-to-charge" (sentence "time" "driver" "vehicle.type" "soc" "electric.fuel.consumption" "trip.distance" "journey.distance" "time.until.depart" "calling.event" "remaining.range" "charging.on.a.whim?" "need.to.charge?") ;;;LOG
   reset-logfile "trip-journey-timeuntildepart" ;;;LOG
   log-data "trip-journey-timeuntildepart" (sentence "time" "departure.time" "driver" "vehicle.type" "soc" "from.taz" "to.taz" "trip.distance" "journey.distance" "time.until.depart" "next.event" "remaining.range" "delay.sum") ;;;LOG
   reset-logfile "seek-charger" ;;;LOG
@@ -340,7 +335,7 @@ end
 to initialize-logfile
   reset-logfile "drivers" ;;;LOG
   reset-logfile "charging" ;;;LOG
-  log-data "charging" (sentence "time" "charger.id" "charger.level" "location" "driver" "vehicle.type" "multi-unit?" "duration" "energy" "begin.soc" "end.soc" "after.end.charge" "charging.on.whim" "time.until.depart") ;;;LOG
+  log-data "charging" (sentence "time" "charger.id" "charger.level" "location" "driver" "vehicle.type" "duration" "energy" "begin.soc" "end.soc" "after.end.charge" "charging.on.whim" "time.until.depart") ;;;LOG
   reset-logfile "pain" ;;;LOG
   log-data "pain" (sentence "time" "driver" "location" "vehicle.type" "pain.type" "pain.value" "state.of.charge") ;;;LOG
   reset-logfile "trip" ;;;LOG
@@ -358,7 +353,7 @@ to initialize-logfile
   reset-logfile "charge-time" ;;;LOG
   log-data "charge-time" (sentence "time" "driver" "charger.in.origin.dest" "level" "soc" "trip.distance" "journey.distance" "time.until.depart" "result.action" "time.from.now") ;;;LOG
   reset-logfile "need-to-charge" ;;;LOG
-  log-data "need-to-charge" (sentence "time" "driver" "vehicle.type" "soc" "trip.distance" "journey.distance" "time.until.depart" "calling.event" "remaining.range" "charging.on.a.whim?" "need.to.charge?") ;;;LOG
+  log-data "need-to-charge" (sentence "time" "driver" "vehicle.type" "soc" "electric.fuel.consumption" "trip.distance" "journey.distance" "time.until.depart" "calling.event" "remaining.range" "charging.on.a.whim?" "need.to.charge?") ;;;LOG
   reset-logfile "trip-journey-timeuntildepart" ;;;LOG
   log-data "trip-journey-timeuntildepart" (sentence "time" "departure.time" "driver" "vehicle.type" "soc" "from.taz" "to.taz" "trip.distance" "journey.distance" "time.until.depart" "next.event" "remaining.range" "delay.sum") ;;;LOG
   reset-logfile "seek-charger" ;;;LOG
@@ -438,20 +433,20 @@ to-report need-to-charge [calling-event]
   ]
   ifelse ( (calling-event = "arrive" and remaining-range < journey-distance * charge-safety-factor) or 
            (calling-event = "depart" and remaining-range < trip-distance * charge-safety-factor) )[
-    log-data "need-to-charge" (sentence ticks id [name] of this-vehicle-type state-of-charge trip-distance journey-distance (departure-time - ticks) calling-event remaining-range charging-on-a-whim? "true") ;;;LOG
+    log-data "need-to-charge" (sentence ticks id [name] of this-vehicle-type state-of-charge electric-fuel-consumption trip-distance journey-distance (departure-time - ticks) calling-event remaining-range charging-on-a-whim? "true") ;;;LOG
     report true
   ][
     ifelse (calling-event = "arrive" and state-of-charge < 1 - small-num) [  ;; drivers only consider unneeded charge if they just arrived and the vehicle does not have a full state of charge
       ifelse time-until-depart >= willing-to-roam-time-threshold and (random-float 1) < probability-of-unneeded-charge * (1 / (1 + exp(-5 + 10 * state-of-charge))) [
         set charging-on-a-whim? true
-        log-data "need-to-charge" (sentence ticks id [name] of this-vehicle-type state-of-charge trip-distance journey-distance (departure-time - ticks) calling-event remaining-range charging-on-a-whim? "true") ;;;LOG
+        log-data "need-to-charge" (sentence ticks id [name] of this-vehicle-type state-of-charge electric-fuel-consumption trip-distance journey-distance (departure-time - ticks) calling-event remaining-range charging-on-a-whim? "true") ;;;LOG
         report true
       ][
-        log-data "need-to-charge" (sentence ticks id [name] of this-vehicle-type state-of-charge trip-distance journey-distance (departure-time - ticks) calling-event remaining-range charging-on-a-whim? "false") ;;;LOG
+        log-data "need-to-charge" (sentence ticks id [name] of this-vehicle-type state-of-charge electric-fuel-consumption trip-distance journey-distance (departure-time - ticks) calling-event remaining-range charging-on-a-whim? "false") ;;;LOG
         report false
       ]
     ][
-      log-data "need-to-charge" (sentence ticks id [name] of this-vehicle-type state-of-charge trip-distance journey-distance (departure-time - ticks) calling-event remaining-range charging-on-a-whim? "false") ;;;LOG
+      log-data "need-to-charge" (sentence ticks id [name] of this-vehicle-type state-of-charge electric-fuel-consumption trip-distance journey-distance (departure-time - ticks) calling-event remaining-range charging-on-a-whim? "false") ;;;LOG
       report false
     ]
   ]
@@ -503,13 +498,9 @@ to seek-charger
   let #level-3-time-penalty 0
   let #level-3-time-penalty-for-origin-or-destination 0
   
-  ;WRONG DISTANCE
-  
   if trip-distance * charge-safety-factor > 0.8 * battery-capacity / electric-fuel-consumption [
     set #level-3-time-penalty-for-origin-or-destination 999
   ]
-  
-  ; WRONG DISTANCE
   
   ifelse not charging-on-a-whim? and is-bev? and time-until-depart < willing-to-roam-time-threshold [  
     set willing-to-roam? true  
@@ -567,10 +558,8 @@ to seek-charger
             ]
           ]
         ]
-        
-       ; Need to add in the priviledged chargers to this search, but be sure that if a priviledged charger is available but public is NOT, it will get used. 
        
-        if (available-chargers #this-taz #level > 0) and ((#level > 0) or ((#this-taz = home-taz and (not multi-unit?)) and #level = 0)) or (#min-priviledged-charger != nobody) [ 
+        if (available-chargers #this-taz #level > 0) and ((#level > 0) or ((#this-taz = home-taz) and #level = 0)) or (#min-priviledged-charger != nobody) [ 
           let #this-charger-type one-of charger-types with [ level = #level ]
           let #this-charge-rate [charge-rate] of #this-charger-type
           ifelse #charger-in-origin-or-destination [
@@ -615,7 +604,7 @@ to seek-charger
           if not #level-3-and-too-full [
             ; self is currently the driver
             
-            ifelse #min-priviledged-cost < [energy-price] of #this-charger-type or available-chargers #this-taz #level = 0 [ ;If the priviledged charger is cheaper, or the only charger 
+            ifelse (#min-priviledged-cost < [energy-price] of #this-charger-type or available-chargers #this-taz #level = 0) and #this-taz = [location] of #min-priviledged-charger [ ;If the priviledged charger is cheaper, or the only charger 
               let #this-cost (time-opportunity-cost * (#extra-time-for-travel + #extra-time-until-end-charge) + #level-3-time-penalty +
               (#min-priviledged-cost) * (item #level #trip-or-journey-energy-need-by-type + #extra-energy-for-travel))
               if #this-cost < #min-cost or (#this-cost = #min-cost and [level] of #this-charger-type > [level] of #min-charger-type) [
@@ -762,7 +751,7 @@ to charge-time-event-scheduler
     set after-end-charge "depart"
   ]
   log-data "charge-time" (sentence ticks id charger-in-origin-or-destination (level-of current-charger) state-of-charge trip-distance journey-distance time-until-depart after-end-charge (next-event-scheduled-at - ticks)) ;;;LOG
-  log-data "charging" (sentence ticks [who] of current-charger level-of current-charger [id] of current-taz [id] of self [name] of this-vehicle-type multi-unit? (next-event-scheduled-at - ticks) ((next-event-scheduled-at - ticks) * charge-rate-of current-charger) state-of-charge (state-of-charge + ((next-event-scheduled-at - ticks) * charge-rate-of current-charger) / battery-capacity ) after-end-charge charging-on-a-whim? (departure-time - ticks)) ;;;LOG
+  log-data "charging" (sentence ticks [who] of current-charger level-of current-charger [id] of current-taz [id] of self [name] of this-vehicle-type (next-event-scheduled-at - ticks) ((next-event-scheduled-at - ticks) * charge-rate-of current-charger) state-of-charge (state-of-charge + ((next-event-scheduled-at - ticks) * charge-rate-of current-charger) / battery-capacity ) after-end-charge charging-on-a-whim? (departure-time - ticks)) ;;;LOG
   if next-event-scheduled-at > departure-time[
     change-depart-time next-event-scheduled-at
   ]
@@ -1097,11 +1086,8 @@ to arrive
   log-driver "arriving" ;;;LOG
   update-itinerary 
   let #to-taz [id] of current-taz
-; STILL THE RIGHT TRIP DISTANCE
   ifelse not itin-complete? [
-; RIGHT DISTANCE
     ifelse need-to-charge "arrive" [
-; WRONG DISTANCE
       seek-charger   
       log-data "trip-journey-timeuntildepart" (sentence ticks departure-time id [name] of this-vehicle-type state-of-charge #from-taz #to-taz #completed-trip #completed-journey (departure-time - ticks) "seeking-charger" remaining-range sum map weight-delay itin-delay-amount) ;;;LOG
     ][
@@ -1112,16 +1098,11 @@ to arrive
     ;; itin is complete and at home? Perform random draw to see if they plug-in immediately and charge till full. If multi-unit, charger may not be available.
     ifelse current-taz = home-taz [
       if (random-float 1) < (1 / (1 + exp(-5 + 6 * state-of-charge))) [
-        ifelse multi-unit? [
-          set multi-unit-search-count 0
-          end-of-day-multi-unit-charge
-        ][
-          set current-charger (one-of item 0 [chargers-by-type] of current-taz)
-          set full-charge-time-need (1 - state-of-charge) * battery-capacity / charge-rate-of current-charger
-          time:schedule-event self task end-charge ticks + full-charge-time-need 
-          set time-until-end-charge full-charge-time-need
-          log-data "charging" (sentence ticks [who] of current-charger level-of current-charger [id] of current-taz [id] of self [name] of this-vehicle-type multi-unit? full-charge-time-need (full-charge-time-need * charge-rate-of current-charger) state-of-charge (state-of-charge + (full-charge-time-need * charge-rate-of current-charger) / battery-capacity ) "stop" false) ;;;LOG
-        ]
+        set current-charger (one-of item 0 [chargers-by-type] of current-taz)
+        set full-charge-time-need (1 - state-of-charge) * battery-capacity / charge-rate-of current-charger
+        time:schedule-event self task end-charge ticks + full-charge-time-need 
+        set time-until-end-charge full-charge-time-need
+        log-data "charging" (sentence ticks [who] of current-charger level-of current-charger [id] of current-taz [id] of self [name] of this-vehicle-type full-charge-time-need (full-charge-time-need * charge-rate-of current-charger) state-of-charge (state-of-charge + (full-charge-time-need * charge-rate-of current-charger) / battery-capacity ) "stop" false) ;;;LOG
       ]
       log-data "trip-journey-timeuntildepart" (sentence ticks ticks id [name] of this-vehicle-type state-of-charge #from-taz #to-taz #completed-trip #completed-journey 0 "home" remaining-range sum map weight-delay itin-delay-amount) ;;;LOG
     ][
@@ -1140,7 +1121,7 @@ to end-of-day-multi-unit-charge
     set full-charge-time-need (1 - state-of-charge) * battery-capacity / charge-rate-of current-charger
     time:schedule-event self task end-charge ticks + full-charge-time-need 
     set time-until-end-charge full-charge-time-need
-    log-data "charging" (sentence ticks [who] of current-charger level-of current-charger [id] of current-taz [id] of self [name] of this-vehicle-type multi-unit? full-charge-time-need (full-charge-time-need * charge-rate-of current-charger) state-of-charge (state-of-charge + (full-charge-time-need * charge-rate-of current-charger) / battery-capacity ) "stop" false) ;;;LOG
+    log-data "charging" (sentence ticks [who] of current-charger level-of current-charger [id] of current-taz [id] of self [name] of this-vehicle-type full-charge-time-need (full-charge-time-need * charge-rate-of current-charger) state-of-charge (state-of-charge + (full-charge-time-need * charge-rate-of current-charger) / battery-capacity ) "stop" false) ;;;LOG
     ask current-charger[
       set current-driver myself
     ]
@@ -1424,7 +1405,7 @@ SWITCH
 176
 log-wait-time
 log-wait-time
-1
+0
 1
 -1000
 
@@ -1435,7 +1416,7 @@ SWITCH
 222
 log-charging
 log-charging
-0
+1
 1
 -1000
 
@@ -1457,7 +1438,7 @@ SWITCH
 313
 log-need-to-charge
 log-need-to-charge
-1
+0
 1
 -1000
 
@@ -1479,7 +1460,7 @@ SWITCH
 359
 log-seek-charger
 log-seek-charger
-1
+0
 1
 -1000
 
@@ -1490,7 +1471,7 @@ SWITCH
 443
 log-break-up-trip
 log-break-up-trip
-1
+0
 1
 -1000
 

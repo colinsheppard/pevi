@@ -5,25 +5,24 @@
 # creation of travel demand data based on CHTS
 ######################################################################################################
 
-load.libraries(c('maptools','plotrix','stats','gpclib','plyr','png','RgoogleMaps','lattice','stringr','ggplot2','rgdal','XML','plotKML','rgeos','doMC','reshape','data.table'))
+load.libraries(c('maptools','plotrix','stats','gpclib','plyr','png','RgoogleMaps','lattice','stringr','ggplot2','XML','plotKML','rgeos','doMC','reshape','data.table'))
 gpclibPermit()
 registerDoMC(num.cpu)
 
-# Load the OD data
-od <- read.table(pp(pevi.shared,'data/UPSTATE/Shasta-OD-2020/sh20_adjvehtrips_3per_3occ.txt'),header=T)
-
-# For now, aggregate occupancy levels into a single column
-od$trips.24 <- od$trips.1occ.24 + od$trips.2occ.24 + od$trips.3occ.24
-od$trips.am <- od$trips.1occ.am + od$trips.2occ.am + od$trips.3occ.am
-od$trips.pm <- od$trips.1occ.pm + od$trips.2occ.pm + od$trips.3occ.pm
-od <- od[,c(1,2,(ncol(od)-2):ncol(od))]
-
-# For 2010 OD matrix, zero rows are excluded from the data, add a row for from==292 for convenience in processing 
-#od <- rbind(od,data.frame(from=292,to=101,trips.24=0,trips.am=0,trips.pm=0))
-
-
 # Take the pa matrix and distribute it by time of day according to the od distribution
 if(!file.exists(pp(pevi.shared,'data/UPSTATE/Shasta-OD-2020/od-by-purpose.Rdata'))){
+  # Load the OD data
+  od <- read.table(pp(pevi.shared,'data/UPSTATE/Shasta-OD-2020/sh20_adjvehtrips_3per_3occ.txt'),header=T)
+
+  # For now, aggregate occupancy levels into a single column
+  od$trips.24 <- od$trips.1occ.24 + od$trips.2occ.24 + od$trips.3occ.24
+  od$trips.am <- od$trips.1occ.am + od$trips.2occ.am + od$trips.3occ.am
+  od$trips.pm <- od$trips.1occ.pm + od$trips.2occ.pm + od$trips.3occ.pm
+  od <- od[,c(1,2,(ncol(od)-2):ncol(od))]
+
+  # For 2010 OD matrix, zero rows are excluded from the data, add a row for from==292 for convenience in processing 
+  #od <- rbind(od,data.frame(from=292,to=101,trips.24=0,trips.am=0,trips.pm=0))
+
   pa <- read.table(pp(pevi.shared,'data/UPSTATE/Shasta-OD-2020/sh20_vehtrips_7purp_3occ.txt'),header=T)
   ## create an omni-directional id over which we can sum PA/AP pairs in both directions
   pa$omni <- apply(pa,1,function(x){
@@ -157,5 +156,76 @@ taz.time.distance$destination.id <- agg.taz$agg.id[match(taz.time.distance$desti
 load(file=pp(pevi.shared,'data/CHTS/nssr-subset.Rdata'))
 setkey(nssr.place,"td.purpose")
 dist.by.purp <- dlply(subset(nssr.place,tripdistance<400),.(td.purpose),function(df){ df$tripdistance})
+
+# specify gateways from SRTA that will become internalized and lose their status as gateways in new matrix associate the 
+# shasta TAZs that should be assumed to flow through those gateways en-route to SIS or TEH
+
+gates.to.intern <- list('1'=list('Siskiyou'=as.numeric(grep('111|107|152|117',subset(agg.taz@data,agg.id<200)$agg.id,value=T,invert=T)),'Tehama'=c()),
+                        '3'=list('Siskiyou'=c(111,107,152,117),'Tehama'=c()),
+                        '13'=list('Tehama'=120,'Siskiyou'=c()),
+                        '12'=list('Tehama'=as.numeric(grep('120',subset(agg.taz@data,agg.id<200)$agg.id,value=T,invert=T)),'Siskiyou'=c()))
+
+orig.gates <- unique(od.agg$from)[which(unique(od.agg$from)<100)]
+gates.to.keep <- orig.gates[-match(as.numeric(names(gates.to.intern)),orig.gates)]
+gates.to.intern.ids <- as.numeric(names(gates.to.intern))
+sha.tazs <- agg.taz$agg.id[which(agg.taz$agg.id>=100 & agg.taz$agg.id<200)]
+
+new.tazs <- agg.taz$agg.id
+
+# produce a unique P/A matrix for each case (SIS vs TEH) from the aggregated OD matrix and the total demand estimates on the point TAZs
+purps <- c('ho','hs','hsc','hw','oo','wo')
+new.pa <- expand.grid(juris=c('Siskiyou','Tehama'),taz=new.tazs,purp=purps)
+new.pa$trips <- NA
+new.pa <- data.table(new.pa)
+setkey(new.pa,'taz')
+agg.dt <- data.table(agg.taz@data)
+agg.dt[,taz:=agg.id]
+setkey(agg.dt,"taz")
+new.pa.temp <- new.pa[agg.dt]
+new.pa <- subset(new.pa.temp,agg.id<200 | juris==jurisdiction)[,list(taz=taz,juris=juris,purp=purp,trips=trips)]
+
+od.agg <- as.data.table(od.agg)
+
+setkey(od.agg,'from')
+od.agg.sums <- od.agg[,list(ho=sum(ho),hs=sum(hs),hsc=sum(hsc),hw=sum(hw),oo=sum(oo),wo=sum(wo),tot=sum(c(ho,hs,hsc,hw,oo,wo))),by="from"]
+od.agg.sums <- od.agg.sums[,':='(ho=ho/tot,hs=hs/tot,hsc=hsc/tot,hw=hw/tot,oo=oo/tot,wo=wo/tot)]
+od.agg.sums.m <- data.table(melt(od.agg.sums,id.vars='from',measure.vars=c('ho','hs','hsc','hw','oo','wo')),key=c('from'))
+
+# look into potential demographic relationships
+#dem <- data.table(dem)
+#dem[,from:=TAZ]
+#dem[,':='(from=TAZ,population=Population,Population=NULL,employment=TOTAL.1)]
+#setkey(dem,"from")
+#od.agg.sums.m <- dem[od.agg.sums.m]
+#ggplot(od.agg.sums.m,aes(x=population,y=value,shape=near.redding))+geom_point()+facet_wrap(~variable)
+
+# just find the mean ratio by purp
+setkey(od.agg.sums.m,"variable")
+mean.frac.purp <- od.agg.sums.m[,list(frac=mean(value,na.rm=T)),by=variable][,':='(purp=variable,variable=NULL)]
+
+# for SHA the p's and a's are taken as the trips to/from the gates which need to be internalized
+setkey(new.pa,'juris','taz','purp')
+od.agg.m <- data.table(melt(od.agg,id.vars=c('from','to'),measure.vars=c('ho','hs','hsc','hw','oo','wo')),key=c('from','to'))[,':='(purp=variable,variable=NULL,trips=value,value=NULL)]
+for(gate in gates.to.intern.ids){
+  for(juris in c('Siskiyou','Tehama')){
+    if(length(gates.to.intern[[as.character(gate)]][[juris]])>0){
+      prods <- od.agg.m[J(gates.to.intern[[as.character(gate)]][[juris]],gate),list(trips=sum(trips)),by=c("from","purp")]
+      prods[,':='(taz=from,from=NULL,juris=juris)]
+      setkey(prods,'juris','taz','purp')
+      new.pa <- prods[new.pa]
+      new.pa[,':='(trips=ifelse(is.na(trips),trips.1,trips),trips.1=NULL)]
+    }
+  }
+}
+
+# for SIS and TEH p's and a's come from the total demand modeled above are are 
+# disaggregated according to the average non-redding trip purpose distribution
+setkey(new.pa,"taz","purp")
+setkey(mean.frac.purp,"purp")
+setkey(agg.dt,"taz")
+new.pa.with.tot <- data.table(agg.dt[new.pa],key="purp")[,':='(name=NULL,agg.id=NULL,jurisdiction=NULL,area=NULL,shp.id=NULL,population=NULL,employment=NULL,point=NULL,near.redding=NULL)]
+new.pa <- mean.frac.purp[new.pa.with.tot]
+new.pa[,':='(trips=ifelse(is.na(trips),total.demand*frac,trips),total.demand=NULL,frac=NULL)]
+#ggplot(new.pa,aes(x=taz,y=trips,fill=purp))+geom_bar(stat='identity')+facet_wrap(~juris)
 
 

@@ -264,3 +264,15 @@ for(file.name in names(sav.dat[['circuit_load_summary']])){
   circ$circuit.num[match(sav.dat[['circuit_load_summary']][[file.name]]$fdr_num,circ$fdr_num)] <- circuit.num
 }
 write.csv(circ,pp(pevi.shared,'/data/GRID/distribution-data/circuits.csv'))
+
+# find the date range in weeks of the data provided by PG&E
+cir <- list.files('~/Dropbox/serc/pev-colin/pev-shared/data/GRID/load/circuits/',pattern='csv')
+cirs <- data.frame(cir=cir,s.datetime=NA,e.datetime=NA,num.weeks=NA)
+for(ci in cir){
+  the.file <- pp('~/Dropbox/serc/pev-colin/pev-shared/data/GRID/load/circuits/',ci)
+  ti <- to.posix(read.csv(the.file,head=F,stringsAsFactors=F)$V1,'%m/%d/%Y %I:%M:%S %p')
+  cirs$s.datetime[cirs$cir==ci] <- min(ti,na.rm=T)
+  cirs$e.datetime[cirs$cir==ci] <- max(ti,na.rm=T)
+}
+cirs$num.weeks <- (cirs$e.datetime-cirs$s.datetime)/(24*60*60*7)
+

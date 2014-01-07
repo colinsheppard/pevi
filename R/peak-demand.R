@@ -17,7 +17,7 @@ source(paste(pevi.home,'R/gis-functions.R',sep=''))
 
 installXLSXsupport()
 
-grid.dir <- pp(pevi.home,'../data/GRID/')
+grid.dir <- pp(pevi.shared,'/data/GRID/distribution-data/')
 
 file.names <- grep("Rdata",grep("~",list.files(grid.dir),invert=T,value=T),invert=T,value=T)
 
@@ -53,10 +53,13 @@ if(!file.exists('columns-names.Rdata')){
 # load the data
 tot.trans <- 0
 reload.db <- F
+# optionally hold onto the data as it loads
+sav.dat<-list()
 for(sheet in sheets){
   table.name <- str_replace_all(tolower(sheet)," ","_")
   my.cat(table.name)
   system('sleep 0.01')
+  sav.dat[[table.name]] <- list()
   for(file.name in file.names){
     r.data.name <- pp(grid.dir,file.name,"-",sheet,".Rdata")
     if(file.exists(r.data.name)){
@@ -100,6 +103,7 @@ for(sheet in sheets){
         try(dbSendQuery(con,s),T)
       })
     }
+    sav.dat[[table.name]][[file.name]] <- dat
   }
   if(sheet == "Transformers")print(pp('# transformers: ',tot.trans))
 }
@@ -218,7 +222,6 @@ load <- ddply(res,.(cust_id),function(df){
 })
 
 heatmap.kml(res$long,res$lat,filepath="test.kml",dotsize=round(res$load/max(res$load)*100),opacity=100,width=2048*4,height=2048*4)
-
 heatmap.kml(load$df.long,load$df.lat,filepath="test.kml",dotsize=20,opacity=100,width=2048*4,height=2048*4)
 
 # load the line sections
@@ -248,5 +251,16 @@ ggplot(melt(tran.ld,id.vars='cust_typ',measure.vars=c('sum_aug_kwhr','sum_jan_kw
 
 cit <- readShapePoly(pp(pevi.shared,'data/HUMCO/cities-wgs84',sep=''))
 cit$name <- cit$NAME
-cit$name <- cit$NAME
 
+# Associate each circuit load summary with a substation
+sql <- "SELECT fdr_num,season,peak_time,total_kw,max_nor_voltage,ckt_bpf,kva_capability,energ_kvar,com_kw,limit_desc,projected,ST_X(ST_Centroid(geom)) AS long,ST_Y(ST_Centroid(geom)) AS lat FROM circuit_load_summary"
+circ <- dbGetQuery(con,sql)
+circ$substation.name <- NA
+circ$circuit.num <- NA
+for(file.name in names(sav.dat[['circuit_load_summary']])){
+  substation <- pp(head(strsplit(strsplit(file.name,".xlsx")[[1]]," ")[[1]],-1),collapse=" ")
+  circuit.num <- tail(strsplit(strsplit(file.name,".xlsx")[[1]]," ")[[1]],1)
+  circ$substation.name[match(sav.dat[['circuit_load_summary']][[file.name]]$fdr_num,circ$fdr_num)] <- substation
+  circ$circuit.num[match(sav.dat[['circuit_load_summary']][[file.name]]$fdr_num,circ$fdr_num)] <- circuit.num
+}
+write.csv(circ,pp(pevi.shared,'/data/GRID/distribution-data/circuits.csv'))

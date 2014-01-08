@@ -67,7 +67,7 @@ if(!file.exists(pp(pevi.shared,'data/UPSTATE/Shasta-OD-2020/od-by-purpose.Rdata'
     data.frame(t(all.day.row),am.row,pm.row)
   },.parallel=T)
   names(odp) <- c('from','to',purp.cols,pp(purp.cols,'.am'),pp(purp.cols,'.pm'))
-  save(odp,file=pp(pevi.shared,'data/UPSTATE/Shasta-OD-2020/od-by-purpose.Rdata'))
+  save(purp.cols,odp,file=pp(pevi.shared,'data/UPSTATE/Shasta-OD-2020/od-by-purpose.Rdata'))
 }else{
   load(file=pp(pevi.shared,'data/UPSTATE/Shasta-OD-2020/od-by-purpose.Rdata'))
 }
@@ -133,16 +133,16 @@ load(file=pp(pevi.shared,'data/UPSTATE/shapefiles/AggregatedTAZsWithPointTAZs.Rd
 # Load od.agg, the aggregated OD matrix
 load(file=pp(pevi.shared,'data/UPSTATE/Shasta-OD-2020/od-aggregated.Rdata'))
 
-# Load taz.time.distance
-load(pp(pevi.shared,'data/UPSTATE/driving-distances/taz_time_distance.Rdata'))
+# Load time.distance
+load(pp(pevi.shared,'data/UPSTATE/driving-distances/time.distance.Rdata'))
 
 # add ids to dist/time matrix
-taz.time.distance$origin.id <- agg.taz$agg.id[match(taz.time.distance$origin.taz,agg.taz$name)] 
-taz.time.distance$destination.id <- agg.taz$agg.id[match(taz.time.distance$destination.taz,agg.taz$name)] 
+time.distance$from <- agg.taz$agg.id[match(time.distance$orig,agg.taz$name)] 
+time.distance$to <- agg.taz$agg.id[match(time.distance$dest,agg.taz$name)] 
 
 #fric.ids <- subset(agg.taz,!point & !near.redding)$agg.id
 #fric.ids <- subset(agg.taz,!point)$agg.id
-#fric.dts <- subset(taz.time.distance,origin.id %in% fric.ids & destination.id %in% fric.ids)[,c('origin.id','destination.id','miles')]
+#fric.dts <- subset(time.distance,origin.id %in% fric.ids & destination.id %in% fric.ids)[,c('origin.id','destination.id','miles')]
 #fric.dts$key <- pp(fric.dts$origin.id,"_",fric.dts$destination.id)
 #fric.od <- subset(od.agg,from %in% fric.ids & to %in% fric.ids)
 #fric.od$key <- pp(fric.od$from,"_",fric.od$to)
@@ -155,7 +155,15 @@ taz.time.distance$destination.id <- agg.taz$agg.id[match(taz.time.distance$desti
 # Load CHTS for NSSR
 load(file=pp(pevi.shared,'data/CHTS/nssr-subset.Rdata'))
 setkey(nssr.place,"td.purpose")
-dist.by.purp <- dlply(subset(nssr.place,tripdistance<400),.(td.purpose),function(df){ df$tripdistance})
+time.by.purp <- dlply(subset(nssr.place,tripdistance<400),.(td.purpose),function(df){ df$tripdur / 60 })
+fric.functions <- llply(time.by.purp,function(l){ den <- density(l)
+  positive.inds <- which(den$x>0)
+  # the following is how we'd create and emprical CDF but that's not needed here, duh
+  #dx <- diff(head(den$x,2))
+  #y <- cumsum(dx*den$y[positive.inds])
+  #data.frame(x=den$x[positive.inds],y=y/max(y))
+  data.frame(x=den$x[positive.inds],y=den$y[positive.inds])
+})
 
 # specify gateways from SRTA that will become internalized and lose their status as gateways in new matrix associate the 
 # shasta TAZs that should be assumed to flow through those gateways en-route to SIS or TEH
@@ -227,5 +235,33 @@ new.pa.with.tot <- data.table(agg.dt[new.pa],key="purp")[,':='(name=NULL,agg.id=
 new.pa <- mean.frac.purp[new.pa.with.tot]
 new.pa[,':='(trips=ifelse(is.na(trips),total.demand*frac,trips),total.demand=NULL,frac=NULL)]
 #ggplot(new.pa,aes(x=taz,y=trips,fill=purp))+geom_bar(stat='identity')+facet_wrap(~juris)
+
+find.friction <- function(x,f,purp){
+  f[[purp]]$y[findInterval(x,f[[purp]]$x,all.inside=T)]
+}
+time.dist.by.purp <- time.distance[rep(seq_len(nrow(time.distance)),length(purps)),list(from,to,hours)]
+time.dist.by.purp[,':='(purp=rep(purps,each=nrow(time.distance)))] 
+setkey(time.dist.by.purp,"purp")
+time.dist.by.purp[,fric:=find.friction(hours,fric.functions,purp[1]),by="purp"]
+
+setkey(time.dist.by.purp,'purp','from','to')
+time.dist.by.purp <- unique(time.dist.by.purp)
+distribed <- data.table(expand.grid(from=new.tazs,to=new.tazs,purp=purps),key=c("purp","from","to"))
+distribed$trips <- NA
+distribed <- time.dist.by.purp[distribed]
+
+gravity <- function(k,distribed){
+  distribed$k <- k
+  denom <- distribed[,list(the.sum=sum(a*fric*k)),by=c('purp','to')]
+  distribed$trips <- distribed$p*distribed$a*distribed$fric*k / sum(distribed$a * distribed$fric
+}
+
+for(juris in c('Siskiyou','Tehama')){
+  pa <- subset(new.pa,juris==juris)
+  setkey(pa,"purp",'taz')
+
+  distribed$p <- pa$trips[match(distribed$from,pa$taz)]
+  distribed$a <- pa$trips[match(distribed$to,pa$taz)]
+}
 
 

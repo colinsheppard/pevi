@@ -83,7 +83,7 @@ for(lib in libs){
 
   if(length(pevi.i)==0){
     # Nothing there so add it
-    cat(pp('library(',lib,',quietly=T)',"\n"),file=r.profile.path,append=T)
+    cat(pp('suppressPackageStartupMessages(library(',lib,',quietly=T))',"\n"),file=r.profile.path,append=T)
   }else if(length(pevi.i)==1){
     # One there, replace it
     r.profile[pevi.i] <- pp('library(',lib,')',"\n") 

@@ -257,6 +257,12 @@ agg.taz.centroids <-SpatialPointsDataFrame(coordinates(agg.taz),data=data.frame(
 agg.mapping <- data.frame(name=over(agg.taz.centroids,redding)$Name)
 agg.taz$near.redding <- !is.na(agg.mapping$name)
 
+agg.taz$jurisdiction[which(coordinates(agg.taz)[,2]>41 & agg.taz$point)] <- 'Siskiyou'
+agg.taz$jurisdiction[which(coordinates(agg.taz)[,2]<41 & agg.taz$point)] <- 'Tehama'
+
+# Change name of Mt. Shasta TAZ
+agg.taz$name[agg.taz$name=="Mt. Shasta"] <- "MtShasta"
+
 #save(agg.taz,file=pp(pevi.shared,'data/UPSTATE/shapefiles/AggregatedTAZsWithPointTAZs.Rdata'))
 load(file=pp(pevi.shared,'data/UPSTATE/shapefiles/AggregatedTAZsWithPointTAZs.Rdata'))
 

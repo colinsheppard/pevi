@@ -31,15 +31,16 @@ source(pp(args$experimentdir,'params.R'))
 # The params file will need to be set in R, so we can edit it mid-run. 
 # Otherwise, batch setup is impossible.
 
+# NL does not recognize tilde expansion. KEEP THI IN MIND.
 param.file <- pp(args$experimentdir,'params.txt')
 param.file.data <- read.table(param.file,sep='\t')
-charger.file <- pp(path.to.vary.files,param.file.data[grep('charger-input-file',param.file.data$V1),2])
+charger.file <- pp(pevi.shared,param.file.data[grep('charger-input-file',param.file.data$V1),2])
 
 # For the current optimization, we need to know the installation costs of the chargers. Assuming that we won't want to vary
 # those costs within an optimization run, we read them in here. If we do want to vary those costs, this would need to be 
 # moved to the driver-file for loop.
 
-charger.info <- read.table(pp(path.to.vary.files,param.file.data[grep('charger-type-input-file',param.file.data$V1),2]),row.names=NULL,header=T,sep='\t')
+charger.info <- read.table(pp(pevi.shared,param.file.data[grep('charger-type-input-file',param.file.data$V1),2]),row.names=NULL,header=T,sep='\t')
 names(charger.info) <- c('level','charge.rate','energy.price','installed.cost')
 
 #for(seed in seeds){
@@ -96,16 +97,16 @@ seed <- 1
 
     # Start for loop for overall penetration level optimization
 		#for(build.i in begin.build.i:250){
-		build.i <- 1 
+		 build.i <- 1 
 			print(paste('build.i = ',build.i))
 
       #	Next is the loop through driver files. We'll want to do a ddply here, which means we'll need a way to
       #	switch parameter files without hacking into another param file, as well as a new NL instance for each file.
       #	Here is where we are going to use parallel=T to take advantage of extra cores.
 	
-			#build.result <- ddply(vary.tab,.(row),function(vary.row) {
-			vary.row <- vary.tab[1,]
-							
+			build.result <- ddply(vary.tab,.(row),function(vary.row) {  # parallel processing applied at this level
+			#vary.row <- vary.tab[1,]
+														
         # start NL
     		tryCatch(NLStart(nl.path, gui=F),error=function(err){ NA })
     		model.path <- paste(pevi.home,"netlogo/PEVI-nolog.nlogo",sep='')
@@ -122,7 +123,11 @@ seed <- 1
       	} else {
         	NLCommand('set fix-seed FALSE')
       	}
-      	NLCommand(paste('set parameter-file "',path.to.inputs,'params.txt"',sep=''))
+      	
+      	# The params file pathways are all assumed to be based from pev-shared. We set a param-base variable in NetLogo
+      	# to make this happen. The outputs folder is unchanged.
+      	NLCommand(pp('set param-file-base "',pevi.shared,'"'))
+      	NLCommand(paste('set parameter-file "',param.file,'"',sep=''))
       	NLCommand('read-parameter-file')
       	
         # If a parameter change exists in vary.tab, we go through and read in the new parameters.
@@ -152,6 +157,7 @@ seed <- 1
 						
             #	Add the candidate charger, then run the model.
 						NLCommand(paste('add-charger',df1$taz,df1$level))
+						NLCommand(pp('print "taz',df1$taz,'level ',df1$level,'"'))
 						NLCommand('time:go-until 500')
 						
 						objective <-  tryCatch(NLReport('objective-function'),error=function(e){ NA })

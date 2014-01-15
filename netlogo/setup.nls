@@ -5,6 +5,8 @@ to read-parameter-file
   ;print "read-parameter-file"
   if parameter-file = 0 [ set parameter-file "params.txt" ]
   if model-directory = 0 [ set model-directory "./" ]
+  if param-file-base = 0 [ user-message "Please select the pev-shared directory"
+    set param-file-base user-directory ]
   set stranded-delay-threshold 3
   ifelse (file-exists? parameter-file) [ 
     file-close
@@ -20,19 +22,18 @@ to read-parameter-file
       ifelse param-name = "frac-phev" [ set frac-phev file-read ][
       ifelse param-name = "electric-fuel-consumption-sd" [ set electric-fuel-consumption-sd file-read ][
       ifelse param-name = "electric-fuel-consumption-range" [ set electric-fuel-consumption-range file-read ][
-      ifelse param-name = "multi-unit-search-tolerance" [ set multi-unit-search-tolerance file-read ][
-      ifelse param-name = "starting-soc-file" [set starting-soc-file word model-directory file-read ][
-      ifelse param-name = "ext-dist-time-file" [set ext-dist-time-file word model-directory file-read ][
-      ifelse param-name = "charger-input-file" [ set charger-input-file word model-directory file-read ][
-      ifelse param-name = "charger-type-input-file" [ set charger-type-input-file word model-directory file-read ][
-      ifelse param-name = "driver-input-file" [ set driver-input-file word model-directory file-read ][
-      ifelse param-name = "od-input-file" [ set od-input-file word model-directory file-read ][
-      ifelse param-name = "vehicle-type-input-file" [ set vehicle-type-input-file word model-directory file-read ][
+      ifelse param-name = "starting-soc-file" [set starting-soc-file word param-file-base file-read ][
+      ifelse param-name = "ext-dist-time-file" [set ext-dist-time-file word param-file-base file-read ][
+      ifelse param-name = "charger-input-file" [ set charger-input-file word param-file-base file-read ][
+      ifelse param-name = "charger-type-input-file" [ set charger-type-input-file word param-file-base file-read ][
+      ifelse param-name = "driver-input-file" [ set driver-input-file word param-file-base file-read ][
+      ifelse param-name = "od-input-file" [ set od-input-file word param-file-base file-read ][
+      ifelse param-name = "vehicle-type-input-file" [ set vehicle-type-input-file word param-file-base file-read ][
       ifelse param-name = "outputs-directory" [ set outputs-directory word model-directory file-read ][
       ifelse param-name = "probability-of-unneeded-charge" [ set probability-of-unneeded-charge file-read ][
       ifelse param-name = "stranded-delay-threshold" [ set stranded-delay-threshold file-read ][
-      ifelse param-name = "charger-permission-file" [set charger-permission-file file-read ][  
-      ]]]]]]]]]]]]]]]]]]]]]
+      ifelse param-name = "charger-permission-file" [set charger-permission-file word param-file-base file-read ][  
+      ]]]]]]]]]]]]]]]]]]]]
     ]
     file-close
   ][ 

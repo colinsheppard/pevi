@@ -28,6 +28,7 @@ globals [
   
 ;; FILE PATHS
   model-directory
+  param-file-base  ;; Set externally, leads to pev-shared. Makes param files more accessible between machines.
   parameter-file
   charger-input-file
   charger-type-input-file
@@ -55,7 +56,6 @@ globals [
   electric-fuel-consumption-sd
   electric-fuel-consumption-range
   stranded-delay-threshold
-  multi-unit-search-tolerance
   
   ;; globals needed for testing
   test-driver
@@ -124,7 +124,6 @@ drivers-own [
   gasoline-used
   miles-driven
   num-denials
-  multi-unit-search-count         ; Counter for how many times a multi-unit driver has tried to charge at the end of the day
   
 ;; CANDIDATE ADDITIONS TO MODEL DESCRIPTION
   energy-received ; a count of how much energy each driver has charged
@@ -409,7 +408,6 @@ end
 
 to remove-charger [taz-id charger-level]  
   ifelse available-chargers table:get taz-table taz-id charger-level > 0 [
-    ;ask one-of chargers with [location = taz taz-id and this-charger-type = one-of charger-types with [level = charger-level]] [die]
     ask table:get taz-table taz-id [
       let #dying-charger structs:stack-pop item charger-level available-chargers-by-type
       ask #dying-charger [die]
@@ -476,7 +474,6 @@ end
 ;;;;;;;;;;;;;;;;;;;;
 to seek-charger
   set seek-charger-index seek-charger-index + 1
-  ;print (word precision ticks 3 " " self " seek-charger ")
   set time-until-depart departure-time - ticks
   let #extra-time-until-end-charge 0
   let #extra-time-for-travel 0
@@ -1109,29 +1106,6 @@ to arrive
       log-data "trip-journey-timeuntildepart" (sentence ticks ticks id [name] of this-vehicle-type state-of-charge #from-taz #to-taz #completed-trip #completed-journey 0 "journey-complete" remaining-range sum map weight-delay itin-delay-amount) ;;;LOG
     ]
   ]
-
-  
-end
-
-to end-of-day-multi-unit-charge
-  ; If a level 5 charger is available for the multi-unit driver, they begin charging. Otheriwse,
-  ; they will attempt to charge at a later time, until they have reached the maximum search limit.
-  ifelse available-chargers current-taz 5 > 0 [
-    set current-charger selected-charger current-taz 5
-    set full-charge-time-need (1 - state-of-charge) * battery-capacity / charge-rate-of current-charger
-    time:schedule-event self task end-charge ticks + full-charge-time-need 
-    set time-until-end-charge full-charge-time-need
-    log-data "charging" (sentence ticks [who] of current-charger level-of current-charger [id] of current-taz [id] of self [name] of this-vehicle-type full-charge-time-need (full-charge-time-need * charge-rate-of current-charger) state-of-charge (state-of-charge + (full-charge-time-need * charge-rate-of current-charger) / battery-capacity ) "stop" false) ;;;LOG
-    ask current-charger[
-      set current-driver myself
-    ]
-  ][
-    set multi-unit-search-count multi-unit-search-count + 1
-    if multi-unit-search-count <= multi-unit-search-tolerance [
-      let event-time-from-now random-exponential wait-time-mean
-      time:schedule-event self task end-of-day-multi-unit-charge ticks + event-time-from-now
-    ]
-  ]
 end
 
 ;;;;;;;;;;;;;;;;;;;;
@@ -1174,11 +1148,13 @@ to initialize-available-chargers
 end
 
 to return-charger [#taz #level #charger]
-  ask #taz [
-    if not structs:stack-contains item #level available-chargers-by-type #charger [
+  if ([alt-energy-price] of #charger = 0) [
+    ask #taz [
+      if not structs:stack-contains item #level available-chargers-by-type #charger [
       structs:stack-push item #level available-chargers-by-type #charger
+      ]
     ]
-  ]
+  ]  
 end
 
 to-report available-chargers [#taz #level]
@@ -1405,7 +1381,7 @@ SWITCH
 176
 log-wait-time
 log-wait-time
-0
+1
 1
 -1000
 
@@ -1438,7 +1414,7 @@ SWITCH
 313
 log-need-to-charge
 log-need-to-charge
-0
+1
 1
 -1000
 
@@ -1449,7 +1425,7 @@ SWITCH
 130
 log-trip-journey-timeuntildepart
 log-trip-journey-timeuntildepart
-0
+1
 1
 -1000
 
@@ -1471,7 +1447,7 @@ SWITCH
 443
 log-break-up-trip
 log-break-up-trip
-0
+1
 1
 -1000
 
@@ -1597,7 +1573,7 @@ SWITCH
 94
 log-trip
 log-trip
-0
+1
 1
 -1000
 

@@ -17,8 +17,8 @@ to.log <- c('pain','charging','trip')
 source(paste(pevi.home,"R/reporters-loggers.R",sep=''))
 
 # read the parameters and values to vary in the experiment
-#vary <- yaml.load(readChar(paste(path.to.inputs,'vary.yaml',sep=''),file.info(paste(path.to.inputs,'vary.yaml',sep=''))$size))
-vary <- yaml.load(readChar(paste(path.to.inputs,'vary-noL1.yaml',sep=''),file.info(paste(path.to.inputs,'vary-noL1.yaml',sep=''))$size))
+vary <- yaml.load(readChar(paste(path.to.inputs,'vary.yaml',sep=''),file.info(paste(path.to.inputs,'vary.yaml',sep=''))$size))
+#vary <- yaml.load(readChar(paste(path.to.inputs,'vary-noL1.yaml',sep=''),file.info(paste(path.to.inputs,'vary-noL1.yaml',sep=''))$size))
 for(file.param in names(vary)[grep("-file",names(vary))]){
   vary[[file.param]] <- str_replace_all(str_replace_all(str_replace_all(vary[[file.param]],"pevi.home",pevi.home),"pevi.shared",pevi.shared),"pevi.nondrop",pevi.nondrop)
 }
@@ -72,6 +72,7 @@ logs <- list()
 
 # for every combination of parameters, run the model and capture the summary statistics
 for(results.i in 1:nrow(results)){
+#results.i <- 1
   cat(paste(results.i,""))
   system('sleep 0.01')
   if(results.i%%10 == 0){
@@ -119,6 +120,7 @@ if(length(grep("animation",path.to.inputs))>0){
   }
 }
 save(logs,file=paste(path.to.inputs,'logs.Rdata',sep=''))
+#load(paste(path.to.inputs,'logs.Rdata',sep=''))
 
 # ANALYZE PAIN
 ggplot(logs[['pain']],aes(x=time,y=state.of.charge,colour=pain.type,shape=vehicle.type))+geom_point()+facet_grid(charge.safety.factor~replicate)
@@ -218,6 +220,7 @@ ggplot(logs[['charging']],aes(x=energy))+geom_histogram(binwidth=0.1)
 
 # Duty factor by TAZ
 
+existing.chargers <- data.frame(id=c(6,23,27,45),name=c("ARC_Plaza","EKA_Waterfront","EKA_NW101","Redway"))
 
 logs[['charging']]$infrastructure.scenario <- NA
 for(scen.i in names(naming$`charger-input-file`)){
@@ -235,13 +238,20 @@ for(charger.file in unique(as.character(logs[['charging']]$charger.input.file)))
   names(num.chargers[[scen.named]]) <- c('taz','L0','L1','L2','L3','L4')
 }
 
-num.reps <- length(unique(logs[['charging']]$replicate))
-charge.sum <- ddply(logs[['charging']],.(location,charger.level,penetration,infrastructure.scenario.named),function(df){
-  data.frame(duty.factor=sum(df$duration)/(24*num.reps*num.chargers[[df$infrastructure.scenario.named[1]]][df$location[1],pp('L',df$charger.level[1])]))
-})
+charge.sum <- na.omit(ddply(logs[['charging']],.(location,charger.level,penetration,infrastructure.scenario.named),function(df){
+  num.reps <- length(unique(df$replicate))
+  duty.factor <- sum(df$duration)/(24*num.reps*num.chargers[[df$infrastructure.scenario.named[1]]][df$location[1],pp('L',df$charger.level[1])])
+  data.frame(duty.factor=ifelse(duty.factor==Inf,NA,duty.factor))
+}))
 
 taz.names <- read.csv(pp(pevi.shared,'data/google-earth/ordering-for-TAZ-table.csv'))
 charge.sum$taz <- taz.names$name[match(charge.sum$location,taz.names$id)]
+
+df <- subset(charge.sum,charger.level>0 & ! location %in% existing.chargers$id)
+p <- ggplot(df,aes(x=factor(charger.level),fill=factor(penetration),y=duty.factor))+geom_bar(stat='identity',position="dodge")+facet_wrap(~taz)+labs(title=df$infrastructure.scenario.named[1],x="Charger Level",y="Duty Factor")
+
+p <- ggplot(df,aes(x=penetration,color=factor(charger.level),y=duty.factor))+geom_point()+geom_line()+facet_wrap(~taz)+labs(title=df$infrastructure.scenario.named[1],x="Penetration",y="Duty Factor",colour="L1/L2")
+ggsave(pp(pevi.shared,'maps-results/duty-factors-CEC.pdf'),p,width=11,height=8.5)
 
 pdf(pp(pevi.shared,'maps-results/duty-factors-noL1.pdf'),width=11,height=8.5)
 d_ply(subset(charge.sum,charger.level>0),.(infrastructure.scenario.named),function(df){
@@ -249,3 +259,27 @@ d_ply(subset(charge.sum,charger.level>0),.(infrastructure.scenario.named),functi
   print(p)
 })
 dev.off()
+
+fish <- read.csv(pp(pevi.shared,'data/chargers/fisherman-terminal-usage-2012-2013/2013-12-04 FTB EVSE Energy-vs-Time.csv'),stringsAsFactors=F)
+names(fish) <- c('date','kwh','cum')
+fish$date <- to.posix(fish$date,'%m/%d/%Y')
+fish$dow <- as.numeric(strftime(fish$date,'%w'))
+fish$is.weekday <- fish$dow>0 & fish$dow<6
+fish$dow <- factor(strftime(fish$date,'%a'))
+fish$dow <- factor(strftime(fish$date,'%a'),levels=levels(fish$dow)[c(2,6,7,5,1,3,4)])
+fish$month <- factor(as.numeric(strftime(fish$date,'%m')))
+
+ggplot(fish,aes(x=date,y=kwh)) + geom_point() + labs(x="Date",y="Energy Dispensed (kWh)",title="Fisherman's Terminal EVSE Utilization")
+ggplot(subset(fish,kwh>0),aes(x=factor(dow),y=kwh,colour=is.weekday)) + geom_point() + geom_boxplot() + labs(x="Week Day",y="Energy Dispensed (kWh)",title="Fisherman's Terminal EVSE Utilization")
+ggplot(ddply(subset(fish,kwh>0),.(dow),function(df){ data.frame(kwh=sum(df$kwh)) }),aes(x=dow,y=kwh)) + geom_bar(stat='identity') + labs(x="Week Day",y="Energy Dispensed (kWh)",title="Fisherman's Terminal EVSE Utilization")
+
+daily.energy <- sum(subset(fish,date>to.posix('2013-02-01'))$kwh)/as.numeric(difftime(max(subset(fish,date>to.posix('2013-02-01'))$date),min(subset(fish,date>to.posix('2013-02-01'))$date),units='days'))
+
+# what fraction of the kWh were delivered to EVs charging at 3.3kW vs 6.6kW
+#(sum(fish$kwh)/316.5- 6.6)/-3.3
+
+# so if there's an average of 3.5 kWh per day delivered and we assume drivers will charge at 6.6kW, that's a 2.2% duty factor for ~100 drivers
+#0.02209596
+
+# PEVI predicts ~40% duty factor at the waterfront with 0.5% pen or 750 driver
+subset(charge.sum,taz=='EKA_Waterfront')

@@ -5,7 +5,7 @@
 
 ##############################################################################################################################################
 # LOAD LIBRARIES NEED BY THIS SCRIPT
-load.libraries(c('optparse','stringr','yaml','plyr','ggplot2','reshape','maptools'))
+load.libraries(c('optparse','stringr','yaml','plyr','ggplot2','reshape','maptools','data.table'))
 
 ##############################################################################################################################################
 # COMMAND LINE OPTIONS 
@@ -35,18 +35,23 @@ counties <- c('SHA','SIS','TEH')
 # SCRIPT CONTENT 
 ##############################################################################################################################################
 
+cnts <- data.frame()
 for(yr in years){
   file.path <- pp(pevi.shared,opts$path,"/",yr,"aadt-raw.csv")
-  if(!file.exists(file.path))error(pp("Cannot find file: ",file.path))
+  if(!file.exists(file.path))next
   tmp <- read.csv(file.path,stringsAsFactors=F)
-  tmp <- subset(tmp,Dist==2 & Route %in% rts & County %in% counties)
+  names(tmp) <- str_replace(str_replace(str_replace(names(tmp),"CO$","County"),"Dist$","District"),"Ahead..AADT","Ahead.AADT")
+  tmp <- subset(tmp,District==2 & Route %in% rts & County %in% counties)
   tmp$Postmile <- as.numeric(tmp$Postmile)
-  tmp$Ahead.AADT <- as.numeric(tmp$Ahead.AADT)
-  tmp$Back.AADT <- as.numeric(tmp$Back.AADT)
+  tmp$Ahead.AADT <- as.numeric(str_replace_all(tmp$Ahead.AADT,",",""))
+  tmp$Back.AADT <- as.numeric(str_replace_all(tmp$Back.AADT,",",""))
   
   tmp.m <- melt(tmp,id.vars=c("County","Route","Postmile"),measure.vars=c('Ahead.AADT','Back.AADT'))
-  ggplot(tmp.m,aes(x=Postmile,y=value,colour=variable))+geom_bar(stat="identity",position='dodge')+facet_wrap(County~Route)
+  tmp.m$year <- yr
+  cnts <- rbind(cnts,tmp.m)
+  #ggplot(tmp.m,aes(x=Postmile,y=value,colour=variable))+geom_bar(stat="identity",position='dodge')+facet_wrap(County~Route)
 }
+save(cnts,file=pp(pevi.shared,opts$path,"/screenline-counts.Rdata"))
 
 ##############################################################################################################################################
 # LOAD Road Network
@@ -57,3 +62,9 @@ parse.mm <- str_split(mm$Name,"-")
 mm$county <- sapply(parse.mm,function(l){ l[1] })
 mm$route  <- sapply(parse.mm,function(l){ l[2] })
 mm$post.mile <- sapply(parse.mm,function(l){ l[3] })
+
+##############################################################################################################################################
+# Look at Routes in SIS and TEH near border to SHA
+ggplot(subset(cnts,Route%in%c(5,89,99,299)),aes(x=year,y=value,colour=Postmile,shape=variable))+geom_point()+facet_grid(Route~County)
+
+

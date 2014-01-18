@@ -16,3 +16,4 @@ pevi-conf.R
 netlogo/profiler
 netlogo/structs
 netlogo/table
+*.Rapp.history

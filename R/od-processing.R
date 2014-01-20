@@ -5,7 +5,7 @@
 # creation of travel demand data based on CHTS
 ######################################################################################################
 
-load.libraries(c('maptools','plotrix','stats','gpclib','plyr','png','RgoogleMaps','lattice','stringr','ggplot2','XML','plotKML','rgeos','doMC','reshape','data.table','DEoptim'))
+load.libraries(c('maptools','gpclib','plyr','stringr','ggplot2','doMC','reshape','data.table','DEoptim'))
 gpclibPermit()
 registerDoMC(num.cpu)
 
@@ -180,8 +180,8 @@ teh.ids <- subset(agg.taz@data,jurisdiction=="Tehama")$agg.id
 teh.gates <- -c(207,215)
 sha.ids <- subset(agg.taz@data,agg.id>=100 & agg.id<200)$agg.id
 #sha.gates <- -112
-sha.gates <- c(4,5,6,14,15)
-sha.gate.agg.id <- c(111,111,107,120,112)
+sha.gates <- c(4,6,14,15)
+sha.gate.agg.id <- c(111,107,120,112)
 new.gates <- c(sis.gates,teh.gates)
 
 ###################################################################################################################################################
@@ -203,8 +203,7 @@ xp <- data.frame(taz=-213,p=mean(subset(cnts.avg,County=="SIS" & Route==5 & Post
 xp <- rbind(xp,data.frame(taz=-205,p=mean(subset(cnts.avg,County=="SIS" & Route==3 & Postmile==21.470)$avg)))
 xp <- rbind(xp,data.frame(taz=-207,p=mean(subset(cnts.avg,County=="TEH" & Route==99 & Postmile==12.308)$avg)))
 xp <- rbind(xp,data.frame(taz=-215,p=mean(subset(cnts.avg,County=="TEH" & Route==5 & Postmile==0.000)$avg)))
-xp <- rbind(xp,data.frame(taz=4,p=mean(subset(cnts.avg,County=="SHA" & Route==299 & Postmile > 99)$avg)))
-xp <- rbind(xp,data.frame(taz=5,p=mean(subset(cnts.avg,County=="SHA" & Route==299 & Postmile > 99)$avg)/3))
+xp <- rbind(xp,data.frame(taz=4,p=4/3*mean(subset(cnts.avg,County=="SHA" & Route==299 & Postmile > 99)$avg))) # the 4/3 is accounting for trips to gate 5
 xp <- rbind(xp,data.frame(taz=6,p=mean(subset(cnts.avg,County=="SHA" & Route==44 & Postmile > 71)$avg)))
 xp <- rbind(xp,data.frame(taz=14,p=subset(cnts.avg,County=="SHA" & Route==36 & Postmile < 5)$avg))
 xp <- rbind(xp,data.frame(taz=15,p=mean(subset(cnts.avg,County=="SHA" & Route==299 & Postmile==0)$avg)))
@@ -220,17 +219,17 @@ agg.taz.data <- merge(agg.taz.data,data.frame(taz=sha.gates,agg.id=sha.gates,
                                               name=pp("GATE_",agg.taz.data$name[match(sha.gate.agg.id, agg.taz.data$agg.id)]),
                                               jurisdiction=agg.taz.data$jurisdiction[match(sha.gate.agg.id, agg.taz.data$agg.id)],
                                               area=0,shp.id=NA,total.demand=NA,population=NA,employment=NA,point=T,near.redding=F),all=T)
-agg.taz.data$name[agg.taz.data$agg.id==4] <- 'GATE_FallRiver_299'
-agg.taz.data$name[agg.taz.data$agg.id==5] <- 'GATE_FallRiver_Old'
+agg.taz.data <- data.table(agg.taz.data)
+agg.taz.data[,taz:=agg.id]
 
 # specify gateways from SRTA that will become internalized and lose their status as gateways in new matrix associate the 
 # shasta TAZs that should be assumed to flow through those gateways en-route to SIS or TEH
 
-gates.to.intern <- list('1'=list('Siskiyou'=as.numeric(grep('111|107|152|117',c(sha.ids,sha.gates),value=T,invert=T)),'Tehama'=c()),
-                        '3'=list('Siskiyou'=c(111,107,152,117),'Tehama'=c()),
-                        '13'=list('Tehama'=120,'Siskiyou'=c()),
-                        '11'=list('Tehama'=as.numeric(grep('120',c(sha.ids,sha.gates),value=T,invert=T)),'Siskiyou'=c()),
-                        '12'=list('Tehama'=as.numeric(grep('120',c(sha.ids,sha.gates),value=T,invert=T)),'Siskiyou'=c()))
+gates.to.intern <- list('1'=list('Siskiyou'=as.numeric(grep('111|107|152|117',c(sha.ids,sha.gates),value=T,invert=T)),'Tehama'=-999),
+                        '3'=list('Siskiyou'=c(111,107,152,117),'Tehama'=-999),
+                        '13'=list('Tehama'=120,'Siskiyou'=-999),
+                        '11'=list('Tehama'=as.numeric(grep('120',c(sha.ids,sha.gates),value=T,invert=T)),'Siskiyou'=-999),
+                        '12'=list('Tehama'=as.numeric(grep('120',c(sha.ids,sha.gates),value=T,invert=T)),'Siskiyou'=-999))
 gates.to.intern.ids <- as.numeric(names(gates.to.intern))
 new.tazs <- c(sis.ids,sis.gates,teh.ids,teh.gates,sha.ids,sha.gates)
 
@@ -262,19 +261,8 @@ for(i in 1:length(all.gates)){
 }
 
 ###################################################################################################################################################
-# produce a unique P/A matrix for each case (SIS vs TEH) from the aggregated OD matrix and the total demand estimates on the point TAZs
+# How are trips distributed by purpose?
 ###################################################################################################################################################
-purps <- c('ho','hs','hsc','hw','oo','wo')
-new.pa <- expand.grid(juris=c('Siskiyou','Tehama'),taz=new.tazs,purp=purps)
-new.pa$trips <- NA
-new.pa <- data.table(new.pa)
-setkey(new.pa,'taz')
-agg.dt <- data.table(agg.taz.data)
-agg.dt[,taz:=agg.id]
-setkey(agg.dt,"taz")
-new.pa.temp <- new.pa[agg.dt]
-new.pa <- subset(new.pa.temp,agg.id<200 | juris==jurisdiction)[,list(taz=taz,juris=juris,purp=purp,trips=trips)]
-
 od.agg <- as.data.table(od.agg)
 
 setkey(od.agg,'from')
@@ -282,9 +270,7 @@ od.agg.sums <- od.agg[,list(ho=sum(ho),hs=sum(hs),hsc=sum(hsc),hw=sum(hw),oo=sum
 od.agg.sums <- od.agg.sums[,':='(ho=ho/tot,hs=hs/tot,hsc=hsc/tot,hw=hw/tot,oo=oo/tot,wo=wo/tot)]
 od.agg.sums.m <- data.table(melt(od.agg.sums,id.vars='from',measure.vars=c('ho','hs','hsc','hw','oo','wo')),key=c('from'))
 
-###################################################################################################################################################
 # look into potential demographic relationships
-###################################################################################################################################################
 #dem <- data.table(dem)
 #dem[,from:=TAZ]
 #dem[,':='(from=TAZ,population=Population,Population=NULL,employment=TOTAL.1)]
@@ -292,62 +278,74 @@ od.agg.sums.m <- data.table(melt(od.agg.sums,id.vars='from',measure.vars=c('ho',
 #od.agg.sums.m <- dem[od.agg.sums.m]
 #ggplot(od.agg.sums.m,aes(x=population,y=value,shape=near.redding))+geom_point()+facet_wrap(~variable)
 
-# just find the mean ratio by purp
+# not fruitful, so instead find the mean ratio by purp
 setkey(od.agg.sums.m,"variable")
 mean.frac.purp <- od.agg.sums.m[,list(frac=mean(value,na.rm=T)),by=variable][,':='(purp=variable,variable=NULL)]
 
 ###################################################################################################################################################
+# P/A MODEL
+# produce a P/A matrix from the aggregated OD matrix, the total demand estimates on the point TAZs, and screenlines on the GATES
+###################################################################################################################################################
+purps <- c('ho','hs','hsc','hw','oo','wo')
+new.pa <- expand.grid(taz=new.tazs,purp=purps)
+new.pa$trips <- 0
+new.pa <- data.table(new.pa)
+setkey(new.pa,'taz')
+setkey(agg.taz.data,"taz")
+new.pa <- new.pa[agg.taz.data]
+new.pa[,':='(name=NULL,jurisdiction=NULL,area=NULL,shp.id=NULL,population=NULL,employment=NULL)]
+
+###################################################################################################################################################
 # for SHA the p's and a's are taken as the trips to/from the gates which need to be internalized
 ###################################################################################################################################################
-setkey(new.pa,'juris','taz','purp')
+setkey(new.pa,'taz','purp')
 od.agg.m <- data.table(melt(od.agg,id.vars=c('from','to'),measure.vars=c('ho','hs','hsc','hw','oo','wo')),key=c('from','to'))[,':='(purp=variable,variable=NULL,trips=value,value=NULL)]
-for(gate in gates.to.intern.ids){
-  for(juris in c('Siskiyou','Tehama')){
+sha.trips.by.juris <- list()
+trips.prev <- new.pa$trips
+for(juris in c('Siskiyou','Tehama')){
+  for(gate in gates.to.intern.ids){
     if(length(gates.to.intern[[as.character(gate)]][[juris]])>0){
       prods <- od.agg.m[J(gates.to.intern[[as.character(gate)]][[juris]],gate),list(trips=sum(trips)),by=c("from","purp")]
-      prods[,':='(taz=from,from=NULL,juris=juris)]
-      setkey(prods,'juris','taz','purp')
+      prods[,':='(taz=from,from=NULL)]
+      setkey(prods,'taz','purp')
       new.pa <- prods[new.pa]
-      new.pa[,':='(trips=ifelse(is.na(trips),trips.1,trips),trips.1=NULL)]
+      new.pa[,':='(trips=ifelse(is.na(trips),0,trips),trips.1=ifelse(is.na(trips.1),0,trips.1))]
+      new.pa[,':='(trips=trips+trips.1,trips.1=NULL)]
     }
   }
+  sha.trips.by.juris[[juris]] <- new.pa$trips - trips.prev
+  trips.prev <- new.pa$trips
 }
+new.pa$frac.from.sis <- sha.trips.by.juris[['Siskiyou']]/(sha.trips.by.juris[['Siskiyou']] + sha.trips.by.juris[['Tehama']])
+new.pa[,frac.from.sis:=ifelse(is.nan(frac.from.sis),0,frac.from.sis)]
 
 ###################################################################################################################################################
 # for SHA GATES that are not internalized, make p/a the difference between screenlines and trips internal to SHA
+# for the SIS/TEH GATES, make p/a be the one-way trips
+# based on analysis of CHTS trip lengths, X trips nearby are ~5 times more frequent than X trips through to the other county
 ###################################################################################################################################################
 xp[,from:=taz]
 setkey(xp,'from')
 xp <- data.table(od.agg.sums[from %in% sha.gates,list(from,tot)],key='from')[xp]
-xp[,p:=ifelse(is.na(tot),p,p-tot)]
-xp[,taz:=from]
-xp[,tot:=NULL]
-new.pa[,trips:=ifelse(taz>0 & taz<100,NA,trips)]
-
-###################################################################################################################################################
-# for the gateways, make p/a be the one-way trips
-# based on analysis of CHTS trip lengths, X trips nearby are ~5 times more frequent than X trips through to the other county
-###################################################################################################################################################
-
+# WARNING, don't do this step without recreating xp several blocks up from here
+xp[,':='(p=ifelse(is.na(tot),p,p-tot),taz=from,tot=NULL)]
+new.pa[,trips:=ifelse(taz<100,NA,trips)]
 setkey(new.pa,'taz')
 setkey(xp,'taz')
 setkey(mean.frac.purp,"purp")
-xp$sha.frac <- c(1/6,5/6,1/6,5/6,0.75,0.75,0.25,1,0.8)
-xp$teh.frac <- 1-xp$sha.frac
+# now that juris is combined, we don't need to impose this SIS/TEH distribution
+#xp$sha.frac <- c(1/6,5/6,1/6,5/6,0.75,0.75,0.25,1,0.8)
+#xp$teh.frac <- 1-xp$sha.frac
+#xp[,':='(p.sha=p*sha.frac,p.teh=p*teh.frac)]
 new.pa <- mean.frac.purp[data.table(xp[new.pa],key="purp")]
-new.pa[,trips:=ifelse(is.na(trips),ifelse(juris=='Siskiyou',p*sha.frac*frac,p*teh.frac*frac),trips)]
-new.pa[,':='(p=NULL,sha.frac=NULL,teh.frac=NULL)]
+new.pa[,trips:=ifelse(is.na(trips),p*frac,trips)]
+new.pa[,':='(p=NULL)]
 
 ###################################################################################################################################################
 # for SIS and TEH p's and a's come from the total demand modeled above are are 
 # disaggregated according to the average non-redding trip purpose distribution
 ###################################################################################################################################################
-setkey(new.pa,"taz")
-setkey(agg.dt,"taz")
-setkey(mean.frac.purp,"purp")
-new.pa.with.tot <- data.table(agg.dt[new.pa],key="purp")[,':='(name=NULL,agg.id=NULL,jurisdiction=NULL,area=NULL,shp.id=NULL,population=NULL,employment=NULL,point=NULL,near.redding=NULL)]
-new.pa <- mean.frac.purp[new.pa.with.tot]
-new.pa[,':='(trips=ifelse(is.na(trips),total.demand*frac,trips),total.demand=NULL,frac=NULL)]
+new.pa[,':='(trips=ifelse(taz>=200,total.demand*frac,trips))]
 #ggplot(new.pa,aes(x=taz,y=trips,fill=purp))+geom_bar(stat='identity')+facet_wrap(~juris)
 
 ###################################################################################################################################################
@@ -361,98 +359,132 @@ time.dist.by.purp[,':='(purp=rep(purps,each=nrow(time.distance)))]
 setkey(time.dist.by.purp,"purp")
 time.dist.by.purp[,fric:=find.friction(hours,fric.functions,purp[1]),by="purp"]
 
+###################################################################################################################################################
+# create the 'distribed' data.table which will be the od matrix
+###################################################################################################################################################
 setkey(time.dist.by.purp,'purp','from','to')
 time.dist.by.purp <- unique(time.dist.by.purp)
 distribed <- data.table(expand.grid(from=new.tazs,to=new.tazs,purp=purps),key=c("purp","from","to"))
 distribed$trips <- -999
 distribed <- time.dist.by.purp[distribed]
 distribed$pft <- pp(distribed$purp,'-',distribed$from,'-',distribed$to)
-shasta.rows <- which((distribed$from>=100 & distribed$from<199) | (distribed$to>=100 & distribed$to<199))
+
+setkey(new.pa,"purp",'taz')
+distribed$pf <- pp(distribed$purp,'-',distribed$from)
+distribed$pt <- pp(distribed$purp,'-',distribed$to)
+new.pa$pt <- pp(new.pa$purp,'-',new.pa$taz)
+distribed$p <- new.pa$trips[match(distribed$pf,new.pa$pt)]
+distribed[,p:=ifelse(is.na(p),0,p)]
+distribed$a <- new.pa$trips[match(distribed$pt,new.pa$pt)]
+distribed[,a:=ifelse(is.na(a),0,a)]
+distribed$frac.from.sis <- new.pa$frac.from.sis[match(distribed$pt,new.pa$pt)] 
+distribed[,a:=ifelse(from%in%c(sis.ids,sis.gates) & to%in%c(sha.ids,sha.gates),a*frac.from.sis,a)]
+distribed[,a:=ifelse(from%in%c(teh.ids,teh.gates) & to%in%c(sha.ids,sha.gates),a*(1-frac.from.sis),a)]
+distribed <- distribed[-which(distribed$from%in%c(sha.ids,sha.gates) & distribed$to%in%c(sha.ids,sha.gates))]
+distribed[,k:=1]
 
 # we need to associate gateways that were internalized from original OD data need to be reassigned to the appropriate point TAZ
 # for use in the constraints inside the gravity objective function
-rows.for.gate.map <- list()
+setkey(distribed,'purp','from','to')
+rows.through.gates <- list()
 for(juris in c('Siskiyou','Tehama')){
-  rows.for.gate.map[[juris]] <- list()
-  rows.for.gate.map[[juris]][['from']] <- c()
-  rows.for.gate.map[[juris]][['to']] <- c()
+  rows.through.gates[[juris]] <- list()
+  rows.through.gates[[juris]][['from']] <- c()
+  rows.through.gates[[juris]][['to']] <- c()
+  rows.through.gates[[juris]][['all']] <- c()
   if(juris=='Siskiyou'){
     pt.tazs.in.juris <- c(sis.ids,sis.gates)
   }else{
     pt.tazs.in.juris <- c(teh.ids,teh.gates)
   }
-  rows.for.gate.map[[juris]][['pt.to.pt']] <- which(distribed$from %in% pt.tazs.in.juris & distribed$to %in% pt.tazs.in.juris)
+  rows.through.gates[[juris]][['pt.to.pt']] <- which(distribed$from %in% pt.tazs.in.juris & distribed$to %in% pt.tazs.in.juris)
   for(id in gates.to.intern.ids){
     shatsa.tazs.of.interest <- gates.to.intern[[as.character(id)]][[juris]]
-    rows.for.gate.map[[juris]][['from']] <- c(rows.for.gate.map[[juris]][['from']],which(distribed$from %in% shatsa.tazs.of.interest & distribed$to %in% pt.tazs.in.juris))
-    rows.for.gate.map[[juris]][['to']] <- c(rows.for.gate.map[[juris]][['to']],which(distribed$to %in% shatsa.tazs.of.interest & distribed$from %in% pt.tazs.in.juris))
+    rows.through.gates[[juris]][['from']] <- c(rows.through.gates[[juris]][['from']],which(distribed$from %in% shatsa.tazs.of.interest & distribed$to %in% pt.tazs.in.juris))
+    rows.through.gates[[juris]][['to']] <- c(rows.through.gates[[juris]][['to']],which(distribed$to %in% shatsa.tazs.of.interest & distribed$from %in% pt.tazs.in.juris))
   }
+  rows.through.gates[[juris]][['from']] <- unique(rows.through.gates[[juris]][['from']])
+  rows.through.gates[[juris]][['to']] <- unique(rows.through.gates[[juris]][['to']])
+  rows.through.gates[[juris]][['all']] <- c(rows.through.gates[[juris]][['to']],rows.through.gates[[juris]][['from']])
 }
-non.zero.k.rows.base <- which(!(distribed$from %in% c(sha.ids,sha.gates) & distribed$to %in% c(sha.ids,sha.gates)))
+rows.to.sisteh <- which(distribed$to %in% c(teh.ids,teh.gates,sis.ids,sis.gates))
 
 # this function assumes key is set on distribed to 'purp','from','to'
-gravity <- function(k){
-  distribed$k[non.zero.k.rows] <- k
-  distribed[,':='(trips=ifelse(a==0 | k==0,0,p*a*fric*k/sum(a*fric*k))),by=c('purp','from')]
+gravity <- function(type='abs'){
   # implement the constraints in the form of an objective that penalizes deviation from the constraints
   # we want the Shasta trips to/from the appropriate gateways to be consistent with the SRTA OD data, 
   # so we penalize for all deviations from productions and attractions from/to TAZs from 100-199.
-  #sum(distribed[rows.for.gate.map[[juris]][['from']],list(from.sr=(sum(trips)-p[1])^2),by=c('purp','from')]$from.sr) + 
-          sum(distribed[rows.for.gate.map[[juris]][['to']],list(to.sr=(sum(trips)-a[1])^2),by=c('purp','to')]$to.sr)
+  if(type=='abs'){
+    tot.sum <- sum(distribed[rows.to.sisteh,list(to.sr=abs(sum(trips)-a[1])),by=c('purp','to')]$to.sr)
+    for(juris in c('Siskiyou','Tehama')){
+      tot.sum <- tot.sum + sum(distribed[rows.through.gates[[juris]][['to']],list(to.sr=abs(sum(trips)-a[1])),by=c('purp','to')]$to.sr)
+    }
+    tot.sum/sum(distribed[,p[1],by=c('purp','from')]$V1)
+  }else if(type=='rmse'){
+    tot.sum <- sum(distribed[rows.to.sisteh,list(to.sr=(sum(trips)-a[1])^2),by=c('purp','to')]$to.sr)
+    for(juris in c('Siskiyou','Tehama')){
+      tot.sum <- tot.sum + sum(distribed[rows.through.gates[[juris]][['to']],list(to.sr=(sum(trips)-a[1])^2),by=c('purp','to')]$to.sr)
+    }
+    sqrt(tot.sum/nrow(distribed))
+  }
 }
 
-od.agg.all <- subset(od.agg,(from > 100 | from %in% all.gates) & (to > 100 | to %in% all.gates))
-for(juris in c('Siskiyou','Tehama')){
-  pa <- streval(pp('subset(new.pa,juris=="',juris,'")'))
-  setkey(pa,"purp",'taz')
+# to inspect
+#distribed[rows.to.sisteh,list(sum=sum(trips),a=a[1]),by=c('purp','to')]
+#distribed[rows.through.gates[['Siskiyou']][['to']],list(sum=sum(trips),a=a[1]),by=c('purp','to')]
+#distribed[rows.through.gates[['Tehama']][['to']],list(sum=sum(trips),a=a[1]),by=c('purp','to')]
+ 
 
-  if(juris=='Tehama'){
-    pt.tazs.in.other.juris <- c(sis.ids,sis.gates)
-  }else{
-    pt.tazs.in.other.juris <- c(teh.ids,teh.gates)
-  }
-  non.zero.k.rows <- non.zero.k.rows.base[-which(distribed$from[non.zero.k.rows.base] %in% pt.tazs.in.other.juris | distribed$to[non.zero.k.rows.base] %in% pt.tazs.in.other.juris)]
-  # for testing:
-  #non.zero.k.rows <- head(non.zero.k.rows,20)
-
-  distribed$pf <- pp(distribed$purp,'-',distribed$from)
-  distribed$pt <- pp(distribed$purp,'-',distribed$to)
-  pa$pt <- pp(pa$purp,'-',pa$taz)
-  distribed$p <- pa$trips[match(distribed$pf,pa$pt)]
-  distribed[,p:=ifelse(is.na(p),0,p)]
-  distribed$a <- pa$trips[match(distribed$pt,pa$pt)]
-  distribed[,a:=ifelse(is.na(a),0,a)]
-  distribed$k <- 0
+###################################################################################################################################################
+# Do the iterative distribution
+###################################################################################################################################################
+relax <- 0.5
+for(i in 1:150){
   setkey(distribed,'purp','from','to')
-  #distribed.bak <- distribed
-  k <- rep(1,length(non.zero.k.rows))
-  distribed$k[non.zero.k.rows] <- k
+  distribed[,':='(trips=ifelse(a==0 | k==0,0,p*a*fric*k/sum(a*fric*k))),by=c('purp','from')]
 
-  for(i in 1:50){
-    setkey(distribed,'purp','from','to')
-    distribed[,':='(trips=ifelse(a==0 | k==0,0,p*a*fric*k/sum(a*fric*k))),by=c('purp','from')]
-    setkey(distribed,'purp','to')
-    if('k.ratio' %in% names(distribed))distribed[,k.ratio:=NULL]
-    setkey(distribed,'purp','from','to')
-    distribed.to.change <- data.table(distribed[rows.for.gate.map[[juris]][['to']],list(k.ratio=ifelse(sum(trips)==0,1,a[1]/sum(trips))),by=c('purp','to')],key=c('purp','to'))[data.table(distribed[rows.for.gate.map[[juris]][['to']]],key=c('purp','to'))]
-    #distribed[,k:=k*k.ratio]
-    distribed.to.change[,k:=k*k.ratio]
+  # now update k to move the distribution closer to that specified by the a's, 
+  # first do this for the SIS/TEH GATES
+  if('k.ratio' %in% names(distribed))distribed[,k.ratio:=NULL]
+  distribed.to.change <- data.table(distribed[rows.to.sisteh,list(k.ratio=ifelse(sum(trips)==0,1,a[1]/sum(trips))),by=c('purp','to')],key=c('purp','to'))[data.table(distribed[rows.to.sisteh],key=c('purp','to'))]
+  distribed.to.change[,k:=k*ifelse(k.ratio<1,(1-(1-k.ratio)*relax),ifelse(k.ratio>1,1+(k.ratio-1)*relax,1))]
+  setkey(distribed.to.change,'pft')
+  setkey(distribed,'pft')
+  new.ks <- distribed.to.change$k[match(distribed$pft,distribed.to.change$pft)]
+  #new.ks[new.ks<1e-3] <- 0
+  #new.ks[new.ks>1e3] <- 1e3
+  distribed[,k:=ifelse(is.na(new.ks),k,new.ks)]
+  # Now do again for SIS and TEH but separately because we want the constraints from the internalized GATES
+  # to be separately resolved.  These sets of OD pairs are disjoint so there should be no overwriting
+  # of the k twice inside this loop.
+  for(juris in c('Siskiyou','Tehama')){
+    distribed.to.change <- data.table(distribed[rows.through.gates[[juris]][['to']],list(k.ratio=ifelse(sum(trips)==0,1,a[1]/sum(trips))),by=c('purp','to')],key=c('purp','to'))[data.table(distribed[rows.through.gates[[juris]][['to']]],key=c('purp','to'))]
+    distribed.to.change[,k:=k*ifelse(k.ratio<1,(1-(1-k.ratio)*relax),ifelse(k.ratio>1,1+(k.ratio-1)*relax,1))]
     setkey(distribed.to.change,'pft')
     setkey(distribed,'pft')
     new.ks <- distribed.to.change$k[match(distribed$pft,distribed.to.change$pft)]
-    distribed$k <- ifelse(is.na(new.ks),distribed$k,new.ks)
-
-    setkey(distribed,'purp','from','to')
-    obj <- gravity(distribed$k[non.zero.k.rows])
-    print(pp('iter ',i,': ',obj))
-    if(obj<1e-4)break
+    #new.ks[new.ks<1e-3] <- 0
+    #new.ks[new.ks>1e3] <- 1e3
+    distribed[,k:=ifelse(is.na(new.ks),k,new.ks)]
   }
-  od.agg.all <- merge(od.agg.all,cast(melt(distribed[c(rows.for.gate.map[[juris]][['pt.to.pt']],rows.for.gate.map[[juris]][['to']],rows.for.gate.map[[juris]][['from']]),list(purp,from,to,trips)],id.vars=c('from','to','purp'),measure.vars=c('trips')),from + to ~ purp),by=c('from','to'),all=T)
+  setkey(distribed,'purp','from','to')
+  obj <- gravity()
+  print(pp('iter ',i,': ',obj))
+  print(summary(distribed$k))
+  print('')
+  if(obj<1e-4)break
 }
+
+###################################################################################################################################################
+# Finalize the matrix
+###################################################################################################################################################
+setkey(od.agg,'from','to')
+od.agg.all <- subset(od.agg,(from > 100 | from %in% all.gates) & (to > 100 | to %in% all.gates))
+od.agg.all <- merge(od.agg.all,data.table(cast(melt(distribed[,list(purp,from,to,trips)],id.vars=c('from','to','purp'),measure.vars=c('trips')),from + to ~ purp),key=c('from','to')),all=T)
 
 # merge results to od.agg
 for(purp in purps){
-  streval(pp('od.agg.all[,',purp,':=ifelse(is.na(',purp,'),ifelse(is.na(',purp,'.x),',purp,'.y,',purp,'.x),',purp,')]'))
+  streval(pp('od.agg.all[,',purp,':=ifelse(is.na(',purp,'.x),',purp,'.y,',purp,'.x)]'))
   streval(pp('od.agg.all[,',purp,'.x:=NULL]'))
   streval(pp('od.agg.all[,',purp,'.y:=NULL]'))
 }
@@ -468,6 +500,9 @@ for(purp in c(purps,'com')){
 }
 od.agg.all[,tot:=ho+hs+hsc+hw+oo+wo]
 
+###################################################################################################################################################
+# Validate the results
+###################################################################################################################################################
 
 # Check out the diff between the system trips and internal screenlines 
 juris <- 'Siskiyou'
@@ -494,59 +529,20 @@ names(vols.intern) <- c('5-SIS','89','5-TEH')
 delta.SIS <- subset(cnts.avg,County=="SIS" & Route==5 & Postmile==0)$avg*2 - vols.intern['5-SIS']
 delta.TEH <- subset(cnts.avg,County=="TEH" & Route==5 & Postmile>42)$avg*2 - vols.intern['5-TEH']
 
-# We're now going to distribute these missing trips into XI, XX, and SHA-TEH travel, we need to define the gateways 
-# for the whole region to do this.  Gateways will be geographically associated with the nearest TAZ and the IDs will be 
-# the negative of that TAZ
-agg.gates <- -c(112,205,213,215,207)
 
-load(pp(pevi.shared,'data/UPSTATE/driving-distances/time.distance.Rdata'))
-time.distance$from <- agg.taz$agg.id[match(time.distance$orig,agg.taz$name)] 
-time.distance$to <- agg.taz$agg.id[match(time.distance$dest,agg.taz$name)] 
-for(gate in agg.gates){
-  td.sub <- subset(time.distance,from==-gate | to==-gate)
-  td.sub$from[td.sub$from==-gate] <- gate
-  td.sub$to[td.sub$to==-gate] <- gate
-  time.distance <- rbind(time.distance,td.sub)
-}
+###################################################################################################################################################
+# Cleanup and Save
+###################################################################################################################################################
 
+# rename SRTA gateways to be consistent with PEVI convention (negative of nearest TAZ) 
+od.agg.all$from[od.agg.all$from%in%sha.gates] <- -sha.gate.agg.id[match(od.agg.all$from[od.agg.all$from%in%sha.gates],sha.gates)]
+od.agg.all$to[od.agg.all$to%in%sha.gates] <- -sha.gate.agg.id[match(od.agg.all$to[od.agg.all$to%in%sha.gates],sha.gates)]
 
-# Find the minimum travel distance we're dealing with and use that to subset the CHTS data to only consider trips longer
-time.dist.rows <- which(time.distance$from %in% sis.gates & time.distance$to %in% c(sha.ids,teh.ids) )
-min.dist <- min(time.distance[time.dist.rows,]$miles)
-x.den <- density(subset(nssr.place,tripdistance>min.dist)$tripdur/60)
+# Rename time.distance and agg.taz data too
+time.distance$from[time.distance$from%in%sha.gates] <- -sha.gate.agg.id[match(time.distance$from[time.distance$from%in%sha.gates],sha.gates)]
+time.distance$to[time.distance$to%in%sha.gates] <- -sha.gate.agg.id[match(time.distance$to[time.distance$to%in%sha.gates],sha.gates)]
+agg.taz.data$agg.id[agg.taz.data$agg.id%in%sha.gates] <- -sha.gate.agg.id[match(agg.taz.data$agg.id[agg.taz.data$agg.id%in%sha.gates],sha.gates)]
 
+agg.taz.data[,taz:=agg.id]
 
-# Iteratively distribute the delta.SIS and delta.TEH until the gateway productions are met.
-for(i in 1:100){
-  # Distribute the delta.SIS
-  if(i==1){
-    setkey(time.distance,'from','to')
-    x.trips <- time.distance[data.table(expand.grid(from=sis.gates,to=c(sha.ids,teh.ids,sha.gates,teh.gates),trips=NA),key=c('from','to'))]
-    x.trips <- xp[x.trips]
-    x.trips$fric <- x.den$y[findInterval(x.trips$hours,x.den$x,all.inside=T)]
-    x.trips$fric[which(x.trips$to<0)] <- 1
-  }
-  x.trips[,trips:=delta.SIS/2*fric*p/sum(fric*p)]
-
-  # Distribute the delta.TEH
-  if(i==1){
-    setkey(time.distance,'from','to')
-    x.trips.teh <- time.distance[data.table(expand.grid(from=teh.gates,to=c(sha.ids,sis.ids,sha.gates,sis.gates),trips=NA),key=c('from','to'))]
-    x.trips.teh <- xp[x.trips.teh]
-    x.trips.teh$fric <- x.den$y[findInterval(x.trips.teh$hours,x.den$x,all.inside=T)]
-    x.trips.teh$fric[which(x.trips.teh$to<0)] <- 1
-  }
-  x.trips.teh[,trips:=delta.TEH/2*fric/sum(fric)]
-
-  for(gate in c(-205,-207,-213,-215)){
-    resid.ratio <- xp[J(gate)]$p/(x.trips.teh[from==gate | to==gate,sum(trips)] + x.trips[from==gate | to==gate,sum(trips)])
-    x.trips$fric[x.trips$to==gate] <- x.trips$fric[x.trips$to==gate] * resid.ratio
-    x.trips.teh$fric[x.trips.teh$to==gate] <- x.trips.teh$fric[x.trips.teh$to==gate] * resid.ratio
-    print(pp(gate,': ',resid.ratio))
-  }
-}
-
-
-
-
-
+save(od.agg.all,file=pp(pevi.shared,'data/UPSTATE/Shasta-OD-2020/od-agg-tricounty.Rdata'))

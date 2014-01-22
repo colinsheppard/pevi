@@ -407,4 +407,4 @@ demand.to.kml <- function(shp,num.vehicles,kml.filename,kmlname="KML Name", kmld
 
   system(paste('open ',kml.filename,sep=''))
 }
-print('map.color, shp.to.kml loaded')
+print('area.of.union, heatmap.kml, map.color, shp.to.kml, chargers.to.kml, collapse.df, demand.to.kml loaded')

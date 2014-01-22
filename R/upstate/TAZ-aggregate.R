@@ -20,11 +20,15 @@ taz$name[which(taz$TAZ==904)] <- "AND_OxYoke"
 agg.taz.data <- ddply(taz@data[!is.na(taz@data$agg.id),],.(agg.id),function(df){ 
   data.frame(name=df$name[1],area=sum(df$AREA),jurisdiction=pp(unique(df$JURISDCTN),collapse=","),stringsAsFactors=F)
 })
+row.names(agg.taz.data) <- agg.taz.data$agg.id
 agg.taz.shp <- SpatialPolygonsDataFrame(agg.taz.shp,agg.taz.data)
 agg.taz.shp$name <- as.character(agg.taz.shp$name)
 agg.taz.shp$shp.id <- unlist(lapply(agg.taz.shp@polygons,function(x){slot(x,'ID')}))
 writePolyShape(agg.taz.shp,pp(pevi.shared,'data/UPSTATE/shapefiles/AggregatedTAZs'))
 shp.to.kml(agg.taz.shp,pp(pevi.shared,'data/UPSTATE/kml/AggregatedTAZs.kml'),'Aggregated TAZs','','red',2,'#00000000','agg.id','name',c('name','agg.id'))
+
+taz.data <- data.table(taz@data)
+save(taz.data,file=pp(pevi.shared,'data/UPSTATE/shapefiles/taz-aggregation-mapping.Rdata'))
 
 # Here I manually cleaned up the polygons (inner rings were scattered throughout) and re-saved to AggregatedTAZs.kml/AggregatedTAZs.shp
 agg.taz <- readShapePoly(pp(pevi.shared,'data/UPSTATE/shapefiles/AggregatedTAZs'))

@@ -94,6 +94,15 @@ dem$near.redding <-  taz.centroids.sp$near.redding[match(dem$TAZ,taz.centroids.s
 dem$trips.from  <- tot.trips$orig[match(dem$TAZ,tot.trips$taz)]
 dem$trips.to    <- tot.trips$dest[match(dem$TAZ,tot.trips$taz)]
 
+# load taz.data, the mapping between raw TAZ and agg TAZ
+load(file=pp(pevi.shared,'data/UPSTATE/shapefiles/taz-aggregation-mapping.Rdata'))
+setkey(taz.data,'TAZ')
+taz.data <- unique(taz.data) # get's rid of the duplicated row for TAZ 502
+dem <- data.table(dem,key="TAZ")
+dem <- taz.data[dem]
+
+save(dem,file=pp(pevi.shared,'data/UPSTATE/demographics/taz-dem.Rdata'))
+
 # get rid of data from within redding area, very low populations and the outliers in terms of trips/capita (college and industrial TAZs)
 to.remove <- c(975,1136)
 dem.sub <- subset(dem,!near.redding & Population>20 & !TAZ %in% to.remove)
@@ -545,4 +554,4 @@ agg.taz.data$agg.id[agg.taz.data$agg.id%in%sha.gates] <- -sha.gate.agg.id[match(
 
 agg.taz.data[,taz:=agg.id]
 
-save(od.agg.all,file=pp(pevi.shared,'data/UPSTATE/Shasta-OD-2020/od-agg-tricounty.Rdata'))
+save(od.agg.all,agg.taz.data,time.distance,file=pp(pevi.shared,'data/UPSTATE/Shasta-OD-2020/od-agg-tricounty.Rdata'))

@@ -377,7 +377,6 @@ chargeSafetyFactor | Multiplier used to approximate the safety factor drivers as
 chargerSearchDistance | The distance in miles used to define what TAZs are considered “neighbors” for the purpose of finding a charger. |5
 willingToRoamTimeThreshold | The amount of time in hours at which point a driver will consider traveling to neighboring or en-route TAZs in order to charge vs. only considering TAZs in their current location. | 1
 timeOpportunityCost | The value of a driver’s time to his or herself in units of $ / hour. | 12.50
-***multiUnitSearchTolerance*** | ***The maximum number of times a driver will check a multi unit charger if the charger is busy.*** | ***8*** 
 fracPHEV | The fractions of PEV vehicles that are PHEV vs BEV. | 0.5
 probabilityOfUnneededCharge | The probability that a driver will choose to charge despite not actually needing it. | 0.1
 electricFuelConsumptionSD | Standard deviation of the truncated normal distribution used to distribute electric fuel consumption amongst the drivers.  In units of kWh/mile. | 0.02

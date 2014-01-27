@@ -42,6 +42,8 @@ if(args$shapetype == "polygon"){
   shapes <- readShapePoly(args$shapefile,proj4string=CRS(args$projstring))
 }else if(args$shapetype == "line"){
   shapes <- readShapeLines(args$shapefile,proj4string=CRS(args$projstring))
+}else if(args$shapetype == "point"){
+	shapes <- readShapePoints(args$shapefile,proj4string=CRS(args$projstring))
 }
 
 writeOGR(spTransform(shapes, CRS("+proj=longlat +ellps=WGS84 +datum=WGS84 +no_defs +towgs84=0,0,0")),args$kmlfile,args$name,"KML",overwrite_layer=T)

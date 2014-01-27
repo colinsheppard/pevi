@@ -478,26 +478,30 @@ end ;setup-chargers
 ;; SETUP SPECIAL PERMISSION CHARGERS
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 to setup-special-chargers
-  ifelse (file-exists? charger-permission-file) [
-    file-close
-    file-open charger-permission-file
-    while [file-at-end? = false] [
-      create-chargers 1 [
-        set location taz file-read
-        let #my-level file-read
-        set this-charger-type one-of charger-types with [level = #my-level]
-        set alt-energy-price file-read
-        let priviledged-drivers read-from-string (word "[" file-read-line "]") ; handy trick from http://stackoverflow.com/questions/10244850/read-file-lines-with-spaces-into-netlogo-as-lists
-        foreach priviledged-drivers [
-          ask drivers with [id = ?] [
-            set permission-list lput myself permission-list
+  ifelse (charger-permission-file != 0) [
+    ifelse (file-exists? charger-permission-file) [
+      file-close
+      file-open charger-permission-file
+      while [file-at-end? = false] [
+        create-chargers 1 [
+          set location taz file-read
+          let #my-level file-read
+          set this-charger-type one-of charger-types with [level = #my-level]
+          set alt-energy-price file-read
+          let priviledged-drivers read-from-string (word "[" file-read-line "]") ; handy trick from http://stackoverflow.com/questions/10244850/read-file-lines-with-spaces-into-netlogo-as-lists
+          foreach priviledged-drivers [
+            ask drivers with [id = ?] [
+              set permission-list lput myself permission-list
+            ]
           ]
         ]
       ]
+      file-close
+    ][ 
+      error (word "Input file '" charger-permission-file "' not found!") 
     ]
-    file-close
-  ][ 
-    error (word "Input file '" charger-permission-file "' not found!") 
+  ][
+    print "No special-permission-charger-file specified."
   ]
 end ;setup-special-chargers
   

@@ -107,6 +107,7 @@ for(pev.penetration in c(0.005,0.01,0.02,0.04)){
         NLCommand('dynamic-scheduler:go-until schedule 500')
         results[results.i,names(reporters)] <- tryCatch(NLDoReport(1,"",reporter = paste("(sentence",paste(reporters,collapse=' '),")"),as.data.frame=T,df.col.names=names(reporters)),error=function(e){ NA })
       }
+      
       build.result[105,c('cost','pain')] <- c(mean(as.numeric(results$infrastructure.cost)),mean(as.numeric(results$frac.stranded.by.delay)))
     }
     build.result <- evaluate.fitness(build.result)

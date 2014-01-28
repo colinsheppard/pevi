@@ -72,7 +72,7 @@ for(seed in seeds){
 
 	init.charger.buildout <- read.table(charger.file,header=T,sep='\t')
 	current.obj <- 0
-	taz.charger.combos <- expand.grid(init.charger.buildout$X.TAZ,subset(charger.info,level != 0)$level)
+	taz.charger.combos <- expand.grid(subset(init.charger.buildout,X.TAZ>0)$X.TAZ,subset(charger.info,level != 0)$level)
 	names(taz.charger.combos) <- c('taz','level')
 
 	if(!exists('cl')){
@@ -127,9 +127,7 @@ for(seed in seeds){
 				obj.average <- mean(df$objective)
 				data.frame(obj = obj.average)
 			})
-			
-			# print(taz.charger.obj)
-			
+						
       #	Winner determined by lowest objective function (currently cost)
 			winner <- which.min(taz.charger.obj$obj)
 			print(paste('winner =',winner))

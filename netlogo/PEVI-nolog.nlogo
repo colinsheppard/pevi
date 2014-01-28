@@ -678,7 +678,7 @@ end
 to wait-time-event-scheduler
   set state "not charging"
   ifelse remaining-range / charge-safety-factor < trip-distance [
-    ifelse ticks > 24 [
+    ifelse ticks > 36 [
       set state "stranded"
 ;;;      log-data "wait-time" (sentence ticks id [name] of this-vehicle-type state-of-charge trip-distance journey-distance time-until-depart "stranded" -1 electric-fuel-consumption) ;;;LOG
 ;;;      log-data "trip-journey-timeuntildepart" (sentence ticks departure-time id [name] of this-vehicle-type state-of-charge [id] of current-taz [id] of destination-taz true false (departure-time - ticks) "stranded" remaining-range sum map weight-delay itin-delay-amount) ;;;LOG

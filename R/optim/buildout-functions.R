@@ -83,7 +83,7 @@ evaluate.fitness <- function(build.result){
 
   clusterEvalQ(cl,rm(list=ls()))
   clusterExport(cl,c( 'run.buildout.batch','pev.penetration','path.to.inputs','optim.code','nl.path','model.path','path.to.outputs','seed','param.file','taz.charger.combos',
-                      'charger.file','write.charger.file','reporters','logfiles','pevi.home','vary.tab','streval','try.nl','debug.reporters','pevi.shared'))
+                      'charger.file','write.charger.file','reporters','logfiles','pevi.home','vary.tab','streval','try.nl','debug.reporters','pevi.shared','build.increment'))
   if(exists('batch.results'))rm('batch.results')
   batch.results<-clusterApply(cl,break.vary.tab,fun='run.buildout.batch')
   build.result<-batch.results[[1]]
@@ -145,7 +145,7 @@ run.buildout.batch <- function(break.vary.tab){
 			charger.results <- ddply(df,.(level),function(df1) {
 						
       	#	Add the candidate charger, then run the model.
-				NLCommand(paste('add-charger',df1$taz,df1$level))
+				NLCommand(paste('add-charger',df1$taz,df1$level,build.increment))
 				NLCommand(pp('print "taz',df1$taz,'level ',df1$level,'"'))
 				NLCommand('time:go-until 500')
 						
@@ -153,7 +153,7 @@ run.buildout.batch <- function(break.vary.tab){
 
         #	Reset for the next run, and delete the charger we added.
 				NLCommand('setup-in-batch-mode')	
-				NLCommand(paste('remove-charger',df1$taz,df1$level))
+				NLCommand(paste('remove-charger',df1$taz,df1$level,build.increment))
 				data.frame(obj = objective)
 			}) # end infrastructure testing - charger type count
 			data.frame(level = charger.results$level,

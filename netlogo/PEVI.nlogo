@@ -388,31 +388,36 @@ to log-taz-data ;;;LOG
   log-data "tazs" (sentence ticks id (count drivers with [current-taz = myself and is-bev?]) (count drivers with [current-taz = myself and not is-bev?]) #num-0 (count item 1 chargers-by-type) (count item 2 chargers-by-type) (count item 3 chargers-by-type) (#num-0 - count drivers with [current-taz = myself and current-charger = (one-of item 0 [chargers-by-type] of myself)]) (count (item 1 chargers-by-type) with [current-driver = nobody]) (count (item 2 chargers-by-type) with [current-driver = nobody]) (count (item 3 chargers-by-type) with [current-driver = nobody]) ) ;;;LOG
 end ;;;LOG
 
-to add-charger [ taz-id charger-level ]
-  create-chargers 1 [
-    set this-charger-type one-of charger-types with [level = charger-level]
+to add-charger [ taz-id charger-level buildout-increment ]
+  let build-charger-type one-of charger-types with [level = charger-level]
+  create-chargers buildout-increment [
+    set this-charger-type build-charger-type
     set location table:get taz-table taz-id
     set shape "Circle 2"
     set color red
     set size 1
     set current-driver nobody
-    let #level [level] of this-charger-type
     set energy-delivered 0
     ask table:get taz-table taz-id [
       structs:stack-push item charger-level available-chargers-by-type myself
-      set chargers-by-type replace-item charger-level chargers-by-type chargers with [([level] of this-charger-type = charger-level) and (location = myself)]
+      set chargers-by-type replace-item charger-level chargers-by-type chargers with [(this-charger-type = build-charger-type) and (location = myself)]
       set n-levels replace-item charger-level n-levels (item charger-level n-levels + 1)
     ]
   ]
 end
 
-to remove-charger [taz-id charger-level]  
-  ifelse available-chargers table:get taz-table taz-id charger-level > 0 [
+to remove-charger [taz-id charger-level buildout-increment]  
+  ifelse available-chargers table:get taz-table taz-id charger-level >= buildout-increment [
+    let build-charger-type one-of charger-types with [level = charger-level]
+    let death-count 0
     ask table:get taz-table taz-id [
-      let #dying-charger structs:stack-pop item charger-level available-chargers-by-type
-      ask #dying-charger [die]
-      set chargers-by-type replace-item charger-level chargers-by-type chargers with [([level] of this-charger-type = charger-level) and (location = myself)]
-      set n-levels replace-item charger-level n-levels (item charger-level n-levels - 1)
+      while [death-count < buildout-increment] [
+        let #dying-charger structs:stack-pop item charger-level available-chargers-by-type
+        ask #dying-charger [die]
+        set death-count death-count + 1
+      ]
+      set chargers-by-type replace-item charger-level chargers-by-type chargers with [(this-charger-type = build-charger-type) and (location = myself)]
+      set n-levels replace-item charger-level n-levels (item charger-level n-levels - buildout-increment)
     ]
   ][print (sentence "TAZ" taz-id "doesn't have a level" charger-level "charger.")] 
 end

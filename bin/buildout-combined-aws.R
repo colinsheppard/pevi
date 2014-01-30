@@ -11,6 +11,7 @@ load.libraries(c('optparse','yaml','RNetLogo','plyr','reshape','stringr','doMC')
 # COMMAND LINE OPTIONS 
 option_list <- list(
   make_option(c("-d", "--experimentdir"), type="character", default='.', help="Path to the directory containing the files needed to run the optimization (params.txt, vary.yaml, paths.yaml) [\"%default\"]")
+  make_option(c("-b", "--buildincrement"), type="numeric", default=1, help="Number of chargers we wish to build in one TAZ each iteration; [\"%default\"]")
 )
 if(interactive()){
   setwd(pp(pevi.shared,'data/inputs/optim-new/'))
@@ -22,6 +23,7 @@ if(interactive()){
 
 if(substr(args$experimentdir,1,1)!="/")args$experimentdir <- pp(getwd(),"/",args$experimentdir)
 if(substr(args$experimentdir,nchar(args$experimentdir),nchar(args$experimentdir)) != "/")args$experimentdir <- pp(args$experimentdir,"/")
+build.increment <- args$buildincrement
 
 Sys.setenv(NOAWT=1)
 options(java.parameters="-Xmx2048m")
@@ -142,7 +144,7 @@ seed <- 1
 			}
 			
       #	Now update our infrastructure file for the next round
-			charger.buildout[taz.charger.obj$taz[winner],grep(taz.charger.obj$level[winner],names(charger.buildout))] <- (charger.buildout[taz.charger.obj$taz[winner],grep(taz.charger.obj$level[winner],names(charger.buildout))] + 1)
+			charger.buildout[taz.charger.obj$taz[winner],grep(taz.charger.obj$level[winner],names(charger.buildout))] <- (charger.buildout[taz.charger.obj$taz[winner],grep(taz.charger.obj$level[winner],names(charger.buildout))] + build.increment)
 			write.table(charger.buildout,charger.file,quote=FALSE,sep='\t',row.names=FALSE)
 						
     } # end iteration loop
@@ -156,4 +158,4 @@ seed <- 1
   #	Reset the initial charger file.
 	write.table(init.charger.buildout,charger.file,quote=FALSE,ssep='\t',row.names=FALSE)    
     
-} # end seed loop
+#} # end seed loop

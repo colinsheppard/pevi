@@ -10,8 +10,8 @@ load.libraries(c('optparse','yaml','RNetLogo','plyr','reshape','stringr','doMC')
 ##############################################################################################################################################
 # COMMAND LINE OPTIONS 
 option_list <- list(
-  make_option(c("-d", "--experimentdir"), type="character", default='.', help="Path to the directory containing the files needed to run the optimization (params.txt, vary.yaml, paths.yaml) [\"%default\"]")
-  make_option(c("-b", "--buildincrement"), type="numeric", default=1, help="Number of chargers we wish to build in one TAZ each iteration; [\"%default\"]")
+  make_option(c("-d", "--experimentdir"), type="character", default='.', help="Path to the directory containing the files needed to run the optimization (params.txt, vary.yaml, paths.yaml) [\"%default\"]"),
+  make_option(c("-b", "--buildincrement"), type="numeric", default=1, help="Number of chargers we wish to build in one TAZ each iteration [\"%default\"]")
 )
 if(interactive()){
   setwd(pp(pevi.shared,'data/inputs/optim-new/'))

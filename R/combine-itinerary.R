@@ -7,15 +7,15 @@ pev.penetration <- 0.005
 replicate <- 1
 final.replicate <- 1
 
-for (i in 1:40){
-	if(file.exists(paste(path.to.combined.inputs,"driver-schedule-pen",pev.penetration*100,"-rep",replicate,"-20140122.txt",sep=''))==FALSE) {break}
+for (i in 1:80){
+	if(file.exists(paste(path.to.combined.inputs,"driver-schedule-pen",pev.penetration*100,"-rep",replicate,"-20140129.txt",sep=''))==FALSE) {break}
 	next.replicate <- replicate + 1
-	sched <- read.table(file=paste(path.to.combined.inputs,"driver-schedule-pen",pev.penetration*100,"-rep",replicate,"-20140122.txt",sep=''),sep='\t',header=T)
-	next.sched <- read.table(file=paste(path.to.combined.inputs,"driver-schedule-pen",pev.penetration*100,"-rep",next.replicate,"-20140122.txt",sep=''),sep='\t',header=T)
+	sched <- read.table(file=paste(path.to.combined.inputs,"driver-schedule-pen",pev.penetration*100,"-rep",replicate,"-20140129.txt",sep=''),sep='\t',header=T)
+	next.sched <- read.table(file=paste(path.to.combined.inputs,"driver-schedule-pen",pev.penetration*100,"-rep",next.replicate,"-20140129.txt",sep=''),sep='\t',header=T)
 	next.sched[,1] <- next.sched[,1] + max(sched[,1])
 	new.sched <- rbind(sched,next.sched,deparse.level = 0)
 	names(new.sched) <- c(';driver','from','to','depart','home')
-	write.table(new.sched,file=paste(path.to.combined.inputs,"driver-schedule-pen",pev.penetration*200,"-rep",final.replicate,"-20140122.txt",sep=''),sep='\t',row.names=F,quote=F)
+	write.table(new.sched,file=paste(path.to.combined.inputs,"driver-schedule-pen",pev.penetration*200,"-rep",final.replicate,"-20140129.txt",sep=''),sep='\t',row.names=F,quote=F)
 	replicate <- replicate + 2
 	final.replicate <- final.replicate + 1
 }

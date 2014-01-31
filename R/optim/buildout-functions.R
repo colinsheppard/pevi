@@ -87,7 +87,7 @@ evaluate.fitness <- function(build.result){
   if(exists('batch.results'))rm('batch.results')
   batch.results<-clusterApply(cl,break.vary.tab,fun='run.buildout.batch')
   build.result<-batch.results[[1]]
-  for(i in 2:length(cl)){
+  for(i in 2:length(batch.results)){
   	build.result <- rbind(build.result,batch.results[[i]])
   }
   # build.result<-data.frame(matrix(unlist(batch.results),numrows,3	,byrow=T))
@@ -163,7 +163,6 @@ run.buildout.batch <- function(break.vary.tab){
 		batch.results$taz[row]				 <- input.i.result$taz[match(min(input.i.result$obj),input.i.result$obj)]
 		batch.results$level[row]			 <- input.i.result$level[match(min(input.i.result$obj),input.i.result$obj)]
 		batch.results$objective[row]	 <- min(input.i.result$obj)
-		print(batch.results[row,])
 	} # end vary.tab for loop
 	
   #	Quit our NetLogo instance

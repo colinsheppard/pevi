@@ -47,8 +47,8 @@ charger.file <- pp(pevi.shared,param.file.data[grep('charger-input-file',param.f
 charger.info <- read.table(pp(pevi.shared,param.file.data[grep('charger-type-input-file',param.file.data$V1),2]),row.names=NULL,header=T,sep='\t')
 names(charger.info) <- c('level','charge.rate','energy.price','installed.cost')
 
-#for(seed in seeds){
-seed <- 1 
+for(seed in seeds){
+#seed <- 1 
   optim.code <- paste(optim.scenario,'-seed',seed,sep='')
   print(optim.code)
 

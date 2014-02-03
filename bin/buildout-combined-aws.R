@@ -156,6 +156,6 @@ for(seed in seeds){
   } # end penetration-level loop
   
   #	Reset the initial charger file.
-	write.table(init.charger.buildout,charger.file,quote=FALSE,ssep='\t',row.names=FALSE)    
+	write.table(init.charger.buildout,charger.file,quote=FALSE,sep='\t',row.names=FALSE)    
     
 } # end seed loop

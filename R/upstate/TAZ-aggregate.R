@@ -30,6 +30,18 @@ shp.to.kml(agg.taz.shp,pp(pevi.shared,'data/UPSTATE/kml/AggregatedTAZs.kml'),'Ag
 taz.data <- data.table(taz@data)
 save(taz.data,file=pp(pevi.shared,'data/UPSTATE/shapefiles/taz-aggregation-mapping.Rdata'))
 
+# Here I'm faking up some EVSE and PEVs to put into a shapefile as points for making up pretty slide to visualize the process:
+use.rows <- sample(1:nrow(taz@data),60)
+fake.evse <-SpatialPointsDataFrame(coordinates(taz)[use.rows,],data=data.frame(longitude= coordinates(taz)[use.rows,1],latitude= coordinates(taz)[use.rows,2]))
+writePointsShape(fake.evse,pp(pevi.shared,'data/UPSTATE/shapefiles/FakeEVSE'))
+
+rds <- readShapeLines(pp(pevi.shared,'data/UPSTATE/shapefiles/Upstate_Roads'))
+rd.coords <- ldply(coordinates(rds),function(l){ l[[1]] })
+use.rows <- sample(1:nrow(rd.coords),200)
+fake.pevs <-SpatialPointsDataFrame(rd.coords[use.rows,],data=data.frame(longitude=rd.coords[use.rows,1],latitude=rd.coords[use.rows,2]))
+plot(fake.pevs)
+writePointsShape(fake.pevs,pp(pevi.shared,'data/UPSTATE/shapefiles/FakePEVs'))
+
 # Here I manually cleaned up the polygons (inner rings were scattered throughout) and re-saved to AggregatedTAZs.kml/AggregatedTAZs.shp
 agg.taz <- readShapePoly(pp(pevi.shared,'data/UPSTATE/shapefiles/AggregatedTAZs'))
 

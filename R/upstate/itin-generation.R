@@ -18,7 +18,7 @@ time.distance$miles.int <- round(time.distance$miles)
 load(file=pp(pevi.shared,'data/CHTS/nssr-subset.Rdata'))
 
 # the trips purposes for from the SRTA model
-purps <- c("ho","hs","hsc" "hw","oo","wo")
+purps <- c("ho","hs","hsc","hw","oo","wo")
 
 # Load/Create the home distribution and nearest neighbors list
 if(!file.exists(pp(pevi.shared,"data/UPSTATE/demographics/frac-homes-and-nearest-10.Rdata"))){
@@ -177,35 +177,39 @@ source(pp(pevi.home,'R/upstate/itin-functions.R',sep=''))
 # fix the bug that causes drivers to have impossible itineraries
 num.replicates <- 80
 time.distance$ft <- pp(time.distance$from,' ',time.distance$to)
-#for(pev.penetration in pev.pens){
-  pev.penetration <- 0.005
-  pev.pen.char <- roundC(pev.penetration,3)
-  schedule.reps[[pev.pen.char]] <- list()
-  for(replicate in 1:num.replicates){
-    print(paste('Penetration ',pev.penetration,' replicate ',replicate,sep=''))
-    schedule.reps[[pev.pen.char]][[as.character(replicate)]] <- create.schedule(pev.penetration,1)
-    sched <- schedule.reps[[pev.pen.char]][[as.character(replicate)]][,c('driver','from','to','depart','home')]
-    #sched <- read.table(file=paste(path.to.shared.inputs,"driver-schedule-pen",pev.penetration*100,"-rep",replicate,"-20130129.txt",sep=''),sep='\t',header=T)
-    sched$ft <- pp(sched$from,' ',sched$to)
+date.code <- '20140129'
+pev.penetration <- 0.005
+pev.pen.char <- roundC(pev.penetration,3)
+if(file.exists(pp(pevi.shared,'data/inputs/driver-input-file/upstate-uncombined-schedule-replicates-',date.code,'.Rdata',sep=''))){
+  load(file=pp(pevi.shared,'data/inputs/driver-input-file/upstate-uncombined-schedule-replicates-',date.code,'.Rdata',sep=''))
+}else{
+  schedule.reps <- list()
+}
+if(is.null(schedule.reps[[pev.pen.char]]))schedule.reps[[pev.pen.char]] <- list()
+for(replicate in 1:num.replicates){
+  print(paste('Penetration ',pev.penetration,' replicate ',replicate,sep=''))
+  schedule.reps[[pev.pen.char]][[as.character(replicate)]] <- create.schedule(pev.penetration,1)
+  sched <- schedule.reps[[pev.pen.char]][[as.character(replicate)]][,c('driver','from','to','depart','home')]
+  #sched <- read.table(file=paste(path.to.shared.inputs,"driver-schedule-pen",pev.penetration*100,"-rep",replicate,"-20130129.txt",sep=''),sep='\t',header=T)
+  sched$ft <- pp(sched$from,' ',sched$to)
 
-    sched <- join(sched,time.distance,by="ft")
-    sched$arrive <- sched$depart + sched$hours
-    if(names(sched)[1]=="X.driver")names(sched)<-c("driver",names(sched)[2:ncol(sched)])
-    sched <- ddply(sched,.(driver),function(df){ 
-      if(nrow(df)>1 & any(df$depart[2:nrow(df)] < df$arrive[1:(nrow(df)-1)])){
-        while(any(df$depart[2:nrow(df)] < df$arrive[1:(nrow(df)-1)])){
-          i <- which(df$depart[2:nrow(df)] < df$arrive[1:(nrow(df)-1)])[1]
-          df$depart[(i+1):nrow(df)] <- df$depart[(i+1):nrow(df)]+1
-        }
+  sched <- join(sched,time.distance,by="ft")
+  sched$arrive <- sched$depart + sched$hours
+  if(names(sched)[1]=="X.driver")names(sched)<-c("driver",names(sched)[2:ncol(sched)])
+  sched <- ddply(sched,.(driver),function(df){ 
+    if(nrow(df)>1 & any(df$depart[2:nrow(df)] < df$arrive[1:(nrow(df)-1)])){
+      while(any(df$depart[2:nrow(df)] < df$arrive[1:(nrow(df)-1)])){
+        i <- which(df$depart[2:nrow(df)] < df$arrive[1:(nrow(df)-1)])[1]
+        df$depart[(i+1):nrow(df)] <- df$depart[(i+1):nrow(df)]+1
       }
-      df
-    })
-    sched <- sched[,c('driver','from','to','depart','home')]
-    names(sched) <- c(';driver','from','to','depart','home')
-    write.table(sched,pp(pevi.shared,"data/inputs/driver-input-file/upstate-uncombined/driver-schedule-pen",pev.penetration*100,"-rep",replicate,"-20140122.txt",sep=''),sep="\t",row.names=F,quote=F)
-  }
-#}
-save(schedule.reps,file=pp(pevi.shared,'data/inputs/driver-input-file/upstate-uncombined-schedule-replicates-20140122.Rdata',sep=''))
+    }
+    df
+  })
+  sched <- sched[,c('driver','from','to','depart','home')]
+  names(sched) <- c(';driver','from','to','depart','home')
+  write.table(sched,pp(pevi.shared,"data/inputs/driver-input-file/upstate-uncombined/driver-schedule-pen",pev.penetration*100,"-rep",replicate,"-",date.code,".txt",sep=''),sep="\t",row.names=F,quote=F)
+}
+save(schedule.reps,file=pp(pevi.shared,'data/inputs/driver-input-file/upstate-uncombined-schedule-replicates-',date.code,'.Rdata',sep=''))
 
 # make plot comparing spatial distribution of trips in itin to GEATM
 if(make.plots){

@@ -139,7 +139,7 @@ for(seed in seeds){
 			if(current.obj > taz.charger.obj$obj[winner]) {
 				current.obj <- taz.charger.obj$obj[winner]
 			} else {
-				current.obj <- 0
+				current.obj <- Inf
 				break
 			}
 			

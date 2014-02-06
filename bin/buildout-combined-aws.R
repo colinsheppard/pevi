@@ -90,6 +90,10 @@ for(seed in seeds){
 	
 	model.path <- paste(pevi.home,"netlogo/PEVI-nolog.nlogo",sep='')
 
+  #	Read in the starting infrastructure. We want linked buildout.
+	charger.buildout <- init.charger.buildout
+	names(charger.buildout) <- c(';TAZ','L0','L1','L2','L3','L4')
+
   for(pev.penetration in pev.penetrations){
   #pev.penetration <- pev.penetrations[1]
     print(paste("pen",pev.penetration))
@@ -106,13 +110,9 @@ for(seed in seeds){
     	vary.tab <- expand.grid(new.vary,stringsAsFactors=F)
     }
     vary.tab$`driver-input-file` <- str_replace(vary.tab$`driver-input-file`,"penXXX",paste("pen",pev.penetration*100,sep=""))
-		
-    #	Read in the starting infrastructure. If we want linked buildout, put in an if statement to only set at the start.
-		charger.buildout <- init.charger.buildout
-		names(charger.buildout) <- c(';TAZ','L0','L1','L2','L3','L4')
-    #	num.charger.type <- ncol(charger.buildout)-3
-		
+				
 		begin.build.i <- 1
+		charger.buildout.history <- data.frame()
 
     # Start for loop for overall penetration level optimization
 		for(build.i in begin.build.i:250){
@@ -138,6 +138,11 @@ for(seed in seeds){
       # If our objective value has reached a minimum, we're done.
 			if(current.obj > taz.charger.obj$obj[winner]) {
 				current.obj <- taz.charger.obj$obj[winner]
+				# REMOVE THIS SCRIPT AFTER TESTING!
+				if(build.i == 2) {
+					break
+				}
+				# END THE PART WE REMOVE
 			} else {
 				current.obj <- Inf
 				break
@@ -146,7 +151,13 @@ for(seed in seeds){
       #	Now update our infrastructure file for the next round
 			charger.buildout[taz.charger.obj$taz[winner],grep(taz.charger.obj$level[winner],names(charger.buildout))] <- (charger.buildout[taz.charger.obj$taz[winner],grep(taz.charger.obj$level[winner],names(charger.buildout))] + build.increment)
 			write.table(charger.buildout,charger.file,quote=FALSE,sep='\t',row.names=FALSE)
-						
+			
+			# Create an Rdata file with a data frame holding all buildout information thus far.
+			charger.buildout.iter <- charger.buildout
+			charger.buildout.iter$iter <- build.i
+			charger.buildout.history <- rbind(charger.buildout.history,charger.buildout.iter)
+			save(charger.buildout.history,file=pp(path.to.outputs,'charger-buildout-history-pen',pev.penetration*100,'.Rdata'))
+									
     } # end iteration loop
     
     # Write out our final infrastructure to a new file.

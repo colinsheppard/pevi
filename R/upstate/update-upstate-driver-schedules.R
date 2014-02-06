@@ -1,4 +1,4 @@
-# Load the conversion table from old TAZ to new TAZ.
+# Load the conversion table from old TAZ to new TAZ: od.converter
 load(pp(pevi.shared,'data/UPSTATE/od.converter.Rdata'))
 
 # Cycle through the uncombined files and convert to the new TAZ ids.

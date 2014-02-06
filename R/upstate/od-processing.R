@@ -243,9 +243,11 @@ gates.to.intern.ids <- as.numeric(names(gates.to.intern))
 new.tazs <- c(sis.ids,sis.gates,teh.ids,teh.gates,sha.ids,sha.gates)
 
 # Load time.distance and add ids to dist/time matrix
+
 load(pp(pevi.shared,'data/UPSTATE/driving-distances/time.distance.Rdata'))
 time.distance$from <- agg.taz$agg.id[match(time.distance$orig,agg.taz$name)] 
 time.distance$to <- agg.taz$agg.id[match(time.distance$dest,agg.taz$name)] 
+
 # make the time/distance to the gates be based on their closest TAZs
 all.gates <- c(new.gates,sha.gates)
 all.gates.agg.id <- c(-new.gates,sha.gate.agg.id)
@@ -269,11 +271,19 @@ for(i in 1:length(all.gates)){
   time.distance <- rbind(time.distance,temp.time.distance)
 }
 
+# now adjust those distances based on the average external trip distance region-wide (24.6 miles)
+od.agg <- data.table(od.agg,key=c('from','to'))
+od.agg[,tot:=ho+hs+hsc+hw+oo+wo]
+setkey(time.distance,'from','to')
+od.agg.with.dist <- na.omit(time.distance[od.agg[from<100 | to<100,list(from,to,tot)],list(from,to,tot,miles)])
+od.agg.with.dist[,vmt:=tot*miles]
+vmt.per.trip <- sum(od.agg.with.dist$vmt)/sum(od.agg.with.dist$tot)
+time.distance[from<100 | to<100,miles:=miles+vmt.per.trip]
+time.distance[from<100 | to<100,hours:=hours+vmt.per.trip/60] # assumes 60 mph avg speed
+
 ###################################################################################################################################################
 # How are trips distributed by purpose?
 ###################################################################################################################################################
-od.agg <- as.data.table(od.agg)
-
 setkey(od.agg,'from')
 od.agg.sums <- od.agg[,list(ho=sum(ho),hs=sum(hs),hsc=sum(hsc),hw=sum(hw),oo=sum(oo),wo=sum(wo),tot=sum(c(ho,hs,hsc,hw,oo,wo))),by="from"]
 od.agg.sums <- od.agg.sums[,':='(ho=ho/tot,hs=hs/tot,hsc=hsc/tot,hw=hw/tot,oo=oo/tot,wo=wo/tot)]

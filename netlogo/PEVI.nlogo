@@ -406,7 +406,7 @@ to add-charger [ taz-id charger-level buildout-increment ]
 end
 
 to remove-charger [taz-id charger-level buildout-increment]  
-  ifelse available-chargers table:get taz-table taz-id charger-level >= buildout-increment [
+  ifelse num-available-chargers table:get taz-table taz-id charger-level >= buildout-increment [
     let build-charger-type one-of charger-types with [level = charger-level]
     let death-count 0
     ask table:get taz-table taz-id [
@@ -560,7 +560,7 @@ to seek-charger
           ]
         ]
        
-        if (available-chargers #this-taz #level > 0) and ((#level > 0) or ((#this-taz = home-taz) and #level = 0)) or (#min-priviledged-charger != nobody) [ 
+        if (num-available-chargers #this-taz #level > 0) and ((#level > 0) or ((#this-taz = home-taz) and #level = 0)) or (#min-priviledged-charger != nobody) [ 
           let #this-charger-type one-of charger-types with [ level = #level ]
           let #this-charge-rate [charge-rate] of #this-charger-type
           ifelse #charger-in-origin-or-destination [
@@ -605,7 +605,7 @@ to seek-charger
           if not #level-3-and-too-full [
             ; self is currently the driver
             
-            ifelse (#min-priviledged-cost < [energy-price] of #this-charger-type or available-chargers #this-taz #level = 0) and #this-taz = [location] of #min-priviledged-charger [ ;If the priviledged charger is cheaper, or the only charger 
+            ifelse (#min-priviledged-cost < [energy-price] of #this-charger-type or num-available-chargers #this-taz #level = 0) and #this-taz = [location] of #min-priviledged-charger [ ;If the priviledged charger is cheaper, or the only charger 
               let #this-cost (time-opportunity-cost * (#extra-time-for-travel + #extra-time-until-end-charge) + #level-3-time-penalty +
               (#min-priviledged-cost) * (item #level #trip-or-journey-energy-need-by-type + #extra-energy-for-travel))
               if #this-cost < #min-cost or (#this-cost = #min-cost and [level] of #this-charger-type > [level] of #min-charger-type) [
@@ -943,7 +943,7 @@ end
 to depart
 ;  log-data "drivers" (sentence precision ticks 3 [id] of self "departing" state-of-charge)
   ifelse need-to-charge "depart" [  
-    ifelse state-of-charge >= 1 - small-num or (( count (existing-chargers current-taz 1)  = 0) and (count (existing-chargers current-taz 2)  = 0) and (count (existing-chargers current-taz 4)  = 0) and state-of-charge >= 0.8 - small-num)[
+    ifelse state-of-charge >= 1 - small-num or (( num-existing-chargers current-taz 1 = 0) and ( num-existing-chargers current-taz 2  = 0) and (num-existing-chargers current-taz 4 = 0) and state-of-charge >= 0.8 - small-num)[
       log-data "break-up-trip" (sentence ticks id state-of-charge ([id] of current-taz) ([id] of destination-taz) remaining-range charging-on-a-whim? "break-up-trip") ;;;LOG
       break-up-trip
     ][
@@ -971,17 +971,17 @@ to break-up-trip
     set #this-taz ?
     let #this-score 0
     let #this-dist distance-from-to [id] of current-taz [id] of #this-taz
-    let #only-level-3 (count (existing-chargers #this-taz 1)  = 0) and (count (existing-chargers #this-taz 2)  = 0) and (count (existing-chargers #this-taz 4)  = 0)
+    let #only-level-3 (num-existing-chargers #this-taz 1  = 0) and (num-existing-chargers #this-taz 2 = 0) and (num-existing-chargers #this-taz 4 = 0)
     if #this-dist <= remaining-range / charge-safety-factor and 
       ( (#only-level-3 and distance-from-to [id] of #this-taz [id] of destination-taz <= 0.8 * battery-capacity / electric-fuel-consumption / charge-safety-factor)
         or (not #only-level-3 and distance-from-to [id] of #this-taz [id] of destination-taz <= battery-capacity / electric-fuel-consumption / charge-safety-factor) ) [
       foreach [level] of charger-types [
         let #level ?
-        if (available-chargers #this-taz #level > 0) [
+        if (num-available-chargers #this-taz #level > 0) [
           ifelse #level = 0 [
             if #this-taz = home-taz [ set #this-score #this-score + 8 ]
           ][
-            set #this-score #this-score + #level * available-chargers #this-taz #level
+            set #this-score #this-score + #level * num-available-chargers #this-taz #level
           ]  
         ]
       ]
@@ -997,7 +997,7 @@ to break-up-trip
       foreach #cand-taz-list [ ;;;LOG
         set #this-taz ? ;;;LOG
         foreach [level] of charger-types [ ;;;LOG
-          log-data "available-chargers" (sentence ticks id [id] of current-taz [id] of home-taz [id] of #this-taz ? available-chargers #this-taz ?) ;;;LOG
+          log-data "available-chargers" (sentence ticks id [id] of current-taz [id] of home-taz [id] of #this-taz ? num-available-chargers #this-taz ?) ;;;LOG
         ] ;;;LOG
       ] ;;;LOG
   ] ;;;LOG
@@ -1013,12 +1013,12 @@ to break-up-trip
       if #this-dist <= remaining-range / charge-safety-factor [
         foreach [level] of charger-types [
           let #level ?
-          let #total-num-chargers existing-chargers #this-taz #level
+          let #total-num-chargers num-existing-chargers #this-taz #level
           if (#total-num-chargers > 0) [
             ifelse #level = 0 [ 
               if #this-taz = home-taz [ set #this-score #this-score + 8 ]
             ][
-              let #num-available available-chargers #this-taz #level
+              let #num-available num-available-chargers #this-taz #level
               set #this-score #this-score + #level * #num-available + #level * (#total-num-chargers - #num-available) * 0.25
             ]  
           ]
@@ -1165,7 +1165,7 @@ to return-charger [#taz #level #charger]
   ]  
 end
 
-to-report available-chargers [#taz #level]
+to-report num-available-chargers [#taz #level]
   let #found-chargers 0
   ask #taz[
     set #found-chargers (structs:stack-count item #level available-chargers-by-type) ; I think this needs the actual chargers, not just how many.
@@ -1181,10 +1181,10 @@ to-report selected-charger [#taz #level]
   report #selected-charger
 end
 
-to-report existing-chargers [#taz #level]
+to-report num-existing-chargers [#taz #level]
   let #found-chargers 0
   ask #taz[
-    set #found-chargers (item #level chargers-by-type)
+    set #found-chargers count (item #level chargers-by-type)
   ]
   report #found-chargers
 end

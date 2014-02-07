@@ -1001,7 +1001,7 @@ to break-up-trip
         ] ;;;LOG
       ] ;;;LOG
   ] ;;;LOG
-  if #max-score = 0 [  ; do it again but don't restrict to taz's that get us there on the second trip
+  if #max-score = 0 [  ; do it again but don't restrict to taz's that get us there on the second trip and count all chargers (not just available chargers) in making the score
     set #result-action "-from-all"
     set #max-taz 0
     set #max-dist 0
@@ -1013,11 +1013,13 @@ to break-up-trip
       if #this-dist <= remaining-range / charge-safety-factor [
         foreach [level] of charger-types [
           let #level ?
-          if (available-chargers #this-taz #level > 0) [
+          let #total-num-chargers existing-chargers #this-taz #level
+          if (#total-num-chargers > 0) [
             ifelse #level = 0 [ 
               if #this-taz = home-taz [ set #this-score #this-score + 8 ]
             ][
-              set #this-score #this-score + #level * available-chargers #this-taz #level
+              let #num-available available-chargers #this-taz #level
+              set #this-score #this-score + #level * #num-available + #level * (#total-num-chargers - #num-available) * 0.25
             ]  
           ]
         ]
@@ -1036,10 +1038,9 @@ to break-up-trip
   ifelse #max-score = 0 [
     ifelse #max-dist-taz = 0 [
       log-data "break-up-trip-choice" (sentence ticks id ([id] of current-taz) ([id] of destination-taz) "none-found" 0 0) ;;;LOG
-      print "ERROR: this situation shouldn't arise, in break-up-trip and no enroute tazs found other than origin and destination which is too far, perhaps battery-capacity is too low or TAZs too big?"
-      ; If a driver gets here, they need more than a full charge to make the trip, and there are no enroute TAZs. They are stranded.
+      ;; Nothing found, this driver is stranded
       set state "stranded"
-      log-data "pain" (sentence ticks id [id] of current-taz [name] of this-vehicle-type "stranded" "" state-of-charge) ;;;LOG
+      log-data "pain" (sentence ticks id [id] of current-taz [name] of this-vehicle-type "stranded" "" state-of-charge) ;;;LOG      
     ][ 
       ; choose the furthest along and hope
       log-data "break-up-trip-choice" (sentence ticks id ([id] of current-taz) ([id] of destination-taz) "max-distance" ([id] of #max-dist-taz) #max-dist-only) ;;;LOG
@@ -1443,7 +1444,7 @@ SWITCH
 359
 log-seek-charger
 log-seek-charger
-1
+0
 1
 -1000
 
@@ -1454,7 +1455,7 @@ SWITCH
 443
 log-break-up-trip
 log-break-up-trip
-0
+1
 1
 -1000
 
@@ -1465,7 +1466,7 @@ SWITCH
 489
 log-break-up-trip-choice
 log-break-up-trip-choice
-0
+1
 1
 -1000
 
@@ -1543,7 +1544,7 @@ SWITCH
 92
 log-pain
 log-pain
-0
+1
 1
 -1000
 

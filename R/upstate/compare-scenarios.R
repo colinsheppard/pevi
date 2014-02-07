@@ -3,10 +3,7 @@ options(java.parameters="-Xmx2048m")
 load.libraries(c('ggplot2','yaml','RNetLogo','plyr','reshape','stringr'))
 
 #exp.name <- commandArgs(trailingOnly=T)[1]
-#exp.name <- 'animation'
-exp.name <- 'evse-metrics'
-#exp.name <- 'patterns'
-#exp.name <- 'phev-only'
+exp.name <- 'upstate-verif'
 path.to.inputs <- pp(pevi.shared,'data/inputs/compare/',exp.name,'/')
 
 #to.log <- c('pain','charging','need-to-charge')
@@ -80,7 +77,8 @@ for(results.i in 1:nrow(results)){
   }
   NLCommand('clear-all-and-initialize')
   NLCommand('random-seed 1')
-  NLCommand(paste('set parameter-file "',path.to.inputs,'params.txt"',sep=''))
+  NLCommand(paste('set param-file-base "',pevi.shared,'"',sep=''))
+  NLCommand(paste('set parameter-file "',path.to.inputs,'/params.txt"',sep=''))
   NLCommand(paste('set model-directory "',pevi.home,'netlogo/"',sep=''))
   NLCommand('set batch-setup? false')
   NLCommand('read-parameter-file')
@@ -122,13 +120,30 @@ if(length(grep("animation",path.to.inputs))>0){
 save(logs,file=paste(path.to.inputs,'logs.Rdata',sep=''))
 #load(paste(path.to.inputs,'logs.Rdata',sep=''))
 
+#######################################
+# POST PROCESSING
+#######################################
+# create pen/rep columns, this assumes the first column is the driver input file
+for(log.file in to.log){
+  names(logs[[log.file]]) <- c('driver.input.file',names(logs[[log.file]])[2:ncol(logs[[log.file]])])
+  logs[[log.file]]$petration <- as.numeric(unlist(lapply(strsplit(as.character(logs[[log.file]]$driver.input.file),'-pen',fixed=T),function(x){ unlist(strsplit(x[2],"-rep",fixed=T)[[1]][1]) })))
+  logs[[log.file]]$replicate <- as.numeric(unlist(lapply(strsplit(as.character(logs[[log.file]]$driver.input.file),'-rep',fixed=T),function(x){ unlist(strsplit(x[2],"-",fixed=T)[[1]][1]) })))
+}
+
+#######################################
+# ANALYSIS
+#######################################
 # ANALYZE PAIN
 ggplot(logs[['pain']],aes(x=time,y=state.of.charge,colour=pain.type,shape=vehicle.type))+geom_point()+facet_grid(charge.safety.factor~replicate)
+ggplot(subset(logs[['pain']],penetration==0.5 & replicate==1 & pain.type=='delay'),aes(x=time,y=state.of.charge,shape=vehicle.type,colour=pain.value))+geom_point()+facet_wrap(~pain.type)
+
 ggplot(subset(logs[['pain']],pain.type=="delay"),aes(x=time,y=state.of.charge,colour=pain.type,shape=location))+geom_point()+facet_grid(charge.safety.factor~replicate)
 ggplot(subset(logs[['pain']],pain.type=="delay"),aes(x=time,y=state.of.charge,colour=pain.type,label=location))+geom_text()+facet_grid(charge.safety.factor~replicate)
 ggplot(subset(logs[['pain']],pain.type=="delay"),aes(x=time,y=state.of.charge,colour=vehicle.type,shape=vehicle.type,label=location))+geom_point()+geom_text(aes(y=state.of.charge+.03))+facet_grid(charge.safety.factor~replicate)
 
 # CHARGING
+ggplot(subset(logs[['charging']],charger.level>0),aes(x=time,y=begin.soc,colour=factor(charger.level)))+geom_point()+facet_grid(penetration~replicate)
+
 ggplot(subset(logs[['charging']],charger.level>0),aes(x=time,y=begin.soc,colour=factor(charger.level)))+geom_point()+facet_grid(charge.safety.factor~replicate)
 
 # ANALYZE charger availability

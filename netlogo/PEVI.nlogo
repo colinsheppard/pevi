@@ -1013,7 +1013,7 @@ to break-up-trip
       if #this-dist <= remaining-range / charge-safety-factor [
         foreach [level] of charger-types [
           let #level ?
-          let #total-num-chargers num-existing-chargers #this-taz #level
+          let #total-num-chargers count num-existing-chargers #this-taz #level
           if (#total-num-chargers > 0) [
             ifelse #level = 0 [ 
               if #this-taz = home-taz [ set #this-score #this-score + 8 ]

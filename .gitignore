@@ -8,7 +8,6 @@ netlogo/summary.txt
 netlogo/dynamic-scheduler
 netlogo/*-out.csv
 netlogo/params.txt
-postgis
 headless/bin
 headless/.classpath
 headless/lib/*.jar

@@ -189,8 +189,7 @@ to setup-and-fix-seed
     set batch-setup? false
     ;let seed new-seed
     ;print seed
-    ;random-seed 1;
-    random-seed 10
+    random-seed 1;
     if parameter-file = 0 [ set parameter-file "params.txt" ]
     if model-directory = 0 [ set model-directory "./" ]
     read-parameter-file
@@ -1211,7 +1210,7 @@ to-report time-from-to [from-taz to-taz]
   ifelse ((from-taz >= 0) and (to-taz >= 0)) [
     set reporter-time item ((from-taz - 1) * n-tazs + to-taz - 1 ) od-time
   ][ ; determine distance from gateway to destination, add extra distance
-    let #gateway-time item ((abs(from-taz) - 1) * n-tazs + abs(to-taz - 1) ) od-time
+    let #gateway-time item ((abs(from-taz) - 1) * n-tazs + (abs(to-taz) - 1) ) od-time
     set reporter-time #gateway-time + [external-time] of self
   ]
   report reporter-time
@@ -1633,7 +1632,7 @@ INPUTBOX
 832
 253
 starting-seed
-2
+1
 1
 0
 Number

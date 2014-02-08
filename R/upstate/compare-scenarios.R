@@ -144,8 +144,27 @@ ggplot(subset(logs[['pain']],pain.type=="delay"),aes(x=time,y=state.of.charge,co
 
 # CHARGING
 ggplot(subset(logs[['charging']],charger.level>0),aes(x=time,y=begin.soc,colour=factor(charger.level)))+geom_point()+facet_grid(penetration~replicate)
-
 ggplot(subset(logs[['charging']],charger.level>0),aes(x=time,y=begin.soc,colour=factor(charger.level)))+geom_point()+facet_grid(charge.safety.factor~replicate)
+
+#  show charging spatially
+source(pp(pevi.home,'R/gis-functions.R'))
+load.libraries(c('maptools','colorRamps'))
+load(pp(pevi.shared,'data/UPSTATE/shapefiles/AggregatedTAZsWithPointTAZs.Rdata'))
+load(pp(pevi.shared,'data/UPSTATE/od.converter.Rdata'))
+agg.taz@data$nl.id <- od.converter$new.id[match(agg.taz$agg.id,od.converter$old.id)]
+charging.summary <- ddply(subset(logs[['charging']],charger.level>0 & penetration==2 & replicate==1),.(location,charger.level),nrow)
+charging.summary <- cast(melt(charging.summary,id.vars=1:2),location~charger.level)
+charging.summary[is.na(charging.summary)] <- 0
+for(level in 1:4){
+  agg.taz@data[,pp('L',level,'.charging.events')] <- charging.summary[match(agg.taz$nl.id,charging.summary$location),as.character(level)]
+  agg.taz@data[is.na(agg.taz@data[,pp('L',level,'.charging.events')]),pp('L',level,'.charging.events')] <- 0
+}
+agg.taz$total.charging.events <- agg.taz$L1.charging.events + agg.taz$L2.charging.events + agg.taz$L3.charging.events + agg.taz$L4.charging.events
+cmap <- map.color(agg.taz$total.charging.events,blue2red(50))
+shp.to.kml(agg.taz,pp(path.to.inputs,'charging-events.kml'),kmlname="# Charging Events by Charger Type", kmldescription="",borders='white',lwds=1.5,colors=cmap,id.col='shp.id',name.col='name',description.cols=c('agg.id','nl.id',pp('L',1:4,'.charging.events'),'total.charging.events'))
+
+
+
 
 # ANALYZE charger availability
 ggplot(melt(subset(logs[['tazs']],replicate==1 & charge.safety.factor==1),id.vars=c("time","taz","replicate","charge.safety.factor"),measure.vars=c(paste("num.avail.L",1:3,sep=''))),aes(x=time,y=value,colour=variable))+geom_line()+facet_wrap(~taz)
@@ -299,3 +318,4 @@ daily.energy <- sum(subset(fish,date>to.posix('2013-02-01'))$kwh)/as.numeric(dif
 
 # PEVI predicts ~40% duty factor at the waterfront with 0.5% pen or 750 driver
 subset(charge.sum,taz=='EKA_Waterfront')
+

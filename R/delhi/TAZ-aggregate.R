@@ -25,11 +25,16 @@ agg.taz.shp$name <- as.character(agg.taz.shp$name)
 agg.taz.shp$shp.id <- unlist(lapply(agg.taz.shp@polygons,function(x){slot(x,'ID')}))
 writePolyShape(agg.taz.shp,pp(pevi.shared,'data/DELHI/POLYGON/AggregatedTAZs'))
 
-# Now load the cleaned polys
+# Now load the cleaned polys and save as Rdata
 agg.taz <- readShapePoly(pp(pevi.shared,'data/DELHI/POLYGON/AggregatedTAZsCleaned'))
+save(agg.taz,file=pp(pevi.shared,'data/DELHI/POLYGON/aggregated-tazs.Rdata'))
+
+# Add the external gateways to the taz mapping table
+taz.data <- data.table(taz@data)
+# the following data were picked off by hand based on the map of the gateways in one of the RITES reports
+taz.data <- rbind(taz.data,data.table(ZONE_NO=361:381,ZONE_NAME=NA,XCOORD=NA,YCOORD=NA,IN_SQM=NA,NumInter=NA,agg.id=-c(1,51,48,49,49,26,26,26,26,39,15,15,15,15,53,31,2,28,23,1,33),name=NA))
 
 # Save the mapping for later use
-taz.data <- data.table(taz@data)
 save(taz.data,file=pp(pevi.shared,'data/DELHI/taz-aggregation-mapping.Rdata'))
 
 ###############################################################
@@ -38,9 +43,13 @@ save(taz.data,file=pp(pevi.shared,'data/DELHI/taz-aggregation-mapping.Rdata'))
 ###############################################################
 
 # Load distance-time
-load(pp(pevi.shared,'data/DELHI/taz_time_distance.Rdata'))
-# Load the OD data
-load(file=pp(pevi.shared,'data/UPSTATE/Shasta-OD-2020/od-by-purpose.Rdata'))
+load(pp(pevi.shared,'data/DELHI/taz-time-distance.Rdata'))
+
+
+
+
+
+
 
 odp$from.agg <- taz$agg.id[match(odp$from,taz$TAZ)]
 odp$to.agg <- taz$agg.id[match(odp$to,taz$TAZ)]

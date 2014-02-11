@@ -74,6 +74,7 @@ for(seed in seeds){
 
 	init.charger.buildout <- read.table(charger.file,header=T,sep='\t')
 	taz.charger.combos <- expand.grid(subset(init.charger.buildout,X.TAZ>0)$X.TAZ,subset(charger.info,level != 0)$level)
+	names(init.charger.buildout) <- c(';TAZ','L0','L1','L2','L3','L4')
 	names(taz.charger.combos) <- c('taz','level')
 
 	if(!exists('cl')){
@@ -92,7 +93,6 @@ for(seed in seeds){
 
   #	Read in the starting infrastructure. We want linked buildout.
 	charger.buildout <- init.charger.buildout
-	names(charger.buildout) <- c(';TAZ','L0','L1','L2','L3','L4')
 
   for(pev.penetration in pev.penetrations){
   #pev.penetration <- pev.penetrations[1]
@@ -138,11 +138,6 @@ for(seed in seeds){
       # If our objective value has reached a minimum, we're done.
 			if(current.obj > taz.charger.obj$obj[winner]) {
 				current.obj <- taz.charger.obj$obj[winner]
-				# REMOVE THIS SCRIPT AFTER TESTING!
-				if(build.i == 2) {
-					break
-				}
-				# END THE PART WE REMOVE
 			} else {
 				current.obj <- Inf
 				break

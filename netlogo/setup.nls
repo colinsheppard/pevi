@@ -22,6 +22,8 @@ to read-parameter-file
       ifelse param-name = "frac-phev" [ set frac-phev file-read ][
       ifelse param-name = "electric-fuel-consumption-sd" [ set electric-fuel-consumption-sd file-read ][
       ifelse param-name = "electric-fuel-consumption-range" [ set electric-fuel-consumption-range file-read ][
+      ifelse param-name = "soft-strand-penalty" [ set soft-strand-penalty file-read ][
+      ifelse param-name = "hard-strand-penalty" [ set hard-strand-penalty file-read ][
       ifelse param-name = "starting-soc-file" [set starting-soc-file word param-file-base file-read ][
       ifelse param-name = "ext-dist-time-file" [set ext-dist-time-file word param-file-base file-read ][
       ifelse param-name = "charger-input-file" [ set charger-input-file word param-file-base file-read ][
@@ -33,7 +35,7 @@ to read-parameter-file
       ifelse param-name = "probability-of-unneeded-charge" [ set probability-of-unneeded-charge file-read ][
       ifelse param-name = "stranded-delay-threshold" [ set stranded-delay-threshold file-read ][
       ifelse param-name = "charger-permission-file" [set charger-permission-file word param-file-base file-read ][  
-      ]]]]]]]]]]]]]]]]]]]]
+      ]]]]]]]]]]]]]]]]]]]]]]
     ]
     file-close
   ][ 
@@ -353,6 +355,7 @@ to setup-itinerary
         let #rand-draw random-float 1
         set external-time interpolate-from-draw #rand-draw ext-taz-cumulative-fraction external-time-bound
         set external-dist interpolate-from-draw #rand-draw ext-taz-cumulative-fraction external-dist-bound
+        set wait-threshold interpolate-from-draw random-float 1 [0 1] [0.5 2]
         let itin-row 0
         set journey-distance (distance-from-to item itin-row itin-to item itin-row itin-from)
         set max-trip-distance journey-distance

@@ -56,6 +56,8 @@ globals [
   electric-fuel-consumption-sd
   electric-fuel-consumption-range
   stranded-delay-threshold
+  soft-strand-penalty
+  hard-strand-penalty
   
   ;; globals needed for testing
   test-driver
@@ -99,6 +101,7 @@ drivers-own [
   current-od-index
   external-time             ; The time it takes to get from an external TAZ to a gateway TAZ
   external-dist             ; The distance between an external TAZ to a gateway TAZ
+  wait-threshold            ; How long a driver is willing to wait before they are considered soft-stranded.
 
 ;; CONVENIENCE VARIABLES
   journey-distance
@@ -498,6 +501,7 @@ to seek-charger
   let #mid-state-of-charge 0
   let #level-3-time-penalty 0
   let #level-3-time-penalty-for-origin-or-destination 0
+  let #charger-exists-but-unavailable false
   
   if trip-distance * charge-safety-factor > 0.8 * battery-capacity / electric-fuel-consumption [
     set #level-3-time-penalty-for-origin-or-destination 999
@@ -558,9 +562,9 @@ to seek-charger
               set #min-priviledged-cost [alt-energy-price] of ?
             ]
           ]
-        ]
+        ] ; end permission-list loop
        
-        if (num-available-chargers #this-taz #level > 0) and ((#level > 0) or ((#this-taz = home-taz) and #level = 0)) or (#min-priviledged-charger != nobody) [ 
+        ifelse (num-available-chargers #this-taz #level > 0) and ((#level > 0) or ((#this-taz = home-taz) and #level = 0)) or (#min-priviledged-charger != nobody) [ 
           let #this-charger-type one-of charger-types with [ level = #level ]
           let #this-charge-rate [charge-rate] of #this-charger-type
           ifelse #charger-in-origin-or-destination [
@@ -637,15 +641,26 @@ to seek-charger
               ]
             ]
           ]
-        ]
-      ]
+        ][ ; end if (available chargers of level in TAZ > 0), switch to the "else" where we check if there are ANY chargers.
+          if (count item #level [chargers-by-type] of #this-taz > 0 and not #charger-exists-but-unavailable) [
+            set #charger-exists-but-unavailable true ; If no available chargers are found, we have a soft instead of hard stranding.
+          ]
+        ]  ; end else
+      ] ; end foreach level of charger-types
     ]
-  ]
+  ] ; end foreach taz-list
   ifelse #min-taz = -99 [
-    log-data "seek-charger-result" (sentence ticks seek-charger-index id -1 "" -1 -1)  ;;;LOG
-    log-data "pain" (sentence ticks id [id] of current-taz [name] of this-vehicle-type "denial" (num-denials + 1) state-of-charge) ;;;LOG
-    set num-denials (num-denials + 1)
-    wait-time-event-scheduler
+    ifelse #charger-exists-but-unavailable or charging-on-a-whim? [ 
+      ; Either they don't really need to charge, or chargers are out there but in use. The latter may result in a soft strand.
+      log-data "seek-charger-result" (sentence ticks seek-charger-index id -1 "" -1 -1)  ;;;LOG
+      log-data "pain" (sentence ticks id [id] of current-taz [name] of this-vehicle-type "denial" (num-denials + 1) state-of-charge) ;;;LOG
+      set num-denials (num-denials + 1)
+      wait-time-event-scheduler
+    ][
+      set state "stranded"
+      set itin-delay-amount replace-item current-itin-row itin-delay-amount (item current-itin-row itin-delay-amount + hard-strand-penalty)
+      log-data "pain" (sentence ticks id [id] of current-taz [name] of this-vehicle-type "stranded" "" state-of-charge) ;;;LOG
+    ]
   ][
     log-data "seek-charger-result" (sentence ticks seek-charger-index id ([id] of #min-taz) (#min-taz = current-taz or #min-taz = destination-taz) ([level] of #min-charger-type) #min-cost)  ;;;LOG
     ifelse #min-taz = current-taz [
@@ -682,8 +697,9 @@ end
 to wait-time-event-scheduler
   set state "not charging"
   ifelse remaining-range / charge-safety-factor < trip-distance [
-    ifelse ticks > 36 [
-      set state "stranded"
+    ifelse sum [itin-delay-amount] of self > wait-threshold [
+      set state "stranded" ;soft stranding
+      set itin-delay-amount replace-item current-itin-row itin-delay-amount (item current-itin-row itin-delay-amount + soft-strand-penalty)
       log-data "wait-time" (sentence ticks id [name] of this-vehicle-type state-of-charge trip-distance journey-distance time-until-depart "stranded" -1 electric-fuel-consumption) ;;;LOG
       log-data "trip-journey-timeuntildepart" (sentence ticks departure-time id [name] of this-vehicle-type state-of-charge [id] of current-taz [id] of destination-taz true false (departure-time - ticks) "stranded" remaining-range sum map weight-delay itin-delay-amount) ;;;LOG
       log-data "pain" (sentence ticks id [id] of current-taz [name] of this-vehicle-type "stranded" "" state-of-charge) ;;;LOG
@@ -1038,8 +1054,9 @@ to break-up-trip
   ifelse #max-score = 0 [
     ifelse #max-dist-taz = 0 [
       log-data "break-up-trip-choice" (sentence ticks id ([id] of current-taz) ([id] of destination-taz) "none-found" 0 0) ;;;LOG
-      ;; Nothing found, this driver is stranded
+      ;; Nothing found, this driver is hard-stranded
       set state "stranded"
+      set itin-delay-amount replace-item current-itin-row itin-delay-amount (item current-itin-row itin-delay-amount + hard-strand-penalty)
       log-data "pain" (sentence ticks id [id] of current-taz [name] of this-vehicle-type "stranded" "" state-of-charge) ;;;LOG      
     ][ 
       ; choose the furthest along and hope

@@ -58,6 +58,9 @@ globals [
   stranded-delay-threshold
   soft-strand-penalty
   hard-strand-penalty
+  charger-lifetime
+  weekend-factor
+  discount
   
   ;; globals needed for testing
   test-driver
@@ -642,7 +645,7 @@ to seek-charger
             ]
           ]
         ][ ; end if (available chargers of level in TAZ > 0), switch to the "else" where we check if there are ANY chargers.
-          if (count item #level [chargers-by-type] of #this-taz > 0 and not #charger-exists-but-unavailable) [
+          if (count item #level [chargers-by-type] of #this-taz > 0 and #level != 0 and not #charger-exists-but-unavailable) [
             set #charger-exists-but-unavailable true ; If no available chargers are found, we have a soft instead of hard stranding.
           ]
         ]  ; end else

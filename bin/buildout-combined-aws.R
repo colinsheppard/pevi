@@ -73,7 +73,7 @@ for(seed in seeds){
 #  vary.tab.original$row <- 1:nrow(vary.tab.original)
 
 	init.charger.buildout <- read.table(charger.file,header=T,sep='\t')
-	taz.charger.combos <- expand.grid(subset(init.charger.buildout,X.TAZ>0)$X.TAZ,subset(charger.info,level != 0)$level)
+	taz.charger.combos <- expand.grid(subset(init.charger.buildout,X.TAZ>0)$X.TAZ,subset(charger.info,level != 0 & level != 1 & level != 4)$level)
 	names(init.charger.buildout) <- c(';TAZ','L0','L1','L2','L3','L4')
 	names(taz.charger.combos) <- c('taz','level')
 

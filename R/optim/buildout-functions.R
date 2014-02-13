@@ -69,7 +69,7 @@
 #  return(batch.results)
 #}
 
-evaluate.fitness <- function(build.result){
+evaluate.fitness <- function(){
   if(!exists('cl')){
     stop('no cluster started')
   }
@@ -97,7 +97,7 @@ evaluate.fitness <- function(build.result){
 
 run.buildout.batch <- function(break.vary.tab){
   break.pair.code <- paste("input ",paste(break.vary.tab,collapse=","),":",sep='')
-  batch.results <- data.frame(rep=vector("numeric",length(break.vary.tab)),taz=vector("numeric",length(break.vary.tab)),level=vector("numeric",length(break.vary.tab)),objective=vector("numeric",length(break.vary.tab)))
+  batch.results <- data.frame()
 
   tryCatch(NLStart(nl.path, gui=F),error=function(err){ NA })
   NLLoadModel(model.path)
@@ -141,28 +141,20 @@ run.buildout.batch <- function(break.vary.tab){
 		NLCommand('setup-in-batch-mode')
 								
     #	Iterate through every taz/charger combo
-		input.i.result <- ddply(taz.charger.combos,.(taz),function(df) {
-			charger.results <- ddply(df,.(level),function(df1) {
-						
+		input.i.result <- ddply(subset(taz.charger.combos,include),.(taz,level),function(df) {
       	#	Add the candidate charger, then run the model.
-				NLCommand(paste('add-charger',df1$taz,df1$level,build.increment))
-				NLCommand(pp('print "taz',df1$taz,'level ',df1$level,'"'))
+				NLCommand(paste('add-charger',df$taz,df$level,build.increment))
+				#NLCommand(pp('print "taz',df1$taz,'level ',df1$level,'"'))
 				NLCommand('time:go-until 500')
 						
 				objective <-  tryCatch(NLReport('objective-function'),error=function(e){ NA })
 
         #	Reset for the next run, and delete the charger we added.
 				NLCommand('setup-in-batch-mode')	
-				NLCommand(paste('remove-charger',df1$taz,df1$level,build.increment))
+				NLCommand(paste('remove-charger',df$taz,df$level,build.increment))
 				data.frame(obj = objective)
-			}) # end infrastructure testing - charger type count
-			data.frame(level = charger.results$level,
-								 obj = charger.results$obj)
-		}) #end infrastructure testing - taz count
-		batch.results$rep[row]				 <- rep
-		batch.results$taz[row]				 <- input.i.result$taz[match(min(input.i.result$obj),input.i.result$obj)]
-		batch.results$level[row]			 <- input.i.result$level[match(min(input.i.result$obj),input.i.result$obj)]
-		batch.results$objective[row]	 <- min(input.i.result$obj)
+		}) # end infrastructure testing - charger type count
+    batch.results <- rbind(batch.results,data.frame(input.i.result,rep=rep))
 	} # end vary.tab for loop
 	
   #	Quit our NetLogo instance

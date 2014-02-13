@@ -176,7 +176,7 @@ to setup-drivers
     ask max-one-of #bev-types [ battery-capacity / electric-fuel-consumption ][     
       ; find the drivers that can't make their longest trip using the current bev type
       let #impossible-drivers drivers with [
-        this-vehicle-type = "impossible" and ; Originally "nobody," for Upstate we don't want to automatically assign types.
+        this-vehicle-type = nobody and 
         (
           max-trip-distance * charge-safety-factor > [battery-capacity] of myself / [electric-fuel-consumption] of myself or
           journey-distance * charge-safety-factor > (min(sentence (max-dwell-time * 6.6 / charge-safety-factor) [battery-capacity] of myself) + [battery-capacity] of myself) / [electric-fuel-consumption] of myself
@@ -195,7 +195,6 @@ to setup-drivers
       
       ; now do the assignmnets
       ask #impossible-drivers [
-        print "I am an impossible driver."
         if length #available-types = 0 [ error "There are too many drivers with trips longer than the range of the BEVs types provided and not enough longer range BEVs and/or PHEVs to acommodate them" ]
         set this-vehicle-type one-of #available-types
         set type-assignment-code 1
@@ -508,7 +507,7 @@ to setup-special-chargers
       error (word "Input file '" charger-permission-file "' not found!") 
     ]
   ][
-    print "No special-permission-charger-file specified."
+    ;print "No special-permission-charger-file specified."
   ]
 end ;setup-special-chargers
   

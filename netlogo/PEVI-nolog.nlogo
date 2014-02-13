@@ -292,26 +292,26 @@ to setup-in-batch-mode
     set seed-list (sentence random 2147483647 random 2147483647 random 2147483647)
     set seed-list-index -1
     ; read-parameter-file ;We want to control parameter file settings externally
-    print "setting up...."
+;    print "setting up...."
     setup-od-data
-    print "setup-tazs"
+;    print "setup-tazs"
     setup-tazs
     convert-enroute-ids
-    print "setup-drivers"
+;    print "setup-drivers"
     setup-drivers
     random-seed next-seed
-    print "initialize-drivers"
-    print random 1000
+;    print "initialize-drivers"
+;    print random 1000
     initialize-drivers
-    print random 1000
-    print "setup-chargers"
+;    print random 1000
+;    print "setup-chargers"
     setup-charger-types
     setup-chargers
     initialize-logfile
     random-seed next-seed
-    print random 1000
+;    print random 1000
   ][
-    print "Already got turtles"
+;    print "Already got turtles"
     set batch-setup? true
     set seed-list-index -1
     ask chargers [

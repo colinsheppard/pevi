@@ -41,7 +41,7 @@ to-report objective-function
   let total-delay sum [ sum map weight-delay itin-delay-amount  ] of drivers
   ; Calculate cost of delay figuring there are 260 working days/year, 10 year lifespan of chargers
   let total-delay-cost 0
-  let annual-delay-cost total-delay * (260 + 105 * weekend-factor)
+  let annual-delay-cost time-opportunity-cost * total-delay * (260 + 105 * weekend-factor)
   let t 1
   repeat charger-lifetime [
     set total-delay-cost total-delay-cost + annual-delay-cost / (1 + discount)^(t - 1)

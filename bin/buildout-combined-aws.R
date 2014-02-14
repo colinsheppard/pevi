@@ -40,6 +40,9 @@ param.file <- pp(args$experimentdir,'params.txt')
 param.file.data <- read.table(param.file,sep='\t')
 param.file.data <- streval(pp('data.frame(',pp(apply(param.file.data,1,function(x){ pp(str_replace_all(x[1],'-','.'),'=',ifelse(length(grep('file|directory',x[1]))>0,pp('"',x[2],'"'),x[2])) }),collapse=","),')'))
 
+taz.names <- NA
+if(file.exists(pp(args$experimentdir,'taz-names.csv')))taz.names <- read.csv(pp(args$experimentdir,'taz-names.csv'))
+
 # For the current optimization, we need to know the installation costs of the chargers. Assuming that we won't want to vary
 # those costs within an optimization run, we read them in here. If we do want to vary those costs, this would need to be 
 # moved to the driver-file for loop.
@@ -54,8 +57,12 @@ taz.charger.combos <- expand.grid(subset(init.charger.buildout,X.TAZ>0)$X.TAZ,su
 names(taz.charger.combos) <- c('taz','level')
 taz.charger.combos$include <- T
 taz.charger.combos$key <- pp(taz.charger.combos$taz,'-',taz.charger.combos$level)
+taz.charger.combos$name <- NA
+if(all(!is.na(taz.names)))taz.charger.combos$name <- taz.names$name[match(taz.charger.combos$taz,taz.names$taz)]
 taz.charger.combos$obj <- NA
 names(init.charger.buildout) <- c(';TAZ','L0','L1','L2','L3','L4')
+# Now initialize the "index banks" that correspond to the various brackets of decision variable values, sorted by their objective,
+# with which we base the choice upon to evaluate or not evaluate the objective during each iteration.
 n.alternatives <- nrow(taz.charger.combos)
 if(skip.rate > n.alternatives / 2)stop(pp('Error - it is inadvisable to have such a high skip.rate (',skip.rate,') with only ',n.alternatives,' decision variables'))
 skip.bank.size <- round(n.alternatives/skip.rate)
@@ -63,10 +70,12 @@ ind.banks <- list()
 ind.banks.seq <- list()
 for(skip.i in 1:skip.rate){
   if(skip.i == skip.rate){
+    # the last group should just go to n in order to handle a skip size that doesn't evenly divide n
     ind.banks[[skip.i]] <- ((skip.i - 1)*skip.bank.size + 1):n.alternatives
   }else{
     ind.banks[[skip.i]] <- ((skip.i - 1)*skip.bank.size + 1):(skip.i*skip.bank.size)
   }
+  # here we create a logical vector corresponding to whether the decision variable should be evaluated in the iteration
   ind.banks.seq[[skip.i]] <- rep(1:skip.i,length.out=max.chargers.per.pen)==1
 }
 
@@ -80,6 +89,18 @@ for(file.param in names(vary)[grep("-file",names(vary))]){
 vary.tab.original <- expand.grid(vary,stringsAsFactors=F)
 #  vary.tab.original$row <- 1:nrow(vary.tab.original)
 
+# configure cluster and get RNetLogo running
+model.path <- paste(pevi.home,"netlogo/PEVI-nolog.nlogo",sep='')
+if(!exists('cl')){
+  print('starting new cluster')
+  cl <- makeCluster(c(rep(list(list(host="localhost")),num.cpu)),type="SOCK")
+  clusterEvalQ(cl,options(java.parameters="-Xmx2048m"))
+  clusterEvalQ(cl,Sys.setenv(NOAWT=1))
+  clusterEvalQ(cl,library('RNetLogo'))
+  clusterExport(cl,c('init.netlogo','model.path','logfiles'))
+  clusterEvalQ(cl,init.netlogo())
+}
+
 for(seed in seeds){
 #seed <- 1 
   optim.code <- paste(optim.scenario,'-seed',seed,sep='')
@@ -92,23 +113,13 @@ for(seed in seeds){
   path.to.outputs <- paste(path.to.outputs.base,optim.code,'/',sep='')
   make.dir(path.to.outputs)
 
-	if(!exists('cl')){
-  	print('starting new cluster')
-		cl <- makeCluster(c(rep(list(list(host="localhost")),num.cpu)),type="SOCK")
-  	clusterEvalQ(cl,options(java.parameters="-Xmx2048m"))
-		clusterEvalQ(cl,Sys.setenv(NOAWT=1))
-	  clusterEvalQ(cl,library('RNetLogo'))
-	}
-	
-	# The clusters previously devided work based upon the number of taz/charger combinations. To take advantage of 
-	# batch mode, we can't do that; we need to divide work based on input files. Instead of break.pairs describing 
-	# the results matrix, "break.pairs" (or somthing like it) should divide up vary.tab
-	
-	model.path <- paste(pevi.home,"netlogo/PEVI-nolog.nlogo",sep='')
 
   #	Initialize the starting infrastructure and write the file to the inputs dir.
 	charger.buildout <- init.charger.buildout
 	write.table(charger.buildout,charger.file,quote=FALSE,sep='\t',row.names=FALSE)
+
+	charger.buildout.history <- data.frame()
+  opt.history <- data.frame()
 
   for(pev.penetration in pev.penetrations){
   #pev.penetration <- pev.penetrations[1]
@@ -128,7 +139,6 @@ for(seed in seeds){
     vary.tab$`driver-input-file` <- str_replace(vary.tab$`driver-input-file`,"penXXX",paste("pen",pev.penetration*100,sep=""))
 				
 		begin.build.i <- 1
-		charger.buildout.history <- data.frame()
 
     # Start for loop for overall penetration level optimization
 		for(build.i in begin.build.i:max.chargers.per.pen){
@@ -144,12 +154,19 @@ for(seed in seeds){
       #	We've run every combination of tazs/chargers for each driver file. Now we asses which charger to place
       #	by averaging the objective function results across all replicates.
 			result.means <- ddply(build.result,.(taz,level),function(df){
-				data.frame(obj = mean(df$obj),key=pp(df$taz[1],'-',df$level[1]))
+				data.frame(obj = mean(df$obj),cv=sd(df$obj)/mean(df$obj),key=pp(df$taz[1],'-',df$level[1]))
 			})
       taz.charger.combos$obj[taz.charger.combos$include] <- result.means$obj[match(taz.charger.combos$key[taz.charger.combos$include],result.means$key)]
+      taz.charger.combos$cv[taz.charger.combos$include] <- result.means$cv[match(taz.charger.combos$key[taz.charger.combos$include],result.means$key)]
       # sort the results and add key, IMPORTANT, everying below relies on this ordering
       taz.charger.combos <- taz.charger.combos[order(taz.charger.combos$obj),] 
       # ggplot(taz.charger.combos,aes(x=factor(taz),y=obj)) + geom_point() + facet_wrap(~level) 
+      
+      opt.iter <- taz.charger.combos
+      opt.iter$penetration <- pev.penetration
+      opt.iter$iteration <- build.i
+      opt.history <- rbind(opt.history,opt.iter)
+			save(opt.history,file=pp(path.to.outputs,'optimization-history.Rdata'))
 
       #	Winner determined by lowest objective function (currently cost)
 			print(pp('winner taz = ',taz.charger.combos$taz[1],' level = ',taz.charger.combos$level[1]))
@@ -168,10 +185,13 @@ for(seed in seeds){
 			
 			# Create an Rdata file with a data frame holding all buildout information thus far.
 			charger.buildout.iter <- charger.buildout
+			charger.buildout.iter$penetration <- pev.penetration
 			charger.buildout.iter$iter <- build.i
 			charger.buildout.history <- rbind(charger.buildout.history,charger.buildout.iter)
-			save(charger.buildout.history,file=pp(path.to.outputs,'charger-buildout-history-pen',pev.penetration*100,'.Rdata'))
-      write.table(data.frame(timestamp=format(Sys.time(), "%Y-%m-%d %H:%M:%S"),seed=seed,penetration=pev.penetration,charger=build.i,n.alternatives.evaluated=sum(taz.charger.combos$include),obj=current.obj,winner.taz=taz.charger.combos$taz[1],winner.level=taz.charger.combos$level[1],t(taz.charger.combos$obj)),append=file.exists(pp(path.to.outputs,'buildout-progress.csv')),col.names=!file.exists(pp(path.to.outputs,'buildout-progress.csv')),file=pp(path.to.outputs,'buildout-progress.csv'),sep=',',row.names=F)
+			save(charger.buildout.history,file=pp(path.to.outputs,'charger-buildout-history.Rdata'))
+
+      # finally, a status update on the state of the optimization run
+      write.table(data.frame(timestamp=format(Sys.time(), "%Y-%m-%d %H:%M:%S"),seed=seed,penetration=pev.penetration,iteration=build.i,n.alternatives.evaluated=sum(taz.charger.combos$include),obj=current.obj,winner.taz=taz.charger.combos$taz[1],winner.name=taz.charger.combos$name[1],winner.level=taz.charger.combos$level[1],t(taz.charger.combos$obj)),append=file.exists(pp(path.to.outputs,'buildout-progress.csv')),col.names=!file.exists(pp(path.to.outputs,'buildout-progress.csv')),file=pp(path.to.outputs,'buildout-progress.csv'),sep=',',row.names=F)
 
       # Finally update taz.charger.combos to include/exclude poorly performing alternatives
       for(bank.i in 1:length(ind.banks)){

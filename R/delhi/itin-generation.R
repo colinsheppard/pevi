@@ -13,7 +13,7 @@ dumb.time.to.hours <- function(x){
   floored + (x-floored*100)/60
 }
 
-do.or.load(pp(pevi.shared,'data/DELHI/tdfs-data/hh-survey.Rdata'),function(){
+do.or.load(pp(pevi.shared,'data/DELHI/itin-generation/hh-survey.Rdata'),function(){
   mode.codes <- rbind(read.csv(pp(pevi.shared,'data/DELHI/tdfs-data/mode-codes.csv')),data.frame(mode.id=0,name=""))
   hh <- read.csv(pp(pevi.shared,'data/DELHI/tdfs-data/hh-survey.csv'))
   hh$key <- pp(hh$FORM_NO,hh$T_ZONE,hh$MEMNO,hh$TRIP_NO,sep='-')
@@ -62,7 +62,22 @@ do.or.load(pp(pevi.shared,'data/DELHI/tdfs-data/hh-survey.Rdata'),function(){
   #ggplot(hh,aes(x=speed))+geom_histogram()+facet_wrap(~mode,scales="free")
   # get rid of modes we're not interested in
   hh <- hh[mode %in% c('Car','Auto','Shared Auto','Shared Taxi','Pool Car')]
-  list('hh'=hh)
+
+  setkey(hh,'form','taz','mem')
+  hh.uniq <- unique(hh)[,list(form,taz,mem)]
+  hh.uniq[,journey.id:=1:nrow(hh.uniq)]
+  setkey(hh.uniq,'form','taz','mem')
+  hh <- hh.uniq[hh]
+  setkey(hh.uniq,'journey.id')
+  hh[,tours.left.in.journey:=(length(trip)-1):0,by='journey.id']
+  hh[,':='(index=1:nrow(hh),home.start= taz==o,home.end= taz==d,begin.int=as.integer(round(depart)),km.int=as.integer(round(dist)))]
+  # we need a quick way to see the number of trips per journey
+  hh.per <- hh[,length(trip),by="journey.id"]
+  # store hh data in a way that allows more optmized access to particular subsets
+  hh.by.home <- list()
+  hh.by.home[['home.start']] <- data.table(hh[home.start==T],key=c("begin.int","km.int"))
+  hh.by.home[['non.home.start']] <- data.table(hh[home.start==F],key=c("begin.int","km.int"))
+  list('hh'=hh,'hh.per'=hh.per,'hh.by.home'=hh.by.home)
 })
 
 # load od.agg and agg.taz.data
@@ -90,7 +105,7 @@ do.or.load(pp(pevi.shared,'data/DELHI/road-network/routing-with-gateways.Rdata')
 })
     
 # Load/Create the home distribution and nearest neighbors list
-do.or.load(pp(pevi.shared,"data/DELHI/frac-homes-and-nearest-10.Rdata"),function(){
+do.or.load(pp(pevi.shared,"data/DELHI/itin-generation/frac-homes-and-nearest-10.Rdata"),function(){
   # Create the home distribution
   ward <- readShapePoly(pp(pevi.shared,'data/DELHI/POLYGON/income_ward_level_map_delhi_WGS84'))
   the.nas <- ward$Income==0
@@ -136,90 +151,23 @@ do.or.load(pp(pevi.shared,"data/DELHI/frac-homes-and-nearest-10.Rdata"),function
   list('home.dist'=home.dist,'taz.10'=taz.10,'pop.2020'=pop.2020,'num.veh.2020'=num.veh.2020)
 })
 
-if(!file.exists(pp(pevi.shared,'data/UPSTATE/itin-generation/data-preprocessed.Rdata'))){
-  if(!file.exists(pp(pevi.shared,'data/UPSTATE/itin-generation/rur-tours.Rdata',sep=''))){
-    # Load the NHTS tour dataset
-    load(file=pp(pevi.shared,'data/NHTS/tour09.Rdata'))
-    rur.tours <- data.table(subset(tours,URBRUR==2 & PMT_POV>0),key='journey.id')
-    rur.tours[,tours.left.in.journey:=(length(home.start)-1):0,by='journey.id']
-
-    # get rid of some bad data: NA for TOT_DWEL4, begin, end
-    rur.tours <- rur.tours[!rur.tours$journey.id %in% rur.tours$journey.id[is.na(rur.tours$TOT_DWEL4)&rur.tours$tours.left.in.journey>0]]
-    rur.tours[,TOT_DWEL4:=ifelse(is.na(TOT_DWEL4),0,TOT_DWEL4)]
-    rur.tours <- rur.tours[!rur.tours$journey.id %in% rur.tours$journey.id[is.na(rur.tours$end)]]
-    rur.tours$index <- 1:nrow(rur.tours)
-    rur.tours.per <- rur.tours[,length(home.start),by="journey.id"]
-
-    # type mappings
-    type.map <- list()
-    type.map[['hw']] <- c('HW','WH')
-    type.map[['ho']] <- c('HO','OH','HH')
-    type.map[['ow']] <- c('OW','WO','OO','WW')
-    type.map.rev <- melt(type.map)
-    names(type.map.rev) <- c('tour.type','purp')
-
-    # add a purp field to rur.tours
-    rur.tours$purp <- as.character(type.map.rev$purp[match(rur.tours$TOURTYPE,type.map.rev$tour.type)])
-
-    save(rur.tours,rur.tours.per,type.map,type.map.rev,file=pp(pevi.shared,'data/UPSTATE/itin-generation/rur-tours.Rdata',sep=''))
-  }else{
-    load(pp(pevi.shared,'data/UPSTATE/itin-generation/rur-tours.Rdata',sep=''))
-  }
-
-  # prepare OD data by condensing trip purposes into HW, HO, OW categories
-  od.agg.simp <- od.agg.all[,list(from=from,to=to,hw=hw,ho=ho+hs+hsc,ow=oo+wo,hw.am=hw.am,ho.am=ho.am+hs.am+hsc.am,ow.am=oo.am+wo.am,hw.pm=hw.pm,ho.pm=ho.pm+hs.pm+hsc.pm,ow.pm=oo.pm+wo.pm)]
-
-  # by how much do we need to scale the AM / PM hours (AM 6:45-7:45, PM 16:30-17:30) to make the aggregate NHTS match GEATM
-  od.24.tot <- sum(od.agg.simp[,list(hw,ho,ow)])
-  od.am.tot <- sum(od.agg.simp[,list(hw.am,ho.am,ow.am)])
-  od.pm.tot <- sum(od.agg.simp[,list(hw.pm,ho.pm,ow.pm)])
-  nh.24.tot <- nrow(rur.tours)
-  nh.am.tot <- sum(rur.tours$begin >= 6.75 & rur.tours$begin < 7.75)
-  nh.pm.tot <- sum(rur.tours$begin >= 16.5 & rur.tours$begin < 17.5)
-
-  am.scale <- (od.am.tot/od.24.tot)/(nh.am.tot/nh.24.tot)
-  pm.scale <- (od.pm.tot/od.24.tot)/(nh.pm.tot/nh.24.tot)
-  offpeak.scale <- ((od.24.tot-od.am.tot-od.pm.tot)/od.24.tot )/((nh.24.tot - nh.am.tot - nh.pm.tot)/nh.24.tot)
-
-  rur.tours$begin.int <- as.integer(round(rur.tours$begin))
-  rur.tours$begin.int[rur.tours$begin.int==24] <- 0
-  rur.tours$tot.miles.int <- as.integer(round(rur.tours$TOT_MILS))
-  
-  rur.by.type <- list()
-  for(type in c('hw','ho','ow')){
-    rur.by.type[[type]] <- list()
-    rur.by.type[[type]][['home.start']] <- data.table(subset(rur.tours,TOURTYPE %in% type.map[[type]] & home.start),key=c("begin.int","tot.miles.int"))
-    rur.by.type[[type]][['non.home.start']] <- data.table(subset(rur.tours,TOURTYPE %in% type.map[[type]] & !home.start),key=c("begin.int","tot.miles.int"))
-  }
-
+do.or.load(pp(pevi.shared,"data/DELHI/itin-generation/departure-time-dists.Rdata"),function(){
   # now develop emprical departure CDF's for each grouping of tour types
-  ecdfs <- list()
-  for(type in c('hw','ho','ow')){
-    ecdfs[[type]] <- ecdf(c(rur.by.type[[type]][['home.start']]$begin,rur.by.type[[type]][['non.home.start']]$begin))
-  }
-
+  ecdfs <- ecdf(hh$depart)
   hours <- seq(-0.25,24,by=0.25)
-  all.scale <- c(rep(offpeak.scale,4*6+3),rep(am.scale,4),rep(offpeak.scale,1+4*8+2),rep(pm.scale,4),rep(offpeak.scale,3+4*6))
+  epdfs <- diff(ecdfs(hours)) 
+  epdfs <- data.frame(hour=as.integer(tail(hours,-1)),epdf=epdfs)
+  epdfs <- ddply(epdfs,.(hour),function(df){ data.frame(epdf=sum(df$epdf)) })
+  epdfs$epdf[1] <- epdfs$epdf[1] +  epdfs$epdf[nrow(epdfs)]
+  epdfs <- h(epdfs,24)
+  epdfs$epdf <- epdfs$epdf/sum(epdfs$epdf)
+  list('epdfs'=epdfs)
+})
 
-  epdfs <- list()
-  epdfs[['hw']] <- diff(ecdfs[['hw']](hours)) * all.scale
-  epdfs[['ho']] <- diff(ecdfs[['ho']](hours)) * all.scale
-  epdfs[['ow']] <- diff(ecdfs[['ow']](hours)) * all.scale
-  epdfs <- data.frame(hour=as.integer(tail(hours,-1)),hw=diff(ecdfs[['hw']](hours)) * all.scale,ho=diff(ecdfs[['ho']](hours)) * all.scale,ow=diff(ecdfs[['ow']](hours)) * all.scale)
-  epdfs <- ddply(epdfs,.(hour),function(df){colSums(df[,2:4])})
-  epdfs <- epdfs[1:24,]
-
-  # verify that it all sums to 1
-  #weighted.mean(colSums(epdfs)[2:4],c(nrow(rur.by.type[['hw']]),nrow(rur.by.type[['ho']]),nrow(rur.by.type[['ow']])))
-
-  save(rur.tours,rur.tours.per,rur.by.type,ecdfs,epdfs,type.map,type.map.rev,od.agg.simp,file=pp(pevi.shared,'data/UPSTATE/itin-generation/data-preprocessed.Rdata'))
-}else{
-  load(file=pp(pevi.shared,'data/UPSTATE/itin-generation/data-preprocessed.Rdata'))
-}
-
-pev.pens <- c(0.005,0.01,0.02,0.04)
+pev.pens <- c(0.005,0.01,0.02)
 replicate <- 1
 source(pp(pevi.home,'R/upstate/itin-functions.R',sep=''))
+
 #schedule <- create.schedule(0.001,1,0.922)
 #print(paste(nrow(schedule)/length(unique(schedule$driver)),nrow(schedule),length(unique(schedule$driver))))
 # see what fraction of drivers end at home?
@@ -356,7 +304,7 @@ compute.new <- T
 if(make.plots){
   dev.new()
   dev.tours.per <- dev.cur()
-  plot(ecdf(rur.tours.per$V1),main="Empirical CDF of # Trips Per Driver")
+  plot(ecdf(hh.per$V1),main="Empirical CDF of # Trips Per Driver")
 }
 
 for(pev.penetration in pev.pens){
@@ -370,13 +318,13 @@ for(pev.penetration in pev.pens){
       num.vehicles[num.vehicles$penetration==pev.penetration,c('expected','scheduled')] <- c(pev.penetration * 130e3,max(schedule$driver))
 
       # TOURS PER DRIVER
-      # assumes we have already computed rur.tours.per
+      # assumes we have already computed hh.per
       if(compute.new) synth.tours.per[[pev.pen.char]] <- ddply(schedule,.(driver),function(df){data.frame(ntours=nrow(df),end.time=df$arrive[nrow(df)])})
       if(make.plots){
         dev.set(dev.tours.per)
         plot(ecdf(synth.tours.per[[pev.pen.char]]$ntours),add=T,col=pen.i,pch=pen.i)
       }
-      ks.tests[ks.tests$penetration == pev.penetration & ks.tests$test == "tours.per.driver", c('stat','p.value')] <- unlist(ks.test(synth.tours.per[[pev.pen.char]]$ntours,rur.tours.per$V1)[c('statistic','p.value')])
+      ks.tests[ks.tests$penetration == pev.penetration & ks.tests$test == "tours.per.driver", c('stat','p.value')] <- unlist(ks.test(synth.tours.per[[pev.pen.char]]$ntours,hh.per$V1)[c('statistic','p.value')])
 
       # DWELL TIME
       if(compute.new) dwell.times[[pev.pen.char]] <- ddply(schedule,.(driver),function(df){ if(nrow(df)>1){ data.frame(dwell = df$depart[2:nrow(df)]-df$arrive[1:(nrow(df)-1)],type= df$type[1:(nrow(df)-1)],purp= df$purp[1:(nrow(df)-1)]) }} )
@@ -516,7 +464,7 @@ ddply(schedule.counts,.(purp),function(df){sum(df$count)})
 colSums(od.24.simp[,3:5])
 
 synth.tours.per <- ddply(schedule,.(driver),function(df){data.frame(ntours=nrow(df),end.time=df$arrive[nrow(df)])})
-if(!exists('rur.tours.per')){ rur.tours.per <- ddply(rur.tours,.(journey.id),nrow) }
+if(!exists('hh.per')){ hh.per <- ddply(rur.tours,.(journey.id),nrow) }
 
 dev.set(dev1)
 ggplot(synth.tours.per,aes(x=ntours))+
@@ -524,14 +472,14 @@ ggplot(synth.tours.per,aes(x=ntours))+
  opts(title = "Synthetic Schedule") +
  scale_x_continuous(name="Tours Per Driver")
 dev.set(dev2)
-ggplot(rur.tours.per,aes(x=V1))+
+ggplot(hh.per,aes(x=V1))+
  geom_histogram(aes(y=..density..),binwidth=1)+
  opts(title = "NHTS") +
  scale_x_continuous(name="Tours Per Driver")
 
 # same as above but in CDF form
 h.synth <- hist(synth.tours.per$ntours,plot=F,breaks=0:ceiling(max(synth.tours.per$ntours)))
-h.nhts <- hist(rur.tours.per$V1,plot=F,breaks=0:ceiling(max(rur.tours.per$V1)))
+h.nhts <- hist(hh.per$V1,plot=F,breaks=0:ceiling(max(hh.per$V1)))
 dev.set(dev1)
 plot(h.synth$breaks[2:length(h.synth$breaks)],cumsum(h.synth$counts)/sum(h.synth$counts),ylim=c(0,1),xlim=c(0,tail(h.nhts$breaks,1)),main="Synthetic")
 grid()

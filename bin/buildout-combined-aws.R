@@ -209,3 +209,20 @@ for(seed in seeds){
 	write.table(init.charger.buildout,charger.file,quote=FALSE,sep='\t',row.names=FALSE)    
     
 } # end seed loop
+
+# Plots to analyze opt.history
+load(pp(pevi.shared,"/data/outputs/optim-new/development-seed1/optimization-history.Rdata"))
+opt.history <- data.table(opt.history,key=c('penetration','iteration','obj'))
+opt.history[,rank:=1:length(name),by=c('penetration','iteration')]
+
+ggplot(subset(opt.history,rank<50),aes(x=iteration,y=rank,label=key,colour=factor(taz))) + geom_text() + facet_wrap(~penetration) + labs(x="Iteration",y="Rank",title="Top 50 Alternatives by Iteration")
+
+# what's the distribution of change in rank from one iteration to the next
+setkey(opt.history,'penetration','key','iteration')
+opt.history[,rank:=as.integer(rank)]
+delta.rank <- opt.history[,list(delta=diff(rank)),by=c('penetration','key')]
+before.win <- ddply(opt.history,.(penetration,key),function(df){
+  data.frame(rank=ifelse(1 %in% df$rank,df$rank[which(df$rank==1)-1],NA))
+})
+hist(before.win$rank)
+

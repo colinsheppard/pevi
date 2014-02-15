@@ -96,9 +96,6 @@ quit.netlogo <- function(){
 }
 
 run.buildout.batch <- function(driver.input.file){
-  #tryCatch(NLStart(nl.path, gui=F),error=function(err){ NA })
-  #NLLoadModel(model.path)
-  #for(cmd in paste('set log-',logfiles,' false',sep='')){ NLCommand(cmd) }
 
   rep <- as.numeric(strsplit(strsplit(driver.input.file,'rep')[[1]][2],'-')[[1]][1])
 

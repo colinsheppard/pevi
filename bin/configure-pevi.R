@@ -25,10 +25,11 @@ option_list <- list(
   make_option(c("-p", "--pevi"), default="~/Dropbox/pevi", help="Path to PEVI repository [default %default]"),
   make_option(c("-s", "--shared"), default="~/Dropbox/pev-shared", help="Path to pev-shared directory [default %default]"),
   make_option(c("-n", "--nondrop"), default="~/Documents/pevi", help="Path to non-dropbox directory for pevi [default %default]")
+  make_option(c("-c", "--numcpu"), default="1", help="Number of CPUs you want this machine to use for parallel analysis [default %default]"),
 )
 if(interactive()){
   setwd('~/Dropbox/serc/pev-colin/pevi/R')
-  args<-c('-p','/Users/sheppardc/Dropbox/serc/pev-colin/pevi/','-s','/Users/sheppardc/Dropbox/serc/pev-colin/pev-shared/','-n','/Users/sheppardc/Documents/pev/','colinmisc')
+  args<-c('-p','/Users/sheppardc/Dropbox/serc/pev-colin/pevi/','-s','/Users/sheppardc/Dropbox/serc/pev-colin/pev-shared/','-n','/Users/sheppardc/Documents/pev/','-c','2','colinmisc')
   args <- parse_args(OptionParser(option_list = option_list,usage = "configure-pevi.R [options] AUTO_LOADED_R_LIBRARIES"),positional_arguments=T,args=args)
 }else{
   args <- parse_args(OptionParser(option_list = option_list,usage = "configure-pevi.R [options] AUTO_LOADED_R_LIBRARIES"),positional_arguments=T)

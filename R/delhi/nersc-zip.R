@@ -18,3 +18,5 @@ cd ~/Dropbox/serc/pev-shared
 # Be sure to include both upstate files (for testing) and delhi files (for future work).
 
 zip pevi-files.zip data/inputs/starting-soc data/inputs/external-time-distance data/inputs/charger-input-file/upstate data/inputs/charger-type-input-file data/inputs/driver-input-file/upstate-combined data/inputs/OD-upstate data/inputs/OD-delhi data/inputs/vehicle-type-input-file data/inputs/optim-new/params.R data/inputs/optim-new/params.txt data/inputs/optim-new/vary.yaml data/inputs/optim-new/varyshort.yaml
+
+scp pevi-files.zip csheppar@carver.nersc.gov:~

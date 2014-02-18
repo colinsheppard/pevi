@@ -5,7 +5,7 @@ gpclibPermit()
 source(paste(pevi.home,'R/gis-functions.R',sep=''))
 
 # First load the original network file from RITES
-net <- readShapeLines(pp(pevi.shared,'data/DELHI/tdfs-data/RITES-files/Delhi_Link_polyline_polyline_WGS84.shp'))
+net <- readShapeLines(pp(pevi.shared,'data/DELHI/road-network/Delhi_Link_polyline_polyline_WGS84.shp'))
 net$link.key <- pp(net$LK_FRM,'--',net$LK_TO) # unique key
 
 # Now append the data table curated by Andy to the attributes of the shape file and write back out to shape
@@ -24,9 +24,9 @@ net.data$PRIV_SPEED[net.data$LK_FRM==1865 & net.data$LK_TO==377] <- 1
 net.data$JOURTIME[na.rows] <- net.data$LINK_LEN_M[na.rows]/1000/net.data$PRIV_SPEED[na.rows]
 net.data$RUNTIME[na.rows] <- net.data$JOURTIME[na.rows] * median(net.data$RUNTIME,na.rm=T)/median(net.data$JOURTIME,na.rm=T)
 net.data$DELAY[na.rows] <- net.data$JOURTIME[na.rows] - net.data$RUNTIME[na.rows] 
-
-net@data <- merge(net@data,data.frame(link.key=net.data$link.key,net.data[,-which(names(net.data)%in%names(net@data))]),by="link.key")
-writeLinesShape(net,pp(pevi.shared,'data/DELHI/tdfs-data/RITES-files/delhi_network.shp'))
+net.data <- merge(net@data,data.frame(link.key=net.data$link.key,net.data[,-which(names(net.data)%in%names(net@data))]),by="link.key")
+net@data <- net.data[match(net$link.key,net.data$link.key),]
+writeLinesShape(net,pp(pevi.shared,'data/DELHI/road-network/delhi_network.shp'))
 
 # some quick analysis to look at the relationship between average speed, runtime and jourtime
 plot.dat<-data.frame(priv.speed.kph=net.data$PRIV_SPEED,runtime.speed.kph=net.data$LINK_LEN_M/1000/(net.data$RUNTIME/3600),jourtime.speed.kph=net.data$LINK_LEN_M/1000/(net.data$JOURTIME/3600))
@@ -83,8 +83,7 @@ for(taz.i in 1:n){
 }
 plot(coordinates(agg.taz))
 
-# from psql prompt
-CREATE TABLE taz_route (
+dbSendQuery(con,paste("CREATE TABLE taz_route (
   id          serial PRIMARY KEY,
   from_taz    integer NOT NULL,
   to_taz      integer NOT NULL,
@@ -93,7 +92,7 @@ CREATE TABLE taz_route (
   time        double precision NOT NULL,
   time_delayed  double precision NOT NULL,
   route_order integer NOT NULL
-);
+)"))
 
 dbGetQuery(con,paste("DELETE FROM taz_route"))
 # Build the routes between each taz pair and store them in taz-routes 
@@ -137,20 +136,22 @@ routes <- data.table(dbGetQuery(con,paste("SELECT * FROM taz_route")))
 setkey(routes,'from_taz','to_taz')
 routes[,distance:=distance/1000] # from m into km
 time.distance <- routes[,list(km=sum(distance),time=sum(time)),by=c('from_taz','to_taz')]
-time.distance[,':='(from_taz=NULL,to_taz=NULL)]
+time.distance[,':='(from=from_taz,to=to_taz,from_taz=NULL,to_taz=NULL)]
 
 ## Note, lengths are in KM
-CREATE OR REPLACE VIEW taz_route_sp AS
+dbSendQuery(con,paste("CREATE OR REPLACE VIEW taz_route_sp AS
 SELECT r.id,r.net_id,r.from_taz,r.to_taz,r.time,r.time_delayed,r.distance,r.route_order,w.start_id,w.end_id,w.geom FROM taz_route AS r
-   LEFT JOIN network AS w ON w.gid = r.net_id;
+   LEFT JOIN network AS w ON w.gid = r.net_id"))
 
 ###############################################################
 # If necessary, load the aggregated TAZs into postgis
 ###############################################################
-#shp2pgsql pev-shared/data/DELHI/POLYGON/AggregatedTAZsCleaned | psql -U pev -d delhi
+#cd pev-shared/data/DELHI/POLYGON/
+#shp2pgsql AggregatedTAZsCleaned | psql -U pev -d delhi
 
 # finally find enroute
-net.in.tazsnet.in.tazs <- data.table(net.id=unique(routes$net_id),agg.id=NA,key='net.id')
+routes[,':='(net.id=net_id,net_id=NULL)]
+net.in.tazs <- data.table(net.id=unique(routes$net.id),agg.id=NA,key='net.id')
 for(net.id in net.in.tazs$net.id){
   res <- dbGetQuery(con,pp("SELECT agg_id FROM aggregatedtazscleaned WHERE ST_Contains(geom,(SELECT startpoint FROM network WHERE gid=",net.id,"))"))
   if(length(res)>0){ 
@@ -158,7 +159,6 @@ for(net.id in net.in.tazs$net.id){
   }
 }
 print(pp("couldn't find taz for net: ",pp(net.in.tazs$net.id[is.na(net.in.tazs$agg.id)],collapse=',')))
-routes[,':='(net.id=net_id,net_id=NULL)]
 setkey(routes,'net.id')
 routes <- net.in.tazs[routes]
 

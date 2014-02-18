@@ -300,29 +300,15 @@ to setup-in-batch-mode
 ;    print "setup-drivers"
     setup-drivers
     random-seed next-seed
-<<<<<<< HEAD
-;    print "initialize-drivers"
-;    print random 1000
-    initialize-drivers
-;    print random 1000
-;    print "setup-chargers"
-=======
     print "initialize-drivers"
     initialize-drivers
     print "setup-chargers"
->>>>>>> 72a4154198b4aec63b174469def726326bc9be2a
     setup-charger-types
     setup-chargers
     initialize-logfile
     random-seed next-seed
-<<<<<<< HEAD
-;    print random 1000
-  ][
-;    print "Already got turtles"
-=======
   ][
     ;print "Already got turtles"
->>>>>>> 72a4154198b4aec63b174469def726326bc9be2a
     set batch-setup? true
     set seed-list-index -1
     ask chargers [
@@ -338,9 +324,11 @@ to setup-in-batch-mode
     reset-ticks
     
     random-seed next-seed
+    
     initialize-drivers
     initialize-logfile
     random-seed next-seed
+
   ]
 end
 

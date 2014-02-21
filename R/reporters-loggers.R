@@ -2,6 +2,7 @@
 # specify the reporters used to summarize an experiment and setup results data frame
 reporters <- data.frame(num.drivers="(count drivers)",
   num.trips="(sum [ length itin-change-flag - sum itin-change-flag ] of drivers)",
+  objective="(objective-function)",
   total.delay="(sum [ sum map weight-delay itin-delay-amount  ] of drivers)",
   mean.delay="(mean-delay)",
   frac.drivers.delayed="(count drivers with [ sum map abs itin-delay-amount > 0 ] / count drivers)",

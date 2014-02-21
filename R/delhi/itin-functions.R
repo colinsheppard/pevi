@@ -1,44 +1,47 @@
-create.schedule <- function(pev.penetration,scale.dist.thresh=1,frac.end.at.home=0.922){
+create.schedule <- function(pev.penetration,scale.dist.thresh=1,frac.end.at.home=0.9663692,frac.include.home=0.9769919){
   environment(pick.driver) <- sys.frame(sys.nframe())
   environment(find.consistent.journey) <- sys.frame(sys.nframe())
    #for testing
    #pev.penetration <- 0.005
-   #scale.dist.thresh <- 1
+   #scale.dist.thresh <- 2
    #frac.end.at.home <- 0.922
    #set.seed(1)
 
-  od.counts <- od.agg.simp
-  od.counts[,':='(hw.mean=hw*pev.penetration,ho.mean=ho*pev.penetration,ow.mean=ow*pev.penetration)]
+  setkey(od.agg,'o','d')
+  # note, these modes were chosen so that the final # trips per driver matched hh, which had an average value of 2.015
+  od.counts <- od.agg[mode%in%c('car','pool-car','taxi','taxi-shared','x-car'),list(trip.mean=sum(trips)*pev.penetration),by=c('o','d')]
+  od.counts[,':='(from=o,to=d,o=NULL,d=NULL)]
   # explode the od.counts frame to be on an hourly basis scaled by the epdfs
-  od.counts <- data.frame(from    = rep(od.counts$from,each=24),
+  od.counts <- data.table(from    = rep(od.counts$from,each=24),
                           to      = rep(od.counts$to,each=24),
                           hour    = rep(6:29,nrow(od.counts)),
-                          hw.mean = rep(od.counts$hw.mean,each=24)*rep(epdfs$hw,nrow(od.counts)),
-                          ho.mean = rep(od.counts$ho.mean,each=24)*rep(epdfs$ho,nrow(od.counts)),
-                          ow.mean = rep(od.counts$ow.mean,each=24)*rep(epdfs$ow,nrow(od.counts)))
+                          trip.mean = rep(od.counts$trip.mean,each=24)*rep(epdfs$epdf,nrow(od.counts)))
 
   # do the random draws to convert the mean trips to discrete numbers
-  od.counts[,c('hw','ho','ow')] <- t(apply(od.counts[,c('hw.mean','ho.mean','ow.mean')],1,function(row){ apply(as.matrix(row,byrow=T),1,rpois,n=1) }))
+  od.counts[,trips:=rpois(rep(1,nrow(od.counts)),trip.mean)]
 
   # now sort by hour and shuffle otherwise
-  od.counts[,c('hw.orig','ho.orig','ow.orig')] <- od.counts[,c('hw','ho','ow')]
+  setkey(od.counts,'hour')
+  od.counts <- od.counts[,list(shuff=sample(length(trip.mean)),from=from,to=to,trips=trips),by='hour']
+  od.counts <- od.counts[,list(from=from[shuff],to=to[shuff],trips=trips[shuff]),by='hour']
+
   tazs <- sort(unique(od.counts$from))
   num.tazs <- length(tazs)
 
-  # now convert into data table 
-  od.counts <- data.table(od.counts,key=c('to'))
+  # now convert into data table useful for keying by to
+  od.counts.to <- data.table(od.counts,key=c('to'))
   
   # start the data structure to store a list of drivers available to be redispatched
   # the structure is nested lists indexed by [from.taz]][[count | drivers]]
   # and will then contain a data frame with 2 columns, driver.id and at.home 
   available.drivers <- list()
   for(taz.i in tazs){
-    num.counts <- sum(od.counts[J(taz.i),hw+ho+ow]$V1)
+    num.counts <- sum(od.counts.to[J(taz.i)]$trips)
     if(num.counts < 1)num.counts <- 1
     available.drivers[[as.character(taz.i)]][['drivers']] <- data.frame(driver.id=rep(NA,num.counts),at.home=NA,hour=NA)
     available.drivers[[as.character(taz.i)]][['count']] <- 0
   }
-  expected.num.drivers <- pev.penetration * sum(pops.2020) * 0.84 # 0.84 is average # vehicle per capita in California
+  expected.num.drivers <- pev.penetration * num.veh.2020
 
   home.drivers <- list()
   driver.count <- 0
@@ -55,55 +58,51 @@ create.schedule <- function(pev.penetration,scale.dist.thresh=1,frac.end.at.home
           home.drivers[[c.taz]][['count']] <- home.drivers[[c.taz]][['count']] + 1
         }
       }
+    }else{
+      home.drivers[[c.taz]] <- list(driver=c(),count=0)
     }
   }
   tot.drivers <- sum(unlist(sapply(home.drivers,function(x){x[['count']]})))
   num.home.drivers <- tot.drivers
-  print(paste("num.drivers",num.home.drivers,"num.trips",sum(od.counts[,hw+ho+ow]),"trips.per.driver",sum(od.counts[,hw+ho+ow])/num.home.drivers))
+  print(paste("num.drivers",num.home.drivers,"num.trips",sum(od.counts$trips),"trips.per.driver",sum(od.counts$trips)/num.home.drivers))
 
   setkey(time.distance,'from','to')
 
   #Rprof(pp(pevi.nondrop,'profile5.txt'))
   # make the schedule
-  od.counts[,':='(hw=hw.orig,ho=ho.orig,ow=ow.orig)]
-  od.m <- melt(od.counts[,list(from,to,hour,hw,ho,ow)],id.vars=c('from','to','hour'),measure.vars=c('hw','ho','ow'))
-  od.m <- data.table(ddply(od.m,.(hour),function(df){df[sample(1:nrow(df)),]}))
-  od.m[,':='(purp=variable,variable=NULL)]
-  od.m[,od.row:=1:nrow(od.m)]
-  setkey(od.m,'purp','from','to','hour')
-  od.m[,od.i:=1:nrow(od.m)]
-  od.row.i.lookup <- data.table(od.m[,list(od.i,od.row)],key='od.row')
+  od.counts[,od.row:=1:nrow(od.counts)]
+  setkey(od.counts,'from','to','hour')
+  od.counts[,od.i:=1:nrow(od.counts)]
+  od.row.i.lookup <- data.table(od.counts[,list(od.i,od.row)],key='od.row')
   
   dist.thresh <- data.frame(under=c(3,seq(5,40,by=5),seq(50,100,by=25),seq(150,300,by=50)),
-                            miles=c(3,rep(5,8),10,rep(25,2),rep(50,4))) # miles
-  dist.thresh$miles <- dist.thresh$miles * scale.dist.thresh
+                            km=c(3,rep(5,8),10,rep(25,2),rep(50,4))) # km
+  dist.thresh$km <- dist.thresh$km * scale.dist.thresh
   depart.thresh <- 3 # hours
-  max.journey.len <- 15 # max(ddply(rur.tours,.(journey.id),nrow)$V1) # takes a long time to run
-  schedule <- data.frame(driver=rep(NA,sum(od.m$value)))
+  max.journey.len <- 6 # max(hh[,length(dist),by=c('form','taz','mem')]$V1)
+  schedule <- data.frame(driver=rep(NA,sum(od.counts$trips)))
   schedule$from   <- NA
   schedule$to     <- NA
   schedule$depart <- NA
   schedule$arrive <- NA
   schedule$type   <- NA
-  schedule$purp <- NA
   schedule$home <- NA
   
   cand.schedule <- schedule[1:max.journey.len,]
   num.trips <- 1
   recycle.drivers.thresh <- 0.0
-  max.length.remaining <- max(rur.tours$tours.left.in.journey)
+  max.length.remaining <- max(hh$tours.left.in.journey)
 
-  for(od.row in 1:nrow(od.m)){
+  for(od.row in 1:nrow(od.counts)){
     od.i <- od.row.i.lookup[od.row,od.i]
     if(od.row%%5000 == 0){
-      print(paste("pev ",pev.penetration," rep ",replicate," progress: ",roundC(od.row/nrow(od.m)*100,1),"%",sep=''))
+      print(paste("pev ",pev.penetration," rep ",replicate," progress: ",roundC(od.row/nrow(od.counts)*100,1),"%",sep=''))
       system('sleep 0.05')
     }
-    if(od.m[od.i,value]<=0)next
-    to.i <- od.m$to[od.i]
-    from.i <- od.m$from[od.i]
-    type <- od.m$purp[od.i]
-    hour <- od.m$hour[od.i]
+    if(od.counts[od.i,trips]<=0)next
+    to.i <- od.counts$to[od.i]
+    from.i <- od.counts$from[od.i]
+    hour <- od.counts$hour[od.i]
     # we increase the working threshold at the boundaries (near hour 0 and 24) to account for the fact that we can't go off the edges
     # and for the fact that demand is lower at night so the pool get's small quickly
     if(hour - 6 < depart.thresh){
@@ -117,22 +116,25 @@ create.schedule <- function(pev.penetration,scale.dist.thresh=1,frac.end.at.home
     # deal with loop around from 24 to 0
     hours.to.search[hours.to.search>23] <- hours.to.search[hours.to.search>23]-24
     dists <- time.distance[J(from.i,to.i),]
-    dist.thresh.to.use <- dist.thresh$miles[findInterval(dists$miles,dist.thresh$under)+1]
-    dists.to.search <- (dists$miles.int-dist.thresh.to.use):(dists$miles.int+dist.thresh.to.use)
+    dist.thresh.to.use <- dist.thresh$km[findInterval(dists$km,dist.thresh$under)+1]
+    dists.to.search <- (dists$km.int-dist.thresh.to.use):(dists$km.int+dist.thresh.to.use)
     # grab the indices of the tours that are close in time and distance, and in the case of home-based travel, starting from home
-    if(type=='ow'){
-      cands <- na.omit(rur.by.type[[type]][['non.home.start']][J(hours.to.search,dists.to.search),index]$index)
-      if(length(cands)==0)cands <- na.omit(rur.by.type[[type]][['home.start']][J(hours.to.search,dists.to.search),index]$index)
+    # for delhi, we use a random draw to assume they start from home based on the fraction of trips starting from home in hh (55.45%)
+    if(runif(1) > frac.include.home){
+      type <- 'ow'
+      cands <- na.omit(hh.by.home[['non.home.start']][J(hours.to.search,dists.to.search),index]$index)
+      if(length(cands)==0)cands <- na.omit(hh.by.home[['home.start']][J(hours.to.search,dists.to.search),index]$index)
       if(length(cands)==0){
-        print(paste('Warning: no candidate tours found for ',dists$miles,' miles at ',hour,' hour for type ',type,' and od.row ',od.row,' taking random cand',sep=''))
-        cands <- sample(rur.by.type[[type]][['non.home.start']]$index,1)
+        print(paste('Warning: no candidate tours found for ',dists$km,' km at ',hour,' hour for type ',type,' and od.row ',od.row,' taking random cand',sep=''))
+        cands <- sample(hh.by.home[['non.home.start']]$index,1)
       }
     }else{
-      cands <- na.omit(rur.by.type[[type]][['home.start']][J(hours.to.search,dists.to.search),index]$index)
-      if(length(cands)==0)cands <- na.omit(rur.by.type[[type]][['non.home.start']][J(hours.to.search,dists.to.search),index]$index)
+      type <- 'hw'
+      cands <- na.omit(hh.by.home[['home.start']][J(hours.to.search,dists.to.search),index]$index)
+      if(length(cands)==0)cands <- na.omit(hh.by.home[['non.home.start']][J(hours.to.search,dists.to.search),index]$index)
       if(length(cands)==0){
-        print(paste('Warning: no candidate tours found for ',dists$miles,' miles at ',hour,' hour for type ',type,' and od.row ',od.row,' taking random cand',sep=''))
-        cands <- sample(rur.by.type[[type]][['home.start']]$index,1)
+        print(paste('Warning: no candidate tours found for ',dists$km,' km at ',hour,' hour for type ',type,' and od.row ',od.row,' taking random cand',sep=''))
+        cands <- sample(hh.by.home[['home.start']]$index,1)
       }
     }
     if(length(cands)==1){
@@ -154,14 +156,14 @@ create.schedule <- function(pev.penetration,scale.dist.thresh=1,frac.end.at.home
     for(cand in shuffled.cands){
       use.cand <- T
       cand.schedule[,] <- NA 
-      journey <- rur.tours[cand:(cand+rur.tours$tours.left.in.journey[cand])]
+      journey <- hh[cand:(cand+hh$tours.left.in.journey[cand])]
       depart <- hour+runif(1)
-      arrive <- depart + dists$hours
+      arrive <- depart + dists$time
       #if(arrive >= 24){
         #arrive <- arrive - 24
       #}
       #print(pp(driver.i,from.i,to.i,depart,arrive,journey$TOURTYPE[1],as.character(journey$purp[1]),driver.home,sep="  "))
-      cand.schedule[1,] <- data.frame(driver.i,from.i,to.i,depart,arrive,journey$TOURTYPE[1],as.character(journey$purp[1]),driver.home,stringsAsFactors=F)
+      cand.schedule[1,] <- data.frame(driver.i,from.i,to.i,depart,arrive,journey$purp[1],driver.home,stringsAsFactors=F)
       if(arrive >= depart & nrow(journey) > 1){
         new.cand.schedule <- find.consistent.journey(2,cand.schedule,journey,dists,dist.thresh)
         if(is.logical(new.cand.schedule)){
@@ -181,10 +183,10 @@ create.schedule <- function(pev.penetration,scale.dist.thresh=1,frac.end.at.home
         num.trips <- num.trips + n.cand.trips
         for(row.i in 1:n.cand.trips){
           if(row.i==1){
-            od.i.check <- od.m[J(type,cand.schedule$from[row.i],cand.schedule$to[row.i],as.integer(cand.schedule$depart[row.i]))]$od.i
+            od.i.check <- od.counts[J(cand.schedule$from[row.i],cand.schedule$to[row.i],as.integer(cand.schedule$depart[row.i]))]$od.i
             if(od.i.check != od.i)stop('stop, somehow the driver schedule does not start in the place we expected based on od.i')
           }
-          od.m[od.i,value:=value - 1L]
+          od.counts[od.i,trips:=trips - 1L]
         }
         if(driver.i %in% home.drivers[[driver.home.ch]]$driver){
           home.drivers[[driver.home.ch]]$driver <- home.drivers[[driver.home.ch]]$driver[-which(home.drivers[[driver.home.ch]]$driver==driver.i)]
@@ -205,7 +207,7 @@ create.schedule <- function(pev.penetration,scale.dist.thresh=1,frac.end.at.home
         available.drivers[[as.character(cand.schedule$to[n.cand.trips])]][['drivers']][available.drivers[[as.character(cand.schedule$to[n.cand.trips])]][['count']],] <- data.frame(driver.id=driver.i,
                                                                                       at.home=cand.schedule$to[n.cand.trips]==driver.home,
                                                                                       hour=ceiling(cand.schedule$arrive[n.cand.trips]))
-        if(od.m[od.i,value] <= 0)break
+        if(od.counts[od.i,trips] <= 0)break
         for(pick.i in 1:50){
           driver <- pick.driver(type,from.i,to.i,hour)
           driver.i <- driver$driver.i
@@ -217,25 +219,24 @@ create.schedule <- function(pev.penetration,scale.dist.thresh=1,frac.end.at.home
         #print(paste(driver.i,driver.home))
       }
     }
-    if(od.m[od.i,value]>0){
-      print(paste('no consistent journeys: giving up on ',od.m[od.i,value],' trips'))
+    if(od.counts[od.i,trips]>0){
+      print(paste('no consistent journeys: giving up on ',od.counts[od.i,trips],' trips'))
       #stop()
     }
   } # end foreach row in od
   #summaryRprof(pp(pevi.nondrop,'profile5.txt'))
   #Rprof(NULL)
   schedule$type <- as.factor(schedule$type)
-  levels(schedule$type) <- levels(rur.tours$TOURTYPE)
   schedule <- na.omit(ddply(schedule[order(schedule$driver),],.(driver),function(df){ df[order(df$depart),] }))
 
   # now force drivers to go home instead of somewhere else, prioritize drivers whose final trip of the day is close in length to a 
   # trip home instead
-  final.trip.by.driver <- ddply(schedule,.(driver),function(df){ data.frame(from=df$from[nrow(df)], to=df$to[nrow(df)], trip.miles=time.distance[J(df$from[nrow(df)],df$to[nrow(df)]),miles]$miles, home=df$home[1], home.miles = time.distance[J(df$from[nrow(df)],df$home[1]),miles]$miles ) })
-  final.trip.by.driver <- final.trip.by.driver[order(abs(final.trip.by.driver$trip.miles - final.trip.by.driver$home.miles)),]
+  final.trip.by.driver <- ddply(schedule,.(driver),function(df){ data.frame(from=df$from[nrow(df)], to=df$to[nrow(df)], trip.km=time.distance[J(df$from[nrow(df)],df$to[nrow(df)]),km]$km, home=df$home[1], home.km = time.distance[J(df$from[nrow(df)],df$home[1]),km]$km ) })
+  final.trip.by.driver <- final.trip.by.driver[order(abs(final.trip.by.driver$trip.km - final.trip.by.driver$home.km)),]
   n.to.change <- round(nrow(final.trip.by.driver) * (frac.end.at.home - sum(final.trip.by.driver$to==final.trip.by.driver$home)/nrow(final.trip.by.driver)))
   if(n.to.change > 0){
     final.trip.by.driver <- subset(final.trip.by.driver,to != home)
-    final.trip.by.driver$trip.diff <- abs(final.trip.by.driver$trip.miles - final.trip.by.driver$home.miles)
+    final.trip.by.driver$trip.diff <- abs(final.trip.by.driver$trip.km - final.trip.by.driver$home.km)
     final.trip.by.driver <- final.trip.by.driver[order(final.trip.by.driver$trip.diff),][1:n.to.change,]
     schedule <- ddply(schedule,.(driver),function(df){ 
       if(df$driver[1] %in% final.trip.by.driver$driver){
@@ -249,42 +250,43 @@ create.schedule <- function(pev.penetration,scale.dist.thresh=1,frac.end.at.home
 
 #cand.schedule[2:nrow(cand.schedule),] <- NA
 
-# vars in this function which must be altered on the global environment: journey, time.distance, dists, od.m, dist.thresh
+# vars in this function which must be altered on the global environment: journey, time.distance, dists, od.counts, dist.thresh
 find.consistent.journey <- function(journey.i,cand.schedule,journey,dists,dist.thresh){
   #print(paste(journey.i, paste(na.omit(cand.schedule$from),na.omit(cand.schedule$to),collapse="---",sep=",")))
   if(journey.i > nrow(journey))return(cand.schedule)
   
   # first see if the dwell time puts us into tomorrow, if so we're done
-  depart <- cand.schedule$arrive[journey.i-1] + journey$TOT_DWEL4[journey.i-1]/60
+  depart <- cand.schedule$arrive[journey.i-1] + (journey$depart[journey.i] - journey$arrive[journey.i-1])
   if(depart >= 30)return(cand.schedule)
 
   # now find a new TAZ within dist.thresh of the NHTS schedule 
   new.hour <- as.integer(depart)
   new.from <- cand.schedule$to[journey.i-1]
   new.type <- journey$purp[journey.i] 
+
   # if the journey tourtype is to home (and not the last trip of the journey), we restrict the search to going to the home taz
   if(journey$home.end[journey.i] & journey.i < nrow(journey)){
-    new.to.distance <- time.distance[J(new.from,driver.home)]$miles
-    new.to.cands <- ifelse( abs(new.to.distance - journey$TOT_MILS[journey.i]) < dist.thresh$miles[findInterval(journey$TOT_MILS[journey.i],dist.thresh$under)+1], driver.home, NA)
+    new.to.distance <- time.distance[J(new.from,driver.home)]$km
+    new.to.cands <- ifelse( abs(new.to.distance - journey$dist[journey.i]) < dist.thresh$km[findInterval(journey$dist[journey.i],dist.thresh$under)+1], driver.home, NA)
   }else{
     # otherwise, look for any TAZ that is near enough
     new.to.cands <- time.distance[J(new.from)]
-    new.to.cands <- subset(new.to.cands,abs(miles - journey$TOT_MILS[journey.i]) < dist.thresh$miles[findInterval(journey$TOT_MILS[journey.i],dist.thresh$under)+1])$to
+    new.to.cands <- subset(new.to.cands,abs(km - journey$dist[journey.i]) < dist.thresh$km[findInterval(journey$dist[journey.i],dist.thresh$under)+1])$to
   }
   if(length(new.to.cands)==0)return(F)
   if(length(new.to.cands)==1){
     if(is.na(new.to.cands))return(F)
   }
-  new.to.cands <- subset(od.m[J(new.type,new.from,new.to.cands,new.hour)],value>0)$to
+  new.to.cands <- subset(od.counts[J(new.from,new.to.cands,new.hour)],trips>0)$to
   if(length(new.to.cands)==0)return(F)
   if(length(new.to.cands)>1)new.to.cands <- sample(new.to.cands) # shuffle if needed
   for(new.to in new.to.cands){
-    arrive <- depart + time.distance[J(new.from,new.to)]$hours
+    arrive <- depart + time.distance[J(new.from,new.to)]$time
     #if(arrive >= 24){
       #arrive <- arrive - 24
     #}
     #print(pp(driver.i,new.from,new.to,depart,arrive,journey$TOURTYPE[journey.i],new.type,driver.home,collapse="  "))
-    cand.schedule[journey.i,] <- data.frame(driver.i,new.from,new.to,depart,arrive,journey$TOURTYPE[journey.i],new.type,driver.home,stringsAsFactors=F)
+    cand.schedule[journey.i,] <- data.frame(driver.i,new.from,new.to,depart,arrive,new.type,driver.home,stringsAsFactors=F)
     new.cand.schedule <- find.consistent.journey(journey.i+1,cand.schedule,journey,dists,dist.thresh)
     if(!is.logical(new.cand.schedule))return(new.cand.schedule)
   }

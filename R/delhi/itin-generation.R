@@ -61,7 +61,7 @@ do.or.load(pp(pevi.shared,'data/DELHI/itin-generation/hh-survey.Rdata'),function
   # inspect the resulting speed distributions
   #ggplot(hh,aes(x=speed))+geom_histogram()+facet_wrap(~mode,scales="free")
   # get rid of modes we're not interested in
-  hh <- hh[mode %in% c('Car','Auto','Shared Auto','Shared Taxi','Pool Car')]
+  hh <- hh[mode %in% c('Car','Auto','Shared Auto','Shared Taxi','Taxi','Pool Car')]
 
   setkey(hh,'form','taz','mem')
   hh.uniq <- unique(hh)[,list(form,taz,mem)]
@@ -77,7 +77,9 @@ do.or.load(pp(pevi.shared,'data/DELHI/itin-generation/hh-survey.Rdata'),function
   hh.by.home <- list()
   hh.by.home[['home.start']] <- data.table(hh[home.start==T],key=c("begin.int","km.int"))
   hh.by.home[['non.home.start']] <- data.table(hh[home.start==F],key=c("begin.int","km.int"))
-  list('hh'=hh,'hh.per'=hh.per,'hh.by.home'=hh.by.home)
+  frac.end.at.home <- nrow(hh[home.end & tours.left.in.journey==0])/nrow(hh[tours.left.in.journey==0])
+  frac.include.home <- nrow(hh[home.start | home.end])/nrow(hh)
+  list('hh'=hh,'hh.per'=hh.per,'hh.by.home'=hh.by.home,'frac.end.at.home'=frac.end.at.home,'frac.include.home'=frac.include.home)
 })
 
 # load od.agg and agg.taz.data
@@ -103,6 +105,24 @@ do.or.load(pp(pevi.shared,'data/DELHI/road-network/routing-with-gateways.Rdata')
   time.distance$km.int <- round(time.distance$km)
   list('time.distance'=time.distance)
 })
+
+# Make some plots to describe the HH data and OD distance distribution
+if(F){
+  hh$mode <- factor(hh$mode,levels=c('Auto','Shared Auto','Car','Pool Car','Taxi','Shared Taxi'))
+  ggplot(subset(hh,dist<100),aes(x=dist))+geom_histogram()+facet_wrap(~mode)+labs(x="Distance (km)",y="Count",title=pp("Travel Distances from RITES Household Survey (n=",nrow(subset(hh,dist<100)),")"))
+  ggplot(hh.per,aes(x=factor(V1)))+geom_histogram()+labs(x="Trips per Person-Day",y="Count",title=pp("Trips per Person-Day from RITES Household Survey (n=",nrow(hh.per),")"))
+  ggplot(hh,aes(x=depart))+geom_histogram(binwidth=1)+facet_wrap(~home.start)+labs(x="Departure Time",y="Count",title=pp("Departure Times by whether they begin from home")) + scale_x_continuous(limits=c(0,24))
+
+  od.agg.tmp <- od.agg
+  od.agg.tmp[,':='(from=o,to=d,o=NULL,d=NULL)]
+  setkey(od.agg.tmp,'from','to')
+  setkey(time.distance,'from','to')
+  od.agg.tmp <- ddply(time.distance[od.agg.tmp],.(mode),function(df){ 
+    data.frame(km=unlist(apply(as.matrix(df),1,function(x){ rep(as.numeric(x['km']),round(as.numeric(x['trips']))) })))
+  })
+  levels(od.agg.tmp$mode) <- c('Auto','Shared Auto','Car','Pool Car','Taxi','Shared Taxi','Two-Wheeler','Car-x','Two-Wheeler-x')
+  ggplot(subset(od.agg.tmp,mode%in%c('Car','Auto','Shared Auto','Shared Taxi','Taxi','Pool Car')),aes(x=km))+geom_histogram()+facet_wrap(~mode)+labs(x="Distance (km)",y="Count",title=pp("Travel Distances from RITES Travel Demand Model (n=",nrow(od.agg.tmp),")"))+scale_x_continuous(limits=c(0,100))
+}
     
 # Load/Create the home distribution and nearest neighbors list
 do.or.load(pp(pevi.shared,"data/DELHI/itin-generation/frac-homes-and-nearest-10.Rdata"),function(){
@@ -164,52 +184,35 @@ do.or.load(pp(pevi.shared,"data/DELHI/itin-generation/departure-time-dists.Rdata
   list('epdfs'=epdfs)
 })
 
+
+######################################################
+# GENERATE THE ITINS
+######################################################
+
 pev.pens <- c(0.005,0.01,0.02)
 replicate <- 1
-source(pp(pevi.home,'R/upstate/itin-functions.R',sep=''))
+source(pp(pevi.home,'R/delhi/itin-functions.R',sep=''))
 
-#schedule <- create.schedule(0.001,1,0.922)
-#print(paste(nrow(schedule)/length(unique(schedule$driver)),nrow(schedule),length(unique(schedule$driver))))
-# see what fraction of drivers end at home?
-# sum(ddply(schedule,.(driver),function(df){ df$to[nrow(df)]==df$home[1] })$V1)/length(unique(schedule$driver))
-
-#num.replicates <- 80
-#schedule.reps <- list()
-#for(pev.penetration in pev.pens){
-  #pev.pen.char <- roundC(pev.penetration,3)
-  #schedule.reps[[pev.pen.char]] <- list()
-  #for(replicate in 1:num.replicates){
-    #print(paste('Penetration ',pev.penetration,' replicate ',replicate,sep=''))
-    #schedule.reps[[pev.pen.char]][[as.character(replicate)]] <- create.schedule(pev.penetration,1)
-    #sched <- schedule.reps[[pev.pen.char]][[as.character(replicate)]][,c('driver','from','to','depart','home')]
-    #names(sched) <- c(';driver','from','to','depart','home')
-    #write.table(sched,file=paste(path.to.shared.inputs,"driver-schedule-pen",pev.penetration*100,"-rep",replicate,"-20130129.txt",sep=''),sep='\t',row.names=F,quote=F)
-    #save(schedule.reps,file=paste(path.to.outputs,'schedule-replicates-20130129.Rdata',sep=''))
-  #}
-#}
-#save(schedule.reps,file=paste(path.to.outputs,'schedule-replicates-20130129.Rdata',sep=''))
-
-# fix the bug that causes drivers to have impossible itineraries
 num.replicates <- 80
 time.distance$ft <- pp(time.distance$from,' ',time.distance$to)
-date.code <- '20140129'
+date.code <- '20140217'
 pev.penetration <- 0.005
 pev.pen.char <- roundC(pev.penetration,3)
-if(file.exists(pp(pevi.shared,'data/inputs/driver-input-file/upstate-uncombined-schedule-replicates-',date.code,'.Rdata',sep=''))){
-  load(file=pp(pevi.shared,'data/inputs/driver-input-file/upstate-uncombined-schedule-replicates-',date.code,'.Rdata',sep=''))
+if(file.exists(pp(pevi.shared,'data/inputs/driver-input-file/delhi-uncombined-schedule-replicates-',date.code,'.Rdata',sep=''))){
+  load(file=pp(pevi.shared,'data/inputs/driver-input-file/delhi-uncombined-schedule-replicates-',date.code,'.Rdata',sep=''))
 }else{
   schedule.reps <- list()
 }
 if(is.null(schedule.reps[[pev.pen.char]]))schedule.reps[[pev.pen.char]] <- list()
 for(replicate in 1:num.replicates){
   print(paste('Penetration ',pev.penetration,' replicate ',replicate,sep=''))
-  schedule.reps[[pev.pen.char]][[as.character(replicate)]] <- create.schedule(pev.penetration,1)
+  schedule.reps[[pev.pen.char]][[as.character(replicate)]] <- create.schedule(pev.penetration,2,frac.end.at.home,frac.include.home)
   sched <- schedule.reps[[pev.pen.char]][[as.character(replicate)]][,c('driver','from','to','depart','home')]
   #sched <- read.table(file=paste(path.to.shared.inputs,"driver-schedule-pen",pev.penetration*100,"-rep",replicate,"-20130129.txt",sep=''),sep='\t',header=T)
   sched$ft <- pp(sched$from,' ',sched$to)
 
   sched <- join(sched,time.distance,by="ft")
-  sched$arrive <- sched$depart + sched$hours
+  sched$arrive <- sched$depart + sched$time
   if(names(sched)[1]=="X.driver")names(sched)<-c("driver",names(sched)[2:ncol(sched)])
   sched <- ddply(sched,.(driver),function(df){ 
     if(nrow(df)>1 & any(df$depart[2:nrow(df)] < df$arrive[1:(nrow(df)-1)])){
@@ -222,274 +225,34 @@ for(replicate in 1:num.replicates){
   })
   sched <- sched[,c('driver','from','to','depart','home')]
   names(sched) <- c(';driver','from','to','depart','home')
-  write.table(sched,pp(pevi.shared,"data/inputs/driver-input-file/upstate-uncombined/driver-schedule-pen",pev.penetration*100,"-rep",replicate,"-",date.code,".txt",sep=''),sep="\t",row.names=F,quote=F)
+  write.table(sched,pp(pevi.shared,"data/inputs/driver-input-file/delhi-uncombined/driver-schedule-pen",pev.penetration*100,"-rep",replicate,"-",date.code,".txt",sep=''),sep="\t",row.names=F,quote=F)
 }
-save(schedule.reps,file=pp(pevi.shared,'data/inputs/driver-input-file/upstate-uncombined-schedule-replicates-',date.code,'.Rdata',sep=''))
+save(schedule.reps,file=pp(pevi.shared,'data/inputs/driver-input-file/delhi-uncombined-schedule-replicates-',date.code,'.Rdata',sep=''))
 
-# make plot comparing spatial distribution of trips in itin to GEATM
-if(make.plots){
-  tot.demand <- sum(od.24.simp[,c('hw','ho','ow')])
-  compare.trips <- ddply(od.24.simp,.(from),function(df){ data.frame(source="GEATM",demand=sum(df[,c('hw','ho','ow')])/tot.demand) })
-  pev.penetration <- 0.04
-  replicate <- 1
-  tot.itin <- nrow(sched)
-  sched <- read.table(file=paste(path.to.shared.inputs,"driver-schedule-pen",pev.penetration*100,"-rep",replicate,"-20130129.txt",sep=''),sep='\t',header=T)
-  if(names(sched)[1]=="X.driver")names(sched)<-c("driver",names(sched)[2:ncol(sched)])
-  compare.trips <- rbind(compare.trips,ddply(sched,.(from),function(df){ data.frame(source="Model",demand=nrow(df)/tot.itin) }))
-  compare.trips$source <- reorder(compare.trips$source,rev(as.numeric(compare.trips$source)))
-  ggplot(compare.trips,aes(x=factor(from),fill=source,y=100*demand))+geom_bar(position='dodge')
+
+###############################################################
+# Run through the itins and produce charger permission files
+###############################################################
+frac.mu <- 0.5
+
+pev.pens <- c(0.005,0.01,0.02)
+replicate <- 1
+source(pp(pevi.home,'R/delhi/itin-functions.R',sep=''))
+
+num.replicates <- 80
+time.distance$ft <- pp(time.distance$from,' ',time.distance$to)
+date.code <- '20140217'
+pev.penetration <- 0.005
+pev.pen.char <- roundC(pev.penetration,3)
+if(file.exists(pp(pevi.shared,'data/inputs/driver-input-file/delhi-uncombined-schedule-replicates-',date.code,'.Rdata',sep=''))){
+  load(file=pp(pevi.shared,'data/inputs/driver-input-file/delhi-uncombined-schedule-replicates-',date.code,'.Rdata',sep=''))
 }
-
-
-
-# summarize the results
-load(file=paste(path.to.outputs,'schedule-replicates-20130129.Rdata',sep=''))
-n.scheds <- num.replicates * length(pev.pens)
-sum.sched <- data.frame(pen=rep(pev.pens,num.replicates),rep=rep(1:num.replicates,each=length(pev.pens)),n.drivers=rep(NA,n.scheds),n.trips=rep(NA,n.scheds),trips.per.driver=rep(NA,n.scheds),home.rmse=rep(NA,n.scheds),home.maxe=rep(NA,n.scheds),home.max.taz=rep(NA,n.scheds))
-for(pev.penetration in pev.pens){
-  pev.pen.char <- roundC(pev.penetration,3)
-  for(replicate in 1:num.replicates){
-    if(!is.null(schedule.reps[[pev.pen.char]][[as.character(replicate)]])){
-
-      sched.home.dist <- ddply(schedule.reps[[pev.pen.char]][[as.character(replicate)]],.(home),function(df){ data.frame(num.drivers=nrow(df)) })
-      sched.home.dist$frac <- sched.home.dist$num.drivers / sum(sched.home.dist$num.drivers)
-      if(nrow(sched.home.dist) < nrow(agg.taz@data)){
-        sched.home.dist <- rbind(sched.home.dist,data.frame(home=which(! 1:nrow(agg.taz@data) %in% sched.home.dist$home),num.drivers=0,frac=0))
-      }
-      sched.home.dist$real <- home.dist$frac.homes[match(sched.home.dist$home,home.dist$agg.taz)]
-
-      sum.sched[sum.sched$pen == pev.penetration & sum.sched$rep==replicate,3:8] <- c(length(unique(schedule.reps[[pev.pen.char]][[as.character(replicate)]]$driver)),nrow(schedule.reps[[pev.pen.char]][[as.character(replicate)]]),nrow(schedule.reps[[pev.pen.char]][[as.character(replicate)]])/length(unique(schedule.reps[[pev.pen.char]][[as.character(replicate)]]$driver)),sqrt(mean((sched.home.dist$real-sched.home.dist$frac)^2))*100,max(sched.home.dist$real-sched.home.dist$frac)*100,sched.home.dist$home[which.max(sched.home.dist$real-sched.home.dist$frac)])
-    }
-  }
+for(replicate in 1:num.replicates){
+  sched <- schedule.reps[[pev.pen.char]][[as.character(replicate)]][,c('driver','from','to','depart','home')]
+  ddply(sched,.(home),function(df){
+    # randomly assign drivers to multi-unit dwellings
+    n.mu <- round(nrow(df)*frac.mu,0)
+    driver.groups <- sample(unique(df$driver))
+  })
 }
-
-# look into why some drivers have trips seemingly out of order
-for(pev.penetration in pev.pens){
-  pev.pen.char <- roundC(pev.penetration,3)
-  for(replicate in 1:num.replicates){
-    if(!is.null(schedule.reps[[pev.pen.char]][[as.character(replicate)]])){
-      print(paste('Penetration ',pev.penetration," rep ",replicate,sep=''))
-      schedule <- schedule.reps[[pev.pen.char]][[as.character(replicate)]]
-      print(unique(schedule$driver)[which(!ddply(schedule,.(driver),function(df){
-        df <- df[order(df$depart),]
-        nrow(df)==1 | all(df$from[2:nrow(df)] == df$to[1:(nrow(df)-1)])
-      })$V1)])
-    }
-  }
-}
-# find a repeatable case where a funky driver appears, pen 0.00135
-set.seed(1)
-schedule <- create.schedule(0.001,1,0.922)
-for(pen in seq(0.00105,0.005,by=0.00005)){
-  set.seed(1)
-  schedule <- create.schedule(pen,1,0.922)
-  print(unique(schedule$driver)[which(!ddply(schedule,.(driver),function(df){
-    df <- df[order(df$depart),]
-    nrow(df)==1 | all(df$from[2:nrow(df)] == df$to[1:(nrow(df)-1)])
-  })$V1)])
-}
-
-
-
-# analyze and plot the schedules, compare them to NHTS and GEATM
-
-ks.tests <- data.frame(penetration=pev.pens,test='tours.per.driver',factor=NA,level=NA,stat=NA,p.value=NA)
-ks.tests <- rbind(ks.tests,data.frame(penetration=rep(pev.pens,each=length(unique(rur.tours$TOURTYPE))),test='dwell.time',factor='tour.type',level=rep(unique(rur.tours$TOURTYPE),length(pev.pens)),stat=NA,p.value=NA))
-ks.tests <- rbind(ks.tests,data.frame(penetration=rep(pev.pens,each=length(unique(rur.tours$TOURTYPE))),test='departure.time',factor='tour.type',level=rep(unique(rur.tours$TOURTYPE),length(pev.pens)),stat=NA,p.value=NA))
-num.vehicles <- data.frame(penetration=pev.pens,expected=NA,scheduled=NA)
-synth.tours.per <- list()
-dwell.times     <- list()
-compute.new <- T
-
-if(make.plots){
-  dev.new()
-  dev.tours.per <- dev.cur()
-  plot(ecdf(hh.per$V1),main="Empirical CDF of # Trips Per Driver")
-}
-
-for(pev.penetration in pev.pens){
-  pev.pen.char <- roundC(pev.penetration,3)
-  pen.i <- which(pev.penetration == pev.pens)+1
-  for(replicate in 1:num.replicates){
-    if(!is.null(schedule.reps[[pev.pen.char]][[as.character(replicate)]])){
-      schedule <- schedule.reps[[pev.pen.char]][[as.character(replicate)]]
-
-      print(paste('Penetration ',pev.penetration," rep ",replicate,sep=''))
-      num.vehicles[num.vehicles$penetration==pev.penetration,c('expected','scheduled')] <- c(pev.penetration * 130e3,max(schedule$driver))
-
-      # TOURS PER DRIVER
-      # assumes we have already computed hh.per
-      if(compute.new) synth.tours.per[[pev.pen.char]] <- ddply(schedule,.(driver),function(df){data.frame(ntours=nrow(df),end.time=df$arrive[nrow(df)])})
-      if(make.plots){
-        dev.set(dev.tours.per)
-        plot(ecdf(synth.tours.per[[pev.pen.char]]$ntours),add=T,col=pen.i,pch=pen.i)
-      }
-      ks.tests[ks.tests$penetration == pev.penetration & ks.tests$test == "tours.per.driver", c('stat','p.value')] <- unlist(ks.test(synth.tours.per[[pev.pen.char]]$ntours,hh.per$V1)[c('statistic','p.value')])
-
-      # DWELL TIME
-      if(compute.new) dwell.times[[pev.pen.char]] <- ddply(schedule,.(driver),function(df){ if(nrow(df)>1){ data.frame(dwell = df$depart[2:nrow(df)]-df$arrive[1:(nrow(df)-1)],type= df$type[1:(nrow(df)-1)],purp= df$purp[1:(nrow(df)-1)]) }} )
-      for(type in unique(rur.tours$TOURTYPE)){
-        ks.tests[ks.tests$penetration == pev.penetration & ks.tests$test == "dwell.time" & ks.tests$factor == "tour.type" & ks.tests$level == type, c('stat','p.value')] <- unlist(ks.test(dwell.times[[pev.pen.char]]$dwell[dwell.times[[pev.pen.char]]$type==type],rur.tours$TOT_DWEL4[rur.tours$TOURTYPE==type]/60)[c('statistic','p.value')])
-      }
-      if(make.plots){
-        p <- ggplot(rbind(data.frame(dwell.times[[pev.pen.char]],set="SYNTH"),data.frame(driver=NA,dwell=rur.tours$TOT_DWEL4/60,type=rur.tours$TOURTYPE,purp=rur.tours$purp,set="NHTS")),
-                 aes(x=dwell))+
-          scale_x_continuous(name="Total Tour Dwell Time (hours)")+
-          opts(title = paste("Dwell Times for Penetration",pev.pen.char)) +
-          geom_bar(aes(fill=set,y=..density..), position="dodge") +
-          facet_wrap(~type)
-        ggsave(p,file=paste(path.to.plots,"dwell-times-pen",pev.pen.char,"-rep",replicate,".pdf",sep=''),width=8,height=8)
-
-        p <- ggplot(rbind(data.frame(dwell.times[[pev.pen.char]],set="SYNTH"),data.frame(driver=NA,dwell=rur.tours$TOT_DWEL4/60,type=rur.tours$TOURTYPE,purp=rur.tours$purp,set="NHTS")),
-                 aes(x=dwell))+
-          scale_x_continuous(name="Total Tour Dwell Time (hours)")+
-          opts(title = paste("Dwell Times for Penetration",pev.pen.char)) +
-          geom_bar(aes(fill=set,y=..density..), position="dodge") +
-          facet_wrap(~purp)
-        ggsave(p,file=paste(path.to.plots,"dwell-times-by-geatm-pen",pev.pen.char,"-rep",replicate,".pdf",sep=''),width=8,height=8)
-      }
-
-      # DEPARTURE TIME
-      for(type in unique(rur.tours$TOURTYPE)){
-        ks.tests[ks.tests$penetration == pev.penetration & ks.tests$test == "departure.time" & ks.tests$factor == "tour.type" & ks.tests$level == type, c('stat','p.value')] <- unlist(ks.test(schedule$depart[schedule$type==type],rur.tours$begin[rur.tours$TOURTYPE==type])[c('statistic','p.value')])
-      }
-      if(make.plots){
-        p <- ggplot(rbind(data.frame(schedule[,c('depart','type')],set="SYNTH"),data.frame(depart=rur.tours$begin,type=rur.tours$TOURTYPE,set="NHTS")),
-                 aes(x=depart))+
-          scale_x_continuous(name="Departure Time (hours)")+
-          opts(title = paste("Departure Times for Penetration",pev.pen.char)) +
-          geom_bar(aes(fill=set,y=..density..), position="dodge") +
-          facet_wrap(~type)
-        ggsave(p,file=paste(path.to.plots,"departure-times-pen",pev.pen.char,"-rep",replicate,".pdf",sep=''),width=8,height=8)
-        p <- ggplot(rbind(data.frame(schedule[,c('depart','purp')],set="SYNTH"),data.frame(depart=rur.tours$begin,purp=rur.tours$purp,set="NHTS")),
-                 aes(x=depart))+
-          scale_x_continuous(name="Departure Time (hours)")+
-          opts(title = paste("Departure Times for Penetration",pev.pen.char)) +
-          geom_bar(aes(fill=set,y=..density..), position="dodge") +
-          facet_wrap(~purp)
-        ggsave(p,file=paste(path.to.plots,"departure-times-by-geatm-pen",pev.pen.char,"-rep",replicate,".pdf",sep=''),width=8,height=8)
-      }
-    }
-  }
-}
-
-if(make.plots){
-  dev.set(dev.tours.per)
-  legend('bottomright',legend=c('NHTS Rural',paste('Synth Pen.',pev.pens)),pch=1:(length(pev.pens)+1),col=1:(length(pev.pens)+1))
-
-  plot(num.vehicles$penetration,num.vehicles$scheduled/num.vehicles$expected,xlab="PEV Penetration",ylab="# Synthetic Vehicles / # Expected Vehicles",main="Ratio of Sythetic to Expected Vehicles",ylim=c(0,max(num.vehicles$scheduled/num.vehicles$expected)*1.1),xlim=c(0,0.27))
-  abline(h=1)
-  grid()
-
-  # inspect all the ks.tests at once
-  ggplot(ks.tests,aes(x=penetration,y=log(p.value+1e-14,10)))+geom_point()+facet_wrap(~test)
-  # look within the tests that vary by type
-  ggplot(subset(ks.tests,test=='dwell.time'),aes(x=penetration,y=log(p.value+1e-14,10)))+geom_point()+facet_wrap(~level)
-  ggplot(subset(ks.tests,test=='departure.time'),aes(x=penetration,y=log(p.value+1e-14,10)))+geom_point()+facet_wrap(~level)
-}
-
-if(F){
-
-num.in.transit <- rep(0,24)
-for(driver.i in unique(schedule$driver)){
-  res <- rep(0,24)
-  df <- schedule[schedule$driver==driver.i,]
-  res[as.integer(df$depart[1]):as.integer(df$arrive[nrow(df)])] <- 1
-  num.in.transit <- num.in.transit + res
-}
-print(paste("num PEVs expected:",pev.penetration * 130e3))
-print(paste("num unique drivers in schedule:",max(schedule$driver)))
-print(paste("max num drivers in transit in any hour:",max(num.in.transit)))
-
-schedule$row <- 1:nrow(schedule)
-recycled <- ddply(schedule,.(driver),function(df){data.frame(is.recycled=!all(diff(df$row)==1))})
-sum(recycled$is.recycled)
-sum(recycled$is.recycled)/tail(sort(unique(schedule$driver)),1)
-
-dwell.times <- ddply(schedule,.(driver),function(df){ if(nrow(df)>1){ data.frame(dwell = df$depart[2:nrow(df)]-df$arrive[1:(nrow(df)-1)],type= df$type[1:(nrow(df)-1)]) }} )
-
-dev.new()
-dev1 <- dev.cur()
-dev.new()
-dev2 <- dev.cur()
-
-dev.set(dev1)
-ggplot(dwell.times,aes(x=dwell))+
- scale_x_continuous(name="Total Tour Dwell Time (hours)")+
- opts(title = "Synthetic Schedule") +
- geom_histogram(binwidth=1,aes(y=..density..)) +
- facet_wrap(~type)
-
-dev.set(dev2)
-ggplot(rur.tours,aes(x=TOT_DWEL4/60))+
- scale_x_continuous(name="Total Tour Dwell Time (hours)")+
- opts(title = "2009 NHTS - Rural US Subset") +
- geom_histogram(binwidth=1,aes(y=..density..)) +
- facet_wrap(~TOURTYPE)
-
-dev.set(dev1)
-ggplot(schedule,aes(x=depart))+
- scale_x_continuous(name="Departure Time (hours)")+
- opts(title = "Synthetic Schedule") +
- geom_histogram(binwidth=1,aes(y=..density..)) +
- facet_wrap(~type)
-
-dev.set(dev2)
-ggplot(rur.tours,aes(x=begin))+
- scale_x_continuous(name="Departure Time (hours)")+
- opts(title = "2009 NHTS - Rural US Subset") + 
- geom_histogram(binwidth=1,aes(y=..density..)) +
- facet_wrap(~TOURTYPE)
-
-schedule.counts <- ddply(schedule,.(from,to,purp),function(df){ data.frame(count=nrow(df)) } )
-
-#dev.set(dev1)
-#ggplot(schedule.counts,aes(x=purp,y=count))+
- #geom_bar(aes(colour=purp))+
- #opts(title = "Synthetic Schedule") +
- #scale_x_discrete(name="Trip Type")+
- #scale_y_continuous(name="# Trips")+
- #facet_grid(from~to)
-
-#melted.od <- melt(od.24.simp,id=c('from','to'))
-#dev.set(dev2)
-#ggplot(melted.od,aes(x=variable,y=value))+
- #geom_bar(aes(colour=variable))+
- #opts(title = "GEATM - Counts by Trip Type") + 
- #scale_x_discrete(name="Trip Type")+
- #scale_y_continuous(name="# Trips")+
- #facet_grid(from~to)
-
-ddply(schedule.counts,.(purp),function(df){sum(df$count)})
-colSums(od.24.simp[,3:5])
-
-synth.tours.per <- ddply(schedule,.(driver),function(df){data.frame(ntours=nrow(df),end.time=df$arrive[nrow(df)])})
-if(!exists('hh.per')){ hh.per <- ddply(rur.tours,.(journey.id),nrow) }
-
-dev.set(dev1)
-ggplot(synth.tours.per,aes(x=ntours))+
- geom_histogram(aes(y=..density..),binwidth=1)+
- opts(title = "Synthetic Schedule") +
- scale_x_continuous(name="Tours Per Driver")
-dev.set(dev2)
-ggplot(hh.per,aes(x=V1))+
- geom_histogram(aes(y=..density..),binwidth=1)+
- opts(title = "NHTS") +
- scale_x_continuous(name="Tours Per Driver")
-
-# same as above but in CDF form
-h.synth <- hist(synth.tours.per$ntours,plot=F,breaks=0:ceiling(max(synth.tours.per$ntours)))
-h.nhts <- hist(hh.per$V1,plot=F,breaks=0:ceiling(max(hh.per$V1)))
-dev.set(dev1)
-plot(h.synth$breaks[2:length(h.synth$breaks)],cumsum(h.synth$counts)/sum(h.synth$counts),ylim=c(0,1),xlim=c(0,tail(h.nhts$breaks,1)),main="Synthetic")
-grid()
-dev.set(dev2)
-plot(h.nhts$breaks[2:length(h.nhts$breaks)],cumsum(h.nhts$counts)/sum(h.nhts$counts),ylim=c(0,1),xlim=c(0,tail(h.nhts$breaks,1)),main="NHTS")
-grid()
-limiting.index <- min(length(h.nhts$counts),length(h.synth$counts),length(prob.weights))
-plot(h.nhts$breaks[1:limiting.index],cumsum(h.nhts$counts[1:limiting.index])/sum(h.nhts$counts)-cumsum(h.synth$counts[1:limiting.index])/sum(h.synth$counts),ylim=c(-0.5,0.5),xlim=c(0,h.nhts$breaks[limiting.index]),type='b')
-grid()
-
-}
-
 

@@ -10,11 +10,10 @@ load.libraries(c('optparse','yaml','RNetLogo','plyr','reshape','stringr'),quietl
 ##############################################################################################################################################
 # COMMAND LINE OPTIONS 
 option_list <- list(
-  make_option(c("-d", "--experimentdir"), type="character", default='.', help="Path to the directory containing the files needed to run the optimization (params.txt, vary.yaml, paths.yaml) [\"%default\"]"),
-  make_option(c("-b", "--buildincrement"), type="numeric", default=1, help="Number of chargers we wish to build in one TAZ each iteration [\"%default\"]")
+  make_option(c("-d", "--experimentdir"), type="character", default='.', help="Path to the directory containing the files needed to run the optimization (params.txt, vary.yaml, paths.yaml) [\"%default\"]")
 )
 if(interactive()){
-  setwd(pp(pevi.shared,'data/inputs/optim-new/'))
+  setwd(pp(pevi.shared,'data/inputs/optim-new/upstate-base/'))
   args<-c()
   args <- parse_args(OptionParser(option_list = option_list,usage = "shp2kml.R [options]"),positional_arguments=F,args=args)
 }else{
@@ -23,7 +22,6 @@ if(interactive()){
 
 if(substr(args$experimentdir,1,1)!="/")args$experimentdir <- pp(getwd(),"/",args$experimentdir)
 if(substr(args$experimentdir,nchar(args$experimentdir),nchar(args$experimentdir)) != "/")args$experimentdir <- pp(args$experimentdir,"/")
-build.increment <- args$buildincrement
 
 Sys.setenv(NOAWT=1)
 options(java.parameters="-Xmx2048m")
@@ -31,6 +29,9 @@ options(java.parameters="-Xmx2048m")
 source(pp(args$experimentdir,'params.R'))
 source(paste(pevi.home,"R/optim/buildout-functions.R",sep=''))
 source(paste(pevi.home,"R/reporters-loggers.R",sep=''))
+
+# in case hot start is not specified in params.R
+hot.start <- ifelse(exists('hot.start'),hot.start,F)
 
 # The params file will need to be set in R, so we can edit it mid-run. 
 # Otherwise, batch setup is impossible.
@@ -53,7 +54,8 @@ names(charger.info) <- c('level','charge.rate','energy.price','installed.cost')
 # initialize infrastructure table, skip data, and the taz/charger combinations
 init.charger.file <- pp(pevi.shared,param.file.data$charger.input.file)
 init.charger.buildout <- read.table(init.charger.file,header=T,sep='\t')
-taz.charger.combos <- expand.grid(subset(init.charger.buildout,X.TAZ>0)$X.TAZ,subset(charger.info,level != 0 & level != 1 & level != 4)$level)
+levels.to.vary <- as.numeric(substr(names(build.increment)[build.increment>0],2,2))
+taz.charger.combos <- expand.grid(subset(init.charger.buildout,X.TAZ>0)$X.TAZ,subset(charger.info,level %in% levels.to.vary)$level)
 names(taz.charger.combos) <- c('taz','level')
 taz.charger.combos$include <- T
 taz.charger.combos$key <- pp(taz.charger.combos$taz,'-',taz.charger.combos$level)
@@ -101,8 +103,21 @@ if(!exists('cl')){
   clusterEvalQ(cl,init.netlogo())
 }
 
-for(seed in seeds){
-#seed <- 1 
+if(hot.start){
+  optim.code <- tail(list.files(path.to.outputs.base,pp(optim.scenario,'-seed')),1)
+  start.seed <- as.numeric(str_split(optim.code,'seed')[[1]][2])
+  seed.inds <- which(seeds>=start.seed)
+  path.to.outputs <- paste(path.to.outputs.base,optim.code,'/',sep='')
+	load(pp(path.to.outputs,'charger-buildout-history.Rdata'))
+  start.pen <- tail(charger.buildout.history$penetration,1)
+  start.iter <- tail(charger.buildout.history$iter,1)
+  my.cat(pp("HOT START: seed ",start.seed,", pen ",start.pen,", iter ",start.iter))
+}else{
+  seed.inds <- 1:(length(seeds))
+}
+
+for(seed in seeds[seed.inds]){
+#seed <- seeds[seed.inds][1]
   optim.code <- paste(optim.scenario,'-seed',seed,sep='')
   print(optim.code)
 
@@ -113,19 +128,34 @@ for(seed in seeds){
   path.to.outputs <- paste(path.to.outputs.base,optim.code,'/',sep='')
   make.dir(path.to.outputs)
 
+  if(hot.start){
+    charger.buildout <- subset(charger.buildout.history,penetration==start.pen & iter==start.iter)
+    charger.buildout <- charger.buildout[,-grep('penetration|iter',names(charger.buildout))]
+		load(file=pp(path.to.outputs,'optimization-history.Rdata'))
+    load(file=pp(path.to.outputs,'build-result-history.Rdata'))
+  }else{
+    #	Initialize the starting infrastructure and write the file to the inputs dir.
+    charger.buildout <- init.charger.buildout
 
-  #	Initialize the starting infrastructure and write the file to the inputs dir.
-	charger.buildout <- init.charger.buildout
-	write.table(charger.buildout,charger.file,quote=FALSE,sep='\t',row.names=FALSE)
-
-	charger.buildout.history <- data.frame()
-  opt.history <- data.frame()
+    charger.buildout.history <- data.frame()
+    opt.history <- data.frame()
+    build.result.history <- data.frame()
+  }
+  write.table(charger.buildout,charger.file,quote=FALSE,sep='\t',row.names=FALSE)
 
   for(pev.penetration in pev.penetrations){
   #pev.penetration <- pev.penetrations[1]
     print(paste("pen",pev.penetration))
     
-    current.obj <- Inf
+    if(hot.start){
+      taz.charger.combos <- subset(opt.history,penetration==start.pen & iteration==start.iter)[,c('taz','level','include','key','name','obj','cv')]
+      current.obj <- taz.charger.combos$obj[1]
+      begin.build.i <- tail(opt.history$iteration,1)
+    }else{
+      current.obj <- Inf
+      begin.build.i <- 1
+      taz.charger.combos$include <- T
+    }
     
     # Note that the expectation is that all pev penetrations beyond the first are even multiples of the first
     if(pev.penetration == pev.penetrations[1]){
@@ -137,13 +167,23 @@ for(seed in seeds){
     	vary.tab <- expand.grid(new.vary,stringsAsFactors=F)
     }
     vary.tab$`driver-input-file` <- str_replace(vary.tab$`driver-input-file`,"penXXX",paste("pen",pev.penetration*100,sep=""))
-				
-		begin.build.i <- 1
-    taz.charger.combos$include <- T
 
     # Start for loop for overall penetration level optimization
 		for(build.i in begin.build.i:max.chargers.per.pen){
 		 #build.i <- 1 
+
+      # at this point, if we're in hot start, drop the history from the current iteration and turn hot start off
+      if(hot.start){
+        opt.history <- subset(opt.history,!(penetration==start.pen & iteration==start.iter))
+			  save(opt.history,file=pp(path.to.outputs,'optimization-history.Rdata'))
+        charger.buildout.history <- subset(charger.buildout.history,!(penetration==start.pen & iter==start.iter))
+			  save(charger.buildout.history,file=pp(path.to.outputs,'charger-buildout-history.Rdata'))
+        if(nrow(build.result.history)>0) build.result.history <- subset(build.result.history,!(penetration==start.pen & iteration==start.iter))
+			  save(build.result.history,file=pp(path.to.outputs,'build-result-history.Rdata'))
+        write.table(head(read.csv(pp(path.to.outputs,'buildout-progress.csv')),-1),file=pp(path.to.outputs,'buildout-progress.csv'),sep=',',row.names=F)
+        hot.start <- F
+      }
+  
 			print(paste('build.i = ',build.i))
       
       #	Next is the loop through driver files. the snow parallelization happens here.
@@ -168,6 +208,10 @@ for(seed in seeds){
       opt.iter$iteration <- build.i
       opt.history <- rbind(opt.history,opt.iter)
 			save(opt.history,file=pp(path.to.outputs,'optimization-history.Rdata'))
+      build.result$penetration <- pev.penetration
+      build.result$iteration <- build.i
+      build.result.history <- rbind(build.result.history,build.result)
+			save(build.result.history,file=pp(path.to.outputs,'build-result-history.Rdata'))
 
       #	Winner determined by lowest objective function (currently cost)
 			print(pp('winner taz = ',taz.charger.combos$taz[1],' level = ',taz.charger.combos$level[1]))
@@ -181,7 +225,7 @@ for(seed in seeds){
 			}
 			
       #	Now update our infrastructure file for the next round
-			charger.buildout[taz.charger.combos$taz[1],grep(taz.charger.combos$level[1],names(charger.buildout))] <- (charger.buildout[taz.charger.combos$taz[1],grep(taz.charger.combos$level[1],names(charger.buildout))] + build.increment)
+			charger.buildout[taz.charger.combos$taz[1],grep(taz.charger.combos$level[1],names(charger.buildout))] <- (charger.buildout[taz.charger.combos$taz[1],grep(taz.charger.combos$level[1],names(charger.buildout))] + build.increment[pp('l',taz.charger.combos$level[1])])
 			write.table(charger.buildout,charger.file,quote=FALSE,sep='\t',row.names=FALSE)
 			
 			# Create an Rdata file with a data frame holding all buildout information thus far.

@@ -4,7 +4,8 @@ load.libraries(c('ggplot2','yaml','RNetLogo','plyr','reshape','stringr'))
 
 #exp.name <- commandArgs(trailingOnly=T)[1]
 #exp.name <- 'animation'
-exp.name <- 'evse-metrics'
+#exp.name <- 'evse-metrics'
+exp.name <- 'upstate-verif-copy'
 #exp.name <- 'patterns'
 #exp.name <- 'phev-only'
 path.to.inputs <- pp(pevi.shared,'data/inputs/compare/',exp.name,'/')
@@ -28,11 +29,11 @@ naming <- yaml.load(readChar(paste(path.to.inputs,'naming.yaml',sep=''),file.inf
 vary.tab <- expand.grid(vary,stringsAsFactors=F)
 
 results <- data.frame(vary.tab)
-if("driver.input.file" %in% names(vary)){
+if("driver-input-file" %in% names(vary)){
   results$penetration <- as.numeric(unlist(lapply(strsplit(as.character(results$driver.input.file),'-pen',fixed=T),function(x){ unlist(strsplit(x[2],"-rep",fixed=T)[[1]][1]) })))
   results$replicate <- as.numeric(unlist(lapply(strsplit(as.character(results$driver.input.file),'-rep',fixed=T),function(x){ unlist(strsplit(x[2],"-",fixed=T)[[1]][1]) })))
 }
-if("charger.input.file" %in% names(vary)){
+if("charger-input-file" %in% names(vary)){
   results$infrastructure.scenario <- unlist(lapply(strsplit(as.character(results$charger.input.file),'-scen',fixed=T),function(x){ unlist(strsplit(x[2],".txt",fixed=T)) }))
   results$infrastructure.scenario.named <- results$infrastructure.scenario
   results$infrastructure.scenario.order <- results$infrastructure.scenario
@@ -46,11 +47,13 @@ if("charger.input.file" %in% names(vary)){
     for(scen.i in as.numeric(names(naming$`charger-input-file`))){
       results$infrastructure.scenario.named[results$infrastructure.scenario == scen.i] <- naming$`charger-input-file`[[as.character(scen.i)]][[1]]
       results$infrastructure.scenario.order[results$infrastructure.scenario == scen.i] <- as.numeric(naming$`charger-input-file`[[as.character(scen.i)]][[2]])
+      # For some reason, these aren't traslating as numeric.
+      results$infrastructure.scenario.order <- as.numeric(results$infrastructure.scenario.order)
     }
   }
   results$infrastructure.scenario.named  <- reorder(factor(results$infrastructure.scenario.named),results$infrastructure.scenario.order)
 }
-if("vehicle.type.input.file" %in% names(vary)){
+if("vehicle-type-input-file" %in% names(vary)){
   results$vehicle.scenario <- as.numeric(unlist(lapply(strsplit(as.character(results$vehicle.type.input.file),'-scen',fixed=T),function(x){ unlist(strsplit(x[2],".txt",fixed=T)) })))
   results$vehicle.scenario.named <- results$vehicle.scenario
   results$vehicle.scenario.order <- results$vehicle.scenario
@@ -80,6 +83,7 @@ for(results.i in 1:nrow(results)){
   }
   NLCommand('clear-all-and-initialize')
   NLCommand('random-seed 1')
+  NLCommand(pp('set param-file-base "',pevi.shared,'"'))
   NLCommand(paste('set parameter-file "',path.to.inputs,'params.txt"',sep=''))
   NLCommand(paste('set model-directory "',pevi.home,'netlogo/"',sep=''))
   NLCommand('set batch-setup? false')

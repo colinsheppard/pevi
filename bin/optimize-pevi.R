@@ -13,7 +13,7 @@ option_list <- list(
   make_option(c("-d", "--experimentdir"), type="character", default='.', help="Path to the directory containing the files needed to run the optimization (params.txt, vary.yaml, paths.yaml) [\"%default\"]")
 )
 if(interactive()){
-  setwd(pp(pevi.shared,'data/inputs/optim-new/upstate-base/'))
+  setwd(pp(pevi.shared,'data/inputs/optim-new/upstate-L2-12.5k/'))
   args<-c()
   args <- parse_args(OptionParser(option_list = option_list,usage = "shp2kml.R [options]"),positional_arguments=F,args=args)
 }else{
@@ -110,10 +110,12 @@ if(hot.start){
   path.to.outputs <- paste(path.to.outputs.base,optim.code,'/',sep='')
 	load(pp(path.to.outputs,'charger-buildout-history.Rdata'))
   start.pen <- tail(charger.buildout.history$penetration,1)
+  pen.inds <- which(pev.penetrations>=start.pen)
   start.iter <- tail(charger.buildout.history$iter,1)
   my.cat(pp("HOT START: seed ",start.seed,", pen ",start.pen,", iter ",start.iter))
 }else{
   seed.inds <- 1:(length(seeds))
+  pen.inds <- 1:(length(pev.penetrations))
 }
 
 for(seed in seeds[seed.inds]){
@@ -143,14 +145,14 @@ for(seed in seeds[seed.inds]){
   }
   write.table(charger.buildout,charger.file,quote=FALSE,sep='\t',row.names=FALSE)
 
-  for(pev.penetration in pev.penetrations){
-  #pev.penetration <- pev.penetrations[1]
+  for(pev.penetration in pev.penetrations[pen.inds]){
+  #pev.penetration <- pev.penetrations[pen.inds][1]
     print(paste("pen",pev.penetration))
     
     if(hot.start){
       taz.charger.combos <- subset(opt.history,penetration==start.pen & iteration==start.iter)[,c('taz','level','include','key','name','obj','cv')]
       current.obj <- taz.charger.combos$obj[1]
-      begin.build.i <- tail(opt.history$iteration,1)
+      begin.build.i <- start.iter
     }else{
       current.obj <- Inf
       begin.build.i <- 1
@@ -174,11 +176,11 @@ for(seed in seeds[seed.inds]){
 
       # at this point, if we're in hot start, drop the history from the current iteration and turn hot start off
       if(hot.start){
-        opt.history <- subset(opt.history,!(penetration==start.pen & iteration==start.iter))
+        opt.history <- subset(opt.history,!(penetration==start.pen & iteration>=start.iter))
 			  save(opt.history,file=pp(path.to.outputs,'optimization-history.Rdata'))
-        charger.buildout.history <- subset(charger.buildout.history,!(penetration==start.pen & iter==start.iter))
+        charger.buildout.history <- subset(charger.buildout.history,!(penetration==start.pen & iter>=start.iter))
 			  save(charger.buildout.history,file=pp(path.to.outputs,'charger-buildout-history.Rdata'))
-        if(nrow(build.result.history)>0) build.result.history <- subset(build.result.history,!(penetration==start.pen & iteration==start.iter))
+        if(nrow(build.result.history)>0) build.result.history <- subset(build.result.history,!(penetration==start.pen & iteration>=start.iter))
 			  save(build.result.history,file=pp(path.to.outputs,'build-result-history.Rdata'))
         write.table(head(read.csv(pp(path.to.outputs,'buildout-progress.csv')),-1),file=pp(path.to.outputs,'buildout-progress.csv'),sep=',',row.names=F)
         hot.start <- F

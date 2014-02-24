@@ -6,13 +6,15 @@ load.libraries(c('ggplot2','yaml','stringr','RNetLogo','maptools','reshape','col
 # for now I'm going to hard code a bunch of stuff for expediancy and because I'm not sure how general purpose this stuff will become
 
 chs <- data.frame()
-#for(optim.code in c('base','build-by-two')){
-for(optim.code in c('base','fewer-drivers')){
-  for(seed in 1:4){
-    load(pp(pevi.shared,'data/outputs/optim-new/',optim.code,'-seed',seed,'/charger-buildout-history.Rdata'))
-    charger.buildout.history$scenario <- optim.code
-    charger.buildout.history$seed     <- seed
-    chs <- rbind(chs,charger.buildout.history)
+for(optim.code in c('base','L2-10k','L2-12.5k','L2-20k')){
+  for(seed in 1:5){
+    hist.file <- pp(pevi.shared,'data/outputs/optim-new/',optim.code,'-seed',seed,'/charger-buildout-history.Rdata')
+    if(file.exists(hist.file)){
+      load(hist.file)
+      charger.buildout.history$scenario <- optim.code
+      charger.buildout.history$seed     <- seed
+      chs <- rbind(chs,charger.buildout.history)
+    }
   }
 }
 names(chs) <- c('TAZ',tail(names(chs),-1))
@@ -22,15 +24,27 @@ ch.fin <- ddply(subset(chs,TAZ>0),.(scenario,seed,penetration),function(df){
   subset(df,iter==max(iter))
 })
 ch.fin.unshaped <- ch.fin
-ch.fin <- cast(subset(melt(ch.fin,measure.vars=pp('L',0:4),variable_name="level"),level%in%pp('L',2:3)),penetration + TAZ + seed + level ~ scenario)
+
+# compare several optimization runs at once
+ch.fin <- subset(melt(ch.fin.unshaped,measure.vars=pp('L',0:4),variable_name="level"),level%in%pp('L',2:3))
+stat_sum_single <- function(fun, geom="point", ...) {
+  stat_summary(fun.y=fun, geom=geom, size = 3, ...)
+}
+ggplot(ddply(ch.fin,.(scenario,level,penetration,seed),function(df) { data.frame(num.chargers=sum(df$value)) }),aes(x=scenario,y=num.chargers,colour=level)) + geom_point() + facet_wrap(~penetration) + stat_summary(fun.y=mean,geom='point',shape='X',size=3)
+
+# the fraction of TAZs with chargers of each type 
+ggplot(ddply(ch.fin,.(level,scenario,penetration,seed),function(df){ data.frame(frac.tazs=sum(df$value>0)/nrow(df))}),aes(x=scenario,y=frac.tazs,colour=level))+geom_point()+facet_wrap(~penetration)
+
+# hard coded comparison of scenarios
+ch.fin <- cast(subset(melt(ch.fin.unshaped,measure.vars=pp('L',0:4),variable_name="level"),level%in%pp('L',2:3)),penetration + TAZ + seed + level ~ scenario)
 #ggplot(ch.fin,aes(x=base,y=`build-by-two`,colour=level))+geom_point(position='jitter')+facet_wrap(~penetration)+ labs(x="# Chargers (build by one)",y="# Chargers (build by two)",title="# Chargers Sited for Each TAZ & Replicate")+geom_abline(intercept=0,slope=1,color='grey')
 ggplot(ch.fin,aes(x=base,y=`fewer-drivers`,colour=level))+geom_point(position='jitter')+facet_wrap(~penetration)+ labs(x="# Chargers (all driver itins)",y="# Chargers (half driver itins)",title="# Chargers Sited for Each TAZ & Replicate")+geom_abline(intercept=0,slope=1,color='grey')
 #ggplot(ddply(ch.fin,.(penetration,seed,level),function(df){ data.frame(base=sum(df$base),build.by.two=sum(df$`build-by-two`)) }),aes(x=base,y=build.by.two,colour=level))+geom_point(position='jitter')+facet_wrap(~penetration)+ labs(x="# Chargers (build by one)",y="# Chargers (build by two)",title="Total Chargers Sited for Each Replicate")+geom_abline(intercept=0,slope=1,color='grey')
 ggplot(ddply(ch.fin,.(penetration,seed,level),function(df){ data.frame(base=sum(df$base),build.by.two=sum(df$`fewer-drivers`)) }),aes(x=base,y=build.by.two,colour=level))+geom_point(position='jitter')+facet_wrap(~penetration)+ labs(x="# Chargers (all driver itins)",y="# Chargers (half driver itins)",title="Total Chargers Sited for Each Replicate")+geom_abline(intercept=0,slope=1,color='grey')
-
 # based on the following, I realized that in most cases, the issue was that the TAZ had a L3 charger and therefore didn't need any L2's
 strange.tazs <- subset(ch.fin,`build-by-two`>1 & penetration==0.01 & seed==1 & base==0)$TAZ
 subset(ch.fin.unshaped,penetration==0.01 & seed==1 & TAZ %in% strange.tazs)[order(subset(ch.fin.unshaped,penetration==0.01 & seed==1 & TAZ %in% strange.tazs)$TAZ),]
+
 
 load(pp(pevi.shared,"data/outputs/optim-new/base-detailed-seed1/build-result-history.Rdata"))
 build.result.history <- ddply(build.result.history,.(penetration,iteration),function(df){ data.frame(df,obj.norm=df$obj/mean(df$obj))})

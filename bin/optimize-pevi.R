@@ -1,4 +1,4 @@
-#!/usr/common/usg/R/R-3.0.1/bin/Rscript --no-save --no-restore
+#!/usr/common/usg/R/R-2.15.2/bin/Rscript --no-save --no-restore
 ##############################################################################################################################################
 # Script to conduct the buildout optimization
 ##############################################################################################################################################
@@ -142,7 +142,7 @@ for(seed in seeds){
     taz.charger.combos$include <- T
 
     # Start for loop for overall penetration level optimization
-		for(build.i in begin.build.i:max.chargers.per.pen){
+		for(build.i in 2){ #begin.build.i:max.chargers.per.pen){
 		 #build.i <- 1 
 			print(paste('build.i = ',build.i))
       

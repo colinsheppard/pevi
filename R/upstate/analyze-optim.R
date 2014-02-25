@@ -6,10 +6,11 @@ load.libraries(c('ggplot2','yaml','stringr','RNetLogo','maptools','reshape','col
 # for now I'm going to hard code a bunch of stuff for expediancy and because I'm not sure how general purpose this stuff will become
 
 chs <- data.frame()
-for(optim.code in c('base','L2-10k','L2-12.5k','L2-20k')){
+for(optim.code in c('L2-10k','L2-12.5k','base','L2-20k','L3-30kW','opp-cost-10')){
   for(seed in 1:5){
     hist.file <- pp(pevi.shared,'data/outputs/optim-new/',optim.code,'-seed',seed,'/charger-buildout-history.Rdata')
-    if(file.exists(hist.file)){
+    final.evse.file <- pp(pevi.shared,'data/outputs/optim-new/',optim.code,'-seed',seed,'/',optim.code,'-seed',seed,'-pen2-final-infrastructure.txt')
+    if(file.exists(final.evse.file)){
       load(hist.file)
       charger.buildout.history$scenario <- optim.code
       charger.buildout.history$seed     <- seed

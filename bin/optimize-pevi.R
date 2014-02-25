@@ -144,6 +144,7 @@ for(seed in seeds){
     # Start for loop for overall penetration level optimization
 		for(build.i in 2){ #begin.build.i:max.chargers.per.pen){
 		 #build.i <- 1 
+			if(build.i > 5) {break}
 			print(paste('build.i = ',build.i))
       
       #	Next is the loop through driver files. the snow parallelization happens here.

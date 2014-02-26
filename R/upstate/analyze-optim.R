@@ -6,10 +6,10 @@ load.libraries(c('ggplot2','yaml','stringr','RNetLogo','maptools','reshape','col
 # for now I'm going to hard code a bunch of stuff for expediancy and because I'm not sure how general purpose this stuff will become
 
 chs <- data.frame()
-for(optim.code in c('L2-10k','L2-12.5k','base','L2-20k','L3-30kW','opp-cost-10')){
-  for(seed in 1:5){
+for(optim.code in c('L2-10k','L2-12.5k','base','L2-20k','L3-30kW','no-L3','opp-cost-10')){
+  for(seed in c(1:5,9:10)){
     hist.file <- pp(pevi.shared,'data/outputs/optim-new/',optim.code,'-seed',seed,'/charger-buildout-history.Rdata')
-    final.evse.file <- pp(pevi.shared,'data/outputs/optim-new/',optim.code,'-seed',seed,'/',optim.code,'-seed',seed,'-pen2-final-infrastructure.txt')
+    final.evse.file <- ifelse(optim.code=='no-L3',pp(pevi.shared,'data/outputs/optim-new/',optim.code,'-seed',seed,'/',optim.code,'-seed',seed,'-pen0.5-final-infrastructure.txt'),pp(pevi.shared,'data/outputs/optim-new/',optim.code,'-seed',seed,'/',optim.code,'-seed',seed,'-pen2-final-infrastructure.txt'))
     if(file.exists(final.evse.file)){
       load(hist.file)
       charger.buildout.history$scenario <- optim.code
@@ -28,13 +28,21 @@ ch.fin.unshaped <- ch.fin
 
 # compare several optimization runs at once
 ch.fin <- subset(melt(ch.fin.unshaped,measure.vars=pp('L',0:4),variable_name="level"),level%in%pp('L',2:3))
+ch.fin$scenario <- factor(ch.fin$scenario,levels=c('L2-10k','L2-12.5k','base','L2-20k','L3-30kW','no-L3','opp-cost-10'))
 stat_sum_single <- function(fun, geom="point", ...) {
   stat_summary(fun.y=fun, geom=geom, size = 3, ...)
 }
-ggplot(ddply(ch.fin,.(scenario,level,penetration,seed),function(df) { data.frame(num.chargers=sum(df$value)) }),aes(x=scenario,y=num.chargers,colour=level)) + geom_point() + facet_wrap(~penetration) + stat_summary(fun.y=mean,geom='point',shape='X',size=3)
+ggplot(ddply(ch.fin,.(scenario,level,penetration,seed),function(df) { data.frame(num.chargers=sum(df$value)) }),aes(x=scenario,y=num.chargers,colour=level)) + geom_point() + facet_wrap(~penetration) + stat_summary(fun.y=mean,geom='point',shape='X',size=3)+labs(x="Scenario",y="# Chargers",title="# Chargers Sited over Several Optimization Variations")+ theme(axis.text.x = element_text(angle = 45, hjust = 1))
 
 # the fraction of TAZs with chargers of each type 
-ggplot(ddply(ch.fin,.(level,scenario,penetration,seed),function(df){ data.frame(frac.tazs=sum(df$value>0)/nrow(df))}),aes(x=scenario,y=frac.tazs,colour=level))+geom_point()+facet_wrap(~penetration)
+ggplot(ddply(ch.fin,.(level,scenario,penetration,seed),function(df){ data.frame(frac.tazs=sum(df$value>0)/nrow(df))}),aes(x=scenario,y=frac.tazs,colour=level))+geom_point()+facet_wrap(~penetration)+labs(x="Scenario",y="Charger Coverage Fraction",title="Fraction of TAZs with Chargers")+ theme(axis.text.x = element_text(angle = 45, hjust = 1))
+frac.tazs <- ddply(ch.fin,.(scenario,penetration,seed),function(df){ 
+  df3 <- ddply(df,.(TAZ),function(df2){
+    data.frame(value=sum(f2$value))
+  })
+  data.frame(frac.tazs=sum(df3$value>0)/nrow(df3))
+})
+ggplot(,aes(x=scenario,y=frac.tazs))+geom_point()+facet_wrap(~penetration)+labs(x="Scenario",y="Charger Coverage Fraction",title="Fraction of TAZs with Chargers")+ theme(axis.text.x = element_text(angle = 45, hjust = 1))
 
 # hard coded comparison of scenarios
 ch.fin <- cast(subset(melt(ch.fin.unshaped,measure.vars=pp('L',0:4),variable_name="level"),level%in%pp('L',2:3)),penetration + TAZ + seed + level ~ scenario)

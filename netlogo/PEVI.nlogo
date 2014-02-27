@@ -62,6 +62,10 @@ globals [
   weekend-factor
   discount
   
+  ;; Objective Function Params needed to optimize the model
+  reference-charger-cost
+  reference-delay-cost
+  
   ;; globals needed for testing
   test-driver
   seek-charger-index

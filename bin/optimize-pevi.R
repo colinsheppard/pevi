@@ -13,7 +13,7 @@ option_list <- list(
   make_option(c("-d", "--experimentdir"), type="character", default='.', help="Path to the directory containing the files needed to run the optimization (params.txt, vary.yaml, paths.yaml) [\"%default\"]")
 )
 if(interactive()){
-  setwd(pp(pevi.shared,'data/inputs/optim-new/upstate-L2-12.5k/'))
+  setwd(pp(pevi.shared,'data/inputs/optim-new/upstate-base/'))
   args<-c()
   args <- parse_args(OptionParser(option_list = option_list,usage = "shp2kml.R [options]"),positional_arguments=F,args=args)
 }else{
@@ -173,7 +173,6 @@ for(seed in seeds[seed.inds]){
     # Start for loop for overall penetration level optimization
 		for(build.i in begin.build.i:max.chargers.per.pen){
 		 #build.i <- 1 
-
       # at this point, if we're in hot start, drop the history from the current iteration and turn hot start off
       if(hot.start){
         opt.history <- subset(opt.history,!(penetration==start.pen & iteration>=start.iter))
@@ -185,8 +184,18 @@ for(seed in seeds[seed.inds]){
         write.table(head(read.csv(pp(path.to.outputs,'buildout-progress.csv')),-1),file=pp(path.to.outputs,'buildout-progress.csv'),sep=',',row.names=F)
         hot.start <- F
       }
-  
 			print(paste('build.i = ',build.i))
+
+      if(build.i == 1){
+        if(nl.obj == 'marginal-cost-to-reduce-delay'){
+          baseline.results <- evaluate.baseline()
+          reference.charger.cost <- mean(baseline.results$total.charger.cost)
+          reference.delay.cost <- mean(baseline.results$total.delay.cost)
+        }else{
+          reference.charger.cost <- 0
+          reference.delay.cost <- 0
+        }
+      }
       
       #	Next is the loop through driver files. the snow parallelization happens here.
 			build.result <- evaluate.fitness()
@@ -197,7 +206,12 @@ for(seed in seeds[seed.inds]){
       #	We've run every combination of tazs/chargers for each driver file. Now we asses which charger to place
       #	by averaging the objective function results across all replicates.
 			result.means <- ddply(build.result,.(taz,level),function(df){
-				data.frame(obj = mean(df$obj),cv=sd(df$obj)/mean(df$obj),key=pp(df$taz[1],'-',df$level[1]))
+        if(nl.obj == 'marginal-cost-to-reduce-delay'){
+          the.obj <- (mean(df$total.delay.cost) - reference.delay.cost)/(mean(df$total.charger.cost) - reference.charger.cost)
+          data.frame(obj = the.obj,cv=sd(df$obj)/the.obj,key=pp(df$taz[1],'-',df$level[1]))
+        }else{
+          data.frame(obj = mean(df$obj),cv=sd(df$obj)/mean(df$obj),key=pp(df$taz[1],'-',df$level[1]))
+        }
 			})
       taz.charger.combos$obj[taz.charger.combos$include] <- result.means$obj[match(taz.charger.combos$key[taz.charger.combos$include],result.means$key)]
       taz.charger.combos$cv[taz.charger.combos$include] <- result.means$cv[match(taz.charger.combos$key[taz.charger.combos$include],result.means$key)]
@@ -218,13 +232,23 @@ for(seed in seeds[seed.inds]){
       #	Winner determined by lowest objective function (currently cost)
 			print(pp('winner taz = ',taz.charger.combos$taz[1],' level = ',taz.charger.combos$level[1]))
 			
-      # If our objective value has reached a minimum, we're done.
-			if(current.obj > taz.charger.combos$obj[1]) {
-				current.obj <- taz.charger.combos$obj[1]
-			} else {
-				current.obj <- Inf
-				break
-			}
+      if(nl.obj == 'marginal-cost-to-reduce-delay'){
+        # If our objective value is 0 or greater, we're done.
+        if(taz.charger.combos$obj[1] < 0){
+          current.obj <- taz.charger.combos$obj[1]
+        } else {
+          current.obj <- Inf
+          break
+        }
+      } else {
+        # If our objective value has reached a minimum, we're done.
+        if(current.obj > taz.charger.combos$obj[1]) {
+          current.obj <- taz.charger.combos$obj[1]
+        } else {
+          current.obj <- Inf
+          break
+        }
+      }
 			
       #	Now update our infrastructure file for the next round
 			charger.buildout[taz.charger.combos$taz[1],grep(taz.charger.combos$level[1],names(charger.buildout))] <- (charger.buildout[taz.charger.combos$taz[1],grep(taz.charger.combos$level[1],names(charger.buildout))] + build.increment[pp('l',taz.charger.combos$level[1])])

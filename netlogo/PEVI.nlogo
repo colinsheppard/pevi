@@ -1,4 +1,4 @@
-extensions [time profiler structs table] 
+extensions [time profiler structs table]
 __includes["setup.nls" "reporters.nls"]
 
 globals [    

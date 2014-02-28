@@ -182,6 +182,8 @@ for(seed in seeds[seed.inds]){
         if(nrow(build.result.history)>0) build.result.history <- subset(build.result.history,!(penetration==start.pen & iteration>=start.iter))
 			  save(build.result.history,file=pp(path.to.outputs,'build-result-history.Rdata'))
         write.table(head(read.csv(pp(path.to.outputs,'buildout-progress.csv')),-1),file=pp(path.to.outputs,'buildout-progress.csv'),sep=',',row.names=F)
+        reference.charger.cost <- subset(opt.history,penetration==start.pen & iteration==build.i)$mean.charger.cost[1] 
+        reference.delay.cost <- subset(opt.history,penetration==start.pen & iteration==build.i)$mean.delay.cost[1] 
         hot.start <- F
       }
 			print(paste('build.i = ',build.i))
@@ -208,13 +210,16 @@ for(seed in seeds[seed.inds]){
 			result.means <- ddply(build.result,.(taz,level),function(df){
         if(nl.obj == 'marginal-cost-to-reduce-delay'){
           the.obj <- (mean(df$total.delay.cost) - reference.delay.cost)/(mean(df$total.charger.cost) - reference.charger.cost)
-          data.frame(obj = the.obj,cv=sd(df$obj)/the.obj,key=pp(df$taz[1],'-',df$level[1]))
+          data.frame(obj = the.obj,cv=sd(df$obj)/the.obj,key=pp(df$taz[1],'-',df$level[1]),mean.delay.cost=mean(df$total.delay.cost),mean.charger.cost=mean(df$total.charger.cost))
         }else{
-          data.frame(obj = mean(df$obj),cv=sd(df$obj)/mean(df$obj),key=pp(df$taz[1],'-',df$level[1]))
+          data.frame(obj = mean(df$obj),cv=sd(df$obj)/mean(df$obj),key=pp(df$taz[1],'-',df$level[1]),mean.delay.cost=0,mean.charger.cost=0)
         }
 			})
-      taz.charger.combos$obj[taz.charger.combos$include] <- result.means$obj[match(taz.charger.combos$key[taz.charger.combos$include],result.means$key)]
-      taz.charger.combos$cv[taz.charger.combos$include] <- result.means$cv[match(taz.charger.combos$key[taz.charger.combos$include],result.means$key)]
+      combos.in.results <- match(taz.charger.combos$key[taz.charger.combos$include],result.means$key)
+      taz.charger.combos$obj[taz.charger.combos$include] <- result.means$obj[combos.in.results]
+      taz.charger.combos$cv[taz.charger.combos$include] <- result.means$cv[combos.in.results]
+      taz.charger.combos$mean.delay.cost[taz.charger.combos$include] <- result.means$mean.delay.cost[combos.in.results]
+      taz.charger.combos$mean.charger.cost[taz.charger.combos$include] <- result.means$mean.charger.cost[combos.in.results]
       # sort the results and add key, IMPORTANT, everying below relies on this ordering
       taz.charger.combos <- taz.charger.combos[order(taz.charger.combos$obj),] 
       # ggplot(taz.charger.combos,aes(x=factor(taz),y=obj)) + geom_point() + facet_wrap(~level) 
@@ -229,8 +234,11 @@ for(seed in seeds[seed.inds]){
       build.result.history <- rbind(build.result.history,build.result)
 			save(build.result.history,file=pp(path.to.outputs,'build-result-history.Rdata'))
 
-      #	Winner determined by lowest objective function (currently cost)
+      #	Winner determined by lowest objective function
 			print(pp('winner taz = ',taz.charger.combos$taz[1],' level = ',taz.charger.combos$level[1]))
+
+      reference.charger.cost <- taz.charger.combos$mean.charger.cost[1] 
+      reference.delay.cost <- taz.charger.combos$mean.delay.cost[1] 
 			
       if(nl.obj == 'marginal-cost-to-reduce-delay'){
         # If our objective value is 0 or greater, we're done.

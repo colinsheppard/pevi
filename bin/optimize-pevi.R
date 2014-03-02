@@ -30,8 +30,9 @@ source(pp(args$experimentdir,'params.R'))
 source(paste(pevi.home,"R/optim/buildout-functions.R",sep=''))
 source(paste(pevi.home,"R/reporters-loggers.R",sep=''))
 
-# in case hot start is not specified in params.R
+# in case hot start or nl.obj is not specified in params.R
 hot.start <- ifelse(exists('hot.start'),hot.start,F)
+nl.obj <- ifelse(exists('nl.obj'),nl.obj,'marginal-cost-to-reduce-delay')
 
 # The params file will need to be set in R, so we can edit it mid-run. 
 # Otherwise, batch setup is impossible.
@@ -275,6 +276,13 @@ for(seed in seeds[seed.inds]){
       # Finally update taz.charger.combos to include/exclude poorly performing alternatives
       for(bank.i in 1:length(ind.banks)){
         taz.charger.combos$include[ind.banks[[bank.i]]] <- ind.banks.seq[[bank.i]][build.i+1]
+      }
+
+      # break if requested
+      if(file.exists(pp(path.to.outputs,'BREAK'))){
+        unlink(pp(path.to.outputs,'BREAK'))
+        system(pp('touch ',path.to.outputs,'STOPPED'))
+        stop('BREAK file found, stopping')
       }
     } # end iteration loop
     

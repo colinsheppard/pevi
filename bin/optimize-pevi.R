@@ -13,7 +13,7 @@ option_list <- list(
   make_option(c("-d", "--experimentdir"), type="character", default='.', help="Path to the directory containing the files needed to run the optimization (params.txt, vary.yaml, paths.yaml) [\"%default\"]")
 )
 if(interactive()){
-  setwd(pp(pevi.shared,'data/inputs/optim-new/delhi-base/'))
+  setwd(pp(pevi.shared,'data/inputs/optim-new/delhi-res-none/'))
   args<-c()
   args <- parse_args(OptionParser(option_list = option_list,usage = "shp2kml.R [options]"),positional_arguments=F,args=args)
 }else{

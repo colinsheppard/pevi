@@ -1,4 +1,4 @@
-#!/usr/common/usg/R/R-3.0.1/bin/Rscript --no-save --no-restore
+#!/usr/bin/Rscript --no-save --no-restore
 ##############################################################################################################################################
 # Script to configure PEVI modeling environment
 ##############################################################################################################################################
@@ -24,8 +24,8 @@ load.libraries(c('optparse','stringr'))
 option_list <- list(
   make_option(c("-p", "--pevi"), default="~/Dropbox/pevi", help="Path to PEVI repository [default %default]"),
   make_option(c("-s", "--shared"), default="~/Dropbox/pev-shared", help="Path to pev-shared directory [default %default]"),
-  make_option(c("-n", "--nondrop"), default="~/Documents/pevi", help="Path to non-dropbox directory for pevi [default %default]")
-  make_option(c("-c", "--numcpu"), default="1", help="Number of CPUs you want this machine to use for parallel analysis [default %default]"),
+  make_option(c("-n", "--nondrop"), default="~/Documents/pevi", help="Path to non-dropbox directory for pevi [default %default]"),
+  make_option(c("-c", "--numcpu"), default="1", help="Number of CPUs you want this machine to use for parallel analysis [default %default]")
 )
 if(interactive()){
   setwd('~/Dropbox/serc/pev-colin/pevi/R')

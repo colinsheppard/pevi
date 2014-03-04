@@ -6,6 +6,14 @@ to-report mean-duty-factor
   ]
 end
 
+to-report mean-duty-factor-by-level [the-level]
+  ifelse count chargers with [ [level] of this-charger-type = the-level ] > 0 [
+    report mean [ energy-delivered / (30 * [charge-rate] of this-charger-type) ] of chargers with [ [level] of this-charger-type = the-level ]
+  ][
+    report 0
+  ]
+end
+
 to-report num-stranded
   report count drivers with [state = "stranded"]
 end
@@ -36,16 +44,31 @@ to-report mean-delay
   ]
 end
 
-to-report objective-function
-  let total-charger-cost sum [ [installed-cost] of this-charger-type ] of chargers with [ [level] of this-charger-type > 0 and [id] of location > 0] * 1000
+to-report total-charger-cost 
+  report sum [ [installed-cost] of this-charger-type ] of chargers with [ [level] of this-charger-type > 0 and [id] of location > 0] * 1000
+end
+
+to-report total-delay-cost
   let total-delay sum [ sum map weight-delay itin-delay-amount  ] of drivers
   ; Calculate cost of delay figuring there are 260 working days/year, 10 year lifespan of chargers
-  let total-delay-cost 0
+  let final-delay-cost 0
   let annual-delay-cost time-opportunity-cost * total-delay * (260 + 105 * weekend-factor)
   let t 1
   repeat charger-lifetime [
-    set total-delay-cost total-delay-cost + annual-delay-cost / (1 + discount)^(t - 1)
+    set final-delay-cost final-delay-cost + annual-delay-cost / (1 + discount)^(t - 1)
     set t (t + 1)
-  ]
+  ] 
+  report final-delay-cost / num-simulation-days
+end
+
+to-report objective-function
   report total-charger-cost + total-delay-cost 
+end
+
+to-report total-cost
+  report total-charger-cost + total-delay-cost 
+end
+
+to-report marginal-cost-to-reduce-delay
+  report (total-delay-cost - reference-delay-cost) / (total-charger-cost - reference-charger-cost)
 end

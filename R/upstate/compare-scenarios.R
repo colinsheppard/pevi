@@ -3,12 +3,12 @@ options(java.parameters="-Xmx2048m")
 load.libraries(c('ggplot2','yaml','RNetLogo','plyr','reshape','stringr'))
 
 #exp.name <- commandArgs(trailingOnly=T)[1]
-exp.name <- 'upstate-verif'
+exp.name <- 'upstate-build-by-two'
 path.to.inputs <- pp(pevi.shared,'data/inputs/compare/',exp.name,'/')
 
 #to.log <- c('pain','charging','need-to-charge')
 #to.log <- c('pain','charging','tazs','trip')
-to.log <- c('pain','charging','trip')
+to.log <- c('pain','charging')
 
 # load the reporters and loggers needed to summarize runs and disable logging
 source(paste(pevi.home,"R/reporters-loggers.R",sep=''))
@@ -25,11 +25,11 @@ naming <- yaml.load(readChar(paste(path.to.inputs,'naming.yaml',sep=''),file.inf
 vary.tab <- expand.grid(vary,stringsAsFactors=F)
 
 results <- data.frame(vary.tab)
-if("driver.input.file" %in% names(vary)){
+if("driver-input-file" %in% names(vary)){
   results$penetration <- as.numeric(unlist(lapply(strsplit(as.character(results$driver.input.file),'-pen',fixed=T),function(x){ unlist(strsplit(x[2],"-rep",fixed=T)[[1]][1]) })))
   results$replicate <- as.numeric(unlist(lapply(strsplit(as.character(results$driver.input.file),'-rep',fixed=T),function(x){ unlist(strsplit(x[2],"-",fixed=T)[[1]][1]) })))
 }
-if("charger.input.file" %in% names(vary)){
+if("charger-input-file" %in% names(vary)){
   results$infrastructure.scenario <- unlist(lapply(strsplit(as.character(results$charger.input.file),'-scen',fixed=T),function(x){ unlist(strsplit(x[2],".txt",fixed=T)) }))
   results$infrastructure.scenario.named <- results$infrastructure.scenario
   results$infrastructure.scenario.order <- results$infrastructure.scenario
@@ -47,7 +47,7 @@ if("charger.input.file" %in% names(vary)){
   }
   results$infrastructure.scenario.named  <- reorder(factor(results$infrastructure.scenario.named),results$infrastructure.scenario.order)
 }
-if("vehicle.type.input.file" %in% names(vary)){
+if("vehicle-type-input-file" %in% names(vary)){
   results$vehicle.scenario <- as.numeric(unlist(lapply(strsplit(as.character(results$vehicle.type.input.file),'-scen',fixed=T),function(x){ unlist(strsplit(x[2],".txt",fixed=T)) })))
   results$vehicle.scenario.named <- results$vehicle.scenario
   results$vehicle.scenario.order <- results$vehicle.scenario
@@ -66,6 +66,10 @@ for(cmd in paste('set log-',logfiles,' false',sep='')){ NLCommand(cmd) }
 for(cmd in paste('set log-',to.log,' true',sep='')){ NLCommand(cmd) }
 
 logs <- list()
+logs[['results']] <- results
+for(reporter in names(reporters)){
+  logs[['results']][,reporter] <- NA
+}
 
 # for every combination of parameters, run the model and capture the summary statistics
 for(results.i in 1:nrow(results)){
@@ -94,6 +98,7 @@ for(results.i in 1:nrow(results)){
   NLCommand('setup')
 
   NLCommand('time:go-until go-until-time')
+  logs[['results']][results.i,names(reporters)] <- tryCatch(NLDoReport(1,"",reporter = paste("(sentence",paste(reporters,collapse=' '),")"),as.data.frame=T,df.col.names=names(reporters)),error=function(e){ NA })
   if(results.i == 1){
     outputs.dir <- NLReport('outputs-directory')
     for(logger in to.log){
@@ -128,7 +133,17 @@ for(log.file in to.log){
   names(logs[[log.file]]) <- c('driver.input.file',names(logs[[log.file]])[2:ncol(logs[[log.file]])])
   logs[[log.file]]$penetration <- as.numeric(unlist(lapply(strsplit(as.character(logs[[log.file]]$driver.input.file),'-pen',fixed=T),function(x){ unlist(strsplit(x[2],"-rep",fixed=T)[[1]][1]) })))
   logs[[log.file]]$replicate <- as.numeric(unlist(lapply(strsplit(as.character(logs[[log.file]]$driver.input.file),'-rep',fixed=T),function(x){ unlist(strsplit(x[2],"-",fixed=T)[[1]][1]) })))
+  if('charger.input.file' %in% names(logs[[log.file]])){
+    logs[[log.file]]$infrastructure.scenario <- NA
+    for(scen.i in names(naming$`charger-input-file`)){
+      logs[[log.file]]$infrastructure.scenario[grep(scen.i,as.character(logs[[log.file]]$charger.input.file))] <- scen.i
+      logs[[log.file]]$infrastructure.scenario.named[logs[[log.file]]$infrastructure.scenario == scen.i] <- naming$`charger-input-file`[[scen.i]][[1]]
+      logs[[log.file]]$infrastructure.scenario.order[logs[[log.file]]$infrastructure.scenario == scen.i] <- as.numeric(naming$`charger-input-file`[[scen.i]][[2]])
+    }
+  }
 }
+save(logs,file=paste(path.to.inputs,'logs.Rdata',sep=''))
+#load(paste(path.to.inputs,'logs.Rdata',sep=''))
 
 #######################################
 # ANALYSIS

@@ -1,4 +1,4 @@
-extensions [time profiler structs table] 
+extensions [time profiler structs table]
 __includes["setup.nls" "reporters.nls"]
 
 globals [    
@@ -61,6 +61,12 @@ globals [
   charger-lifetime
   weekend-factor
   discount
+  assign-phevs-to-extreme-drivers
+  num-simulation-days
+  
+  ;; Objective Function Params needed to optimize the model
+  reference-charger-cost
+  reference-delay-cost
   
   ;; globals needed for testing
   test-driver
@@ -386,6 +392,26 @@ to log-taz-data ;;;LOG
   let #num-0 count drivers with [home-taz = myself] ;;;LOG
   log-data "tazs" (sentence ticks id (count drivers with [current-taz = myself and is-bev?]) (count drivers with [current-taz = myself and not is-bev?]) #num-0 (count item 1 chargers-by-type) (count item 2 chargers-by-type) (count item 3 chargers-by-type) (#num-0 - count drivers with [current-taz = myself and current-charger = (one-of item 0 [chargers-by-type] of myself)]) (count (item 1 chargers-by-type) with [current-driver = nobody]) (count (item 2 chargers-by-type) with [current-driver = nobody]) (count (item 3 chargers-by-type) with [current-driver = nobody]) ) ;;;LOG
 end ;;;LOG
+
+to add-permission-charger [ taz-id charger-level #alt-energy-price permissioned-drivers buildout-increment ]
+  ; Build a permission-charger. Permissioned-drivers must be input as a list, i.e. (list 43 45 47)
+   let build-charger-type one-of charger-types with [level = charger-level]
+    create-chargers buildout-increment [
+      set this-charger-type build-charger-type
+      set location table:get taz-table taz-id
+      set shape "Circle 2"
+      set color red
+      set size 1
+      set current-driver nobody
+      set energy-delivered 0
+      set alt-energy-price #alt-energy-price
+      foreach permissioned-drivers [
+        ask drivers with [id = ?] [
+          set permission-list lput myself permission-list
+        ]
+      ]
+    ]
+end
 
 to add-charger [ taz-id charger-level buildout-increment ]
   let build-charger-type one-of charger-types with [level = charger-level]

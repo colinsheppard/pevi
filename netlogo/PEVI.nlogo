@@ -61,6 +61,8 @@ globals [
   charger-lifetime
   weekend-factor
   discount
+  assign-phevs-to-extreme-drivers
+  num-simulation-days
   
   ;; Objective Function Params needed to optimize the model
   reference-charger-cost

@@ -1,4 +1,4 @@
-extensions [time profiler structs table] 
+extensions [time profiler structs table]
 __includes["setup.nls" "reporters.nls"]
 
 globals [    
@@ -61,6 +61,7 @@ globals [
   charger-lifetime
   weekend-factor
   discount
+  assign-phevs-to-extreme-drivers
   
   ;; Objective Function Params needed to optimize the model
   reference-charger-cost

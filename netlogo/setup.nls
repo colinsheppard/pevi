@@ -37,13 +37,17 @@ to read-parameter-file
       ifelse param-name = "outputs-directory" [ set outputs-directory word model-directory file-read ][
       ifelse param-name = "probability-of-unneeded-charge" [ set probability-of-unneeded-charge file-read ][
       ifelse param-name = "stranded-delay-threshold" [ set stranded-delay-threshold file-read ][
-      ifelse param-name = "charger-permission-file" [set charger-permission-file word param-file-base file-read ][  
-      ]]]]]]]]]]]]]]]]]]]]]]]]]
+      ifelse param-name = "charger-permission-file" [set charger-permission-file word param-file-base file-read ][ 
+      ifelse param-name = "assign-phevs-to-extreme-drivers" [set assign-phevs-to-extreme-drivers file-read ][ 
+      ifelse param-name = "num-simulation-days" [set num-simulation-days file-read ][
+      ]]]]]]]]]]]]]]]]]]]]]]]]]]]
     ]
     file-close
   ][ 
     error (word "Input file '" parameter-file "' not found!") 
   ]
+  ;; ASSING DEFAULT VALUES TO UNSET VARIABLES OR IMPOSSIBLE VALUES
+  if num-simulation-days <= 0 [ set num-simulation-days 1 ]
 end
 
 ;;;;;;;;;;;;;;;;;;;;
@@ -176,7 +180,7 @@ to setup-drivers
     ask max-one-of #bev-types [ battery-capacity / electric-fuel-consumption ][     
       ; find the drivers that can't make their longest trip using the current bev type
       let #impossible-drivers drivers with [
-        this-vehicle-type = nobody and 
+        assign-phevs-to-extreme-drivers and this-vehicle-type = nobody and 
         (
           max-trip-distance * charge-safety-factor > [battery-capacity] of myself / [electric-fuel-consumption] of myself or
           journey-distance * charge-safety-factor > (min(sentence (max-dwell-time * 6.6 / charge-safety-factor) [battery-capacity] of myself) + [battery-capacity] of myself) / [electric-fuel-consumption] of myself

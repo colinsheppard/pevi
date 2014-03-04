@@ -58,7 +58,7 @@ to-report total-delay-cost
     set final-delay-cost final-delay-cost + annual-delay-cost / (1 + discount)^(t - 1)
     set t (t + 1)
   ] 
-  report final-delay-cost
+  report final-delay-cost / num-simulation-days
 end
 
 to-report objective-function

@@ -13,7 +13,7 @@ option_list <- list(
   make_option(c("-d", "--experimentdir"), type="character", default='.', help="Path to the directory containing the files needed to run the optimization (params.txt, vary.yaml, paths.yaml) [\"%default\"]")
 )
 if(interactive()){
-  setwd(pp(pevi.shared,'data/inputs/optim-new/upstate-base/'))
+  setwd(pp(pevi.shared,'data/inputs/optim-new/delhi-base/'))
   args<-c()
   args <- parse_args(OptionParser(option_list = option_list,usage = "shp2kml.R [options]"),positional_arguments=F,args=args)
 }else{
@@ -40,7 +40,7 @@ nl.obj <- ifelse(exists('nl.obj'),nl.obj,'marginal-cost-to-reduce-delay')
 # NL does not recognize tilde expansion. KEEP THIS IN MIND.
 param.file <- pp(args$experimentdir,'params.txt')
 param.file.data <- read.table(param.file,sep='\t')
-param.file.data <- streval(pp('data.frame(',pp(apply(param.file.data,1,function(x){ pp(str_replace_all(x[1],'-','.'),'=',ifelse(length(grep('file|directory',x[1]))>0,pp('"',x[2],'"'),x[2])) }),collapse=","),')'))
+param.file.data <- streval(pp('data.frame(',pp(apply(param.file.data,1,function(x){ pp(str_replace_all(x[1],'-','.'),'=',ifelse(length(grep('file|directory',x[1]))>0,pp('"',x[2],'"'),ifelse(x[2]%in%c('true','false'),x[2]=='true',x[2]))) }),collapse=","),')'))
 
 taz.names <- NA
 if(file.exists(pp(args$experimentdir,'taz-names.csv')))taz.names <- read.csv(pp(args$experimentdir,'taz-names.csv'))

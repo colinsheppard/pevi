@@ -172,7 +172,7 @@ for(seed in seeds[seed.inds]){
     vary.tab$`driver-input-file` <- str_replace(vary.tab$`driver-input-file`,"penXXX",paste("pen",pev.penetration*100,sep=""))
 
     # Start for loop for overall penetration level optimization
-		for(build.i in 2){ #begin.build.i:max.chargers.per.pen){
+		for(build.i in begin.build.i:max.chargers.per.pen){
 		 #build.i <- 1 
       # at this point, if we're in hot start, drop the history from the current iteration and turn hot start off
       if(hot.start){

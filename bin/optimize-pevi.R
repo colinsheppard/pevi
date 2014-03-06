@@ -1,4 +1,5 @@
 #!/usr/bin/Rscript --no-save --no-restore
+
 ##############################################################################################################################################
 # Script to conduct the buildout optimization
 ##############################################################################################################################################
@@ -13,7 +14,7 @@ option_list <- list(
   make_option(c("-d", "--experimentdir"), type="character", default='.', help="Path to the directory containing the files needed to run the optimization (params.txt, vary.yaml, paths.yaml) [\"%default\"]")
 )
 if(interactive()){
-  setwd(pp(pevi.shared,'data/inputs/optim-new/upstate-L2-12.5k/'))
+  setwd(pp(pevi.shared,'data/inputs/optim-new/delhi-res-none/'))
   args<-c()
   args <- parse_args(OptionParser(option_list = option_list,usage = "shp2kml.R [options]"),positional_arguments=F,args=args)
 }else{
@@ -24,14 +25,16 @@ if(substr(args$experimentdir,1,1)!="/")args$experimentdir <- pp(getwd(),"/",args
 if(substr(args$experimentdir,nchar(args$experimentdir),nchar(args$experimentdir)) != "/")args$experimentdir <- pp(args$experimentdir,"/")
 
 Sys.setenv(NOAWT=1)
-options(java.parameters="-Xmx2048m")
+options(java.parameters="-Xmx1024m")
+#options(java.parameters="-Xmx2048m")
 
 source(pp(args$experimentdir,'params.R'))
 source(paste(pevi.home,"R/optim/buildout-functions.R",sep=''))
 source(paste(pevi.home,"R/reporters-loggers.R",sep=''))
 
-# in case hot start is not specified in params.R
+# in case hot start or nl.obj is not specified in params.R
 hot.start <- ifelse(exists('hot.start'),hot.start,F)
+nl.obj <- ifelse(exists('nl.obj'),nl.obj,'marginal-cost-to-reduce-delay')
 
 # The params file will need to be set in R, so we can edit it mid-run. 
 # Otherwise, batch setup is impossible.
@@ -39,7 +42,7 @@ hot.start <- ifelse(exists('hot.start'),hot.start,F)
 # NL does not recognize tilde expansion. KEEP THIS IN MIND.
 param.file <- pp(args$experimentdir,'params.txt')
 param.file.data <- read.table(param.file,sep='\t')
-param.file.data <- streval(pp('data.frame(',pp(apply(param.file.data,1,function(x){ pp(str_replace_all(x[1],'-','.'),'=',ifelse(length(grep('file|directory',x[1]))>0,pp('"',x[2],'"'),x[2])) }),collapse=","),')'))
+param.file.data <- streval(pp('data.frame(',pp(apply(param.file.data,1,function(x){ pp(str_replace_all(x[1],'-','.'),'=',ifelse(length(grep('file|directory',x[1]))>0,pp('"',x[2],'"'),ifelse(x[2]%in%c('true','false'),x[2]=='true',x[2]))) }),collapse=","),')'))
 
 taz.names <- NA
 if(file.exists(pp(args$experimentdir,'taz-names.csv')))taz.names <- read.csv(pp(args$experimentdir,'taz-names.csv'))
@@ -172,8 +175,7 @@ for(seed in seeds[seed.inds]){
 
     # Start for loop for overall penetration level optimization
 		for(build.i in begin.build.i:max.chargers.per.pen){
-		 #build.i <- 1 
-
+		 #build.i <- begin.build.i
       # at this point, if we're in hot start, drop the history from the current iteration and turn hot start off
       if(hot.start){
         opt.history <- subset(opt.history,!(penetration==start.pen & iteration>=start.iter))
@@ -183,10 +185,22 @@ for(seed in seeds[seed.inds]){
         if(nrow(build.result.history)>0) build.result.history <- subset(build.result.history,!(penetration==start.pen & iteration>=start.iter))
 			  save(build.result.history,file=pp(path.to.outputs,'build-result-history.Rdata'))
         write.table(head(read.csv(pp(path.to.outputs,'buildout-progress.csv')),-1),file=pp(path.to.outputs,'buildout-progress.csv'),sep=',',row.names=F)
+        reference.charger.cost <- subset(opt.history,penetration==start.pen & iteration==build.i)$mean.charger.cost[1] 
+        reference.delay.cost <- subset(opt.history,penetration==start.pen & iteration==build.i)$mean.delay.cost[1] 
         hot.start <- F
       }
-  
 			print(paste('build.i = ',build.i))
+
+      if(build.i == 1){
+        if(nl.obj == 'marginal-cost-to-reduce-delay'){
+          baseline.results <- evaluate.baseline()
+          reference.charger.cost <- mean(baseline.results$total.charger.cost)
+          reference.delay.cost <- mean(baseline.results$total.delay.cost)
+        }else{
+          reference.charger.cost <- 0
+          reference.delay.cost <- 0
+        }
+      }
       
       #	Next is the loop through driver files. the snow parallelization happens here.
 			build.result <- evaluate.fitness()
@@ -197,10 +211,18 @@ for(seed in seeds[seed.inds]){
       #	We've run every combination of tazs/chargers for each driver file. Now we asses which charger to place
       #	by averaging the objective function results across all replicates.
 			result.means <- ddply(build.result,.(taz,level),function(df){
-				data.frame(obj = mean(df$obj),cv=sd(df$obj)/mean(df$obj),key=pp(df$taz[1],'-',df$level[1]))
+        if(nl.obj == 'marginal-cost-to-reduce-delay'){
+          the.obj <- (mean(df$total.delay.cost) - reference.delay.cost)/(mean(df$total.charger.cost) - reference.charger.cost)
+          data.frame(obj = the.obj,cv=sd(df$obj)/the.obj,key=pp(df$taz[1],'-',df$level[1]),mean.delay.cost=mean(df$total.delay.cost),mean.charger.cost=mean(df$total.charger.cost))
+        }else{
+          data.frame(obj = mean(df$obj),cv=sd(df$obj)/mean(df$obj),key=pp(df$taz[1],'-',df$level[1]),mean.delay.cost=0,mean.charger.cost=0)
+        }
 			})
-      taz.charger.combos$obj[taz.charger.combos$include] <- result.means$obj[match(taz.charger.combos$key[taz.charger.combos$include],result.means$key)]
-      taz.charger.combos$cv[taz.charger.combos$include] <- result.means$cv[match(taz.charger.combos$key[taz.charger.combos$include],result.means$key)]
+      combos.in.results <- match(taz.charger.combos$key[taz.charger.combos$include],result.means$key)
+      taz.charger.combos$obj[taz.charger.combos$include] <- result.means$obj[combos.in.results]
+      taz.charger.combos$cv[taz.charger.combos$include] <- result.means$cv[combos.in.results]
+      taz.charger.combos$mean.delay.cost[taz.charger.combos$include] <- result.means$mean.delay.cost[combos.in.results]
+      taz.charger.combos$mean.charger.cost[taz.charger.combos$include] <- result.means$mean.charger.cost[combos.in.results]
       # sort the results and add key, IMPORTANT, everying below relies on this ordering
       taz.charger.combos <- taz.charger.combos[order(taz.charger.combos$obj),] 
       # ggplot(taz.charger.combos,aes(x=factor(taz),y=obj)) + geom_point() + facet_wrap(~level) 
@@ -215,16 +237,29 @@ for(seed in seeds[seed.inds]){
       build.result.history <- rbind(build.result.history,build.result)
 			save(build.result.history,file=pp(path.to.outputs,'build-result-history.Rdata'))
 
-      #	Winner determined by lowest objective function (currently cost)
+      #	Winner determined by lowest objective function
 			print(pp('winner taz = ',taz.charger.combos$taz[1],' level = ',taz.charger.combos$level[1]))
+
+      reference.charger.cost <- taz.charger.combos$mean.charger.cost[1] 
+      reference.delay.cost <- taz.charger.combos$mean.delay.cost[1] 
 			
-      # If our objective value has reached a minimum, we're done.
-			if(current.obj > taz.charger.combos$obj[1]) {
-				current.obj <- taz.charger.combos$obj[1]
-			} else {
-				current.obj <- Inf
-				break
-			}
+      if(nl.obj == 'marginal-cost-to-reduce-delay'){
+        # If our objective value is 0 or greater, we're done.
+        if(taz.charger.combos$obj[1] < 0){
+          current.obj <- taz.charger.combos$obj[1]
+        } else {
+          current.obj <- Inf
+          break
+        }
+      } else {
+        # If our objective value has reached a minimum, we're done.
+        if(current.obj > taz.charger.combos$obj[1]) {
+          current.obj <- taz.charger.combos$obj[1]
+        } else {
+          current.obj <- Inf
+          break
+        }
+      }
 			
       #	Now update our infrastructure file for the next round
 			charger.buildout[taz.charger.combos$taz[1],grep(taz.charger.combos$level[1],names(charger.buildout))] <- (charger.buildout[taz.charger.combos$taz[1],grep(taz.charger.combos$level[1],names(charger.buildout))] + build.increment[pp('l',taz.charger.combos$level[1])])
@@ -243,6 +278,13 @@ for(seed in seeds[seed.inds]){
       # Finally update taz.charger.combos to include/exclude poorly performing alternatives
       for(bank.i in 1:length(ind.banks)){
         taz.charger.combos$include[ind.banks[[bank.i]]] <- ind.banks.seq[[bank.i]][build.i+1]
+      }
+
+      # break if requested
+      if(file.exists(pp(path.to.outputs,'BREAK'))){
+        unlink(pp(path.to.outputs,'BREAK'))
+        system(pp('touch ',path.to.outputs,'STOPPED'))
+        stop('BREAK file found, stopping')
       }
     } # end iteration loop
     

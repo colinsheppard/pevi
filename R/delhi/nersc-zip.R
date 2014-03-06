@@ -12,11 +12,13 @@
 # "od-input-file"	"data/inputs/OD-upstate/upstate-od-data-update.txt"
 # "vehicle-type-input-file"	"data/inputs/vehicle-type-input-file/vehicle-types-scen2.txt"
 
-# From pevi-shared directory
-cd ~/Dropbox/serc/pev-shared
+optim.scenarios <- c('base','res-none')
 
-# Be sure to include both upstate files (for testing) and delhi files (for future work).
+setwd(pevi.shared)
 
-zip pevi-files.zip data/inputs/starting-soc data/inputs/external-time-distance data/inputs/charger-input-file/upstate data/inputs/charger-type-input-file data/inputs/driver-input-file/upstate-combined data/inputs/OD-upstate data/inputs/OD-delhi data/inputs/vehicle-type-input-file data/inputs/optim-new/params.R data/inputs/optim-new/params.txt data/inputs/optim-new/vary.yaml data/inputs/optim-new/varyshort.yaml
+#zip('pevi-files.zip',c('data/inputs/starting-soc','data/inputs/external-time-distance','data/inputs/charger-input-file/delhi/delhi-existing-chargers.txt','data/inputs/charger-type-input-file','data/inputs/driver-input-file/delhi-combined','data/inputs/OD-delhi','data/inputs/vehicle-type-input-file'),extras='-x data/inputs/driver-input-file/delhi-combined/old')
+zip('pevi-experiments.zip',c(pp('data/inputs/optim-new/delhi-',optim.scenarios)))
 
-scp pevi-files.zip csheppar@carver.nersc.gov:~
+# use the following shell command to push the data up to nersc
+#scp pevi-files.zip csheppar@carver.nersc.gov:~/pevi-shared/
+#ssh csheppar@carver.nersc.gov

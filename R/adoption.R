@@ -38,6 +38,9 @@ if(!file.exists(pp(pevi.shared,'data/vehicle-registration/veh.Rdata',sep=''))){
   load(pp(pevi.shared,'data/vehicle-registration/veh.Rdata',sep=''))
 }
   
+# Vehicle counts for export
+veh.counts <- ddply(subset(veh,FUEL.TYPE%in%c("GAS/ELEC","ELECTRIC")),.(ZIP.CODE,year,make.model),function(df){ data.frame(num.vehicles=sum(df$COUNT),fuel.type=df$FUEL.TYPE[1],city=df$city[1])})
+write.csv(data.table(veh.counts,key=c('year','fuel.type','make.model','ZIP.CODE')),file=pp(pevi.shared,'data/vehicle-registration/vehicle-counts.csv'))
 
 # Hybrid and EV registrations by year and zip
 

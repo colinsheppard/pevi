@@ -2,18 +2,48 @@ library(colinmisc)
 Sys.setenv(NOAWT=1)
 load.libraries(c('ggplot2','yaml','stringr','RNetLogo','maptools','reshape','colorRamps','caTools'))
 
-
-# for now I'm going to hard code a bunch of stuff for expediancy and because I'm not sure how general purpose this stuff will become
+#old.obj <- c('L2-10k','L2-12.5k','base','L2-20k','L3-30kW','no-L2','no-L3','no-phev-crit','opp-cost-10')
+#old.obj <- c('base','no-L2','no-L3')
+old.obj <- c()
+new.obj <- c('new-obj','L2-10k','L2-20k','opp-cost-10','opp-cost-20')
 
 chs <- data.frame()
-for(optim.code in c('base','L2-10k','L2-12.5k','L2-20k')){
-  for(seed in 1:5){
-    hist.file <- pp(pevi.shared,'data/outputs/optim-new/',optim.code,'-seed',seed,'/charger-buildout-history.Rdata')
-    if(file.exists(hist.file)){
+opts <- data.frame()
+for(optim.code in old.obj){
+  for(seed in c(1:10)){
+    hist.file <- pp(pevi.shared,'data/outputs/optim-new/old-obj/',optim.code,'-seed',seed,'/charger-buildout-history.Rdata')
+    final.evse.file <- ifelse(optim.code=='no-L2' | optim.code=='no-L3',pp(pevi.shared,'data/outputs/optim-new/old-obj/',optim.code,'-seed',seed,'/',optim.code,'-seed',seed,'-pen0.5-final-infrastructure.txt'),pp(pevi.shared,'data/outputs/optim-new/old-obj/',optim.code,'-seed',seed,'/',optim.code,'-seed',seed,'-pen2-final-infrastructure.txt'))
+    if(file.exists(final.evse.file)){
       load(hist.file)
       charger.buildout.history$scenario <- optim.code
       charger.buildout.history$seed     <- seed
+      charger.buildout.history$obj      <- 'old'
       chs <- rbind(chs,charger.buildout.history)
+      load(pp(pevi.shared,'data/outputs/optim-new/old-obj/',optim.code,'-seed',seed,'/optimization-history.Rdata'))
+      opt.history$scenario <- optim.code
+      opt.history$seed     <- seed
+      opt.history$obj.type      <- 'old'
+      opt.history$mean.delay.cost <- NA
+      opt.history$mean.charger.cost <- NA
+      opts <- rbind(opts,opt.history)
+    }
+  }
+}
+for(optim.code in new.obj){
+  for(seed in c(1:10)){
+    hist.file <- pp(pevi.shared,'data/outputs/optim-new/',optim.code,'-seed',seed,'/charger-buildout-history.Rdata')
+    final.evse.file <- pp(pevi.shared,'data/outputs/optim-new/',optim.code,'-seed',seed,'/',optim.code,'-seed',seed,'-pen2-final-infrastructure.txt')
+    if(file.exists(final.evse.file)){
+      load(hist.file)
+      charger.buildout.history$scenario <- optim.code
+      charger.buildout.history$seed     <- seed
+      charger.buildout.history$obj      <- 'new'
+      chs <- rbind(chs,charger.buildout.history)
+      load(pp(pevi.shared,'data/outputs/optim-new/',optim.code,'-seed',seed,'/optimization-history.Rdata'))
+      opt.history$scenario <- optim.code
+      opt.history$seed     <- seed
+      opt.history$obj.type      <- 'new'
+      opts <- rbind(opts,opt.history)
     }
   }
 }
@@ -25,15 +55,55 @@ ch.fin <- ddply(subset(chs,TAZ>0),.(scenario,seed,penetration),function(df){
 })
 ch.fin.unshaped <- ch.fin
 
+winners <- ddply(opts,.(scenario,seed,penetration,iteration),function(df){
+  df[which.min(df$obj),]
+})
+winners$cost <- c(15,75)[match(winners$level,c(2,3))]
+winners$cost[winners$level==2 & winners$scenario=="L2-10k"] <- 10
+winners$cost[winners$level==2 & winners$scenario=="L2-12.5k"] <- 12.5
+winners$cost[winners$level==2 & winners$scenario=="L2-20k"] <- 20
+winners$cost[winners$level==2 & winners$scenario=="L2-30kW"] <- 10
+winners <- ddply(winners,.(scenario,seed),function(df){
+  df <- as.data.frame(data.table(df,key=c('penetration','iteration')))
+  data.frame(df,cum.cost=cumsum(df$cost))
+})
+# for old OBJ
+old.inds <- winners$obj.type == 'old'
+winners$delay[old.inds] <- winners$obj[old.inds] - winners$cum.cost[old.inds]*1000
+# for new OBJ
+new.inds <- winners$obj.type == 'new'
+winners$delay[new.inds] <- winners$mean.delay.cost[new.inds] 
+
+winners$penetration <- winners$penetration*100
+
+#ggplot(subset(winners,seed==1),aes(x=cum.cost,y=obj,colour=factor(penetration))) + geom_point() + facet_wrap(~scenario,scales='free_y') + labs(x="Infrastructure Cost",y="Objective",title="")
+winners$scenario <- factor(winners$scenario,levels=c('new-obj','L2-10k','L2-20k','opp-cost-10','opp-cost-20'))
+winners$scenario <- revalue(winners$scenario,c('new-obj'='Base','L2-10k'='L2 Cost $10k','L2-20k'='L2 Cost $20k','opp-cost-10'='Opportunity Cost $10/hr','opp-cost-20'='Opportunity Cost $20/hr'))
+ggplot(subset(winners,(scenario=="Base" & seed==4) | (scenario=="L2 Cost $10k" & seed==3) | (scenario=="L2 Cost $20k" & seed==1) | (scenario=="Opportunity Cost $10/hr" & seed==1)  | (scenario=="Opportunity Cost $20/hr" & seed==1)),aes(x=cum.cost/1e3,y=delay/1e6,colour=factor(scenario))) + geom_point() + labs(x="Infrastructure Cost ($M)",y="PV of Driver Delay ($M)",title="",colour="Scenario")+facet_wrap(~penetration)
+ggplot(subset(winners,(scenario=="Base" & seed==4)),aes(x=cum.cost/1e3,y=delay/1e6,colour=factor(penetration))) + geom_point() + labs(x="Infrastructure Cost ($M)",y="PV of Driver Delay ($M)",title="",colour="Penetration (%)")
+
+# can we blend the various seeds together?
+winners <- data.table(winners,key=c('penetration','scenario','iteration'))
+winners.blended <- winners[,list(cost=mean(cum.cost)/1e3,delay=mean(delay)/1e6),by=c('penetration','scenario','iteration')]
+ggplot(winners.blended,aes(x=cost,y=delay,colour=factor(scenario))) + geom_point() + labs(x="Infrastructure Cost ($M)",y="PV of Driver Delay ($M)",title="",colour="Scenario")+facet_wrap(~penetration)
+
 # compare several optimization runs at once
 ch.fin <- subset(melt(ch.fin.unshaped,measure.vars=pp('L',0:4),variable_name="level"),level%in%pp('L',2:3))
+ch.fin$scenario <- factor(ch.fin$scenario,levels=c('base','no-L2','no-L3','new-obj','L2-by-two','L2-10k','L2-20k','opp-cost-10','opp-cost-20'))
 stat_sum_single <- function(fun, geom="point", ...) {
   stat_summary(fun.y=fun, geom=geom, size = 3, ...)
 }
-ggplot(ddply(ch.fin,.(scenario,level,penetration,seed),function(df) { data.frame(num.chargers=sum(df$value)) }),aes(x=scenario,y=num.chargers,colour=level)) + geom_point() + facet_wrap(~penetration) + stat_summary(fun.y=mean,geom='point',shape='X',size=3)
+ggplot(ddply(ch.fin,.(scenario,level,penetration,seed),function(df) { data.frame(num.chargers=sum(df$value)) }),aes(x=scenario,y=num.chargers,colour=level)) + geom_point() + facet_wrap(~penetration) + stat_summary(fun.y=mean,geom='point',shape='X',size=3)+labs(x="Scenario",y="# Chargers",title="# Chargers Sited over Several Optimization Variations")+ theme(axis.text.x = element_text(angle = 45, hjust = 1))
 
 # the fraction of TAZs with chargers of each type 
-ggplot(ddply(ch.fin,.(level,scenario,penetration,seed),function(df){ data.frame(frac.tazs=sum(df$value>0)/nrow(df))}),aes(x=scenario,y=frac.tazs,colour=level))+geom_point()+facet_wrap(~penetration)
+ggplot(ddply(ch.fin,.(level,scenario,penetration,seed),function(df){ data.frame(frac.tazs=sum(df$value>0)/nrow(df))}),aes(x=scenario,y=frac.tazs,colour=level))+geom_point()+facet_wrap(~penetration)+labs(x="Scenario",y="Charger Coverage Fraction",title="Fraction of TAZs with Chargers")+ theme(axis.text.x = element_text(angle = 45, hjust = 1))
+frac.tazs <- ddply(ch.fin,.(scenario,penetration,seed),function(df){ 
+  df3 <- ddply(df,.(TAZ),function(df2){
+    data.frame(value=sum(df2$value))
+  })
+  data.frame(frac.tazs=sum(df3$value>0)/nrow(df3))
+})
+ggplot(frac.tazs,aes(x=scenario,y=frac.tazs))+geom_point()+facet_wrap(~penetration)+labs(x="Scenario",y="Charger Coverage Fraction",title="Fraction of TAZs with Chargers")+ theme(axis.text.x = element_text(angle = 45, hjust = 1))
 
 # hard coded comparison of scenarios
 ch.fin <- cast(subset(melt(ch.fin.unshaped,measure.vars=pp('L',0:4),variable_name="level"),level%in%pp('L',2:3)),penetration + TAZ + seed + level ~ scenario)
@@ -59,65 +129,37 @@ build.result.history.mean <- ddply(build.result.history,.(rep),function(df){ dat
 build.result.history.mean$rep[build.result.history.mean$obj.norm.mean > quantile(build.result.history.mean$obj.norm.mean,c(0.25)) & build.result.history.mean$obj.norm.mean < quantile(build.result.history.mean$obj.norm.mean,c(0.75))]
 
 
+load(pp(pevi.shared,'data/UPSTATE/shapefiles/AggregatedTAZsWithPointTAZs.Rdata'))
+load(pp(pevi.shared,'data/UPSTATE/od-converter.Rdata'))
+agg.taz$new.id <- od.converter$new.id[match(agg.taz$agg.id,od.converter$old.id)]
 
+l2.scenario <- subset(ch.fin,penetration==0.02 & scenario=='new-obj' & seed==4 & level=='L2')
+agg.taz$L2 <- l2.scenario$value[match(agg.taz$new.id,l2.scenario$TAZ)]
+l3.scenario <- subset(ch.fin,penetration==0.02 & scenario=='new-obj' & seed==4 & level=='L3')
+agg.taz$L3 <- l3.scenario$value[match(agg.taz$new.id,l3.scenario$TAZ)]
 
+# Each charger is defined by an array: 
+# [ NAME, LONG, LAT, DESCRIP, # CHARGERS, APPEAR ABOVE ZOOM, APPEAR BELOW ZOOM, EXISTING CHARGER?, L3 CHARGER? ]
+charger.data.file <- pp(pevi.shared,'data/UPSTATE/results/maps/charger-data.yaml')
+cat('chargers:\n',file=charger.data.file)
+for(i in 1:nrow(agg.taz@data)){
+  if(agg.taz$L2[i] > 0) cat(sprintf("  - ['%s',%f,%f,'<b>%s</b> <br/>%d proposed charging stations',%d,%d,null,%s,%s]\n",agg.taz$name[i],agg.coords[i,1]-0.01,agg.coords[i,2],agg.taz$name[i],agg.taz$L2[i],agg.taz$L2[i],7,'false','false'),file=charger.data.file,append=T)
+  if(agg.taz$L3[i] > 0) cat(sprintf("  - ['%s',%f,%f,'<b>%s</b> <br/>%d proposed charging stations',%d,%d,null,%s,%s]\n",agg.taz$name[i],agg.coords[i,1]+0.01,agg.coords[i,2],agg.taz$name[i],agg.taz$L3[i],agg.taz$L3[i],7,'false','true'),file=charger.data.file,append=T)
+}
 
-path.to.google <- paste(base.path,'pev-shared/data/google-earth/',sep='')
-path.to.geatm <- paste(base.path,'pev-shared/data/GEATM-2020/',sep='')
-hard.code.coords <- read.csv(paste(path.to.google,"hard-coded-coords.csv",sep=''),stringsAsFactors=F)
-source(paste(pevi.home,'R/gis-functions.R',sep=''))
-source(paste(pevi.home,"R/optim/buildout-functions.R",sep='')) 
+#path.to.google <- paste(base.path,'pev-shared/data/google-earth/',sep='')
+#path.to.geatm <- paste(base.path,'pev-shared/data/GEATM-2020/',sep='')
+#hard.code.coords <- read.csv(paste(path.to.google,"hard-coded-coords.csv",sep=''),stringsAsFactors=F)
+#source(paste(pevi.home,"R/optim/buildout-functions.R",sep='')) 
 
 # load aggregated tazs
-agg.taz <- readShapePoly(paste(path.to.google,'aggregated-taz-with-weights/aggregated-taz-with-weights',sep=''),IDvar="ID")
-load(paste(path.to.google,'aggregated-taz-with-weights/aggregated-taz-with-weights-fieldnames.Rdata',sep=''))
-names(agg.taz@data) <- c("SP_ID",taz.shp.fieldnames)
+#agg.taz <- readShapePoly(paste(path.to.google,'aggregated-taz-with-weights/aggregated-taz-with-weights',sep=''),IDvar="ID")
+#load(paste(path.to.google,'aggregated-taz-with-weights/aggregated-taz-with-weights-fieldnames.Rdata',sep=''))
+#names(agg.taz@data) <- c("SP_ID",taz.shp.fieldnames)
 
 # load dist times
 dist <- read.csv(file=paste(path.to.geatm,'taz-dist-time.csv',sep=''))
 names(dist)[1] <- "from"
-
-#optim.code <- 'linked-min-cost-constrained-by-frac-stranded-50-50'
-#optim.code <- 'linked-min-cost-constrained-by-frac-stranded-75-25'
-#optim.code <- 'linked-min-cost-constrained-by-frac-stranded-25-75'
-#optim.code <- 'min-cost-constrained-by-frac-stranded-50-50'
-optim.code <- 'linked2-50-50'
-#optim.code <- 'thresh-1-linked-min-cost-constrained-by-frac-stranded-50-50'
-#optim.code <- 'thresh-2-linked-min-cost-constrained-by-frac-stranded-50-50'
-
-#optim.codes <- c('linked2-50-50','linked2-battery-1.25','linked2-battery-1.5','linked2-battery-2.0','linked2-cost-1.5','linked2-cost-2.0','linked2-type','linked2-base-fixed')
-path.to.inputs <- paste(base.path,'pev-shared/data/inputs/buildout/linked2-50-50-seed1/',sep='')
-
-optim.codes <- c('linked2-50-50','linked2-sa2-battery-1.25','linked2-sa2-battery','linked2-sa2-battery-2.0','linked2-sa2-cost-1.5','linked2-sa2-cost','linked2-sa2-type')
-
-naming <- yaml.load(readChar(paste(path.to.inputs,'../naming.yaml',sep=''),file.info(paste(path.to.inputs,'../naming.yaml',sep=''))$size))
-
-if(exists('compare'))rm('compare')
-for(optim.code in optim.codes){
-
-  optim.code.date <- paste(optim.code,"-",format(Sys.time(), "%Y%m%d"),sep='')
-
-  link.pens <- str_detect(optim.code,"linked")
-
-  path.to.inputs <- paste(base.path,'pev-shared/data/inputs/buildout/',optim.code,'-seed1/',sep='')
-  #path.to.outputs <- paste(base.path,'pev-shared/data/outputs/buildout/',optim.code,'/',sep='')
-  path.to.outputs.base <- paste(base.path,'pev-shared/data/outputs/sensitivity/',optim.code,sep='')
-
-  make.dir(path.to.inputs)
-  make.dir(path.to.outputs.base)
-  make.dir(paste(path.to.outputs.base,"/",optim.code.date,sep=''))
-  make.dir(paste(path.to.google,"buildout",sep=''))
-  make.dir(paste(path.to.inputs,"../../charger-input-file/",optim.code,sep=''))
-
-  results <- list()
-
-  #Make build.res a list, differentiated by seed.
-  build.res <- list()
-
-  n.seeds <- max(as.numeric(unlist(lapply(strsplit(grep(optim.code,list.files(paste(path.to.outputs.base,"-seed1/..",sep='')),value=T),"-seed"),function(x){ ifelse(length(x)==2,x[2],NA)}))),na.rm=T)
-
-  #pev.penetration <- 0.005
-  for(pev.penetration in c(0.005,0.01,0.02,0.04)){
 
     #Prepares a null matrix to fill with values			
     results.matrix <- matrix(,104,n.seeds)

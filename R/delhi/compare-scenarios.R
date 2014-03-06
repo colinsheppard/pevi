@@ -3,12 +3,12 @@ options(java.parameters="-Xmx2048m")
 load.libraries(c('ggplot2','yaml','RNetLogo','plyr','reshape','stringr'))
 
 #exp.name <- commandArgs(trailingOnly=T)[1]
-exp.name <- 'charging-demand'
+exp.name <- 'delhi-homeless'
 path.to.inputs <- pp(pevi.shared,'data/inputs/compare/',exp.name,'/')
 
 #to.log <- c('pain','charging','need-to-charge')
 #to.log <- c('pain','charging','tazs','trip')
-to.log <- c('tazs')
+to.log <- c('pain','charging','trip')
 
 # load the reporters and loggers needed to summarize runs and disable logging
 source(paste(pevi.home,"R/reporters-loggers.R",sep=''))
@@ -43,8 +43,6 @@ if("charger-input-file" %in% names(vary)){
     for(scen.i in as.numeric(names(naming$`charger-input-file`))){
       results$infrastructure.scenario.named[results$infrastructure.scenario == scen.i] <- naming$`charger-input-file`[[as.character(scen.i)]][[1]]
       results$infrastructure.scenario.order[results$infrastructure.scenario == scen.i] <- as.numeric(naming$`charger-input-file`[[as.character(scen.i)]][[2]])
-      # For some reason, these aren't traslating as numeric.
-      results$infrastructure.scenario.order <- as.numeric(results$infrastructure.scenario.order)
     }
   }
   results$infrastructure.scenario.named  <- reorder(factor(results$infrastructure.scenario.named),results$infrastructure.scenario.order)
@@ -68,6 +66,10 @@ for(cmd in paste('set log-',logfiles,' false',sep='')){ NLCommand(cmd) }
 for(cmd in paste('set log-',to.log,' true',sep='')){ NLCommand(cmd) }
 
 logs <- list()
+logs[['results']] <- results
+for(reporter in names(reporters)){
+  logs[['results']][,reporter] <- NA
+}
 
 # for every combination of parameters, run the model and capture the summary statistics
 for(results.i in 1:nrow(results)){
@@ -79,8 +81,8 @@ for(results.i in 1:nrow(results)){
   }
   NLCommand('clear-all-and-initialize')
   NLCommand('random-seed 1')
-  NLCommand(pp('set param-file-base "',pevi.shared,'"'))
-  NLCommand(paste('set parameter-file "',path.to.inputs,'params.txt"',sep=''))
+  NLCommand(paste('set param-file-base "',pevi.shared,'"',sep=''))
+  NLCommand(paste('set parameter-file "',path.to.inputs,'/params.txt"',sep=''))
   NLCommand(paste('set model-directory "',pevi.home,'netlogo/"',sep=''))
   NLCommand('set batch-setup? false')
   NLCommand('read-parameter-file')
@@ -96,6 +98,7 @@ for(results.i in 1:nrow(results)){
   NLCommand('setup')
 
   NLCommand('time:go-until go-until-time')
+  logs[['results']][results.i,names(reporters)] <- tryCatch(NLDoReport(1,"",reporter = paste("(sentence",paste(reporters,collapse=' '),")"),as.data.frame=T,df.col.names=names(reporters)),error=function(e){ NA })
   if(results.i == 1){
     outputs.dir <- NLReport('outputs-directory')
     for(logger in to.log){
@@ -122,14 +125,67 @@ if(length(grep("animation",path.to.inputs))>0){
 save(logs,file=paste(path.to.inputs,'logs.Rdata',sep=''))
 #load(paste(path.to.inputs,'logs.Rdata',sep=''))
 
+#######################################
+# POST PROCESSING
+#######################################
+# create pen/rep columns, this assumes the first column is the driver input file
+for(log.file in to.log){
+  names(logs[[log.file]]) <- c('driver.input.file',names(logs[[log.file]])[2:ncol(logs[[log.file]])])
+  logs[[log.file]]$homeless <- F
+  logs[[log.file]]$homeless[grep('homeless',logs[[log.file]]$driver.input.file)] <- T
+  logs[[log.file]]$penetration <- as.numeric(unlist(lapply(strsplit(as.character(logs[[log.file]]$driver.input.file),'-pen',fixed=T),function(x){ unlist(strsplit(x[2],"-rep",fixed=T)[[1]][1]) })))
+  logs[[log.file]]$replicate <- as.numeric(unlist(lapply(strsplit(as.character(logs[[log.file]]$driver.input.file),'-rep',fixed=T),function(x){ unlist(strsplit(x[2],"-",fixed=T)[[1]][1]) })))
+  if('charger.input.file' %in% names(logs[[log.file]])){
+    logs[[log.file]]$infrastructure.scenario <- NA
+    for(scen.i in names(naming$`charger-input-file`)){
+      logs[[log.file]]$infrastructure.scenario[grep(scen.i,as.character(logs[[log.file]]$charger.input.file))] <- scen.i
+      logs[[log.file]]$infrastructure.scenario.named[logs[[log.file]]$infrastructure.scenario == scen.i] <- naming$`charger-input-file`[[scen.i]][[1]]
+      logs[[log.file]]$infrastructure.scenario.order[logs[[log.file]]$infrastructure.scenario == scen.i] <- as.numeric(naming$`charger-input-file`[[scen.i]][[2]])
+    }
+  }
+}
+save(logs,file=paste(path.to.inputs,'logs.Rdata',sep=''))
+#load(paste(path.to.inputs,'logs.Rdata',sep=''))
+
+#######################################
+# ANALYSIS
+#######################################
 # ANALYZE PAIN
 ggplot(logs[['pain']],aes(x=time,y=state.of.charge,colour=pain.type,shape=vehicle.type))+geom_point()+facet_grid(charge.safety.factor~replicate)
+ggplot(subset(logs[['pain']],penetration==0.5 & replicate==1 & pain.type=='delay'),aes(x=time,y=state.of.charge,shape=vehicle.type,colour=pain.value))+geom_point()+facet_wrap(~pain.type)
+ggplot(subset(logs[['pain']],pain.type=='stranded'),aes(x=time,y=state.of.charge,shape=vehicle.type))+geom_point()+facet_wrap(penetration~replicate)
+
 ggplot(subset(logs[['pain']],pain.type=="delay"),aes(x=time,y=state.of.charge,colour=pain.type,shape=location))+geom_point()+facet_grid(charge.safety.factor~replicate)
 ggplot(subset(logs[['pain']],pain.type=="delay"),aes(x=time,y=state.of.charge,colour=pain.type,label=location))+geom_text()+facet_grid(charge.safety.factor~replicate)
 ggplot(subset(logs[['pain']],pain.type=="delay"),aes(x=time,y=state.of.charge,colour=vehicle.type,shape=vehicle.type,label=location))+geom_point()+geom_text(aes(y=state.of.charge+.03))+facet_grid(charge.safety.factor~replicate)
 
+# how many delays are by the same driver
+ddply(subset(logs[['pain']],pain.type=="delay"),.(homeless,replicate),function(df){ data.frame(tot.delay=sum(df$pain.value),delay.wo.repeats=sum(df$pain.value[!duplicated(df$driver)]),frac.uniq=length(unique(df$driver))/nrow(df),n.uniq=length(unique(df$driver))) })
+ddply(subset(logs[['pain']],pain.type=="stranded"),.(homeless,replicate),function(df){ data.frame(n=nrow(df)) })
+
 # CHARGING
+ggplot(subset(logs[['charging']],charger.level>0),aes(x=time,y=begin.soc,colour=factor(charger.level)))+geom_point()+facet_grid(penetration~replicate)
 ggplot(subset(logs[['charging']],charger.level>0),aes(x=time,y=begin.soc,colour=factor(charger.level)))+geom_point()+facet_grid(charge.safety.factor~replicate)
+
+#  show charging spatially
+source(pp(pevi.home,'R/gis-functions.R'))
+load.libraries(c('maptools','colorRamps'))
+load(pp(pevi.shared,'data/UPSTATE/shapefiles/AggregatedTAZsWithPointTAZs.Rdata'))
+load(pp(pevi.shared,'data/UPSTATE/od.converter.Rdata'))
+agg.taz@data$nl.id <- od.converter$new.id[match(agg.taz$agg.id,od.converter$old.id)]
+charging.summary <- ddply(subset(logs[['charging']],charger.level>0 & penetration==2 & replicate==1),.(location,charger.level),nrow)
+charging.summary <- cast(melt(charging.summary,id.vars=1:2),location~charger.level)
+charging.summary[is.na(charging.summary)] <- 0
+for(level in 1:4){
+  agg.taz@data[,pp('L',level,'.charging.events')] <- charging.summary[match(agg.taz$nl.id,charging.summary$location),as.character(level)]
+  agg.taz@data[is.na(agg.taz@data[,pp('L',level,'.charging.events')]),pp('L',level,'.charging.events')] <- 0
+}
+agg.taz$total.charging.events <- agg.taz$L1.charging.events + agg.taz$L2.charging.events + agg.taz$L3.charging.events + agg.taz$L4.charging.events
+cmap <- map.color(agg.taz$total.charging.events,blue2red(50))
+shp.to.kml(agg.taz,pp(path.to.inputs,'charging-events.kml'),kmlname="# Charging Events by Charger Type", kmldescription="",borders='white',lwds=1.5,colors=cmap,id.col='shp.id',name.col='name',description.cols=c('agg.id','nl.id',pp('L',1:4,'.charging.events'),'total.charging.events'))
+
+
+
 
 # ANALYZE charger availability
 ggplot(melt(subset(logs[['tazs']],replicate==1 & charge.safety.factor==1),id.vars=c("time","taz","replicate","charge.safety.factor"),measure.vars=c(paste("num.avail.L",1:3,sep=''))),aes(x=time,y=value,colour=variable))+geom_line()+facet_wrap(~taz)
@@ -283,3 +339,4 @@ daily.energy <- sum(subset(fish,date>to.posix('2013-02-01'))$kwh)/as.numeric(dif
 
 # PEVI predicts ~40% duty factor at the waterfront with 0.5% pen or 750 driver
 subset(charge.sum,taz=='EKA_Waterfront')
+

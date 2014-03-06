@@ -1,81 +1,10 @@
 
-####################
-## OLD VERSION
-####################
-#evaluate.fitness <- function(build.result){
-#  if(!exists('cl')){
-#    stop('no cluster started')
-#  }
-#  numrows <- nrow(build.result)-1
-#  breaks <- seq(1,numrows,by=ceiling(numrows/length(cl)))
-#  break.pairs <- list()
-#  for(i in 1:(length(breaks)-1)){
-#    break.pairs[[i]] <- c(breaks[i],breaks[i+1]-1)
-#  }
-#  break.pairs[[i+1]] <- c(breaks[i+1],numrows)
-#
-#  clusterEvalQ(cl,rm(list=ls()))
-#  clusterExport(cl,c( 'run.buildout.batch','pev.penetration','path.to.inputs','optim.code','nl.path','model.path','path.to.outputs','seed',
-#                      'write.charger.file','reporters','logfiles','results','path.to.pevi','vary.tab','streval','try.nl','debug.reporters'))
-#  if(exists('batch.results'))rm('batch.results')
-#  batch.results<-clusterApply(cl,break.pairs,fun='run.buildout.batch',build.result=build.result)
-#  batch.results<-data.frame(matrix(unlist(batch.results),numrows,2,byrow=T))
-#  build.result[1:numrows,c('cost','pain')] <- batch.results
-#
-#  return(build.result)
-#}
-
-#run.buildout.batch <- function(break.pair,build.result){
-#  ll<-break.pair[1]
-#  ul<-break.pair[2]
-#  break.pair.code <- paste("node ",paste(break.pair,collapse=","),":",sep='')
-#  batch.results <- array(NA,length(ll:ul))
-#  i <- 1
-#
-#  tryCatch(NLStart(nl.path, gui=F),error=function(err){ NA })
-#  NLLoadModel(model.path)
-#  for(cmd in paste('set log-',logfiles,' false',sep='')){ NLCommand(cmd) }
-#
-#  batch.results <- list()
-#  batch.results.i <- 1
-#  for(alt.i in ll:ul){
-#    chargers.alt <- build.result$chargers[1:104]
-#    chargers.alt[alt.i] <- chargers.alt[alt.i] + 1
-#    write.charger.file(chargers.alt,alt.i)
-#
-#    for(results.i in 1:nrow(results)){
-#      try.nl('clear-all-and-initialize',break.pair.code)
-#      try.nl(paste('set parameter-file "',path.to.inputs,'params.txt"',sep=''),break.pair.code)
-#      try.nl(paste('set model-directory "',path.to.pevi,'netlogo/"',sep=''),break.pair.code)
-#      try.nl('read-parameter-file',break.pair.code)
-#      for(param in names(vary.tab)){
-#        if(is.character(vary.tab[1,param])){
-#          try.nl(paste('set ',param,' "',vary.tab[results.i,param],'"',sep=''),break.pair.code)
-#        }else{
-#          try.nl(paste('set ',param,' ',vary.tab[results.i,param],'',sep=''),break.pair.code)
-#        }
-#      }
-#      try.nl(paste('set charger-input-file "',path.to.inputs,'chargers-alt-',alt.i,'.txt"',sep=''),break.pair.code)
-#      if(!is.na(seed)){
-#        try.nl(paste('random-seed ',seed),break.pair.code)
-#      }
-#      try.nl('setup',break.pair.code)
-#      try.nl('dynamic-scheduler:go-until schedule 500',break.pair.code)
-#      results[results.i,names(reporters)] <- tryCatch(NLDoReport(1,"",reporter = paste("(sentence",paste(reporters,collapse=' '),")"),as.data.frame=T,df.col.names=names(reporters)),error=function(e){ NA })
-#    }
-#    batch.results[[batch.results.i]] <- data.frame(cost=mean(as.numeric(results$infrastructure.cost)),pain=mean(as.numeric(results$frac.stranded.by.delay)))
-#    batch.results.i <- batch.results.i + 1
-#  }
-#  return(batch.results)
-#}
-
 evaluate.fitness <- function(){
   if(!exists('cl')){
     stop('no cluster started')
   }
-  clusterEvalQ(cl,rm(list=ls()))
-  clusterExport(cl,c( 'run.buildout.batch','pev.penetration','path.to.inputs','optim.code','nl.path','path.to.outputs','seed','param.file','taz.charger.combos',
-                      'charger.file','write.charger.file','reporters','pevi.home','vary.tab','streval','try.nl','debug.reporters','pevi.shared','build.increment'))
+  #clusterEvalQ(cl,rm(list=ls()))
+  clusterExport(cl,c( 'run.buildout.batch','pev.penetration','path.to.inputs','optim.code','nl.path','path.to.outputs','seed','param.file','taz.charger.combos','charger.file','write.charger.file','reporters','pevi.home','vary.tab','streval','try.nl','debug.reporters','pevi.shared','build.increment','nl.obj','reference.charger.cost','reference.delay.cost'))
   if(exists('batch.results'))rm('batch.results')
   batch.results<-clusterApplyLB(cl,vary.tab$`driver-input-file`,fun='run.buildout.batch')
   build.result<-batch.results[[1]]
@@ -125,9 +54,12 @@ run.buildout.batch <- function(driver.input.file){
   }else{
     NLCommand(pp('set driver-input-file ',driver.input.file,''))
   }
-
   # set the charger input file
   NLCommand(pp('set charger-input-file "',charger.file,'"'))
+
+  # set the reference charger and delay costs
+  NLCommand(pp('set reference-charger-cost ',reference.charger.cost))
+  NLCommand(pp('set reference-delay-cost ',reference.delay.cost))
 
   # Now we start a batch-run, and iterate through potential infrastructures.
   NLCommand('setup-in-batch-mode')
@@ -139,15 +71,79 @@ run.buildout.batch <- function(driver.input.file){
       #NLCommand(pp('print "taz',df1$taz,'level ',df1$level,'"'))
       NLCommand('time:go-until 500')
           
-      objective <-  tryCatch(NLReport('objective-function'),error=function(e){ NA })
+      total.charger.cost <-  tryCatch(NLReport('total-charger-cost'),error=function(e){ NA })
+      total.delay.cost <-  tryCatch(NLReport('total-delay-cost'),error=function(e){ NA })
+      objective <-  tryCatch(NLReport(nl.obj),error=function(e){ NA })
 
       #	Reset for the next run, and delete the charger we added.
       NLCommand('setup-in-batch-mode')	
       NLCommand(paste('remove-charger',df$taz,df$level,build.increment[pp('l',df$level)]))
-      data.frame(obj = objective)
+      data.frame(obj = objective, total.charger.cost = total.charger.cost, total.delay.cost = total.delay.cost)
   }) # end infrastructure testing - charger type count
 	
   return(data.frame(input.i.result,rep=rep))
+}
+
+evaluate.baseline <- function(){
+  if(!exists('cl')){
+    stop('no cluster started')
+  }
+  #clusterEvalQ(cl,rm(list=ls()))
+  clusterExport(cl,c( 'run.baseline.batch','pev.penetration','path.to.inputs','optim.code','nl.path','path.to.outputs','seed','param.file','taz.charger.combos',
+                      'charger.file','write.charger.file','reporters','pevi.home','vary.tab','streval','try.nl','debug.reporters','pevi.shared','build.increment'
+                      ))
+  if(exists('batch.results'))rm('batch.results')
+  batch.results<-clusterApplyLB(cl,vary.tab$`driver-input-file`,fun='run.baseline.batch')
+  build.result<-batch.results[[1]]
+  for(i in 2:length(batch.results)){
+  	build.result <- rbind(build.result,batch.results[[i]])
+  }
+  return(build.result)
+}
+
+run.baseline.batch <- function(driver.input.file){
+
+  rep <- as.numeric(strsplit(strsplit(driver.input.file,'rep')[[1]][2],'-')[[1]][1])
+
+  NLCommand('clear-all-and-initialize') # Clear out the old file
+
+  # Set to fixed-seed if applicable.
+  if(!is.na(seed)){
+    NLCommand(paste('set starting-seed',seed))      
+    NLCommand('set fix-seed TRUE')
+  } else {
+    NLCommand('set fix-seed FALSE')
+  }
+      
+  # The params file pathways are all assumed to be based from pev-shared. We set a param-base variable in NetLogo
+  # to make this happen. The outputs folder is unchanged.
+  NLCommand(pp('set param-file-base "',pevi.shared,'"'))
+  NLCommand(paste('set parameter-file "',param.file,'"',sep=''))
+  NLCommand('read-parameter-file')
+      
+  # If a parameter change exists in vary.tab, we go through and read in the new parameters.
+  # Given how we are parallel programming batch-mode, I can't think of a way to do this without
+  # the blanket assumption that only driver input files are in vary.tab, as names aren't preserved
+  # when we break apart vary.tab for processing.
+      
+  if(is.character(driver.input.file)){
+    NLCommand(pp('set driver-input-file "',driver.input.file,'"'))
+  }else{
+    NLCommand(pp('set driver-input-file ',driver.input.file,''))
+  }
+
+  # set the charger input file
+  NLCommand(pp('set charger-input-file "',charger.file,'"'))
+
+  # Now we start a batch-run, and iterate through potential infrastructures.
+  NLCommand('setup-in-batch-mode')
+              
+  NLCommand('time:go-until 500')
+          
+  total.charger.cost <-  tryCatch(NLReport('total-charger-cost'),error=function(e){ NA })
+  total.delay.cost <-  tryCatch(NLReport('total-delay-cost'),error=function(e){ NA })
+
+  data.frame(total.charger.cost = total.charger.cost, total.delay.cost = total.delay.cost, rep=rep)
 }
 
 try.nl <- function(cmd,break.pair.code=""){

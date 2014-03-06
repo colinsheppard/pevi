@@ -24,7 +24,8 @@ if(substr(args$experimentdir,1,1)!="/")args$experimentdir <- pp(getwd(),"/",args
 if(substr(args$experimentdir,nchar(args$experimentdir),nchar(args$experimentdir)) != "/")args$experimentdir <- pp(args$experimentdir,"/")
 
 Sys.setenv(NOAWT=1)
-options(java.parameters="-Xmx2048m")
+options(java.parameters="-Xmx1024m")
+#options(java.parameters="-Xmx2048m")
 
 source(pp(args$experimentdir,'params.R'))
 source(paste(pevi.home,"R/optim/buildout-functions.R",sep=''))
@@ -173,7 +174,7 @@ for(seed in seeds[seed.inds]){
 
     # Start for loop for overall penetration level optimization
 		for(build.i in begin.build.i:max.chargers.per.pen){
-		 #build.i <- 1 
+		 #build.i <- begin.build.i
       # at this point, if we're in hot start, drop the history from the current iteration and turn hot start off
       if(hot.start){
         opt.history <- subset(opt.history,!(penetration==start.pen & iteration>=start.iter))

@@ -24,6 +24,10 @@ emfac.years <- c(2005,2010,2020)
 emfac.years <- c(2010,2020)
 
 for(yr in emfac.years){
+  if(file.exists(pp(path.to.geatm,'../HCOAG/',yr,'/od-',yr,'-old-and-new-including-external-trips.Rdata'))){
+    load(pp(path.to.geatm,'../HCOAG/',yr,'/od-',yr,'-old-and-new-including-external-trips.Rdata'))
+    next
+  }
 
   # Load OD data from newer HCOAG model, since this is for GHG analysis, we don't need AM/PM
   taz <- readShapePoly(paste(path.to.geatm,'../HCOAG/shapefiles/Humboldt TA.shp',sep=''))

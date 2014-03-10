@@ -3,16 +3,12 @@ options(java.parameters="-Xmx2048m")
 load.libraries(c('ggplot2','yaml','RNetLogo','plyr','reshape','stringr'))
 
 #exp.name <- commandArgs(trailingOnly=T)[1]
-#exp.name <- 'animation'
-#exp.name <- 'evse-metrics'
-exp.name <- 'upstate-verif-copy'
-#exp.name <- 'patterns'
-#exp.name <- 'phev-only'
+exp.name <- 'charging-demand'
 path.to.inputs <- pp(pevi.shared,'data/inputs/compare/',exp.name,'/')
 
 #to.log <- c('pain','charging','need-to-charge')
 #to.log <- c('pain','charging','tazs','trip')
-to.log <- c('pain','charging','trip')
+to.log <- c('tazs')
 
 # load the reporters and loggers needed to summarize runs and disable logging
 source(paste(pevi.home,"R/reporters-loggers.R",sep=''))

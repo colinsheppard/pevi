@@ -10,23 +10,36 @@ load.libraries(c('optparse','yaml','RNetLogo','plyr','reshape','stringr'),quietl
 ##############################################################################################################################################
 # COMMAND LINE OPTIONS 
 option_list <- list(
-  make_option(c("-d", "--experimentdir"), type="character", default='.', help="Path to the directory containing the files needed to run the optimization (params.txt, vary.yaml, paths.yaml) [\"%default\"]")
+  make_option(c("-d", "--experimentdir"), type="character", default='.', help="Path to the directory containing the files needed to run the optimization (params.txt, vary.yaml, paths.yaml) [\"%default\"]"),
+  make_option(c("-s", "--seed"), type="integer", default=-1, help="Override seeds in params.R with a single value, a negative integer means do not override [%default]"),
+  make_option(c("-t", "--hotstart"),action="store_true", type="logical", default=F, help="Set hot.start to TRUE, overriding the value in params.R [%default]")
 )
 if(interactive()){
   setwd(pp(pevi.shared,'data/inputs/optim-new/delhi-res-none/'))
-  args<-c()
-  args <- parse_args(OptionParser(option_list = option_list,usage = "shp2kml.R [options]"),positional_arguments=F,args=args)
+  args<-c('-t')
+  #args<-c()
+  args <- parse_args(OptionParser(option_list = option_list,usage = "optimize-pevi.R [options]"),positional_arguments=F,args=args)
 }else{
-  args <- parse_args(OptionParser(option_list = option_list,usage = "shp2kml.R [options]"),positional_arguments=F)
+  args <- parse_args(OptionParser(option_list = option_list,usage = "optimize-pevi.R [options]"),positional_arguments=F)
 }
 
 if(substr(args$experimentdir,1,1)!="/")args$experimentdir <- pp(getwd(),"/",args$experimentdir)
 if(substr(args$experimentdir,nchar(args$experimentdir),nchar(args$experimentdir)) != "/")args$experimentdir <- pp(args$experimentdir,"/")
 
 Sys.setenv(NOAWT=1)
-options(java.parameters="-Xmx2048m")
+options(java.parameters="-Xmx1024m")
+#options(java.parameters="-Xmx2048m")
 
 source(pp(args$experimentdir,'params.R'))
+
+# let commandline args override settings in params.R
+if(args$seed>=0){
+  seeds <- args$seed
+}
+if(args$hotstart){
+  hot.start <- T
+}
+
 source(paste(pevi.home,"R/optim/buildout-functions.R",sep=''))
 source(paste(pevi.home,"R/reporters-loggers.R",sep=''))
 
@@ -105,8 +118,9 @@ if(!exists('cl')){
 }
 
 if(hot.start){
-  optim.code <- tail(list.files(path.to.outputs.base,pp(optim.scenario,'-seed')),1)
-  start.seed <- as.numeric(str_split(optim.code,'seed')[[1]][2])
+  found.seeds <- sort(as.numeric(unlist(lapply(str_split(list.files(path.to.outputs.base,pp(optim.scenario,'-seed',seeds,'$',collapse="|")),'seed'),function(l){ l[2] }))))
+  start.seed <- tail(found.seeds,1)
+  optim.code <- pp(optim.scenario,'-seed',start.seed)
   seed.inds <- which(seeds>=start.seed)
   path.to.outputs <- paste(path.to.outputs.base,optim.code,'/',sep='')
 	load(pp(path.to.outputs,'charger-buildout-history.Rdata'))
@@ -173,24 +187,25 @@ for(seed in seeds[seed.inds]){
 
     # Start for loop for overall penetration level optimization
 		for(build.i in begin.build.i:max.chargers.per.pen){
-		 #build.i <- 1 
+		 #build.i <- begin.build.i
       # at this point, if we're in hot start, drop the history from the current iteration and turn hot start off
       if(hot.start){
+        reference.charger.cost <- subset(opt.history,penetration==start.pen & iteration==build.i)$mean.charger.cost[1] 
+        reference.delay.cost <- subset(opt.history,penetration==start.pen & iteration==build.i)$mean.delay.cost[1] 
         opt.history <- subset(opt.history,!(penetration==start.pen & iteration>=start.iter))
 			  save(opt.history,file=pp(path.to.outputs,'optimization-history.Rdata'))
         charger.buildout.history <- subset(charger.buildout.history,!(penetration==start.pen & iter>=start.iter))
 			  save(charger.buildout.history,file=pp(path.to.outputs,'charger-buildout-history.Rdata'))
         if(nrow(build.result.history)>0) build.result.history <- subset(build.result.history,!(penetration==start.pen & iteration>=start.iter))
 			  save(build.result.history,file=pp(path.to.outputs,'build-result-history.Rdata'))
-        write.table(head(read.csv(pp(path.to.outputs,'buildout-progress.csv')),-1),file=pp(path.to.outputs,'buildout-progress.csv'),sep=',',row.names=F)
-        reference.charger.cost <- subset(opt.history,penetration==start.pen & iteration==build.i)$mean.charger.cost[1] 
-        reference.delay.cost <- subset(opt.history,penetration==start.pen & iteration==build.i)$mean.delay.cost[1] 
+        write.table(subset(read.csv(pp(path.to.outputs,'buildout-progress.csv')),!(penetration==start.pen & iteration>=start.iter)),file=pp(path.to.outputs,'buildout-progress.csv'),sep=',',row.names=F)
         hot.start <- F
       }
 			print(paste('build.i = ',build.i))
 
       if(build.i == 1){
         if(nl.obj == 'marginal-cost-to-reduce-delay'){
+          print('evaluate baseline cost and delay')
           baseline.results <- evaluate.baseline()
           reference.charger.cost <- mean(baseline.results$total.charger.cost)
           reference.delay.cost <- mean(baseline.results$total.delay.cost)

@@ -4,9 +4,7 @@ evaluate.fitness <- function(){
     stop('no cluster started')
   }
   #clusterEvalQ(cl,rm(list=ls()))
-  clusterExport(cl,c( 'run.buildout.batch','pev.penetration','path.to.inputs','optim.code','nl.path','path.to.outputs','seed','param.file','taz.charger.combos',
-                      'charger.file','write.charger.file','reporters','pevi.home','vary.tab','streval','try.nl','debug.reporters','pevi.shared','build.increment',
-                      'nl.obj','reference.charger.cost','reference.delay.cost'))
+  clusterExport(cl,c( 'run.buildout.batch','pev.penetration','path.to.inputs','optim.code','nl.path','path.to.outputs','seed','param.file','taz.charger.combos','charger.file','write.charger.file','reporters','pevi.home','vary.tab','streval','try.nl','debug.reporters','pevi.shared','build.increment','nl.obj','reference.charger.cost','reference.delay.cost'))
   if(exists('batch.results'))rm('batch.results')
   batch.results<-clusterApplyLB(cl,vary.tab$`driver-input-file`,fun='run.buildout.batch')
   build.result<-batch.results[[1]]

@@ -93,6 +93,8 @@ ch.fin$scenario <- factor(ch.fin$scenario,levels=c('base','no-L2','no-L3','new-o
 stat_sum_single <- function(fun, geom="point", ...) {
   stat_summary(fun.y=fun, geom=geom, size = 3, ...)
 }
+ch.fin$scenario <- factor(ch.fin$scenario,levels=c('new-obj','L2-10k','L2-20k','opp-cost-10','opp-cost-20'))
+ch.fin$scenario <- revalue(ch.fin$scenario,c('new-obj'='Base','L2-10k'='L2 Cost $10k','L2-20k'='L2 Cost $20k','opp-cost-10'='Opportunity Cost $10/hr','opp-cost-20'='Opportunity Cost $20/hr'))
 ggplot(ddply(ch.fin,.(scenario,level,penetration,seed),function(df) { data.frame(num.chargers=sum(df$value)) }),aes(x=scenario,y=num.chargers,colour=level)) + geom_point() + facet_wrap(~penetration) + stat_summary(fun.y=mean,geom='point',shape='X',size=3)+labs(x="Scenario",y="# Chargers",title="# Chargers Sited over Several Optimization Variations")+ theme(axis.text.x = element_text(angle = 45, hjust = 1))
 
 # the fraction of TAZs with chargers of each type 

@@ -20,10 +20,13 @@ emm <- data.frame(veh=c('Gasoline/Petroleum','PEV'),upstream.hi=c(120,74),upstre
 emm.m <- melt(emm,id.vars='veh',measure.vars=c('upstream.hi','upstream.low'))
 emm.m <- rbind(emm.m,emm.m)
 ggplot(emm.m,aes(x=veh,y=value))+geom_boxplot()
-emm <- data.frame(veh=rep(c('Gasoline/Petroleum','PEV'),2),type=rep(c('Upstream','Tailpipe'),each=2),emissions=c(mean(c(120,69)),mean(c(74,52)),0.041*8887,0))
+#emm <- data.frame(veh=rep(c('Gasoline/Petroleum','PEV'),2),type=rep(c('Upstream','Tailpipe'),each=2),emissions=c(mean(c(120,69)),mean(c(74,52)),0.041*8887,0))
+# the following is updated estimate based on Jerome's feedback
+emm <- data.frame(veh=rep(c('Gasoline/Petroleum','PEV'),2),type=rep(c('Upstream','Tailpipe'),each=2),emissions=c(75,mean(c(74,52)),350,0))
 cbPalette <- c("#56B4E9","#999999", "#E69F00" , "#009E73", "#F0E442", "#0072B2", "#CC79A7","#D55E00" )
 emm$type <- factor(emm$type,levels=c('Upstream','Tailpipe'))
-ggplot(emm,aes(x=veh,y=emissions,fill=type))+geom_bar(stat='identity')+scale_fill_manual(values=cbPalette)+labs(y="Emissions (grams CO2-eq / mile)",fill="Type",title="GHG Emissions from Conventional Light Duty Vehicles vs PEVs")
+ggplot(emm,aes(x=veh,y=emissions,fill=type))+geom_bar(stat='identity')+scale_fill_manual(values=cbPalette)+labs(y="Emissions (grams CO2-eq / mile)",x="",fill="",title="GHG Emissions from Conventional Vehicles vs PEVs")+
+theme(plot.title = element_text(size = rel(2),colour='white'),plot.background = element_rect(fill = "black"), axis.text.y = element_text(colour='white',size = rel(2)) ,axis.text.x = element_text(colour='white',size = rel(2)),axis.title.x = element_text(colour='white',size = rel(2)),axis.title.y = element_text(colour='white',size = rel(2)),legend.text=element_text(size = rel(1.5)),legend.key.size=unit(1.5,'cm'))
 
 base.path <- '/Users/sheppardc/Dropbox/serc/pev-colin/'
 #base.path <- '/Users/critter/Dropbox/serc/pev-colin/'

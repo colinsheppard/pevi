@@ -255,17 +255,19 @@ cit <- readShapePoly(pp(pevi.shared,'data/HUMCO/cities-wgs84',sep=''))
 cit$name <- cit$NAME
 
 # Associate each circuit load summary with a substation
-sql <- "SELECT fdr_num,season,peak_time,total_kw,max_nor_voltage,ckt_bpf,kva_capability,energ_kvar,com_kw,limit_desc,projected,ST_X(ST_Centroid(geom)) AS long,ST_Y(ST_Centroid(geom)) AS lat FROM circuit_load_summary"
-circ <- dbGetQuery(con,sql)
-circ$substation.name <- NA
-circ$circuit.num <- NA
-for(file.name in names(sav.dat[['circuit_load_summary']])){
-  substation <- pp(head(strsplit(strsplit(file.name,".xlsx")[[1]]," ")[[1]],-1),collapse=" ")
-  circuit.num <- tail(strsplit(strsplit(file.name,".xlsx")[[1]]," ")[[1]],1)
-  circ$substation.name[match(sav.dat[['circuit_load_summary']][[file.name]]$fdr_num,circ$fdr_num)] <- substation
-  circ$circuit.num[match(sav.dat[['circuit_load_summary']][[file.name]]$fdr_num,circ$fdr_num)] <- circuit.num
-}
-write.csv(circ,pp(pevi.shared,'/data/GRID/distribution-data/circuits.csv'))
+do.or.load(pp(pevi.shared,'/data/GRID/circuits.Rdata'),function(){
+  sql <- "SELECT fdr_num,season,peak_time,total_kw,max_nor_voltage,ckt_bpf,kva_capability,energ_kvar,com_kw,limit_desc,projected,ST_X(ST_Centroid(geom)) AS long,ST_Y(ST_Centroid(geom)) AS lat FROM circuit_load_summary"
+  circ <- dbGetQuery(con,sql)
+  circ$substation.name <- NA
+  circ$circuit.num <- NA
+  for(file.name in names(sav.dat[['circuit_load_summary']])){
+    substation <- pp(head(strsplit(strsplit(file.name,".xlsx")[[1]]," ")[[1]],-1),collapse=" ")
+    circuit.num <- tail(strsplit(strsplit(file.name,".xlsx")[[1]]," ")[[1]],1)
+    circ$substation.name[match(sav.dat[['circuit_load_summary']][[file.name]]$fdr_num,circ$fdr_num)] <- substation
+    circ$circuit.num[match(sav.dat[['circuit_load_summary']][[file.name]]$fdr_num,circ$fdr_num)] <- circuit.num
+  }
+  list('circ'=circ)
+})
 
 ########################################
 # PEAK DEMAND ANALYSIS STARTS HERE
@@ -290,6 +292,18 @@ if(!file.exists(pp(pevi.shared,'/data/GRID/load/circuit-mappings.csv'))){
 }else{
   circs <- read.csv(pp(pevi.shared,'/data/GRID/load/circuit-mappings.csv'))
 }
+
+# Associate each circuit load summary with the circuit
+do.or.load(pp(pevi.shared,'/data/GRID/circuit-summary.Rdata'),function(){
+  sql <- "SELECT fdr_num,season,peak_time,total_kw,max_nor_voltage,ckt_bpf,kva_capability,energ_kvar,com_kw,limit_desc,projected,ST_X(ST_Centroid(geom)) AS long,ST_Y(ST_Centroid(geom)) AS lat FROM circuit_load_summary"
+  circ.sum <- dbGetQuery(con,sql)
+  list('circ.sum'=circ.sum)
+})
+names(circ.sum) <- str_replace_all(names(circ.sum),"_",".")
+circ.sum <- data.table(circ.sum,key='fdr.num')
+
+circs <- data.table(circs,key='fdr.num')
+circs <- circ.sum[circs]
 
 # we need to know the fraction of demand in each TAZ to assign to each transformer and therefore circuit
 
@@ -374,7 +388,6 @@ do.or.load(pp(pevi.shared,'/data/GRID/load/demand-by-circuit.Rdata'),function(){
 circ.shapes$year.day <- strftime(circ.shapes$datetime,"%Y-%j")
 circ.shapes <- data.table(circ.shapes,key="file")
 
-circs <- data.table(circs)
 circs[,file:=circ.file]
 setkey(circs,'file')
 
@@ -386,11 +399,75 @@ peaks.by.circ <- circ.shapes[,list(peak=max(value)),by=c('fdr.num','year.day','l
 setkey(peaks.by.circ,'fdr.num','peak')
 top.peaks <- peaks.by.circ[,list(year.day=tail(year.day,20),leg=tail(leg,20)),by='fdr.num']
 
+circ.shapes[,time:=as.numeric(strftime(datetime,"%H"))+ as.numeric(strftime(datetime,"%M"))/60]
+
 setkey(top.peaks,'fdr.num','year.day','leg')
 setkey(circ.shapes,'fdr.num','year.day','leg')
 top.shapes <- circ.shapes[top.peaks]
-top.shapes[,hour:=as.numeric(strftime(datetime,"%H"))+ as.numeric(strftime(datetime,"%M"))/60]
+top.shapes[,time:=as.numeric(strftime(datetime,"%H"))+ as.numeric(strftime(datetime,"%M"))/60]
+top.shapes[,kw:=value*12] # assume nominal voltage of 12kV
 
-ggplot(top.shapes,aes(x=hour,y=value)) + geom_point() + facet_wrap(~fdr.num) + labs(x="Hour",y="Load",title="")
+ggplot(top.shapes,aes(x=time,y=value)) + geom_point() + facet_wrap(~fdr.num) + labs(x="Hour",y="Load",title="")
 
+# join the PEV demand to the regular demand
+
+setkey(top.shapes,'fdr.num','time')
+setkey(pev.by.circ,'fdr.num','time')
+top.shapes <- pev.by.circ[top.shapes,allow.cartesian=T]
+
+top.shapes[,':='(kw.res=kw+residential,kw.pub=kw+public,kw.all=kw+residential+public)]
+top.shapes[,':='(frac.increase.res=kw.res/kw,frac.increase.pub=kw.pub/kw,frac.increase.all=kw.all/kw)]
+
+setkey(top.shapes,'fdr.num','leg','time')
+top.shapes.m <- melt(top.shapes,id.vars=c('fdr.num','year.day','penetration','leg','time'),measure.vars=c('kw','kw.res','kw.pub','kw.all'))
+ggplot(subset(top.shapes.m,fdr.num==192391103 & penetration==2),aes(x=time,y=value,colour=variable)) + geom_line() + facet_wrap(leg~year.day) + labs(x="",y="",title="")
+
+ggplot(subset(top.shapes,penetration==2),aes(x=time,y=frac.increase.all)) + geom_point() + facet_wrap(~fdr.num,scales='free_y') + labs(x="",y="",title="")
+ggplot(subset(top.shapes,fdr.num==192221103 & penetration==2),aes(x=time,y=frac.increase.all)) + geom_point() + facet_wrap(~fdr.num,scales='free_y') + labs(x="",y="",title="")
+
+ggplot(subset(top.shapes.m,fdr.num==192341101 & penetration==2),aes(x=time,y=value,colour=variable)) + geom_line() + facet_wrap(leg~year.day) + labs(x="",y="",title="")
+# Garberville
+ggplot(subset(top.shapes.m,fdr.num==192221103 & penetration==2),aes(x=time,y=value,colour=variable)) + geom_line() + facet_wrap(leg~year.day) + labs(x="",y="",title="")
+# Arcata / Polished
+arc.lims <- c(0,worst.peaks[fdr.num==192021106,kva.capability]/1000)
+cbPalette <- c("#56B4E9","#D55E00","#999999", "#E69F00" , "#009E73", "#F0E442", "#0072B2", "#CC79A7")
+top.shapes.m$variable <- revalue(top.shapes.m$variable,c("kw"="Existing Demand",'kw.all'="Demand with Charging"))
+ggplot(subset(top.shapes.m,variable %in% c("Existing Demand","Demand with Charging") & fdr.num==192021106 & penetration==2),aes(x=time,y=value/1e3,colour=variable)) + geom_line() + facet_wrap(leg~year.day) + labs(x="Hour",y="Electricity Demand (MW)",title="Electricity Demand on Example Peak Days")+scale_y_continuous(limits=arc.lims*1.05) + geom_abline(intercept=arc.lims[2],slope=0,colour='grey') +
+theme(plot.title = element_text(size = rel(2),colour='black'),axis.text.y = element_text(colour='black',size = rel(2)) ,axis.text.x = element_text(colour='black',size = rel(1.5),angle = 45, hjust = 1),axis.title.x = element_text(colour='black',size = rel(2)),axis.title.y = element_text(colour='black',size = rel(2)),legend.text=element_text(size = rel(1.5)),legend.key.size=unit(1.5,'cm'))+scale_colour_manual(values=cbPalette)
+
+# find the worst exacerbation for each circuit
+worst.peaks <- top.shapes[,list(peak.datetime=datetime[which.max(kw.all)],peak.time=time[which.max(kw.all)],peak.before=kw[which.max(kw.all)],peak.after=max(kw.all)),by="fdr.num"]
+setkey(worst.peaks,'fdr.num')
+setkey(circs,'fdr.num')
+
+worst.peaks <- circs[worst.peaks]
+worst.peaks[,':='(cum.before=peak.before)]
+worst.peaks[,':='(cum.after=peak.after-peak.before)]
+worst.peaks[,':='(cum.cap=kva.capability-peak.before-cum.after)]
+peaks.m <- data.table(melt(worst.peaks,id.vars='name',measure.vars=c('cum.before','cum.after','cum.cap')),key=c('name','variable'))
+peaks.m.rank <- data.table(peaks.m[variable=='cum.cap',list(value),by='name'],key='value')
+peaks.m$name <- factor(peaks.m$name,levels=as.character(peaks.m.rank$name))
+peaks.m$variable <- revalue(peaks.m$variable,c("cum.before"="Existing Peak",'cum.after'="Added Peak from Charging",'cum.cap'="Remaining Circuit Capacity"))
+cbPalette <- c( "#56B4E9" ,"#D55E00","#999999", "#E69F00" , "#009E73", "#F0E442", "#0072B2", "#CC79A7")
+ggplot(peaks.m,aes(x=name,y=value/1e3,fill=variable))+geom_bar(stat='identity')+labs(x="Distribution Circuit Name and Feeder Number",y="Power (MW)",title="Impact on Peak Humboldt Demand of PEV Charging at 2% Penetration",fill="")+geom_point(data=worst.peaks,aes(y=projected/1e3),fill=NA,colour='#E69F00',size=4)+
+theme(plot.title = element_text(size = rel(2),colour='black'),axis.text.y = element_text(colour='black',size = rel(2)) ,axis.text.x = element_text(colour='black',size = rel(1.5),angle = 45, hjust = 1),axis.title.x = element_text(colour='black',size = rel(2)),axis.title.y = element_text(colour='black',size = rel(2)),legend.text=element_text(size = rel(1.5)),legend.key.size=unit(1.5,'cm'))+scale_fill_manual(values=cbPalette)
+
+ggplot(peaks.m,aes(x=name,y=value/1e3,fill=variable))+geom_bar(stat='identity')+theme(plot.title = element_text(size = rel(2),colour='white'),plot.background = element_rect(fill = "black"), axis.text.y = element_text(colour='white',size = rel(2)) ,axis.text.x = element_text(colour='white',size = rel(1.5),angle = 45, hjust = 1),axis.title.x = element_text(colour='white',size = rel(2)),axis.title.y = element_text(colour='white',size = rel(2)),legend.text=element_text(size = rel(1.5)),legend.key.size=unit(1.5,'cm'))+labs(x="Distribution Circuit Name and Feeder Number",y="Power (MW)",title="Impact on Peak Humboldt Demand of PEV Charging at 2% Penetration",fill="")+scale_fill_manual(values=cbPalette)
+
+#ggplot(melt(worst.peaks,id.vars='fdr.num',measure.vars=c('peak.before','peak.after','projected','kva.capability')),aes(x=factor(fdr.num),y=value,colour=variable))+geom_point()
+
+# Tabular results
+
+# Absolute impact (kw)
+    #Min.  1st Qu.   Median     Mean  3rd Qu.     Max. 
+  #0.1216   4.8590  24.4300  37.1000  56.1700 143.3000 
+
+
+# Impact on the peak
+#Min. 1st Qu.  Median    Mean 3rd Qu.    Max. 
+#1.000   1.004   1.014   1.016   1.024   1.058 
+
+# Impact on the remaining capacity
+#Min. 1st Qu.  Median    Mean 3rd Qu.    Max. 
+#0.9155  0.9882  0.9941  0.9897  0.9989  1.0000 
 

@@ -135,6 +135,11 @@ load(pp(pevi.shared,'data/UPSTATE/shapefiles/AggregatedTAZsWithPointTAZs.Rdata')
 load(pp(pevi.shared,'data/UPSTATE/od-converter.Rdata'))
 agg.taz$new.id <- od.converter$new.id[match(agg.taz$agg.id,od.converter$old.id)]
 agg.coords <- coordinates(agg.taz)
+#write.csv(agg.taz@data,pp(pevi.shared,'data/UPSTATE/results/maps/agg-taz-data.csv'))
+agg.taz.data <- read.csv(pp(pevi.shared,'data/UPSTATE/results/maps/agg-taz-data.csv'))
+agg.taz.data <- agg.taz.data[match(agg.taz$agg.id,agg.taz.data$agg.id),]
+agg.taz.data$x <- agg.coords[,1]
+agg.taz.data$y <- agg.coords[,2]
 
 # Now to calculate some average buildouts. First, let's average the final buildout between all seeds.
 # The resulting data frame should have for each row a unique penetration/taz/level combination, and the
@@ -157,10 +162,34 @@ agg.taz$L3 <- l3.scenario$num.chargers[match(agg.taz$new.id,l3.scenario$TAZ)]
 # [ NAME, LONG, LAT, DESCRIP, # CHARGERS, APPEAR ABOVE ZOOM, APPEAR BELOW ZOOM, EXISTING CHARGER?, L3 CHARGER? ]
 charger.data.file <- pp(pevi.shared,'data/UPSTATE/results/maps/charger-data.yaml')
 cat('chargers:\n',file=charger.data.file)
+
+# start with the high zoom level tazs
 for(i in 1:nrow(agg.taz@data)){
-  if(agg.taz$L2[i] > 0) cat(sprintf("  - ['%s',%f,%f,'<b>%s</b> <br/>%d proposed charging stations',%d,%d,%d,%s,%s]\n",agg.taz$name[i],agg.coords[i,1]-0.01,agg.coords[i,2],agg.taz$name[i],agg.taz$L2[i],agg.taz$L2[i],10,15,'false','false'),file=charger.data.file,append=T)
-  if(agg.taz$L3[i] > 0) cat(sprintf("  - ['%s',%f,%f,'<b>%s</b> <br/>%d proposed charging stations',%d,%d,%d,%s,%s]\n",agg.taz$name[i],agg.coords[i,1]+0.01,agg.coords[i,2],agg.taz$name[i],agg.taz$L3[i],agg.taz$L3[i],10,15,'false','true'),file=charger.data.file,append=T)
+  appear.above.zoom <- ifelse(length(grep("_",agg.taz$name[i]))>0,'10','null')
+  if(agg.taz$L2[i] > 0) cat(sprintf("  - ['%s',%f,%f,'<b>%s</b> <br/>%d proposed charging stations',%d,%s,%d,%s,%s]\n",agg.taz$name[i],agg.coords[i,1]-0.01,agg.coords[i,2],agg.taz$name[i],agg.taz$L2[i],agg.taz$L2[i],appear.above.zoom,15,'false','false'),file=charger.data.file,append=T)
+  if(agg.taz$L3[i] > 0) cat(sprintf("  - ['%s',%f,%f,'<b>%s</b> <br/>%d proposed charging stations',%d,%s,%d,%s,%s]\n",agg.taz$name[i],agg.coords[i,1]+0.01,agg.coords[i,2],agg.taz$name[i],agg.taz$L3[i],agg.taz$L3[i],appear.above.zoom,15,'false','true'),file=charger.data.file,append=T)
 }
+# now write medium zooms
+d_ply(agg.taz.data,.(med.zoom.group),function(df){
+  lon <- mean(df$x)
+  lat <- mean(df$y)
+  l2 <- sum(df$L2)
+  l3 <- sum(df$L3)
+  if(agg.taz$L2[i] > 0) cat(sprintf("  - ['%s',%f,%f,'<b>%s</b> <br/>%d proposed charging stations',%d,%d,%d,%s,%s]\n",df$med.zoom.group[1],lon-0.01,lat,df$med.zoom.group[1],l2,l2,7,12,'false','false'),file=charger.data.file,append=T)
+  if(agg.taz$L3[i] > 0) cat(sprintf("  - ['%s',%f,%f,'<b>%s</b> <br/>%d proposed charging stations',%d,%d,%d,%s,%s]\n",df$med.zoom.group[1],lon+0.01,lat,df$med.zoom.group[1],l3,l3,7,12,'false','true'),file=charger.data.file,append=T)
+})
+# low zoom
+d_ply(agg.taz.data,.(low.zoom.group),function(df){
+  lon <- mean(df$x)
+  lat <- mean(df$y)
+  l2 <- sum(df$L2)
+  l3 <- sum(df$L3)
+  if(agg.taz$L2[i] > 0) cat(sprintf("  - ['%s',%f,%f,'<b>%s</b> <br/>%d proposed charging stations',%d,%s,%d,%s,%s]\n",df$med.zoom.group[1],lon-0.01,lat,df$med.zoom.group[1],l2,l2,'null',7,'false','false'),file=charger.data.file,append=T)
+  if(agg.taz$L3[i] > 0) cat(sprintf("  - ['%s',%f,%f,'<b>%s</b> <br/>%d proposed charging stations',%d,%s,%d,%s,%s]\n",df$med.zoom.group[1],lon+0.01,lat,df$med.zoom.group[1],l3,l3,'null',7,'false','true'),file=charger.data.file,append=T)
+})
+  
+  
+
 
 #path.to.google <- paste(base.path,'pev-shared/data/google-earth/',sep='')
 #path.to.geatm <- paste(base.path,'pev-shared/data/GEATM-2020/',sep='')

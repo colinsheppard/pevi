@@ -55,6 +55,19 @@ ch.fin <- ddply(subset(chs,TAZ>0),.(scenario,seed,penetration),function(df){
 })
 ch.fin.unshaped <- ch.fin
 
+# Now to calculate some average buildouts. First, let's average the final buildout between all seeds.
+# The resulting data frame should have for each row a unique penetration/taz/level combination, and the
+# remaining columns will be the total for each scenario.
+
+mean.ch.fin <- ddply(ch.fin,.(penetration,TAZ,level),function(df){
+	data.frame('new-obj' = round(mean(df$'new-obj',na.rm=TRUE)),
+						 'L2-10k' = round(mean(df$'L2-10k',na.rm=TRUE)),
+						 'L2-20k' = round(mean(df$'L2-20k',na.rm=TRUE)),
+						 'opp-cost-10' = round(mean(df$'opp-cost-10',na.rm=TRUE)),
+						 'opp-cost-20' = round(mean(df$'opp-cost-20',na.rm=TRUE))
+)})
+names(mean.ch.fin) <- c('penetration','TAZ','level','new-obj','L2-10k','L2-20k','opp-cost-10','opp-cost-20')
+
 winners <- ddply(opts,.(scenario,seed,penetration,iteration),function(df){
   df[which.min(df$obj),]
 })
@@ -135,18 +148,21 @@ load(pp(pevi.shared,'data/UPSTATE/shapefiles/AggregatedTAZsWithPointTAZs.Rdata')
 load(pp(pevi.shared,'data/UPSTATE/od-converter.Rdata'))
 agg.taz$new.id <- od.converter$new.id[match(agg.taz$agg.id,od.converter$old.id)]
 
-l2.scenario <- subset(ch.fin,penetration==0.02 & seed==4 & level=='L2',select=c('penetration','TAZ','seed','level','new-obj'))
+#l2.scenario <- subset(ch.fin,penetration==0.02 & seed==4 & level=='L2',select=c('penetration','TAZ','seed','level','new-obj'))
+l2.scenario <- subset(mean.ch.fin,penetration==0.02 & level=='L2',select=c('penetration','TAZ','level','new-obj'))
 agg.taz$L2 <- l2.scenario$'new-obj'[match(agg.taz$new.id,l2.scenario$TAZ)]
-l3.scenario <- subset(ch.fin,penetration==0.02 & seed==4 & level=='L3',select=c('penetration','TAZ','seed','level','new-obj'))
+#l3.scenario <- subset(ch.fin,penetration==0.02 & seed==4 & level=='L3',select=c('penetration','TAZ','seed','level','new-obj'))
+l3.scenario <- subset(mean.ch.fin,penetration==0.02 & level=='L3',select=c('penetration','TAZ','level','new-obj'))
 agg.taz$L3 <- l3.scenario$'new-obj'[match(agg.taz$new.id,l3.scenario$TAZ)]
 
+# For the charger files that wll get translated nto Google maps, we use mean.ch.fin
 # Each charger is defined by an array: 
 # [ NAME, LONG, LAT, DESCRIP, # CHARGERS, APPEAR ABOVE ZOOM, APPEAR BELOW ZOOM, EXISTING CHARGER?, L3 CHARGER? ]
 charger.data.file <- pp(pevi.shared,'data/UPSTATE/results/maps/charger-data.yaml')
 cat('chargers:\n',file=charger.data.file)
 for(i in 1:nrow(agg.taz@data)){
-  if(agg.taz$L2[i] > 0) cat(sprintf("  - ['%s',%f,%f,'<b>%s</b> <br/>%d proposed charging stations',%d,%d,null,%s,%s]\n",agg.taz$name[i],agg.coords[i,1]-0.01,agg.coords[i,2],agg.taz$name[i],agg.taz$L2[i],agg.taz$L2[i],7,'false','false'),file=charger.data.file,append=T)
-  if(agg.taz$L3[i] > 0) cat(sprintf("  - ['%s',%f,%f,'<b>%s</b> <br/>%d proposed charging stations',%d,%d,null,%s,%s]\n",agg.taz$name[i],agg.coords[i,1]+0.01,agg.coords[i,2],agg.taz$name[i],agg.taz$L3[i],agg.taz$L3[i],7,'false','true'),file=charger.data.file,append=T)
+  if(agg.taz$L2[i] > 0) cat(sprintf("  - ['%s',%f,%f,'<b>%s</b> <br/>%d proposed charging stations',%d,%d,%d,%s,%s]\n",agg.taz$name[i],agg.coords[i,1]-0.01,agg.coords[i,2],agg.taz$name[i],agg.taz$L2[i],agg.taz$L2[i],10,15,'false','false'),file=charger.data.file,append=T)
+  if(agg.taz$L3[i] > 0) cat(sprintf("  - ['%s',%f,%f,'<b>%s</b> <br/>%d proposed charging stations',%d,%d,%d,%s,%s]\n",agg.taz$name[i],agg.coords[i,1]+0.01,agg.coords[i,2],agg.taz$name[i],agg.taz$L3[i],agg.taz$L3[i],10,15,'false','true'),file=charger.data.file,append=T)
 }
 
 #path.to.google <- paste(base.path,'pev-shared/data/google-earth/',sep='')

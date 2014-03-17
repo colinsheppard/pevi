@@ -163,6 +163,8 @@ agg.taz$L2 <- l2.scenario$num.chargers[match(agg.taz$new.id,l2.scenario$TAZ)]
 #l3.scenario <- subset(ch.fin,penetration==0.02 & seed==4 & level=='L3',select=c('penetration','TAZ','seed','level','new-obj'))
 l3.scenario <- subset(mean.ch.fin,penetration==0.02 & level=='L3' & scenario=='new-obj',select=c('TAZ','num.chargers'))
 agg.taz$L3 <- l3.scenario$num.chargers[match(agg.taz$new.id,l3.scenario$TAZ)]
+agg.taz$L2E <- agg.taz.data$L2E
+agg.taz$L3E <- agg.taz.data$L3E
 
 # For the charger files that wll get translated nto Google maps, we use mean.ch.fin
 # Each charger is defined by an array: 
@@ -172,31 +174,39 @@ cat('chargers:\n',file=charger.data.file)
 
 # start with the high zoom level tazs
 for(i in 1:nrow(agg.taz@data)){
-  appear.above.zoom <- ifelse(length(grep("_",agg.taz$name[i]))>0,'10','null')
-  if(agg.taz$L2[i] > 0) cat(sprintf("  - ['%s',%f,%f,'<b>%s</b> <br/>%d proposed charging stations',%d,%s,%d,%s,%s]\n",agg.taz$name[i],agg.coords[i,1]-0.01,agg.coords[i,2],agg.taz$name[i],agg.taz$L2[i],agg.taz$L2[i],appear.above.zoom,15,'false','false'),file=charger.data.file,append=T)
-  if(agg.taz$L3[i] > 0) cat(sprintf("  - ['%s',%f,%f,'<b>%s</b> <br/>%d proposed charging stations',%d,%s,%d,%s,%s]\n",agg.taz$name[i],agg.coords[i,1]+0.01,agg.coords[i,2],agg.taz$name[i],agg.taz$L3[i],agg.taz$L3[i],appear.above.zoom,15,'false','true'),file=charger.data.file,append=T)
+  appear.above.zoom <- ifelse(length(grep("_",agg.taz$name[i]))>0,'9','9')
+	if(agg.taz$L2E[i] > 0) cat(sprintf("  - ['%s',%f,%f,'<b>%s</b> <br/>%d existing Level 2 charging stations',%d,%s,%d,%s,%s]\n",agg.taz$name[i],agg.coords[i,1],agg.coords[i,2],agg.taz$name[i],agg.taz$L2E[i],agg.taz$L2E[i],appear.above.zoom,15,'true','false'),file=charger.data.file,append=T)
+  if(agg.taz$L3E[i] > 0) cat(sprintf("  - ['%s',%f,%f,'<b>%s</b> <br/>%d existing Level 3 (DC Fast) charging stations',%d,%s,%d,%s,%s]\n",agg.taz$name[i],agg.coords[i,1],agg.coords[i,2],agg.taz$name[i],agg.taz$L3E[i],agg.taz$L3E[i],appear.above.zoom,15,'true','true'),file=charger.data.file,append=T)
+  if(agg.taz$L2[i] > 0) cat(sprintf("  - ['%s',%f,%f,'<b>%s</b> <br/>%d proposed Level 2 charging stations',%d,%s,%d,%s,%s]\n",agg.taz$name[i],agg.coords[i,1]-0.01,agg.coords[i,2],agg.taz$name[i],agg.taz$L2[i],agg.taz$L2[i],appear.above.zoom,15,'false','false'),file=charger.data.file,append=T)
+  if(agg.taz$L3[i] > 0) cat(sprintf("  - ['%s',%f,%f,'<b>%s</b> <br/>%d proposed Level 3 (DC Fast) charging stations',%d,%s,%d,%s,%s]\n",agg.taz$name[i],agg.coords[i,1]+0.01,agg.coords[i,2],agg.taz$name[i],agg.taz$L3[i],agg.taz$L3[i],appear.above.zoom,15,'false','true'),file=charger.data.file,append=T)
 }
-# now write medium zooms
+# now write medium zooms. To have medium zoom disappear as high zoom appears, make sure the maximum zoom level is 1 lower than high zoom's lowest level.
 d_ply(agg.taz.data,.(med.zoom.group),function(df){
   lon <- mean(df$x)
   lat <- mean(df$y)
   l2 <- sum(df$L2)
   l3 <- sum(df$L3)
-  if(agg.taz$L2[i] > 0) cat(sprintf("  - ['%s',%f,%f,'<b>%s</b> <br/>%d proposed charging stations',%d,%d,%d,%s,%s]\n",df$med.zoom.group[1],lon-0.01,lat,df$med.zoom.group[1],l2,l2,7,12,'false','false'),file=charger.data.file,append=T)
-  if(agg.taz$L3[i] > 0) cat(sprintf("  - ['%s',%f,%f,'<b>%s</b> <br/>%d proposed charging stations',%d,%d,%d,%s,%s]\n",df$med.zoom.group[1],lon+0.01,lat,df$med.zoom.group[1],l3,l3,7,12,'false','true'),file=charger.data.file,append=T)
+  l2E <- sum(df$L2E)
+  l3E <- sum(df$L3E)
+  if(l2E > 0) cat(sprintf("  - ['%s',%f,%f,'<b>%s</b> <br/>%d existing Level 2 charging stations',%d,%d,%d,%s,%s]\n",df$med.zoom.group[1],lon,lat+0.06,df$med.zoom.group[1],l2E,l2E,8,10,'true','false'),file=charger.data.file,append=T)
+	if(l3E > 0) cat(sprintf("  - ['%s',%f,%f,'<b>%s</b> <br/>%d existing Level 3 (DC Fast) charging stations',%d,%d,%d,%s,%s]\n",df$med.zoom.group[1],lon,lat-0.06,df$med.zoom.group[1],l3E,l3E,8,10,'true','true'),file=charger.data.file,append=T)
+  if(l2 > 0) cat(sprintf("  - ['%s',%f,%f,'<b>%s</b> <br/>%d proposed Level 2 charging stations',%d,%d,%d,%s,%s]\n",df$med.zoom.group[1],lon-0.06,lat,df$med.zoom.group[1],l2,l2,8,10,'false','false'),file=charger.data.file,append=T)
+	if(l3 > 0) cat(sprintf("  - ['%s',%f,%f,'<b>%s</b> <br/>%d proposed Level 3 (DC Fast) charging stations',%d,%d,%d,%s,%s]\n",df$med.zoom.group[1],lon+0.06,lat,df$med.zoom.group[1],l3,l3,8,10,'false','true'),file=charger.data.file,append=T)
 })
 # low zoom
 d_ply(agg.taz.data,.(low.zoom.group),function(df){
+	# For the time being, take the average lat/lon values for the placement of the low zoom icon.
   lon <- mean(df$x)
   lat <- mean(df$y)
   l2 <- sum(df$L2)
   l3 <- sum(df$L3)
-  if(agg.taz$L2[i] > 0) cat(sprintf("  - ['%s',%f,%f,'<b>%s</b> <br/>%d proposed charging stations',%d,%s,%d,%s,%s]\n",df$med.zoom.group[1],lon-0.01,lat,df$med.zoom.group[1],l2,l2,'null',7,'false','false'),file=charger.data.file,append=T)
-  if(agg.taz$L3[i] > 0) cat(sprintf("  - ['%s',%f,%f,'<b>%s</b> <br/>%d proposed charging stations',%d,%s,%d,%s,%s]\n",df$med.zoom.group[1],lon+0.01,lat,df$med.zoom.group[1],l3,l3,'null',7,'false','true'),file=charger.data.file,append=T)
+  l2E <- sum(df$L2E)
+  l3E <- sum(df$L3E)
+	if(l2E > 0) cat(sprintf("  - ['%s',%f,%f,'<b>%s</b> <br/>%d existing Level 2 charging stations',%d,%s,%d,%s,%s]\n",df$low.zoom.group[1],lon,lat+0.25,df$low.zoom.group[1],l2E,l2E,'null',9,'true','false'),file=charger.data.file,append=T)
+	if(l3E > 0) cat(sprintf("  - ['%s',%f,%f,'<b>%s</b> <br/>%d existing Level 3 (DC Fast) charging stations',%d,%s,%d,%s,%s]\n",df$low.zoom.group[1],lon,lat-0.25,df$low.zoom.group[1],l3E,l3E,'null',9,'true','true'),file=charger.data.file,append=T)
+	if(l2 > 0) cat(sprintf("  - ['%s',%f,%f,'<b>%s</b> <br/>%d proposed Level 2 charging stations',%d,%s,%d,%s,%s]\n",df$low.zoom.group[1],lon-0.25,lat,df$low.zoom.group[1],l2,l2,'null',9,'false','false'),file=charger.data.file,append=T)
+	if(l3 > 0) cat(sprintf("  - ['%s',%f,%f,'<b>%s</b> <br/>%d proposed Level 3 (DC Fast) charging stations',%d,%s,%d,%s,%s]\n",df$low.zoom.group[1],lon+0.25,lat,df$low.zoom.group[1],l3,l3,'null',9,'false','true'),file=charger.data.file,append=T)
 })
-  
-  
-
 
 #path.to.google <- paste(base.path,'pev-shared/data/google-earth/',sep='')
 #path.to.geatm <- paste(base.path,'pev-shared/data/GEATM-2020/',sep='')

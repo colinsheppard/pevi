@@ -14,6 +14,7 @@
 
 optim.scenarios <- c('base','res-none','homeless')
 optim.scenarios <- c('homeless')
+optim.scenarios <- c('half-homeless')
 
 setwd(pevi.shared)
 
@@ -23,4 +24,5 @@ zip('pevi-experiments.zip',c(pp('data/inputs/optim-new/delhi-',optim.scenarios))
 
 # use the following shell command to push the data up to nersc
 #scp pevi-files.zip csheppar@carver.nersc.gov:~/pevi-shared/
+#scp pevi-experiments.zip csheppar@carver.nersc.gov:~/pevi-shared/
 #ssh csheppar@carver.nersc.gov

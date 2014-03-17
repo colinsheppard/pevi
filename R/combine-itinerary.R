@@ -7,12 +7,15 @@
 load(pp(pevi.shared,'data/inputs/driver-input-file/delhi-uncombined-schedule-replicates-20140217.Rdata'))
 path.to.combined.inputs <- pp(pevi.shared,'data/inputs/driver-input-file/delhi-combined/')
 path.to.combined.homeless.inputs <- pp(pevi.shared,'data/inputs/driver-input-file/delhi-combined/homeless/')
+path.to.combined.half.homeless.inputs <- pp(pevi.shared,'data/inputs/driver-input-file/delhi-combined/half-homeless/')
 
 pens <- c(0.005,0.01,0.02)
 
 for (pen in pens){
+  #pen <- pens[1]
   final.end <- ifelse(pen==0.005,80,80/(pen/0.005))
   for (final.replicate in 1:final.end){
+    #final.replicate <- 1
     rep.1 <- 2*final.replicate-1
     rep.2 <- 2*final.replicate
     if(pen==0.005){
@@ -31,9 +34,13 @@ for (pen in pens){
                    #df2$depart <- df2$depart + 24
                    #rbind(df,df2)
                   #})
+    evics <- data.frame(driver=unique(new.sched$driver),evict=sample(c(T,F),length(unique(new.sched$driver)),replace=T))
+    evics.sched <- evics$evict[match(new.sched$driver,evics$driver)]
     names(new.sched) <- c(';driver',tail(names(new.sched),-1))
-    write.table(new.sched[,c(';driver','from','to','depart','home')],file=paste(path.to.combined.inputs,"driver-schedule-pen",pen*100,"-rep",final.replicate,"-20140217.txt",sep=''),sep='\t',row.names=F,quote=F)
+    #write.table(new.sched[,c(';driver','from','to','depart','home')],file=paste(path.to.combined.inputs,"driver-schedule-pen",pen*100,"-rep",final.replicate,"-20140217.txt",sep=''),sep='\t',row.names=F,quote=F)
+    new.sched$home[evics.sched] <- 0
+    write.table(new.sched[,c(';driver','from','to','depart','home')],file=paste(path.to.combined.half.homeless.inputs,"driver-schedule-pen",pen*100,"-rep",final.replicate,"-20140217.txt",sep=''),sep='\t',row.names=F,quote=F)
     new.sched$home <- 0
-    write.table(new.sched[,c(';driver','from','to','depart','home')],file=paste(path.to.combined.homeless.inputs,"driver-schedule-pen",pen*100,"-rep",final.replicate,"-20140217.txt",sep=''),sep='\t',row.names=F,quote=F)
+    #write.table(new.sched[,c(';driver','from','to','depart','home')],file=paste(path.to.combined.homeless.inputs,"driver-schedule-pen",pen*100,"-rep",final.replicate,"-20140217.txt",sep=''),sep='\t',row.names=F,quote=F)
   }
 }

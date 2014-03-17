@@ -130,6 +130,13 @@ ggplot(build.result.history.mean,aes(x=factor(rep),y=obj.norm.mean,colour=factor
 build.result.history.mean <- ddply(build.result.history,.(rep),function(df){ data.frame(obj.norm.mean=mean(df$obj.norm))})
 build.result.history.mean$rep[build.result.history.mean$obj.norm.mean > quantile(build.result.history.mean$obj.norm.mean,c(0.25)) & build.result.history.mean$obj.norm.mean < quantile(build.result.history.mean$obj.norm.mean,c(0.75))]
 
+########################
+# GOOGLE MAP
+########################
+
+# export the TAZs for the base layer
+shp.to.kml(agg.taz,pp(pevi.shared,'data/UPSTATE/results/maps/tazs.kml'),'Shasta TAZs','',borders="black",colors='#FFFFFF33',id.col="shp.id",name.col="name")
+
 
 load(pp(pevi.shared,'data/UPSTATE/shapefiles/AggregatedTAZsWithPointTAZs.Rdata'))
 load(pp(pevi.shared,'data/UPSTATE/od-converter.Rdata'))

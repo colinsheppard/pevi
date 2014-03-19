@@ -28,6 +28,13 @@ results <- data.frame(vary.tab)
 if("driver-input-file" %in% names(vary)){
   results$penetration <- as.numeric(unlist(lapply(strsplit(as.character(results$driver.input.file),'-pen',fixed=T),function(x){ unlist(strsplit(x[2],"-rep",fixed=T)[[1]][1]) })))
   results$replicate <- as.numeric(unlist(lapply(strsplit(as.character(results$driver.input.file),'-rep',fixed=T),function(x){ unlist(strsplit(x[2],"-",fixed=T)[[1]][1]) })))
+  results$itin.scenario <- unlist(lapply(strsplit(as.character(results$driver.input.file),'/driver-schedule',fixed=T),function(x){ tail(unlist(strsplit(x[1],"/",fixed=T)[[1]]),1) }))
+  results$itin.scenario.named <- results$itin.scenario
+  results$itin.scenario.order <- results$itin.scenario
+  for(scen.i in names(naming$`driver-input-file`)){
+    results$itin.scenario.named[results$itin.scenario == scen.i] <- naming$`driver-input-file`[[scen.i]][[1]]
+    results$itin.scenario.order[results$itin.scenario == scen.i] <- as.numeric(naming$`driver-input-file`[[as.character(scen.i)]][[2]])
+  }
 }
 if("charger-input-file" %in% names(vary)){
   results$infrastructure.scenario <- unlist(lapply(strsplit(as.character(results$charger.input.file),'-scen',fixed=T),function(x){ unlist(strsplit(x[2],".txt",fixed=T)) }))
@@ -130,11 +137,15 @@ save(logs,file=paste(path.to.inputs,'logs.Rdata',sep=''))
 #######################################
 # create pen/rep columns, this assumes the first column is the driver input file
 for(log.file in to.log){
-  names(logs[[log.file]]) <- c('driver.input.file',names(logs[[log.file]])[2:ncol(logs[[log.file]])])
-  logs[[log.file]]$homeless <- F
-  logs[[log.file]]$homeless[grep('homeless',logs[[log.file]]$driver.input.file)] <- T
   logs[[log.file]]$penetration <- as.numeric(unlist(lapply(strsplit(as.character(logs[[log.file]]$driver.input.file),'-pen',fixed=T),function(x){ unlist(strsplit(x[2],"-rep",fixed=T)[[1]][1]) })))
   logs[[log.file]]$replicate <- as.numeric(unlist(lapply(strsplit(as.character(logs[[log.file]]$driver.input.file),'-rep',fixed=T),function(x){ unlist(strsplit(x[2],"-",fixed=T)[[1]][1]) })))
+  logs[[log.file]]$itin.scenario <- unlist(lapply(strsplit(as.character(logs[[log.file]]$driver.input.file),'/driver-schedule',fixed=T),function(x){ tail(unlist(strsplit(x[1],"/",fixed=T)[[1]]),1) }))
+  logs[[log.file]]$itin.scenario.named <- logs[[log.file]]$itin.scenario
+  logs[[log.file]]$itin.scenario.order <- logs[[log.file]]$itin.scenario
+  for(scen.i in names(naming$`driver-input-file`)){
+    logs[[log.file]]$itin.scenario.named[logs[[log.file]]$itin.scenario == scen.i] <- naming$`driver-input-file`[[scen.i]][[1]]
+    logs[[log.file]]$itin.scenario.order[logs[[log.file]]$itin.scenario == scen.i] <- as.numeric(naming$`driver-input-file`[[as.character(scen.i)]][[2]])
+  }
   if('charger.input.file' %in% names(logs[[log.file]])){
     logs[[log.file]]$infrastructure.scenario <- NA
     for(scen.i in names(naming$`charger-input-file`)){
@@ -157,7 +168,13 @@ ggplot(subset(logs[['pain']],pain.type=='stranded'),aes(x=time,y=state.of.charge
 
 ggplot(subset(logs[['pain']],pain.type=="delay"),aes(x=time,y=state.of.charge,colour=pain.type,shape=location))+geom_point()+facet_grid(charge.safety.factor~replicate)
 ggplot(subset(logs[['pain']],pain.type=="delay"),aes(x=time,y=state.of.charge,colour=pain.type,label=location))+geom_text()+facet_grid(charge.safety.factor~replicate)
-ggplot(subset(logs[['pain']],pain.type=="delay"),aes(x=time,y=state.of.charge,colour=vehicle.type,shape=vehicle.type,label=location))+geom_point()+geom_text(aes(y=state.of.charge+.03))+facet_grid(charge.safety.factor~replicate)
+
+ggplot(subset(logs[['pain']],pain.type=="delay" & num.simulation.days==2),aes(x=time,y=state.of.charge,colour=vehicle.type,shape=vehicle.type))+geom_point()+facet_grid(itin.scenario.named~replicate)
+ggplot(subset(logs[['pain']],pain.type%in%c("delay","stranded") & num.simulation.days==2),aes(x=time,y=state.of.charge,colour=pain.type,shape=vehicle.type))+geom_point()+facet_grid(itin.scenario.named~replicate)
+
+# bulk # of delays and strandings
+ddply(subset(logs[['pain']],pain.type%in%c("delay","stranded") & num.simulation.days==2),.(pain.type,itin.scenario),nrow)
+ddply(subset(logs[['results']],num.simulation.days==2),.(itin.scenario),function(df){ data.frame(delay=sum(df$total.delay.cost)) })
 
 # how many delays are by the same driver
 ddply(subset(logs[['pain']],pain.type=="delay"),.(homeless,replicate),function(df){ data.frame(tot.delay=sum(df$pain.value),delay.wo.repeats=sum(df$pain.value[!duplicated(df$driver)]),frac.uniq=length(unique(df$driver))/nrow(df),n.uniq=length(unique(df$driver))) })
@@ -166,6 +183,8 @@ ddply(subset(logs[['pain']],pain.type=="stranded"),.(homeless,replicate),functio
 # CHARGING
 ggplot(subset(logs[['charging']],charger.level>0),aes(x=time,y=begin.soc,colour=factor(charger.level)))+geom_point()+facet_grid(penetration~replicate)
 ggplot(subset(logs[['charging']],charger.level>0),aes(x=time,y=begin.soc,colour=factor(charger.level)))+geom_point()+facet_grid(charge.safety.factor~replicate)
+
+ggplot(subset(logs[['charging']],charger.level>0),aes(x=time,y=begin.soc,colour=factor(charger.level)))+geom_point()+facet_grid(itin.scenario.named~num.simulation.days)
 
 #  show charging spatially
 source(pp(pevi.home,'R/gis-functions.R'))

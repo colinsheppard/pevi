@@ -15,6 +15,7 @@
 optim.scenarios <- c('base','res-none','homeless')
 optim.scenarios <- c('homeless')
 optim.scenarios <- c('half-homeless')
+optim.scenarios <- c('no-homeless')
 
 setwd(pevi.shared)
 

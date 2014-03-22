@@ -17,8 +17,8 @@ option_list <- list(
 )
 if(interactive()){
   setwd(pp(pevi.shared,'data/inputs/optim-new/delhi-half-homeless/'))
-  args<-c('-t')
-  args<-c('-s','20')
+  setwd(pp(pevi.shared,'data/inputs/optim-new/delhi-swap/'))
+  args<-c('-s','21')
   args <- parse_args(OptionParser(option_list = option_list,usage = "optimize-pevi.R [options]"),positional_arguments=F,args=args)
 }else{
   args <- parse_args(OptionParser(option_list = option_list,usage = "optimize-pevi.R [options]"),positional_arguments=F)

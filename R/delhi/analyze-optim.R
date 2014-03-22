@@ -5,12 +5,12 @@ source(pp(pevi.home,'R/gis-functions.R'))
 
 # unfortunately, results from res-none are worthless
 #scenarios <- c('base','res-none','homeless','half-homeless')
-scenarios <- c('base','homeless','half-homeless')
+scenarios <- c('homeless','half-homeless','no-homeless')
 
 chs <- data.frame()
 opts <- data.frame()
 for(optim.code in scenarios){
-  for(seed in c(1:20)){
+  for(seed in c(20:30)){
     hist.file <- pp(pevi.shared,'data/outputs/optim-new/delhi-',optim.code,'-seed',seed,'/charger-buildout-history.Rdata')
     final.evse.file <- pp(pevi.shared,'data/outputs/optim-new/delhi-',optim.code,'-seed',seed,'/delhi-',optim.code,'-seed',seed,'-pen2-final-infrastructure.txt')
     if(file.exists(final.evse.file)){
@@ -59,16 +59,17 @@ if(F){
   ggplot(subset(ch.fin,scenario=='homeless'),aes(x=factor(TAZ),y=value,fill=level)) + geom_bar(stat='identity') + facet_grid(penetration~seed) + labs(x="",y="",title="")
 
   # compare seeds against each other for each TAZ / level
-  ch.fin <- cast(subset(melt(ch.fin.unshaped,measure.vars=pp('L',0:4),variable_name="level"),scenario=='homeless' & level%in%pp('L',1:3) & seed %in% c(1,2)),TAZ + level + penetration ~ seed)
-  ggplot(ch.fin,aes(x=`1`,y=`2`,colour=level)) + geom_point() + facet_wrap(~penetration) + labs(x="",y="",title="")+geom_abline(intercept=0,slope=1)
+  ch.fin <- cast(subset(melt(ch.fin.unshaped,measure.vars=pp('L',0:4),variable_name="level"),scenario=='homeless' & level%in%pp('L',1:3)),TAZ + level + penetration ~ seed)
+  ggplot(ch.fin,aes(x=`21`,y=`22`,colour=level)) + geom_point() + facet_wrap(~penetration) + labs(x="",y="",title="")+geom_abline(intercept=0,slope=1)
 
   # compare several optimization runs at once
-  ch.fin <- subset(melt(ch.fin.unshaped,measure.vars=pp('L',0:4),variable_name="level"),level%in%pp('L',2:3))
-  ch.fin$scenario <- factor(ch.fin$scenario,levels=c('base','no-L2','no-L3','new-obj','L2-by-two','L2-10k','L2-20k','opp-cost-10','opp-cost-20'))
+  ch.fin <- subset(melt(ch.fin.unshaped,measure.vars=pp('L',0:4),variable_name="level"),level%in%pp('L',1:3))
+  #ch.fin$scenario <- factor(ch.fin$scenario,levels=c('0% Drivers with Home Chargers','50% Drivers with Home Charging','100% Drivers with Home Charging'))
+  ch.fin$scenario <- revalue(ch.fin$scenario,c('homeless'='0% Drivers with Home Chargers','half-homeless'='50% Drivers with Home Charging','no-homeless'='100% Drivers with Home Charging'))
   stat_sum_single <- function(fun, geom="point", ...) {
     stat_summary(fun.y=fun, geom=geom, size = 3, ...)
   }
-  ggplot(ddply(ch.fin,.(scenario,level,penetration,seed),function(df) { data.frame(num.chargers=sum(df$value)) }),aes(x=scenario,y=num.chargers,colour=level)) + geom_point() + facet_wrap(~penetration) + stat_summary(fun.y=mean,geom='point',shape='X',size=3)+labs(x="Scenario",y="# Chargers",title="# Chargers Sited over Several Optimization Variations")+ theme(axis.text.x = element_text(angle = 45, hjust = 1))
+  ggplot(ddply(ch.fin,.(scenario,level,penetration,seed),function(df) { data.frame(num.chargers=sum(df$value)) }),aes(x=scenario,y=num.chargers,colour=level))+geom_point() + facet_wrap(~penetration) + stat_summary(fun.y=mean,geom='point',size=3)+labs(x="Scenario",y="# Chargers",title="# Chargers Sited over Optimization Variations")+ theme(axis.text.x = element_text(angle = 45, hjust = 1))
 }
 
 ################################################

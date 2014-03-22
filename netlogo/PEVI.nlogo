@@ -237,7 +237,7 @@ end
 ;; SETUP 
 ;;;;;;;;;;;;;;;;;;;;
 to setup
-  set small-num 1e-11
+  set small-num 1e-6
   print "setup-od-data"
   setup-od-data
   print "setup-tazs"
@@ -288,12 +288,24 @@ to setup
   log-data "charge-limiting-factor" (sentence "time" "driver" "vehicle.type" "state.of.charge" "result.action" "full-charge-time-need" "trip-charge-time-need" "journey-charge-time-need" "time-until-depart" "charger-in-origin-or-destination" "this-charger-type") ;;;LOG
 end 
 
+to setup-in-batch-mode-from-gui
+  clear-all-and-initialize
+  set starting-seed 21
+  set fix-seed TRUE
+  set param-file-base "/Users/critter/Dropbox/serc/pev-colin/pev-shared/"
+  set parameter-file "/Users/critter/Dropbox/serc/pev-colin/pevi/netlogo/params.txt"
+  read-parameter-file
+  set reference-charger-cost 0
+  set reference-delay-cost 0
+  setup-in-batch-mode
+end
+
 to setup-in-batch-mode
   ifelse count turtles = 1 [
     ; expecting that clear-all-and-initialize has been run
     if fix-seed [random-seed starting-seed]
     ; Can we combine this with the code existing in setup?
-    set small-num 1e-11
+    set small-num 1e-6
     set batch-setup? false
     set seed-list (sentence random 2147483647 random 2147483647 random 2147483647)
     set seed-list-index -1
@@ -1656,10 +1668,10 @@ NIL
 BUTTON
 11
 136
-152
+242
 169
 NIL
-setup-in-batch-mode
+setup-in-batch-mode-from-gui
 NIL
 1
 T
@@ -1676,7 +1688,7 @@ INPUTBOX
 832
 253
 starting-seed
-1
+21
 1
 0
 Number

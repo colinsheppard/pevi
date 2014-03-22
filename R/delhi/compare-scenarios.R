@@ -174,7 +174,7 @@ ggplot(subset(logs[['pain']],pain.type%in%c("delay","stranded") & num.simulation
 
 # bulk # of delays and strandings
 ddply(subset(logs[['pain']],pain.type%in%c("delay","stranded") & num.simulation.days==2),.(pain.type,itin.scenario),nrow)
-ddply(subset(logs[['results']],num.simulation.days==2),.(itin.scenario),function(df){ data.frame(delay=sum(df$total.delay.cost)) })
+ddply(subset(logs[['results']],num.simulation.days==2),.(itin.scenario),function(df){ data.frame(delay.cost=mean(df$total.delay.cost/1e6),delay.per.driver=mean(df$total.delay/df$num.drivers),frac.drivers.delayed=mean(df$frac.drivers.delayed),energy.charged=mean(df$energy.charged),electric.miles.driven=mean(df$electric.miles.driven)) })
 
 # how many delays are by the same driver
 ddply(subset(logs[['pain']],pain.type=="delay"),.(homeless,replicate),function(df){ data.frame(tot.delay=sum(df$pain.value),delay.wo.repeats=sum(df$pain.value[!duplicated(df$driver)]),frac.uniq=length(unique(df$driver))/nrow(df),n.uniq=length(unique(df$driver))) })
@@ -185,6 +185,9 @@ ggplot(subset(logs[['charging']],charger.level>0),aes(x=time,y=begin.soc,colour=
 ggplot(subset(logs[['charging']],charger.level>0),aes(x=time,y=begin.soc,colour=factor(charger.level)))+geom_point()+facet_grid(charge.safety.factor~replicate)
 
 ggplot(subset(logs[['charging']],charger.level>0),aes(x=time,y=begin.soc,colour=factor(charger.level)))+geom_point()+facet_grid(itin.scenario.named~num.simulation.days)
+logs[['charging']]$is.external <- F
+logs[['charging']]$is.external[logs[['charging']]$location<0] <- T
+ggplot(subset(logs[['charging']],charger.level>0 & num.simulation.days==2),aes(x=time,y=begin.soc,colour=is.external))+geom_point()+facet_wrap(~itin.scenario.named)
 
 #  show charging spatially
 source(pp(pevi.home,'R/gis-functions.R'))

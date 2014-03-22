@@ -15,9 +15,9 @@ option_list <- list(
   make_option(c("-t", "--hotstart"),action="store_true", type="logical", default=F, help="Set hot.start to TRUE, overriding the value in params.R [%default]")
 )
 if(interactive()){
-  setwd(pp(pevi.shared,'data/inputs/optim-new/delhi-res-none/'))
-  args<-c('-t')
-  #args<-c()
+  setwd(pp(pevi.shared,'data/inputs/optim-new/delhi-half-homeless/'))
+  setwd(pp(pevi.shared,'data/inputs/optim-new/delhi-swap/'))
+  args<-c('-s','21')
   args <- parse_args(OptionParser(option_list = option_list,usage = "optimize-pevi.R [options]"),positional_arguments=F,args=args)
 }else{
   args <- parse_args(OptionParser(option_list = option_list,usage = "optimize-pevi.R [options]"),positional_arguments=F)
@@ -27,8 +27,8 @@ if(substr(args$experimentdir,1,1)!="/")args$experimentdir <- pp(getwd(),"/",args
 if(substr(args$experimentdir,nchar(args$experimentdir),nchar(args$experimentdir)) != "/")args$experimentdir <- pp(args$experimentdir,"/")
 
 Sys.setenv(NOAWT=1)
-options(java.parameters="-Xmx1024m")
-#options(java.parameters="-Xmx2048m")
+#options(java.parameters="-Xmx1024m")
+options(java.parameters="-Xmx2048m")
 
 source(pp(args$experimentdir,'params.R'))
 

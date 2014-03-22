@@ -3,12 +3,13 @@ options(java.parameters="-Xmx2048m")
 load.libraries(c('ggplot2','yaml','RNetLogo','plyr','reshape','stringr'))
 
 #exp.name <- commandArgs(trailingOnly=T)[1]
-exp.name <- 'upstate-build-by-two'
+exp.name <- 'upstate-charging-demand'
 path.to.inputs <- pp(pevi.shared,'data/inputs/compare/',exp.name,'/')
 
 #to.log <- c('pain','charging','need-to-charge')
-#to.log <- c('pain','charging','tazs','trip')
-to.log <- c('pain','charging')
+to.log <- c('pain','charging','tazs','trip')
+#to.log <- c('pain','charging')
+#to.log <- c('tazs','charging')
 
 # load the reporters and loggers needed to summarize runs and disable logging
 source(paste(pevi.home,"R/reporters-loggers.R",sep=''))
@@ -57,6 +58,9 @@ if("vehicle-type-input-file" %in% names(vary)){
   }
 }
 
+# don't run unnecessary scenarios, only for charing demand experiment
+results <- subset(results,(penetration==0.5 & infrastructure.scenario=='upstate-final-rec-pen-0.5') | (penetration==1 & infrastructure.scenario=='upstate-final-rec-pen-1') | (penetration==2 & infrastructure.scenario=='upstate-final-rec-pen-2'))
+
 # start NL
 tryCatch(NLStart(nl.path, gui=F),error=function(err){ NA })
 model.path <- paste(pevi.home,"netlogo/PEVI.nlogo",sep='')
@@ -93,7 +97,7 @@ for(results.i in 1:nrow(results)){
       NLCommand(paste('set ',param,' ',vary.tab[results.i,param],'',sep=''))
     }
   }
-  if("tazs" %in% to.log)NLCommand('set log-taz-time-interval 15')
+  if("tazs" %in% to.log)NLCommand('set log-taz-time-interval 5')
   NLCommand('set go-until-time 100')
   NLCommand('setup')
 
@@ -279,7 +283,7 @@ for(scen.i in names(naming$`charger-input-file`)){
   logs[['charging']]$infrastructure.scenario.order[logs[['charging']]$infrastructure.scenario == scen.i] <- as.numeric(naming$`charger-input-file`[[scen.i]][[2]])
 }
 logs[['charging']]$penetration <- as.numeric(unlist(lapply(strsplit(as.character(logs[['charging']]$driver.input.file),'-pen',fixed=T),function(x){ unlist(strsplit(x[2],"-rep",fixed=T)[[1]][1]) })))
-logs[['charging']]$replicate <- as.numeric(unlist(lapply(strsplit(as.character(logs[['charging']]$driver.input.file),'-rep',fixed=T),function(x){ unlist(strsplit(x[2],"-",fixed=T)[[1]][1]) })))
+logtazs')s[['charging']]$replicate <- as.numeric(unlist(lapply(strsplit(as.character(logs[['charging']]$driver.input.file),'-rep',fixed=T),function(x){ unlist(strsplit(x[2],"-",fixed=T)[[1]][1]) })))
 
 num.chargers <- list()
 for(charger.file in unique(as.character(logs[['charging']]$charger.input.file))){

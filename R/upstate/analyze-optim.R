@@ -68,13 +68,30 @@ winners <- ddply(winners,.(scenario,seed),function(df){
   data.frame(df,cum.cost=cumsum(df$cost))
 })
 # for old OBJ
-old.inds <- winners$obj.type == 'old'
-winners$delay[old.inds] <- winners$obj[old.inds] - winners$cum.cost[old.inds]*1000
+#old.inds <- winners$obj.type == 'old'
+#winners$delay[old.inds] <- winners$obj[old.inds] - winners$cum.cost[old.inds]*1000
 # for new OBJ
 new.inds <- winners$obj.type == 'new'
 winners$delay[new.inds] <- winners$mean.delay.cost[new.inds] 
 
 winners$penetration <- winners$penetration*100
+
+################################################
+# Save charger profiles for later runs
+################################################
+ch.sav <- data.table(subset(ch.fin.unshaped,scenario=='new-obj'),key=c('TAZ','penetration'))
+ch.sav <- ch.sav[,list(L0=round(mean(L0)),L1=round(mean(L1)),L2=round(mean(L2)),L3=round(mean(L3)),L4=round(mean(L4))),by=c('TAZ','penetration')]
+existing.ch <- read.table(file=pp(pevi.shared,'data/inputs/charger-input-file/upstate/upstate-existing-chargers.txt'),sep='\t',header=T)
+names(existing.ch) <- c('TAZ',pp('L',0:4))
+d_ply(ch.sav,.(penetration),function(df){
+      pen <- df$penetration[1]
+      df <- df[,c('TAZ',pp('L',0:4))]
+      df <- rbind(df,subset(existing.ch,TAZ<0))
+      names(df) <- c(';TAZ',pp('L',0:4))
+      write.table(df,file=pp(pevi.shared,'data/inputs/charger-input-file/upstate/final-recommendations/upstate-final-rec-pen-',pen*100,'.txt'),sep='\t',row.names=F,quote=F)
+})
+
+
 
 #ggplot(subset(winners,seed==1),aes(x=cum.cost,y=obj,colour=factor(penetration))) + geom_point() + facet_wrap(~scenario,scales='free_y') + labs(x="Infrastructure Cost",y="Objective",title="")
 winners$scenario <- factor(winners$scenario,levels=c('new-obj','L2-10k','L2-20k','opp-cost-10','opp-cost-20'))
@@ -118,7 +135,7 @@ strange.tazs <- subset(ch.fin,`build-by-two`>1 & penetration==0.01 & seed==1 & b
 subset(ch.fin.unshaped,penetration==0.01 & seed==1 & TAZ %in% strange.tazs)[order(subset(ch.fin.unshaped,penetration==0.01 & seed==1 & TAZ %in% strange.tazs)$TAZ),]
 
 
-load(pp(pevi.shared,"data/outputs/optim-new/base-detailed-seed1/build-result-history.Rdata"))
+load(pp(pevi.shared,"data/outputs/optim-new/new-obj-seed1/build-result-history.Rdata")) #"base-detailed" not in pevi.shared
 build.result.history <- ddply(build.result.history,.(penetration,iteration),function(df){ data.frame(df,obj.norm=df$obj/mean(df$obj))})
 build.result.history.mean <- ddply(build.result.history,.(rep,level),function(df){ data.frame(obj.norm.mean=mean(df$obj.norm))})
 build.result.history.mean <- build.result.history.mean[order(build.result.history.mean$obj.norm.mean),]
@@ -130,24 +147,144 @@ ggplot(build.result.history.mean,aes(x=factor(rep),y=obj.norm.mean,colour=factor
 build.result.history.mean <- ddply(build.result.history,.(rep),function(df){ data.frame(obj.norm.mean=mean(df$obj.norm))})
 build.result.history.mean$rep[build.result.history.mean$obj.norm.mean > quantile(build.result.history.mean$obj.norm.mean,c(0.25)) & build.result.history.mean$obj.norm.mean < quantile(build.result.history.mean$obj.norm.mean,c(0.75))]
 
-
+########################
+# Rankings
+########################
 load(pp(pevi.shared,'data/UPSTATE/shapefiles/AggregatedTAZsWithPointTAZs.Rdata'))
 load(pp(pevi.shared,'data/UPSTATE/od-converter.Rdata'))
 agg.taz$new.id <- od.converter$new.id[match(agg.taz$agg.id,od.converter$old.id)]
+agg.coords <- coordinates(agg.taz)
+#write.csv(agg.taz@data,pp(pevi.shared,'data/UPSTATE/results/maps/agg-taz-data.csv'))
+agg.taz.data <- read.csv(pp(pevi.shared,'data/UPSTATE/results/maps/agg-taz-data.csv'))
+agg.taz.data <- agg.taz.data[match(agg.taz$agg.id,agg.taz.data$agg.id),]
+agg.taz.data$x <- agg.coords[,1]
+agg.taz.data$y <- agg.coords[,2]
+agg.taz$x <- agg.coords[,1]
+agg.taz$y <- agg.coords[,2]
+agg.taz$low.zoom.group <- agg.taz.data$low.zoom.group[match(agg.taz$agg.id,agg.taz.data$agg.id)]
+agg.taz$med.zoom.group <- agg.taz.data$med.zoom.group[match(agg.taz$agg.id,agg.taz.data$agg.id)]
 
-l2.scenario <- subset(ch.fin,penetration==0.02 & scenario=='new-obj' & seed==4 & level=='L2')
-agg.taz$L2 <- l2.scenario$value[match(agg.taz$new.id,l2.scenario$TAZ)]
-l3.scenario <- subset(ch.fin,penetration==0.02 & scenario=='new-obj' & seed==4 & level=='L3')
-agg.taz$L3 <- l3.scenario$value[match(agg.taz$new.id,l3.scenario$TAZ)]
+win <- data.table(subset(winners,scenario=='new-obj' & penetration==0.5),key=c('seed','penetration','iteration'))
+win[,rank:=(1:length(iteration))/length(iteration),by='seed']
+setkey(win,'taz','level','seed')
+best.ranks <- win[,list(rank=min(rank)),by=c('taz','level','seed')]
+best.ranks <- best.ranks[,list(rank=mean(rank)),by=c('taz','level')]
+setkey(best.ranks,'rank')
+best.ranks[,percentile:=(1:length(rank))/length(rank)]
+best.ranks[,quartile:=ifelse(percentile<=0.25,1,ifelse(percentile<=0.5,2,ifelse(percentile<=0.75,3,4)))]
+best.ranks$name <- agg.taz.data$name[match(best.ranks$taz,agg.taz$new.id)]
+# only works if below code has been run
+agg.taz.data.for.join <- data.table(melt(agg.taz@data,id.vars=c('new.id'),measure.vars=c('L2','L3')))
+agg.taz.data.for.join[,taz:=new.id]
+agg.taz.data.for.join[,level:=ifelse(variable=="L2",2,3)]
+setkey(agg.taz.data.for.join,'taz','level')
+setkey(best.ranks,'taz','level')
+best.ranks <- agg.taz.data.for.join[best.ranks]
+setkey(best.ranks,'rank')
 
-# Each charger is defined by an array: 
-# [ NAME, LONG, LAT, DESCRIP, # CHARGERS, APPEAR ABOVE ZOOM, APPEAR BELOW ZOOM, EXISTING CHARGER?, L3 CHARGER? ]
-charger.data.file <- pp(pevi.shared,'data/UPSTATE/results/maps/charger-data.yaml')
-cat('chargers:\n',file=charger.data.file)
-for(i in 1:nrow(agg.taz@data)){
-  if(agg.taz$L2[i] > 0) cat(sprintf("  - ['%s',%f,%f,'<b>%s</b> <br/>%d proposed charging stations',%d,%d,null,%s,%s]\n",agg.taz$name[i],agg.coords[i,1]-0.01,agg.coords[i,2],agg.taz$name[i],agg.taz$L2[i],agg.taz$L2[i],7,'false','false'),file=charger.data.file,append=T)
-  if(agg.taz$L3[i] > 0) cat(sprintf("  - ['%s',%f,%f,'<b>%s</b> <br/>%d proposed charging stations',%d,%d,null,%s,%s]\n",agg.taz$name[i],agg.coords[i,1]+0.01,agg.coords[i,2],agg.taz$name[i],agg.taz$L3[i],agg.taz$L3[i],7,'false','true'),file=charger.data.file,append=T)
+write.csv(best.ranks,pp(pevi.shared,'data/UPSTATE/results/charger-priorities-0.5.csv'))
+
+########################
+# GOOGLE MAP
+########################
+
+# export the TAZs for the base layer
+shp.to.kml(agg.taz,pp(pevi.shared,'data/UPSTATE/results/maps/tazs.kml'),'Shasta TAZs','',borders="black",colors='#FFFFFF33',id.col="shp.id",name.col="name")
+
+
+# Now to calculate some average buildouts. First, let's average the final buildout between all seeds.
+# The resulting data frame should have for each row a unique penetration/taz/level combination, and the
+# remaining columns will be the total for each scenario.
+
+ch.fin <- subset(melt(ch.fin.unshaped,measure.vars=pp('L',0:4),variable_name="level"),level%in%pp('L',2:3))
+mean.ch.fin <- ddply(ch.fin,.(penetration,TAZ,level,scenario),function(df){
+	data.frame(num.chargers = round(mean(df$value,na.rm=TRUE)))
+})
+
+for(pen in c(0.005,0.01,0.02)){
+  setkey(best.ranks,'taz','level')
+  l2.scenario <- subset(mean.ch.fin,penetration==pen & level=='L2' & scenario=='new-obj',select=c('TAZ','num.chargers'))
+  agg.taz$L2 <- l2.scenario$num.chargers[match(agg.taz$new.id,l2.scenario$TAZ)]
+  agg.taz$L2.rank <- best.ranks[J(agg.taz.data$new.id,2),quartile]$quartile
+  l3.scenario <- subset(mean.ch.fin,penetration==pen & level=='L3' & scenario=='new-obj',select=c('TAZ','num.chargers'))
+  agg.taz$L3 <- l3.scenario$num.chargers[match(agg.taz$new.id,l3.scenario$TAZ)]
+  agg.taz$L3.rank <- best.ranks[J(agg.taz.data$new.id,3),quartile]$quartile
+  agg.taz$L2E <- agg.taz.data$L2E
+  agg.taz$L3E <- agg.taz.data$L3E
+
+  # Here we override the model results for a bunch of TAZs, moving them somewhere else
+  if(pen==0.005){
+    agg.taz$L3[which(agg.taz$name=="MtShasta")] <- 1
+    agg.taz$L3.rank[which(agg.taz$name=="MtShasta")] <- 4
+  }
+  agg.taz$L3[which(agg.taz$name=="Lakehead")] <- 1
+  agg.taz$L3.rank[which(agg.taz$name=="Lakehead")] <- 4
+  agg.taz$L2[which(agg.taz$name=="Gerber")] <- 0
+  agg.taz$L2[which(agg.taz$name=="Corning")] <- agg.taz$L2[which(agg.taz$name=="Corning")] + 1
+  agg.taz$L2[which(agg.taz$name=="Red Bluff")] <- agg.taz$L2[which(agg.taz$name=="Red Bluff")] + 1
+  agg.taz$L2[which(agg.taz$name=="Shasta")] <- agg.taz$L2[which(agg.taz$name=="Shasta")] + agg.taz$L2[which(agg.taz$name=="FrenchGulch")]
+  agg.taz$L2[which(agg.taz$name=="FrenchGulch")] <- 0
+  agg.taz$L2[which(agg.taz$name=="HappyValley")] <- agg.taz$L2[which(agg.taz$name=="HappyValley")] + agg.taz$L2[which(agg.taz$name=="OnoIgo")]
+  agg.taz$L2[which(agg.taz$name=="OnoIgo")] <- 0
+  agg.taz$L2[which(agg.taz$name=="Millville")] <- agg.taz$L2[which(agg.taz$name=="Millville")] + agg.taz$L2[which(agg.taz$name=="Whitmore")]
+  agg.taz$L2[which(agg.taz$name=="Whitmore")] <- 0
+  agg.taz$L2[which(agg.taz$name=="Burney")] <- agg.taz$L2[which(agg.taz$name=="Burney")] + agg.taz$L2[which(agg.taz$name=="BigBend")]
+  agg.taz$L2[which(agg.taz$name=="BigBend")] <- 0
+
+  shp.to.kml(agg.taz,pp(pevi.shared,'data/UPSTATE/results/maps/tazs-',pen,'.kml'),pp('Upstate ',100*pen,'% Results'),'',borders="black",colors='#FFFFFF33',id.col="shp.id",name.col="name",description.cols=c('L2','L2.rank','L3','L3.rank'))
+
+  plur.station <- function(num,rank){
+    res <- ifelse(num>1,'stations','station')
+    res <- ifelse(is.na(rank),res,pp(res,' (Priority: ',ifelse(rank==1,'first',ifelse(rank==2,'second',ifelse(rank==3,'third','fourth'))),')'))
+    res
+  }
+
+  # For the charger files that wll get translated nto Google maps, we use mean.ch.fin
+  # Each charger is defined by an array: 
+  # [ NAME, LONG, LAT, DESCRIP, # CHARGERS, APPEAR ABOVE ZOOM, APPEAR BELOW ZOOM, EXISTING CHARGER?, L3 CHARGER? ]
+  charger.data.file <- pp(pevi.shared,'data/UPSTATE/results/maps/charger-data-',pen*100,'.yaml')
+  cat('chargers:\n',file=charger.data.file)
+
+  # start with the high zoom level tazs
+  for(i in 1:nrow(agg.taz@data)){
+    appear.above.zoom <- ifelse(length(grep("_",agg.taz$name[i]))>0,'9','9')
+    separator.factor <- ifelse(length(grep("RED_",agg.taz$name[i]))>0,1,2)
+    vadjust <- ifelse(length(grep("SHA_BearMountain",agg.taz$name[i]))>0,-0.04,0)
+    if(agg.taz$L2[i] > 0) cat(sprintf(pp("  - ['%s',%f,%f,'<b>%s</b> <br/>%d proposed Level 2 charging ",plur.station(agg.taz$L2[i],agg.taz$L2.rank[i]),"',%d,%s,%s,%s,%s]\n"),agg.taz$name[i],agg.coords[i,1]-separator.factor*0.002,agg.coords[i,2]+vadjust,agg.taz$name[i],agg.taz$L2[i],agg.taz$L2[i],appear.above.zoom,'null','false','false'),file=charger.data.file,append=T)
+    if(agg.taz$L3[i] > 0) cat(sprintf(pp("  - ['%s',%f,%f,'<b>%s</b> <br/>%d proposed Level 3 (DC Fast) charging ",plur.station(agg.taz$L3[i],agg.taz$L3.rank[i]),"',%d,%s,%s,%s,%s]\n"),agg.taz$name[i],agg.coords[i,1]+0.002*separator.factor,agg.coords[i,2]-0.002*separator.factor+vadjust,agg.taz$name[i],agg.taz$L3[i],agg.taz$L3[i],appear.above.zoom,'null','false','true'),file=charger.data.file,append=T)
+    if(agg.taz$L2E[i] > 0) cat(sprintf(pp("  - ['%s',%f,%f,'<b>%s</b> <br/>%d existing Level 2 charging ",plur.station(agg.taz$L2E[i],NA),"',%d,%s,%s,%s,%s]\n"),agg.taz$name[i],agg.coords[i,1],agg.coords[i,2]-0.005*separator.factor+vadjust,agg.taz$name[i],agg.taz$L2E[i],agg.taz$L2E[i],appear.above.zoom,'null','true','false'),file=charger.data.file,append=T)
+    if(agg.taz$L3E[i] > 0) cat(sprintf(pp("  - ['%s',%f,%f,'<b>%s</b> <br/>%d existing Level 3 (DC Fast) charging ",plur.station(agg.taz$L3E[i],NA),"',%d,%s,%s,%s,%s]\n"),agg.taz$name[i],agg.coords[i,1],agg.coords[i,2]-0.005*separator.factor+vadjust,agg.taz$name[i],agg.taz$L3E[i],agg.taz$L3E[i],appear.above.zoom,'null','true','true'),file=charger.data.file,append=T)
+  }
+  # now write medium zooms. To have medium zoom disappear as high zoom appears, make sure the maximum zoom level is 1 lower than high zoom's lowest level.
+  d_ply(agg.taz@data,.(med.zoom.group),function(df){
+    lon <- mean(df$x)
+    lat <- mean(df$y)
+    l2 <- sum(df$L2)
+    l3 <- sum(df$L3)
+    l2E <- sum(df$L2E)
+    l3E <- sum(df$L3E)
+    if(l2 > 0) cat(sprintf(pp("  - ['%s',%f,%f,'<b>%s</b> <br/>%d proposed Level 2 charging ",plur.station(l2,NA),"',%d,%d,%d,%s,%s]\n"),df$med.zoom.group[1],lon-0.02,lat,df$med.zoom.group[1],l2,l2,8,10,'false','false'),file=charger.data.file,append=T)
+    if(l3 > 0) cat(sprintf(pp("  - ['%s',%f,%f,'<b>%s</b> <br/>%d proposed Level 3 (DC Fast) charging ",plur.station(l3,NA),"',%d,%d,%d,%s,%s]\n"),df$med.zoom.group[1],lon+0.02,lat-0.01,df$med.zoom.group[1],l3,l3,8,10,'false','true'),file=charger.data.file,append=T)
+    if(l2E > 0) cat(sprintf(pp("  - ['%s',%f,%f,'<b>%s</b> <br/>%d existing Level 2 charging ",plur.station(l2E,NA),"',%d,%d,%d,%s,%s]\n"),df$med.zoom.group[1],lon+0.02,lat-0.03,df$med.zoom.group[1],l2E,l2E,8,10,'true','false'),file=charger.data.file,append=T)
+    if(l3E > 0) cat(sprintf(pp("  - ['%s',%f,%f,'<b>%s</b> <br/>%d existing Level 3 (DC Fast) charging ",plur.station(l3E,NA),"',%d,%d,%d,%s,%s]\n"),df$med.zoom.group[1],lon-0.02,lat-0.04,df$med.zoom.group[1],l3E,l3E,8,10,'true','true'),file=charger.data.file,append=T)
+  })
+  # low zoom
+  d_ply(agg.taz@data,.(low.zoom.group),function(df){
+    # For the time being, take the average lat/lon values for the placement of the low zoom icon.
+    lon <- mean(df$x)
+    lat <- mean(df$y)
+    l2 <- sum(df$L2)
+    l3 <- sum(df$L3)
+    l2E <- sum(df$L2E)
+    l3E <- sum(df$L3E)
+    if(l2 > 0) cat(sprintf(pp("  - ['%s',%f,%f,'<b>%s</b> <br/>%d proposed Level 2 charging ",plur.station(l2,NA),"',%d,%s,%d,%s,%s]\n"),df$low.zoom.group[1],lon-0.15,lat,df$low.zoom.group[1],l2,l2,'null',9,'false','false'),file=charger.data.file,append=T)
+    if(l3 > 0) cat(sprintf(pp("  - ['%s',%f,%f,'<b>%s</b> <br/>%d proposed Level 3 (DC Fast) charging ",plur.station(l3,NA),"',%d,%s,%d,%s,%s]\n"),df$low.zoom.group[1],lon+0.15,lat,df$low.zoom.group[1],l3,l3,'null',9,'false','true'),file=charger.data.file,append=T)
+    if(l2E > 0) cat(sprintf(pp("  - ['%s',%f,%f,'<b>%s</b> <br/>%d existing Level 2 charging ",plur.station(l2E,NA),"',%d,%s,%d,%s,%s]\n"),df$low.zoom.group[1],lon,lat+0.15,df$low.zoom.group[1],l2E,l2E,'null',9,'true','false'),file=charger.data.file,append=T)
+    if(l3E > 0) cat(sprintf(pp("  - ['%s',%f,%f,'<b>%s</b> <br/>%d existing Level 3 (DC Fast) charging ",plur.station(l3E,NA),"',%d,%s,%d,%s,%s]\n"),df$low.zoom.group[1],lon,lat-0.15,df$low.zoom.group[1],l3E,l3E,'null',9,'true','true'),file=charger.data.file,append=T)
+  })
 }
+
+
 
 #path.to.google <- paste(base.path,'pev-shared/data/google-earth/',sep='')
 #path.to.geatm <- paste(base.path,'pev-shared/data/GEATM-2020/',sep='')
@@ -163,102 +300,8 @@ for(i in 1:nrow(agg.taz@data)){
 dist <- read.csv(file=paste(path.to.geatm,'taz-dist-time.csv',sep=''))
 names(dist)[1] <- "from"
 
-    #Prepares a null matrix to fill with values			
-    results.matrix <- matrix(,104,n.seeds)
-    colnames(results.matrix) <- paste("seed",1:n.seeds,sep='')
-    
-    if(pev.penetration==0.005) {target.year <- 2014}
-    if(pev.penetration==0.01) {target.year <- 2017}
-    if(pev.penetration==0.02) {target.year <- 2023}
-    if(pev.penetration==0.04) {target.year <- 'After 2026'}
-    
-    charger.descrip.text <- paste('This google earth layer presents the number of recommended plug-in electric vehicle (PEV) chargers for each each travel analysis zone if PEV adoption reaches ',pev.penetration*100,'% penetration into the Humboldt County vehicle fleet.  Each icon contains two numbers indicating the number of Level 2 and the number of Level 3 chargers to be sited in that zone (separated by a slash).  Level 2 chargers can provide a full charge to a Nissan Leaf in 5-6 hours, Level 3 chargers would take less than 1 hour.   The map contains an additional level of detail for the municipalities of Eureka, Arcata, McKinleyville, and Fortuna, zoom in to reveal this detail.',sep='')
-    driver.descrip.text <- paste('This google earth layer presents the number of expected plug-in electric vehicle (PEV) drivers living in each travel analysis zone as simulated in the North Coast PEV modeling analysis.  The map contains an additional level of detail for the municipalities of Eureka, Arcata, McKinleyville, and Fortuna, zoom in to reveal this detail.',sep='')
-    
-    for(seed in 1:n.seeds){
-      path.to.charger.input.file <- paste(path.to.inputs,"../../charger-input-file/",optim.code,"/seed",seed,sep='')
-      make.dir(path.to.charger.input.file)
-      path.to.outputs <- paste(path.to.outputs.base,'-seed',seed,'/',sep='')
-      build.files <- data.frame(file=list.files(path.to.outputs,paste('^buildout-pen',pev.penetration*100,'.*csv',sep='')),stringsAsFactors=F)
-      if(nrow(build.files)==0)next
-      build.files$iter <- as.numeric(sapply(strsplit(build.files$file,'-iter',fixed=T),function(x){ strsplit(x[2],'-',fixed=T)[[1]][1] }))
-      build.files <- build.files[order(build.files$iter),]
-      build.file.iter <- nrow(build.files)
-    
-      if(!link.pens | pev.penetration==0.005){
-        build.res[[seed]] <- data.frame(iter=rep(build.files$iter,each=105),taz=rep(c(1:52,1:52,0),nrow(build.files)),level=c(rep(2,52),rep(3,52),0),cost=NA,pain=NA,chargers=NA,marg.cost.of.abatement=NA,pen=pev.penetration)
-        all.build.rows <- 1:nrow(build.res[[seed]])
-      }else{
-        build.res[[seed]] <- rbind(build.res[[seed]],data.frame(iter=rep(build.files$iter,each=105),taz=rep(c(1:52,1:52,0),nrow(build.files)),level=c(rep(2,52),rep(3,52),0),cost=NA,pain=NA,chargers=NA,marg.cost.of.abatement=NA,first=NA,name=NA,pen=pev.penetration))
-        all.build.rows <- which(build.res[[seed]]$iter %in% build.files$iter)
-      }
-      
-      for(build.i in 1:build.file.iter){
-        build.res[[seed]][build.res[[seed]]$iter==build.files$iter[build.i],c('cost','pain','chargers','marg.cost.of.abatement')] <- read.csv(paste(path.to.outputs,build.files$file[build.i],sep=''))[,c('cost','pain','chargers','marg.cost.of.abatement')]
-        # write the charger distribution to the inputs directory for use in future model runs
-        write.charger.file(build.res[[seed]]$chargers[build.res[[seed]]$iter==build.files$iter[build.i]][1:104],filepath=paste(path.to.charger.input.file,"/chargers-iter",build.files$iter[build.i],"-pen",pev.penetration*100,".txt",sep=''))
-      }
-    
-      build.res[[seed]]$name <- agg.taz$name[match(build.res[[seed]]$taz,agg.taz$id)]
-    
-      first <- ddply(build.res[[seed]],.(taz),function(df){ data.frame(first=ifelse(sum(df$chargers)>0,subset(df,chargers>ifelse(df$taz%in%c(6,23,27),1,0))$iter[1],9999)) })
-      build.res[[seed]]$first <- first$first[match(build.res[[seed]]$taz,first$taz)]
-      build.res[[seed]]$name <- reorder(build.res[[seed]]$name,build.res[[seed]]$first)
-          
-      results.matrix[,paste('seed',seed,sep='')] <- NA
-      n.iter <- max(build.res[[seed]]$iter)
-      agg.taz$L2 <- NA
-      agg.taz$L3 <- NA
-      for(taz.i in 1:52){
-        results.matrix[taz.i,c(paste('seed',seed,sep=''))] <- build.res[[seed]]$chargers[build.res[[seed]]$taz == taz.i & build.res[[seed]]$iter==n.iter & build.res[[seed]]$level==2]
-        results.matrix[taz.i+52,c(paste('seed',seed,sep=''))] <- build.res[[seed]]$chargers[build.res[[seed]]$taz == taz.i & build.res[[seed]]$iter==n.iter & build.res[[seed]]$level==3]
-        agg.taz$L2[which(agg.taz$id==taz.i)] <- build.res[[seed]]$chargers[build.res[[seed]]$taz == taz.i & build.res[[seed]]$iter==n.iter & build.res[[seed]]$level==2]
-        agg.taz$L3[which(agg.taz$id==taz.i)] <- build.res[[seed]]$chargers[build.res[[seed]]$taz == taz.i & build.res[[seed]]$iter==n.iter & build.res[[seed]]$level==3]
-      }
-    
-    }	# end loop for(seed in 1:n.seeds)
-
-    # make sure we only process columns with numeric values, no NA's
-    numeric.cols <- !is.na(results.matrix[1,])
-    results[[as.character(pev.penetration)]] <- results.matrix[,numeric.cols]
-    reorder.inds <- match(agg.taz$id,agg.taz$order)
-    reorder.inds <- c(reorder.inds,(53:104)[reorder.inds])
-    #cov.data <- cor(t(results[[as.character(pev.penetration)]]))
-    #cov.data <- cov.data[reorder.inds,reorder.inds]
-    mean.results <- apply(results[[as.character(pev.penetration)]],1,mean,na.rm=T)[reorder.inds]
-    sd.results <- apply(results[[as.character(pev.penetration)]],1,sd,na.rm=T)[reorder.inds]
-    
-    agg.taz$L2 <- NA
-    agg.taz$L3 <- NA
-    agg.taz$L2 <- round(mean.results[1:52],digits = 0)
-    agg.taz$L3 <- round(mean.results[53:104])
-    
-    c.map <- paste(map.color(agg.taz@data$weighted.demand,blue2red(50)),'7F',sep='')
-    #demand.to.kml(agg.taz,150e3 * pev.penetration,paste(path.to.google,'buildout/',optim.code,'-pen',100*pev.penetration,'-demand-publish.kml',sep=''),paste('PEV Drivers at ',100*pev.penetration,'% Penetration (Target Year ',target.year,')',sep=''),driver.descrip.text,'black',1.5,c.map,id.col='ID',name.col='name',description.cols=c('weighted.demand'))
-    chargers.to.kml(agg.taz,paste(path.to.outputs.base,'/',optim.code.date,"/",optim.code,'-mean-pen',100*pev.penetration,'.kml',sep=''),paste('Charger Deployment for ',100*pev.penetration,'% PEV Penetration (Target Year ',target.year,')',sep=''),charger.descrip.text,'black',1.5,'#0000FF7F',id.col='ID',name.col='name',description.cols=c('L2','L3','weighted.demand'),open.kml=F)
-
-    # summarize the ranking of each taz in terms of order of first acquisition of a charger, only do it for the last loop or pen4
-    rankings <- data.frame(matrix(9999,52,n.seeds))
-    names(rankings) <- paste("seed",1:n.seeds,sep='')
-    for(seed in 1:n.seeds){
-      winners <- subset(build.res[[seed]],iter==build.res[[seed]]$iter[nrow(build.res[[seed]])] & level > 0)[,c('taz','first')]
-      rankings[winners$taz,seed] <- winners$first
-    }
-    rankings[is.na(rankings)] <- 9999
-    rankings <- apply(rankings,2,function(x){ 
-                      max.real <- max(x[x<9999])
-                      x[x==9999] <- max.real+1
-                      x/(max.real+1) })
-    mean.rank <- order(apply(rankings,1,function(x){ mean(x,na.rm=T) }))
-    mean.data <- data.frame(scenario=optim.code,pen=pev.penetration,name=agg.taz$name,level=c(rep(2,52),rep(3,52)),mean=mean.results,sd=sd.results,mean.rank=match(agg.taz$id,mean.rank))
-    if(!exists('compare')){
-      compare <- mean.data
-    }else{
-      compare <- rbind(compare,mean.data)
-    } 
-    write.csv(mean.data,file=paste(path.to.outputs.base,'/',optim.code.date,'/mean-sd-rank-pen',100*pev.penetration,'.csv',sep=''),row.names=T)
-  }
-}
+    #Prepares a null matrix to fill with values. MAKE SURE N.SEEDS IS ACTUALLY SET!
+   	
 write.csv(compare,file=paste(path.to.outputs.base,'/../analysis/compare-optim-scenarios.csv',sep=''))
 
 # Load data already compiled

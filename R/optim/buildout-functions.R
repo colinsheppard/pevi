@@ -68,7 +68,6 @@ run.buildout.batch <- function(driver.input.file){
   input.i.result <- ddply(subset(taz.charger.combos,include),.(taz,level),function(df) {
       #	Add the candidate charger, then run the model.
       NLCommand(paste('add-charger',df$taz,df$level,build.increment[pp('l',df$level)]))
-      #NLCommand(pp('print "taz',df1$taz,'level ',df1$level,'"'))
       NLCommand('time:go-until 500')
           
       total.charger.cost <-  tryCatch(NLReport('total-charger-cost'),error=function(e){ NA })

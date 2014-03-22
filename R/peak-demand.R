@@ -345,14 +345,27 @@ load.by.circ[,frac.load:=tot.load/sum(tot.load,na.rm=T),by='taz']
 
 # load the demand resuls from PEVI
 load(pp(pevi.shared,'data/inputs/compare/charging-demand/logs.Rdata'))
+load(pp(pevi.shared,'data/inputs/compare/upstate-charging-demand/logs.Rdata'))
+
+if(region='upstate'){
+  load(pp(pevi.shared,'data/UPSTATE/shapefiles/AggregatedTAZsWithPointTAZs.Rdata'))
+  load(pp(pevi.shared,'data/UPSTATE/od-converter.Rdata'))
+  agg.taz$new.id <- od.converter$new.id[match(agg.taz$agg.id,od.converter$old.id)]
+  agg.taz.data <- data.table(agg.taz@data)
+  agg.taz.data[,taz:=new.id]
+  setkey(agg.taz.data,'taz')
+}
 
 dem <- data.table(logs[['tazs']])[time<30 & taz>0]
 dem[,driver.input.file:=NULL]
-dem[,':='(L0=num.L0-num.avail.L0,L2=num.L2-num.avail.L2,num.L0=NULL,num.L1=NULL,num.L2=NULL,num.L3=NULL,num.avail.L0=NULL,num.avail.L1=NULL,num.avail.L2=NULL,num.avail.L3=NULL)]
-dem[,':='(residential=L0*6.6,public=L2*6.6)]
+dem[,':='(L0=num.L0-num.avail.L0,L2=num.L2-num.avail.L2,L3=num.L3-num.avail.L3,num.L0=NULL,num.L1=NULL,num.L2=NULL,num.L3=NULL,num.avail.L0=NULL,num.avail.L1=NULL,num.avail.L2=NULL,num.avail.L3=NULL)]
+dem[,':='(residential=L0*6.6,public=L2*6.6+L3*50,public.2=L2*6.6,public.3=L3*50)]
+setkey(dem,'taz')
+dem <- agg.taz.data[dem]
 
 setkey(dem,'time','penetration')
-ggplot(dem[,list(type=c('res','pub'),load=c(sum(residential),sum(public))),by=c('penetration','time')],aes(x=time,y=load,color=type)) + geom_line() + facet_wrap(~penetration) + labs(x="",y="",title="")
+ggplot(dem[,list(type=c('Residential','Public'),load=c(sum(residential),sum(public))),by=c('penetration','time')],aes(x=time,y=load/1e3,color=type)) + geom_line() + facet_wrap(~penetration) + labs(x="Hour",y="EVSE Demand (MW)",title="Upstate Aggregate Charging Demand by % Penetration of PEVs",colour="Charger Type")
+ggplot(dem[grep('RED_',name) & time>=6,list(type=c('Residential','Public'),load=c(sum(residential),sum(public))),by=c('penetration','time')],aes(x=time,y=load/1e3,color=type)) + geom_line() + facet_wrap(~penetration) + labs(x="Hour",y="EVSE Demand (MW)",title="Redding Aggregate Charging Demand by % Penetration of PEVs",colour="Charger Type")
 
 # pour the demand by time and penetration into the circuits
 

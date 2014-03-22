@@ -76,6 +76,23 @@ winners$delay[new.inds] <- winners$mean.delay.cost[new.inds]
 
 winners$penetration <- winners$penetration*100
 
+################################################
+# Save charger profiles for later runs
+################################################
+ch.sav <- data.table(subset(ch.fin.unshaped,scenario=='new-obj'),key=c('TAZ','penetration'))
+ch.sav <- ch.sav[,list(L0=round(mean(L0)),L1=round(mean(L1)),L2=round(mean(L2)),L3=round(mean(L3)),L4=round(mean(L4))),by=c('TAZ','penetration')]
+existing.ch <- read.table(file=pp(pevi.shared,'data/inputs/charger-input-file/upstate/upstate-existing-chargers.txt'),sep='\t',header=T)
+names(existing.ch) <- c('TAZ',pp('L',0:4))
+d_ply(ch.sav,.(penetration),function(df){
+      pen <- df$penetration[1]
+      df <- df[,c('TAZ',pp('L',0:4))]
+      df <- rbind(df,subset(existing.ch,TAZ<0))
+      names(df) <- c(';TAZ',pp('L',0:4))
+      write.table(df,file=pp(pevi.shared,'data/inputs/charger-input-file/upstate/final-recommendations/upstate-final-rec-pen-',pen*100,'.txt'),sep='\t',row.names=F,quote=F)
+})
+
+
+
 #ggplot(subset(winners,seed==1),aes(x=cum.cost,y=obj,colour=factor(penetration))) + geom_point() + facet_wrap(~scenario,scales='free_y') + labs(x="Infrastructure Cost",y="Objective",title="")
 winners$scenario <- factor(winners$scenario,levels=c('new-obj','L2-10k','L2-20k','opp-cost-10','opp-cost-20'))
 winners$scenario <- revalue(winners$scenario,c('new-obj'='Base','L2-10k'='L2 Cost $10k','L2-20k'='L2 Cost $20k','opp-cost-10'='Opportunity Cost $10/hr','opp-cost-20'='Opportunity Cost $20/hr'))
@@ -142,8 +159,12 @@ agg.taz.data <- read.csv(pp(pevi.shared,'data/UPSTATE/results/maps/agg-taz-data.
 agg.taz.data <- agg.taz.data[match(agg.taz$agg.id,agg.taz.data$agg.id),]
 agg.taz.data$x <- agg.coords[,1]
 agg.taz.data$y <- agg.coords[,2]
+agg.taz$x <- agg.coords[,1]
+agg.taz$y <- agg.coords[,2]
+agg.taz$low.zoom.group <- agg.taz.data$low.zoom.group[match(agg.taz$agg.id,agg.taz.data$agg.id)]
+agg.taz$med.zoom.group <- agg.taz.data$med.zoom.group[match(agg.taz$agg.id,agg.taz.data$agg.id)]
 
-win <- data.table(subset(winners,scenario=='new-obj'),key=c('seed','penetration','iteration'))
+win <- data.table(subset(winners,scenario=='new-obj' & penetration==0.5),key=c('seed','penetration','iteration'))
 win[,rank:=(1:length(iteration))/length(iteration),by='seed']
 setkey(win,'taz','level','seed')
 best.ranks <- win[,list(rank=min(rank)),by=c('taz','level','seed')]
@@ -153,7 +174,7 @@ best.ranks[,percentile:=(1:length(rank))/length(rank)]
 best.ranks[,quartile:=ifelse(percentile<=0.25,1,ifelse(percentile<=0.5,2,ifelse(percentile<=0.75,3,4)))]
 best.ranks$name <- agg.taz.data$name[match(best.ranks$taz,agg.taz$new.id)]
 # only works if below code has been run
-agg.taz.data.for.join <- data.table(melt(agg.taz.data,id.vars=c('new.id'),measure.vars=c('L2','L3')))
+agg.taz.data.for.join <- data.table(melt(agg.taz@data,id.vars=c('new.id'),measure.vars=c('L2','L3')))
 agg.taz.data.for.join[,taz:=new.id]
 agg.taz.data.for.join[,level:=ifelse(variable=="L2",2,3)]
 setkey(agg.taz.data.for.join,'taz','level')
@@ -161,7 +182,7 @@ setkey(best.ranks,'taz','level')
 best.ranks <- agg.taz.data.for.join[best.ranks]
 setkey(best.ranks,'rank')
 
-write.csv(best.ranks,pp(pevi.shared,'data/UPSTATE/results/charger-priorities.csv'))
+write.csv(best.ranks,pp(pevi.shared,'data/UPSTATE/results/charger-priorities-0.5.csv'))
 
 ########################
 # GOOGLE MAP
@@ -180,71 +201,88 @@ mean.ch.fin <- ddply(ch.fin,.(penetration,TAZ,level,scenario),function(df){
 	data.frame(num.chargers = round(mean(df$value,na.rm=TRUE)))
 })
 
-setkey(best.ranks,'taz','level')
-#l2.scenario <- subset(ch.fin,penetration==0.02 & seed==4 & level=='L2',select=c('penetration','TAZ','seed','level','new-obj'))
-l2.scenario <- subset(mean.ch.fin,penetration==0.02 & level=='L2' & scenario=='new-obj',select=c('TAZ','num.chargers'))
-agg.taz$L2 <- l2.scenario$num.chargers[match(agg.taz$new.id,l2.scenario$TAZ)]
-agg.taz$L2.rank <- best.ranks[J(agg.taz.data$new.id,2),quartile]$quartile
-#l3.scenario <- subset(ch.fin,penetration==0.02 & seed==4 & level=='L3',select=c('penetration','TAZ','seed','level','new-obj'))
-l3.scenario <- subset(mean.ch.fin,penetration==0.02 & level=='L3' & scenario=='new-obj',select=c('TAZ','num.chargers'))
-agg.taz$L3 <- l3.scenario$num.chargers[match(agg.taz$new.id,l3.scenario$TAZ)]
-agg.taz$L3.rank <- best.ranks[J(agg.taz.data$new.id,3),quartile]$quartile
-agg.taz$L2E <- agg.taz.data$L2E
-agg.taz$L3E <- agg.taz.data$L3E
+for(pen in c(0.005,0.01,0.02)){
+  setkey(best.ranks,'taz','level')
+  l2.scenario <- subset(mean.ch.fin,penetration==pen & level=='L2' & scenario=='new-obj',select=c('TAZ','num.chargers'))
+  agg.taz$L2 <- l2.scenario$num.chargers[match(agg.taz$new.id,l2.scenario$TAZ)]
+  agg.taz$L2.rank <- best.ranks[J(agg.taz.data$new.id,2),quartile]$quartile
+  l3.scenario <- subset(mean.ch.fin,penetration==pen & level=='L3' & scenario=='new-obj',select=c('TAZ','num.chargers'))
+  agg.taz$L3 <- l3.scenario$num.chargers[match(agg.taz$new.id,l3.scenario$TAZ)]
+  agg.taz$L3.rank <- best.ranks[J(agg.taz.data$new.id,3),quartile]$quartile
+  agg.taz$L2E <- agg.taz.data$L2E
+  agg.taz$L3E <- agg.taz.data$L3E
 
-# Here we override the model results for 
-agg.taz$L3[which(agg.taz$name=="Lakehead")] <- 1
-agg.taz$L3.rank[which(agg.taz$name=="Lakehead")] <- 4
+  # Here we override the model results for a bunch of TAZs, moving them somewhere else
+  if(pen==0.005){
+    agg.taz$L3[which(agg.taz$name=="MtShasta")] <- 1
+    agg.taz$L3.rank[which(agg.taz$name=="MtShasta")] <- 4
+  }
+  agg.taz$L3[which(agg.taz$name=="Lakehead")] <- 1
+  agg.taz$L3.rank[which(agg.taz$name=="Lakehead")] <- 4
+  agg.taz$L2[which(agg.taz$name=="Gerber")] <- 0
+  agg.taz$L2[which(agg.taz$name=="Corning")] <- agg.taz$L2[which(agg.taz$name=="Corning")] + 1
+  agg.taz$L2[which(agg.taz$name=="Red Bluff")] <- agg.taz$L2[which(agg.taz$name=="Red Bluff")] + 1
+  agg.taz$L2[which(agg.taz$name=="Shasta")] <- agg.taz$L2[which(agg.taz$name=="Shasta")] + agg.taz$L2[which(agg.taz$name=="FrenchGulch")]
+  agg.taz$L2[which(agg.taz$name=="FrenchGulch")] <- 0
+  agg.taz$L2[which(agg.taz$name=="HappyValley")] <- agg.taz$L2[which(agg.taz$name=="HappyValley")] + agg.taz$L2[which(agg.taz$name=="OnoIgo")]
+  agg.taz$L2[which(agg.taz$name=="OnoIgo")] <- 0
+  agg.taz$L2[which(agg.taz$name=="Millville")] <- agg.taz$L2[which(agg.taz$name=="Millville")] + agg.taz$L2[which(agg.taz$name=="Whitmore")]
+  agg.taz$L2[which(agg.taz$name=="Whitmore")] <- 0
+  agg.taz$L2[which(agg.taz$name=="Burney")] <- agg.taz$L2[which(agg.taz$name=="Burney")] + agg.taz$L2[which(agg.taz$name=="BigBend")]
+  agg.taz$L2[which(agg.taz$name=="BigBend")] <- 0
 
-plur.station <- function(num,rank){
-  res <- ifelse(num>1,'stations','station')
-  res <- ifelse(is.na(rank),res,pp(res,' (Priority: ',ifelse(rank==1,'first',ifelse(rank==2,'second',ifelse(rank==3,'third','fourth'))),')'))
-  res
+  shp.to.kml(agg.taz,pp(pevi.shared,'data/UPSTATE/results/maps/tazs-',pen,'.kml'),pp('Upstate ',100*pen,'% Results'),'',borders="black",colors='#FFFFFF33',id.col="shp.id",name.col="name",description.cols=c('L2','L2.rank','L3','L3.rank'))
+
+  plur.station <- function(num,rank){
+    res <- ifelse(num>1,'stations','station')
+    res <- ifelse(is.na(rank),res,pp(res,' (Priority: ',ifelse(rank==1,'first',ifelse(rank==2,'second',ifelse(rank==3,'third','fourth'))),')'))
+    res
+  }
+
+  # For the charger files that wll get translated nto Google maps, we use mean.ch.fin
+  # Each charger is defined by an array: 
+  # [ NAME, LONG, LAT, DESCRIP, # CHARGERS, APPEAR ABOVE ZOOM, APPEAR BELOW ZOOM, EXISTING CHARGER?, L3 CHARGER? ]
+  charger.data.file <- pp(pevi.shared,'data/UPSTATE/results/maps/charger-data-',pen*100,'.yaml')
+  cat('chargers:\n',file=charger.data.file)
+
+  # start with the high zoom level tazs
+  for(i in 1:nrow(agg.taz@data)){
+    appear.above.zoom <- ifelse(length(grep("_",agg.taz$name[i]))>0,'9','9')
+    separator.factor <- ifelse(length(grep("RED_",agg.taz$name[i]))>0,1,2)
+    vadjust <- ifelse(length(grep("SHA_BearMountain",agg.taz$name[i]))>0,-0.04,0)
+    if(agg.taz$L2[i] > 0) cat(sprintf(pp("  - ['%s',%f,%f,'<b>%s</b> <br/>%d proposed Level 2 charging ",plur.station(agg.taz$L2[i],agg.taz$L2.rank[i]),"',%d,%s,%s,%s,%s]\n"),agg.taz$name[i],agg.coords[i,1]-separator.factor*0.002,agg.coords[i,2]+vadjust,agg.taz$name[i],agg.taz$L2[i],agg.taz$L2[i],appear.above.zoom,'null','false','false'),file=charger.data.file,append=T)
+    if(agg.taz$L3[i] > 0) cat(sprintf(pp("  - ['%s',%f,%f,'<b>%s</b> <br/>%d proposed Level 3 (DC Fast) charging ",plur.station(agg.taz$L3[i],agg.taz$L3.rank[i]),"',%d,%s,%s,%s,%s]\n"),agg.taz$name[i],agg.coords[i,1]+0.002*separator.factor,agg.coords[i,2]-0.002*separator.factor+vadjust,agg.taz$name[i],agg.taz$L3[i],agg.taz$L3[i],appear.above.zoom,'null','false','true'),file=charger.data.file,append=T)
+    if(agg.taz$L2E[i] > 0) cat(sprintf(pp("  - ['%s',%f,%f,'<b>%s</b> <br/>%d existing Level 2 charging ",plur.station(agg.taz$L2E[i],NA),"',%d,%s,%s,%s,%s]\n"),agg.taz$name[i],agg.coords[i,1],agg.coords[i,2]-0.005*separator.factor+vadjust,agg.taz$name[i],agg.taz$L2E[i],agg.taz$L2E[i],appear.above.zoom,'null','true','false'),file=charger.data.file,append=T)
+    if(agg.taz$L3E[i] > 0) cat(sprintf(pp("  - ['%s',%f,%f,'<b>%s</b> <br/>%d existing Level 3 (DC Fast) charging ",plur.station(agg.taz$L3E[i],NA),"',%d,%s,%s,%s,%s]\n"),agg.taz$name[i],agg.coords[i,1],agg.coords[i,2]-0.005*separator.factor+vadjust,agg.taz$name[i],agg.taz$L3E[i],agg.taz$L3E[i],appear.above.zoom,'null','true','true'),file=charger.data.file,append=T)
+  }
+  # now write medium zooms. To have medium zoom disappear as high zoom appears, make sure the maximum zoom level is 1 lower than high zoom's lowest level.
+  d_ply(agg.taz@data,.(med.zoom.group),function(df){
+    lon <- mean(df$x)
+    lat <- mean(df$y)
+    l2 <- sum(df$L2)
+    l3 <- sum(df$L3)
+    l2E <- sum(df$L2E)
+    l3E <- sum(df$L3E)
+    if(l2 > 0) cat(sprintf(pp("  - ['%s',%f,%f,'<b>%s</b> <br/>%d proposed Level 2 charging ",plur.station(l2,NA),"',%d,%d,%d,%s,%s]\n"),df$med.zoom.group[1],lon-0.02,lat,df$med.zoom.group[1],l2,l2,8,10,'false','false'),file=charger.data.file,append=T)
+    if(l3 > 0) cat(sprintf(pp("  - ['%s',%f,%f,'<b>%s</b> <br/>%d proposed Level 3 (DC Fast) charging ",plur.station(l3,NA),"',%d,%d,%d,%s,%s]\n"),df$med.zoom.group[1],lon+0.02,lat-0.01,df$med.zoom.group[1],l3,l3,8,10,'false','true'),file=charger.data.file,append=T)
+    if(l2E > 0) cat(sprintf(pp("  - ['%s',%f,%f,'<b>%s</b> <br/>%d existing Level 2 charging ",plur.station(l2E,NA),"',%d,%d,%d,%s,%s]\n"),df$med.zoom.group[1],lon+0.02,lat-0.03,df$med.zoom.group[1],l2E,l2E,8,10,'true','false'),file=charger.data.file,append=T)
+    if(l3E > 0) cat(sprintf(pp("  - ['%s',%f,%f,'<b>%s</b> <br/>%d existing Level 3 (DC Fast) charging ",plur.station(l3E,NA),"',%d,%d,%d,%s,%s]\n"),df$med.zoom.group[1],lon-0.02,lat-0.04,df$med.zoom.group[1],l3E,l3E,8,10,'true','true'),file=charger.data.file,append=T)
+  })
+  # low zoom
+  d_ply(agg.taz@data,.(low.zoom.group),function(df){
+    # For the time being, take the average lat/lon values for the placement of the low zoom icon.
+    lon <- mean(df$x)
+    lat <- mean(df$y)
+    l2 <- sum(df$L2)
+    l3 <- sum(df$L3)
+    l2E <- sum(df$L2E)
+    l3E <- sum(df$L3E)
+    if(l2 > 0) cat(sprintf(pp("  - ['%s',%f,%f,'<b>%s</b> <br/>%d proposed Level 2 charging ",plur.station(l2,NA),"',%d,%s,%d,%s,%s]\n"),df$low.zoom.group[1],lon-0.15,lat,df$low.zoom.group[1],l2,l2,'null',9,'false','false'),file=charger.data.file,append=T)
+    if(l3 > 0) cat(sprintf(pp("  - ['%s',%f,%f,'<b>%s</b> <br/>%d proposed Level 3 (DC Fast) charging ",plur.station(l3,NA),"',%d,%s,%d,%s,%s]\n"),df$low.zoom.group[1],lon+0.15,lat,df$low.zoom.group[1],l3,l3,'null',9,'false','true'),file=charger.data.file,append=T)
+    if(l2E > 0) cat(sprintf(pp("  - ['%s',%f,%f,'<b>%s</b> <br/>%d existing Level 2 charging ",plur.station(l2E,NA),"',%d,%s,%d,%s,%s]\n"),df$low.zoom.group[1],lon,lat+0.15,df$low.zoom.group[1],l2E,l2E,'null',9,'true','false'),file=charger.data.file,append=T)
+    if(l3E > 0) cat(sprintf(pp("  - ['%s',%f,%f,'<b>%s</b> <br/>%d existing Level 3 (DC Fast) charging ",plur.station(l3E,NA),"',%d,%s,%d,%s,%s]\n"),df$low.zoom.group[1],lon,lat-0.15,df$low.zoom.group[1],l3E,l3E,'null',9,'true','true'),file=charger.data.file,append=T)
+  })
 }
-
-# For the charger files that wll get translated nto Google maps, we use mean.ch.fin
-# Each charger is defined by an array: 
-# [ NAME, LONG, LAT, DESCRIP, # CHARGERS, APPEAR ABOVE ZOOM, APPEAR BELOW ZOOM, EXISTING CHARGER?, L3 CHARGER? ]
-charger.data.file <- pp(pevi.shared,'data/UPSTATE/results/maps/charger-data.yaml')
-cat('chargers:\n',file=charger.data.file)
-
-# start with the high zoom level tazs
-for(i in 1:nrow(agg.taz@data)){
-  appear.above.zoom <- ifelse(length(grep("_",agg.taz$name[i]))>0,'9','9')
-  separator.factor <- ifelse(length(grep("RED_",agg.taz$name[i]))>0,1,2)
-  vadjust <- ifelse(length(grep("SHA_BearMountain",agg.taz$name[i]))>0,-0.04,0)
-  if(agg.taz$L2[i] > 0) cat(sprintf(pp("  - ['%s',%f,%f,'<b>%s</b> <br/>%d proposed Level 2 charging ",plur.station(agg.taz$L2[i],agg.taz$L2.rank[i]),"',%d,%s,%s,%s,%s]\n"),agg.taz$name[i],agg.coords[i,1]-separator.factor*0.002,agg.coords[i,2]+vadjust,agg.taz$name[i],agg.taz$L2[i],agg.taz$L2[i],appear.above.zoom,'null','false','false'),file=charger.data.file,append=T)
-  if(agg.taz$L3[i] > 0) cat(sprintf(pp("  - ['%s',%f,%f,'<b>%s</b> <br/>%d proposed Level 3 (DC Fast) charging ",plur.station(agg.taz$L3[i],agg.taz$L3.rank[i]),"',%d,%s,%s,%s,%s]\n"),agg.taz$name[i],agg.coords[i,1]+0.002*separator.factor,agg.coords[i,2]-0.002*separator.factor+vadjust,agg.taz$name[i],agg.taz$L3[i],agg.taz$L3[i],appear.above.zoom,'null','false','true'),file=charger.data.file,append=T)
-	if(agg.taz$L2E[i] > 0) cat(sprintf(pp("  - ['%s',%f,%f,'<b>%s</b> <br/>%d existing Level 2 charging ",plur.station(agg.taz$L2E[i],NA),"',%d,%s,%s,%s,%s]\n"),agg.taz$name[i],agg.coords[i,1],agg.coords[i,2]-0.005*separator.factor+vadjust,agg.taz$name[i],agg.taz$L2E[i],agg.taz$L2E[i],appear.above.zoom,'null','true','false'),file=charger.data.file,append=T)
-  if(agg.taz$L3E[i] > 0) cat(sprintf(pp("  - ['%s',%f,%f,'<b>%s</b> <br/>%d existing Level 3 (DC Fast) charging ",plur.station(agg.taz$L3E[i],NA),"',%d,%s,%s,%s,%s]\n"),agg.taz$name[i],agg.coords[i,1],agg.coords[i,2]-0.005*separator.factor+vadjust,agg.taz$name[i],agg.taz$L3E[i],agg.taz$L3E[i],appear.above.zoom,'null','true','true'),file=charger.data.file,append=T)
-}
-# now write medium zooms. To have medium zoom disappear as high zoom appears, make sure the maximum zoom level is 1 lower than high zoom's lowest level.
-d_ply(agg.taz.data,.(med.zoom.group),function(df){
-  lon <- mean(df$x)
-  lat <- mean(df$y)
-  l2 <- sum(df$L2)
-  l3 <- sum(df$L3)
-  l2E <- sum(df$L2E)
-  l3E <- sum(df$L3E)
-  if(l2 > 0) cat(sprintf(pp("  - ['%s',%f,%f,'<b>%s</b> <br/>%d proposed Level 2 charging ",plur.station(l2,NA),"',%d,%d,%d,%s,%s]\n"),df$med.zoom.group[1],lon-0.02,lat,df$med.zoom.group[1],l2,l2,8,10,'false','false'),file=charger.data.file,append=T)
-	if(l3 > 0) cat(sprintf(pp("  - ['%s',%f,%f,'<b>%s</b> <br/>%d proposed Level 3 (DC Fast) charging ",plur.station(l3,NA),"',%d,%d,%d,%s,%s]\n"),df$med.zoom.group[1],lon+0.02,lat-0.01,df$med.zoom.group[1],l3,l3,8,10,'false','true'),file=charger.data.file,append=T)
-  if(l2E > 0) cat(sprintf(pp("  - ['%s',%f,%f,'<b>%s</b> <br/>%d existing Level 2 charging ",plur.station(l2E,NA),"',%d,%d,%d,%s,%s]\n"),df$med.zoom.group[1],lon+0.02,lat-0.03,df$med.zoom.group[1],l2E,l2E,8,10,'true','false'),file=charger.data.file,append=T)
-	if(l3E > 0) cat(sprintf(pp("  - ['%s',%f,%f,'<b>%s</b> <br/>%d existing Level 3 (DC Fast) charging ",plur.station(l3E,NA),"',%d,%d,%d,%s,%s]\n"),df$med.zoom.group[1],lon-0.02,lat-0.04,df$med.zoom.group[1],l3E,l3E,8,10,'true','true'),file=charger.data.file,append=T)
-})
-# low zoom
-d_ply(agg.taz.data,.(low.zoom.group),function(df){
-	# For the time being, take the average lat/lon values for the placement of the low zoom icon.
-  lon <- mean(df$x)
-  lat <- mean(df$y)
-  l2 <- sum(df$L2)
-  l3 <- sum(df$L3)
-  l2E <- sum(df$L2E)
-  l3E <- sum(df$L3E)
-	if(l2 > 0) cat(sprintf(pp("  - ['%s',%f,%f,'<b>%s</b> <br/>%d proposed Level 2 charging ",plur.station(l2,NA),"',%d,%s,%d,%s,%s]\n"),df$low.zoom.group[1],lon-0.15,lat,df$low.zoom.group[1],l2,l2,'null',9,'false','false'),file=charger.data.file,append=T)
-	if(l3 > 0) cat(sprintf(pp("  - ['%s',%f,%f,'<b>%s</b> <br/>%d proposed Level 3 (DC Fast) charging ",plur.station(l3,NA),"',%d,%s,%d,%s,%s]\n"),df$low.zoom.group[1],lon+0.15,lat,df$low.zoom.group[1],l3,l3,'null',9,'false','true'),file=charger.data.file,append=T)
-	if(l2E > 0) cat(sprintf(pp("  - ['%s',%f,%f,'<b>%s</b> <br/>%d existing Level 2 charging ",plur.station(l2E,NA),"',%d,%s,%d,%s,%s]\n"),df$low.zoom.group[1],lon,lat+0.15,df$low.zoom.group[1],l2E,l2E,'null',9,'true','false'),file=charger.data.file,append=T)
-	if(l3E > 0) cat(sprintf(pp("  - ['%s',%f,%f,'<b>%s</b> <br/>%d existing Level 3 (DC Fast) charging ",plur.station(l3E,NA),"',%d,%s,%d,%s,%s]\n"),df$low.zoom.group[1],lon,lat-0.15,df$low.zoom.group[1],l3E,l3E,'null',9,'true','true'),file=charger.data.file,append=T)
-})
 
 
 

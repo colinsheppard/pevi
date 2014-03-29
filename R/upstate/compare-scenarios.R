@@ -59,7 +59,7 @@ if("vehicle-type-input-file" %in% names(vary)){
 }
 
 # don't run unnecessary scenarios, only for charing demand experiment
-results <- subset(results,(penetration==0.5 & infrastructure.scenario=='upstate-final-rec-pen-0.5') | (penetration==1 & infrastructure.scenario=='upstate-final-rec-pen-1') | (penetration==2 & infrastructure.scenario=='upstate-final-rec-pen-2'))
+#results <- subset(results,(penetration==0.5 & infrastructure.scenario=='upstate-final-rec-pen-0.5') | (penetration==1 & infrastructure.scenario=='upstate-final-rec-pen-1') | (penetration==2 & infrastructure.scenario=='upstate-final-rec-pen-2'))
 
 # start NL
 tryCatch(NLStart(nl.path, gui=F),error=function(err){ NA })

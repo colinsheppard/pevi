@@ -5,15 +5,18 @@
 #path.to.combined.inputs <- pp(pevi.shared,'data/inputs/driver-input-file/upstate-combined/')
 
 load(pp(pevi.shared,'data/inputs/driver-input-file/delhi-uncombined-schedule-replicates-20140217.Rdata'))
-path.to.combined.inputs <- pp(pevi.shared,'data/inputs/driver-input-file/delhi-combined/')
+path.to.combined.inputs <- pp(pevi.shared,'data/inputs/driver-input-file/delhi-combined/doubled/')
 path.to.combined.homeless.inputs <- pp(pevi.shared,'data/inputs/driver-input-file/delhi-combined/homeless/')
 path.to.combined.half.homeless.inputs <- pp(pevi.shared,'data/inputs/driver-input-file/delhi-combined/half-homeless/')
 
 pens <- c(0.005,0.01,0.02)
+schedule.reps[['0.01']] <- list()
 
+#path.to.combined <- path.to.combined.inputs
 for (pen in pens){
+  prev.pen <- ifelse(pen==0.01,'0.005','0.01')
   #pen <- pens[1]
-  final.end <- ifelse(pen==0.005,80,80/(pen/0.005))
+  final.end <- ifelse(pen==0.005,20,20/(pen/0.005))
   for (final.replicate in 1:final.end){
     #final.replicate <- 1
     rep.1 <- 2*final.replicate-1
@@ -22,25 +25,29 @@ for (pen in pens){
       sched <- schedule.reps[['0.005']][[final.replicate]]
       next.sched <- data.frame()
     }else{
-      sched <- schedule.reps[['0.005']][[rep.1]]
-      next.sched <- schedule.reps[['0.005']][[rep.2]]
+      sched <- schedule.reps[[prev.pen]][[rep.1]]
+      next.sched <- schedule.reps[[prev.pen]][[rep.2]]
       next.sched$driver <- next.sched$driver + max(sched$driver)
     }
     new.sched <- data.table(rbind(sched,next.sched,deparse.level = 0),key='driver')
+    if(pen==0.01){
+      schedule.reps[['0.01']][[final.replicate]] <- new.sched
+    }
     new.sched <- as.data.frame(new.sched[,list(from=rep(from,2),to=rep(to,2),depart=c(depart,depart+24),home=rep(home,2)),by='driver'])
-    #new.sched <- rbind(sched,next.sched,deparse.level = 0)
-    #new.sched <- ddply(new.sched,.(driver),function(df){ 
-                   #df2 <- df 
-                   #df2$depart <- df2$depart + 24
-                   #rbind(df,df2)
-                  #})
-    evics <- data.frame(driver=unique(new.sched$driver),evict=sample(c(T,F),length(unique(new.sched$driver)),replace=T))
-    evics.sched <- evics$evict[match(new.sched$driver,evics$driver)]
-    names(new.sched) <- c(';driver',tail(names(new.sched),-1))
-    #write.table(new.sched[,c(';driver','from','to','depart','home')],file=paste(path.to.combined.inputs,"driver-schedule-pen",pen*100,"-rep",final.replicate,"-20140217.txt",sep=''),sep='\t',row.names=F,quote=F)
-    new.sched$home[evics.sched] <- 0
-    write.table(new.sched[,c(';driver','from','to','depart','home')],file=paste(path.to.combined.half.homeless.inputs,"driver-schedule-pen",pen*100,"-rep",final.replicate,"-20140217.txt",sep=''),sep='\t',row.names=F,quote=F)
-    new.sched$home <- 0
-    #write.table(new.sched[,c(';driver','from','to','depart','home')],file=paste(path.to.combined.homeless.inputs,"driver-schedule-pen",pen*100,"-rep",final.replicate,"-20140217.txt",sep=''),sep='\t',row.names=F,quote=F)
+    for(path.to.combined in c(path.to.combined.inputs,path.to.combined.half.homeless.inputs,path.to.combined.homeless.inputs)){
+      if(path.to.combined == path.to.combined.half.homeless.inputs){
+        names(new.sched) <- c('driver',tail(names(new.sched),-1))
+        evics <- data.frame(driver=unique(new.sched$driver),evict=sample(c(T,F),length(unique(new.sched$driver)),replace=T))
+        evics.sched <- evics$evict[match(new.sched$driver,evics$driver)]
+        new.sched$home[evics.sched] <- 0
+      }else if(path.to.combined == path.to.combined.homeless.inputs){
+        new.sched$home <- 0
+      }
+      names(new.sched) <- c(';driver',tail(names(new.sched),-1))
+      write.table(new.sched[,c(';driver','from','to','depart','home')],file=pp(path.to.combined,"driver-schedule-pen",pen*100,"-rep",final.replicate,"-20140217.txt"),sep='\t',row.names=F,quote=F)
+      print(pp(path.to.combined,"driver-schedule-pen",pen*100,"-rep",final.replicate,"-20140217.txt"))
+      print(h(new.sched))
+      print(sum(new.sched$home==0))
+    }
   }
 }

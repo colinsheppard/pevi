@@ -3,12 +3,12 @@ options(java.parameters="-Xmx2048m")
 load.libraries(c('ggplot2','yaml','RNetLogo','plyr','reshape','stringr'))
 
 #exp.name <- commandArgs(trailingOnly=T)[1]
-exp.name <- 'delhi-homeless'
+exp.name <- 'delhi-battery-swap'
 path.to.inputs <- pp(pevi.shared,'data/inputs/compare/',exp.name,'/')
 
-#to.log <- c('pain','charging','need-to-charge')
+to.log <- c()
+#to.log <- c('pain','charging','trip')
 #to.log <- c('pain','charging','tazs','trip')
-to.log <- c('pain','charging','trip')
 
 # load the reporters and loggers needed to summarize runs and disable logging
 source(paste(pevi.home,"R/reporters-loggers.R",sep=''))
@@ -58,10 +58,26 @@ if("vehicle-type-input-file" %in% names(vary)){
   results$vehicle.scenario <- as.numeric(unlist(lapply(strsplit(as.character(results$vehicle.type.input.file),'-scen',fixed=T),function(x){ unlist(strsplit(x[2],".txt",fixed=T)) })))
   results$vehicle.scenario.named <- results$vehicle.scenario
   results$vehicle.scenario.order <- results$vehicle.scenario
-  for(scen.i in as.numeric(names(naming$`vehicle-type-input-file`))){
-    results$vehicle.scenario.named[results$vehicle.scenario == scen.i] <- naming$`vehicle-type-input-file`[[as.character(scen.i)]][[1]]
-    results$vehicle.scenario.order[results$vehicle.scenario == scen.i] <- as.numeric(naming$`vehicle-type-input-file`[[as.character(scen.i)]][[2]])
+  if(all(is.na(results$vehicle.scenario))){
+    for(scen.i in names(naming$`vehicle-type-input-file`)){
+      results$vehicle.scenario[grep(scen.i,as.character(results$vehicle.type.input.file))] <- scen.i
+      results$vehicle.scenario.named[results$vehicle.scenario == scen.i] <- naming$`vehicle-type-input-file`[[scen.i]][[1]]
+      results$vehicle.scenario.order[results$vehicle.scenario == scen.i] <- as.numeric(naming$`vehicle-type-input-file`[[scen.i]][[2]])
+    }
+  }else{
+    for(scen.i in as.numeric(names(naming$`vehicle-type-input-file`))){
+      results$vehicle.scenario.named[results$vehicle.scenario == scen.i] <- naming$`vehicle-type-input-file`[[as.character(scen.i)]][[1]]
+      results$vehicle.scenario.order[results$vehicle.scenario == scen.i] <- as.numeric(naming$`vehicle-type-input-file`[[as.character(scen.i)]][[2]])
+    }
   }
+}
+if(exp.name=='delhi-battery-swap'){
+  results <- subset(results,(penetration==0.5 & infrastructure.scenario=='delhi-final-rec-pen-0.5') | 
+                    (penetration==1 & infrastructure.scenario=='delhi-final-rec-pen-1') | 
+                    (penetration==2 & infrastructure.scenario=='delhi-final-rec-pen-2') |
+                    (penetration==0.5 & infrastructure.scenario=='delhi-final-with-swap-pen-0.5') | 
+                    (penetration==1 & infrastructure.scenario=='delhi-final-with-swap-pen-1') | 
+                    (penetration==2 & infrastructure.scenario=='delhi-final-with-swap-pen-2'))
 }
 
 # start NL
@@ -100,8 +116,8 @@ for(results.i in 1:nrow(results)){
       NLCommand(paste('set ',param,' ',vary.tab[results.i,param],'',sep=''))
     }
   }
-  if("tazs" %in% to.log)NLCommand('set log-taz-time-interval 15')
-  NLCommand('set go-until-time 100')
+  if("tazs" %in% to.log)NLCommand('set log-taz-time-interval 5')
+  NLCommand('set go-until-time 55')
   NLCommand('setup')
 
   NLCommand('time:go-until go-until-time')
@@ -154,6 +170,14 @@ for(log.file in to.log){
       logs[[log.file]]$infrastructure.scenario.order[logs[[log.file]]$infrastructure.scenario == scen.i] <- as.numeric(naming$`charger-input-file`[[scen.i]][[2]])
     }
   }
+  if('vehicle.type.input.file' %in% names(logs[[log.file]])){
+    logs[[log.file]]$vehicle.scenario <- NA
+    for(scen.i in names(naming$`vehicle-type-input-file`)){
+      logs[[log.file]]$vehicle.scenario[grep(scen.i,as.character(logs[[log.file]]$vehicle.type.input.file))] <- scen.i
+      logs[[log.file]]$vehicle.scenario.named[logs[[log.file]]$vehicle.scenario == scen.i] <- naming$`vehicle-type-input-file`[[scen.i]][[1]]
+      logs[[log.file]]$vehicle.scenario.order[logs[[log.file]]$vehicle.scenario == scen.i] <- as.numeric(naming$`vehicle-type-input-file`[[scen.i]][[2]])
+    }
+  }
 }
 save(logs,file=paste(path.to.inputs,'logs.Rdata',sep=''))
 #load(paste(path.to.inputs,'logs.Rdata',sep=''))
@@ -162,18 +186,25 @@ save(logs,file=paste(path.to.inputs,'logs.Rdata',sep=''))
 # ANALYSIS
 #######################################
 # ANALYZE PAIN
+ggplot(subset(logs[['pain']],replicate==1 & pain.type%in%c("stranded","delay")),aes(x=time,y=state.of.charge,colour=pain.type,shape=location>0))+geom_point()+facet_grid(~vehicle.scenario.named)
+
 ggplot(logs[['pain']],aes(x=time,y=state.of.charge,colour=pain.type,shape=vehicle.type))+geom_point()+facet_grid(charge.safety.factor~replicate)
 ggplot(subset(logs[['pain']],penetration==0.5 & replicate==1 & pain.type=='delay'),aes(x=time,y=state.of.charge,shape=vehicle.type,colour=pain.value))+geom_point()+facet_wrap(~pain.type)
 ggplot(subset(logs[['pain']],pain.type=='stranded'),aes(x=time,y=state.of.charge,shape=vehicle.type))+geom_point()+facet_wrap(penetration~replicate)
 
 ggplot(subset(logs[['pain']],pain.type=="delay"),aes(x=time,y=state.of.charge,colour=pain.type,shape=location))+geom_point()+facet_grid(charge.safety.factor~replicate)
-ggplot(subset(logs[['pain']],pain.type=="delay"),aes(x=time,y=state.of.charge,colour=pain.type,label=location))+geom_text()+facet_grid(charge.safety.factor~replicate)
+ggplot(subset(logs[['pain']],pain.type=="delay"),aes(x=time,y=state.of.charge,colour=pain.type,label=location))+geom_text()+facet_grid(vehicle.scenario.name~replicate)
 
 ggplot(subset(logs[['pain']],pain.type=="delay" & num.simulation.days==2),aes(x=time,y=state.of.charge,colour=vehicle.type,shape=vehicle.type))+geom_point()+facet_grid(itin.scenario.named~replicate)
 ggplot(subset(logs[['pain']],pain.type%in%c("delay","stranded") & num.simulation.days==2),aes(x=time,y=state.of.charge,colour=pain.type,shape=vehicle.type))+geom_point()+facet_grid(itin.scenario.named~replicate)
 
 # bulk # of delays and strandings
 ddply(subset(logs[['pain']],pain.type%in%c("delay","stranded") & num.simulation.days==2),.(pain.type,itin.scenario),nrow)
+# now plot it 
+logs[['pain']]$vehicle.scenario.named <- factor(logs[['pain']]$vehicle.scenario.named,c("All Low","Low/Med/High (33/33/33)","All High"))
+ggplot(ddply(subset(logs[['pain']],pain.type%in%c("delay","stranded")),.(pain.type,vehicle.scenario.named),nrow),aes(x=vehicle.scenario.named,y=V1,fill=pain.type))+geom_bar(stat='identity',position='dodge')+labs(title="Number of Delay and Stranding Events Over 5 Replicates and a Constant Infrastructure",x="Scenario",y="Number of Events",fill="Event Type")
+
+
 ddply(subset(logs[['results']],num.simulation.days==2),.(itin.scenario),function(df){ data.frame(delay.cost=mean(df$total.delay.cost/1e6),delay.per.driver=mean(df$total.delay/df$num.drivers),frac.drivers.delayed=mean(df$frac.drivers.delayed),energy.charged=mean(df$energy.charged),electric.miles.driven=mean(df$electric.miles.driven)) })
 
 # how many delays are by the same driver

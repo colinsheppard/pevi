@@ -12,12 +12,13 @@ load.libraries(c('optparse','yaml','RNetLogo','plyr','reshape','stringr'),quietl
 option_list <- list(
   make_option(c("-d", "--experimentdir"), type="character", default='.', help="Path to the directory containing the files needed to run the optimization (params.txt, vary.yaml, paths.yaml) [\"%default\"]"),
   make_option(c("-s", "--seed"), type="integer", default=-1, help="Override seeds in params.R with a single value, a negative integer means do not override [%default]"),
-  make_option(c("-t", "--hotstart"),action="store_true", type="logical", default=F, help="Set hot.start to TRUE, overriding the value in params.R [%default]")
+  make_option(c("-t", "--hotstart"),action="store_true", type="logical", default=F, help="Set hot.start to TRUE, overriding the value in params.R [%default]"),
+  make_option(c("-c", "--correcttwo"),action="store_true", type="logical", default=F, help="Correct 2%, this will delete all 2% results and hot start from iter 1 [%default]")
 )
 if(interactive()){
   setwd(pp(pevi.shared,'data/inputs/optim-new/delhi-half-homeless/'))
   setwd(pp(pevi.shared,'data/inputs/optim-new/delhi-swap/'))
-  args<-c('-s','21')
+  args<-c('-s','21','-c')
   args <- parse_args(OptionParser(option_list = option_list,usage = "optimize-pevi.R [options]"),positional_arguments=F,args=args)
 }else{
   args <- parse_args(OptionParser(option_list = option_list,usage = "optimize-pevi.R [options]"),positional_arguments=F)
@@ -39,6 +40,7 @@ if(args$seed>=0){
 if(args$hotstart){
   hot.start <- T
 }
+correct.two <- args$correcttwo 
 
 source(paste(pevi.home,"R/optim/buildout-functions.R",sep=''))
 source(paste(pevi.home,"R/reporters-loggers.R",sep=''))
@@ -105,18 +107,37 @@ for(file.param in names(vary)[grep("-file",names(vary))]){
 vary.tab.original <- expand.grid(vary,stringsAsFactors=F)
 #  vary.tab.original$row <- 1:nrow(vary.tab.original)
 
-# configure cluster and get RNetLogo running
-model.path <- paste(pevi.home,"netlogo/PEVI-nolog.nlogo",sep='')
-if(!exists('cl')){
-  print('starting new cluster')
-  cl <- makeCluster(c(rep(list(list(host="localhost")),num.cpu)),type="SOCK")
-  clusterEvalQ(cl,options(java.parameters="-Xmx2048m"))
-  clusterEvalQ(cl,Sys.setenv(NOAWT=1))
-  clusterEvalQ(cl,library('RNetLogo'))
-  clusterExport(cl,c('init.netlogo','model.path','logfiles'))
-  clusterEvalQ(cl,init.netlogo())
+if(correct.two){
+  my.cat(pp("DELETING PEN 2% RESULTS"))
+  # test to see if there are any 2% results to delete,
+  # if yes, make backups and then delete
+	
+  for(seed in seeds){
+    optim.code <- pp(optim.scenario,'-seed',seed)
+    path.to.outputs <- paste(path.to.outputs.base,optim.code,'/',sep='')
+    final.2pen.filepath <- pp(path.to.outputs,optim.code,'-pen2-final-infrastructure.txt')
+    if(file.exists(final.2pen.filepath)){
+      path.to.bak <- pp(path.to.outputs,'bad-2pen-backup/')
+      make.dir(path.to.bak)
+      file.copy(pp(path.to.outputs,'optimization-history.Rdata'),path.to.bak)
+      file.copy(pp(path.to.outputs,'build-result-history.Rdata'),path.to.bak)
+      file.copy(pp(path.to.outputs,'buildout-progress.csv'),path.to.bak)
+      file.copy(pp(path.to.outputs,'charger-buildout-history.Rdata'),path.to.bak)
+      file.copy(final.2pen.filepath,path.to.bak)
+      unlink(final.2pen.filepath)
+	    load(pp(path.to.outputs,'charger-buildout-history.Rdata'))
+      charger.buildout.history <- subset(charger.buildout.history,penetration < 0.02)
+	    save(charger.buildout.history,file=pp(path.to.outputs,'charger-buildout-history.Rdata'))
+	    load(pp(path.to.outputs,'optimization-history.Rdata'))
+      opt.history <- subset(opt.history,penetration < 0.02)
+	    save(opt.history,file=pp(path.to.outputs,'optimization-history.Rdata'))
+	    load(pp(path.to.outputs,'build-result-history.Rdata'))
+      build.result.history <- subset(build.result.history,penetration < 0.02)
+	    save(build.result.history,file=pp(path.to.outputs,'build-result-history.Rdata'))
+    }
+  }
+  hot.start <- T
 }
-
 if(hot.start){
   found.seeds <- sort(as.numeric(unlist(lapply(str_split(list.files(path.to.outputs.base,pp(optim.scenario,'-seed',seeds,'$',collapse="|")),'seed'),function(l){ l[2] }))))
   start.seed <- tail(found.seeds,1)
@@ -129,8 +150,21 @@ if(hot.start){
   start.iter <- tail(charger.buildout.history$iter,1)
   my.cat(pp("HOT START: seed ",start.seed,", pen ",start.pen,", iter ",start.iter))
 }else{
+  my.cat(pp("COLD START: seed ",seeds[1],", pen 0.005 iter 1"))
   seed.inds <- 1:(length(seeds))
   pen.inds <- 1:(length(pev.penetrations))
+}
+
+# configure cluster and get RNetLogo running
+model.path <- paste(pevi.home,"netlogo/PEVI-nolog.nlogo",sep='')
+if(!exists('cl')){
+  print('starting new cluster')
+  cl <- makeCluster(c(rep(list(list(host="localhost")),num.cpu)),type="SOCK")
+  clusterEvalQ(cl,options(java.parameters="-Xmx2048m"))
+  clusterEvalQ(cl,Sys.setenv(NOAWT=1))
+  clusterEvalQ(cl,library('RNetLogo'))
+  clusterExport(cl,c('init.netlogo','model.path','logfiles'))
+  clusterEvalQ(cl,init.netlogo())
 }
 
 for(seed in seeds[seed.inds]){
@@ -144,6 +178,8 @@ for(seed in seeds[seed.inds]){
   charger.file <- pp(path.to.inputs,'charger-file.txt')
   path.to.outputs <- paste(path.to.outputs.base,optim.code,'/',sep='')
   make.dir(path.to.outputs)
+  file.copy(param.file,path.to.outputs)
+  file.copy(pp(args$experimentdir,'params.R'),path.to.outputs)
 
   if(hot.start){
     charger.buildout <- subset(charger.buildout.history,penetration==start.pen & iter==start.iter)

@@ -18,6 +18,7 @@ optim.scenarios <- c('half-homeless')
 optim.scenarios <- c('no-homeless')
 optim.scenarios <- c('swap')
 optim.scenarios <- c('veh-low','veh-high')
+optim.scenarios <- c('opp-cost-high','cheap-l1','cheap-l2','cheap-l3','cheap-l4')
 
 setwd(pevi.shared)
 

@@ -117,9 +117,16 @@ for(l4 in 0*1e3){
   }
 }
 
+my.purp <- '#984ea3'
+my.oran <- '#ff7f00'
+my.red <- '#e41a1c'
+my.blue <- '#377eb8'
+my.green <- '#4daf4a'
+charger.cols <- c(my.blue,my.purp,my.oran,my.red)
+
 for(lev in 1:4){
   for(num in 0:3000){
-    if((lev == 1 & num < 1000) | (lev == 2 & num > 499) | (lev == 3 & num > 99) | (lev==4 & num > 49))next
+    if((lev == 1 & num%%5 != 0) | (lev == 2 & num > 499) | (lev == 3 & num > 99) | (lev==4 & num > 49))next
     thou.dir <- floor(num/1e3)*1e3
     hund.dir <- thou.dir + floor((num - thou.dir)/1e2)*1e2
     ico.file <- pp(path.to.icons,'l',lev,'/',thou.dir,'/',hund.dir,'/',num,'.png')
@@ -128,7 +135,7 @@ for(lev in 1:4){
     plot(1:2,xaxt='n',yaxt='n',bty='n',pch='',ylab='',xlab='')
     lim <- par()
     rasterImage(img[[lev]], lim$usr[1], lim$usr[3], lim$usr[2], lim$usr[4])
-    text(1.5+outline.thickness*x.vary,1.7+outline.thickness*y.vary,num,pos=3,cex=8,font=2,family="Impact",col='#00529c')
+    text(1.5+outline.thickness*x.vary,1.7+outline.thickness*y.vary,num,pos=3,cex=8,font=2,family="Impact",col=charger.cols[lev])
     text(1.5,1.7,num,pos=3,cex=8,font=2,family="Impact",col='white')
     dev.off()
   }

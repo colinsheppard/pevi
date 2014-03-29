@@ -180,6 +180,7 @@ for(seed in seeds[seed.inds]){
   make.dir(path.to.outputs)
   file.copy(param.file,path.to.outputs)
   file.copy(pp(args$experimentdir,'params.R'),path.to.outputs)
+  cat(pp(whoami,' starting ',format(Sys.time(), "%Y-%m-%d %H:%M:%S")),file=pp(path.to.outputs,'WHOAMI'))
 
   if(hot.start){
     charger.buildout <- subset(charger.buildout.history,penetration==start.pen & iter==start.iter)
@@ -346,6 +347,7 @@ for(seed in seeds[seed.inds]){
   #	Reset the initial charger file.
 	write.table(init.charger.buildout,charger.file,quote=FALSE,sep='\t',row.names=FALSE)    
     
+  cat(pp(whoami,' ending ',format(Sys.time(), "%Y-%m-%d %H:%M:%S")),file=pp(path.to.outputs,'WHOAMI'))
 } # end seed loop
 
 if(F){

@@ -49,9 +49,10 @@ for(optim.code in scenarios){
   charger.data <- read.table(pp(pevi.shared,param.file.data$charger.type.input.file),header=T)
   names(charger.data) <- c('level',tail(names(charger.data),-1))
   charger.types[[optim.code]] <- charger.data
-  for(seed in c(20:30)){
+  for(seed in c(20:25)){
     hist.file <- pp(pevi.shared,'data/outputs/optim-new/delhi-',optim.code,'-seed',seed,'/charger-buildout-history.Rdata')
     final.evse.file <- pp(pevi.shared,'data/outputs/optim-new/delhi-',optim.code,'-seed',seed,'/delhi-',optim.code,'-seed',seed,'-pen2-final-infrastructure.txt')
+    final.evse.file <- pp(pevi.shared,'data/outputs/optim-new/delhi-',optim.code,'-seed',seed,'/WHOAMI.txt')
     if(file.exists(final.evse.file)){
       load(hist.file)
       charger.buildout.history$scenario <- optim.code

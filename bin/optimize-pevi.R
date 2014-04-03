@@ -13,12 +13,13 @@ option_list <- list(
   make_option(c("-d", "--experimentdir"), type="character", default='.', help="Path to the directory containing the files needed to run the optimization (params.txt, vary.yaml, paths.yaml) [\"%default\"]"),
   make_option(c("-s", "--seed"), type="integer", default=-1, help="Override seeds in params.R with a single value, a negative integer means do not override [%default]"),
   make_option(c("-t", "--hotstart"),action="store_true", type="logical", default=F, help="Set hot.start to TRUE, overriding the value in params.R [%default]"),
-  make_option(c("-c", "--correcttwo"),action="store_true", type="logical", default=F, help="Correct 2%, this will delete all 2% results and hot start from iter 1 [%default]")
+  make_option(c("-c", "--correcttwo"),action="store_true", type="logical", default=F, help="Correct 2%, this will delete all 2% results and hot start from iter 1 [%default]"),
+  make_option(c("-p", "--pushend"),action="store_true", type="logical", default=F, help="Push the stopping criterion [%default]")
 )
 if(interactive()){
   setwd(pp(pevi.shared,'data/inputs/optim-new/delhi-half-homeless/'))
-  setwd(pp(pevi.shared,'data/inputs/optim-new/delhi-swap/'))
-  args<-c('-s','21','-c')
+  #setwd(pp(pevi.shared,'data/inputs/optim-new/delhi-swap/'))
+  args<-c('-s','31','-p')
   args <- parse_args(OptionParser(option_list = option_list,usage = "optimize-pevi.R [options]"),positional_arguments=F,args=args)
 }else{
   args <- parse_args(OptionParser(option_list = option_list,usage = "optimize-pevi.R [options]"),positional_arguments=F)
@@ -40,7 +41,11 @@ if(args$seed>=0){
 if(args$hotstart){
   hot.start <- T
 }
-correct.two <- args$correcttwo 
+# correct two has been done everywhere now so override to F for safety
+#correct.two <- args$correcttwo 
+correct.two <- F 
+
+push.end <- args$pushend
 
 source(paste(pevi.home,"R/optim/buildout-functions.R",sep=''))
 source(paste(pevi.home,"R/reporters-loggers.R",sep=''))
@@ -107,6 +112,64 @@ for(file.param in names(vary)[grep("-file",names(vary))]){
 vary.tab.original <- expand.grid(vary,stringsAsFactors=F)
 #  vary.tab.original$row <- 1:nrow(vary.tab.original)
 
+if(push.end){
+  if(length(seeds)>1)stop("seeds must be of length 1 when using 'pushend'")
+  if(seeds<30)stop("seed must be >= 30 to push the optimization")
+  seed <- seeds
+  seed.20 <- seed - 10
+  optim.code <- pp(optim.scenario,'-seed',seed)
+  optim.code.20 <- pp(optim.scenario,'-seed',seed.20)
+  path.to.outputs <- paste(path.to.outputs.base,optim.code,'/',sep='')
+  path.to.outputs.20 <- paste(path.to.outputs.base,optim.code.20,'/',sep='')
+  if(!file.exists(pp(path.to.outputs.20,optim.code.20,'-pen2-final-infrastructure.txt')))stop(pp("seed ",seed.20," wasn't complete, skipping"))
+
+  make.dir(path.to.outputs)
+  file.copy(pp(path.to.outputs.20,'optimization-history.Rdata'),path.to.outputs)
+  file.copy(pp(path.to.outputs.20,'build-result-history.Rdata'),path.to.outputs)
+  file.copy(pp(path.to.outputs.20,'buildout-progress.csv'),path.to.outputs)
+  file.copy(pp(path.to.outputs.20,'charger-buildout-history.Rdata'),path.to.outputs)
+  file.copy(pp(path.to.outputs.20,optim.code.20,'-pen0.5-final-infrastructure.txt'),pp(path.to.outputs,optim.code,'-pen0.5-final-infrastructure.txt'))
+  file.copy(pp(path.to.outputs.20,optim.code.20,'-pen1-final-infrastructure.txt'),pp(path.to.outputs,optim.code,'-pen1-final-infrastructure.txt'))
+  file.copy(pp(path.to.outputs.20,optim.code.20,'-pen2-final-infrastructure.txt'),pp(path.to.outputs,optim.code,'-pen2-final-infrastructure.txt'))
+
+  # now locate the penetration at which point we need to do a hot start
+  load(pp(path.to.outputs,'optimization-history.Rdata'))
+  winner.history <- ddply(opt.history,.(penetration,iteration),function(df){
+    df[which.min(df$obj),]
+  })
+  installed.costs <- read.table(pp(pevi.shared,as.character(param.file.data$charger.type.input.file)),header=T)$installed.cost
+  cost.per.iter <- build.increment * installed.costs
+  winner.history$cost <- unlist(cost.per.iter[match(winner.history$level,0:4)])*1000
+  winner.history$num.added <- unlist(build.increment[match(winner.history$level,0:4)])
+  winner.history <- as.data.frame(data.table(winner.history,key=c('penetration','iteration')))
+  winner.history$cum.cost = cumsum(winner.history$cost)
+  save(winner.history,file=pp(path.to.outputs,'winner-history.Rdata'))
+
+  end.slopes <- ddply(winner.history,.(penetration),function(df){
+    data.frame(slope=lm('mean.delay.cost ~ cum.cost',tail(df,5))$coefficients[2]) 
+  })
+  pen.to.trunc <- end.slopes$penetration[which(end.slopes$slope < -10)[1]]
+  if(is.na(pen.to.trunc))stop(pp('This seed seems to have converged already, slopes by pen: ',pp(pp(end.slopes$penetration*100,'% = ',roundC(end.slopes$slope,2)),collapse=", ")))
+
+  if(pen.to.trunc < 0.02){
+    my.cat(pp("TRUNCATING RESULTS ABOVE ",pen.to.trunc*100,"%"))
+    # now truncate the output files accordingly
+    load(pp(path.to.outputs,'charger-buildout-history.Rdata'))
+    charger.buildout.history <- subset(charger.buildout.history,penetration <= pen.to.trunc)
+    save(charger.buildout.history,file=pp(path.to.outputs,'charger-buildout-history.Rdata'))
+    load(pp(path.to.outputs,'optimization-history.Rdata'))
+    opt.history <- subset(opt.history,penetration <= pen.to.trunc)
+    save(opt.history,file=pp(path.to.outputs,'optimization-history.Rdata'))
+    load(pp(path.to.outputs,'build-result-history.Rdata'))
+    build.result.history <- subset(build.result.history,pen.to.trunc <= pen.to.trunc)
+    save(build.result.history,file=pp(path.to.outputs,'build-result-history.Rdata'))
+    write.table(subset(read.csv(pp(path.to.outputs,'buildout-progress.csv')),penetration <= pen.to.trunc),file=pp(path.to.outputs,'buildout-progress.csv'),sep=',',row.names=F)
+  }
+  for(pen.to.unlink in c(0.005,0.01,0.02)[c(0.005,0.01,0.02)>=pen.to.trunc]){
+    unlink(pp(path.to.outputs,optim.code,'-pen',pen.to.unlink*100,'-final-infrastructure.txt'))
+  }
+  hot.start <- T
+}
 if(correct.two){
   my.cat(pp("DELETING PEN 2% RESULTS"))
   # test to see if there are any 2% results to delete,
@@ -148,6 +211,19 @@ if(hot.start){
   start.pen <- tail(charger.buildout.history$penetration,1)
   pen.inds <- which(pev.penetrations>=start.pen)
   start.iter <- tail(charger.buildout.history$iter,1)
+  if(!file.exists(pp(path.to.outputs,'winner-history.Rdata'))){
+    load(pp(path.to.outputs,'optimization-history.Rdata'))
+    winner.history <- ddply(opt.history,.(penetration,iteration),function(df){
+      df[which.min(df$obj),]
+    })
+    installed.costs <- read.table(pp(pevi.shared,as.character(param.file.data$charger.type.input.file)),header=T)$installed.cost
+    cost.per.iter <- build.increment * installed.costs
+    winner.history$cost <- unlist(cost.per.iter[match(winner.history$level,0:4)])*1000
+    winner.history$num.added <- unlist(build.increment[match(winner.history$level,0:4)])
+    winner.history <- as.data.frame(data.table(winner.history,key=c('penetration','iteration')))
+    winner.history$cum.cost = cumsum(winner.history$cost)
+    save(winner.history,file=pp(path.to.outputs,'winner-history.Rdata'))
+  }
   my.cat(pp("HOT START: seed ",start.seed,", pen ",start.pen,", iter ",start.iter))
 }else{
   my.cat(pp("COLD START: seed ",seeds[1],", pen 0.005 iter 1"))
@@ -186,6 +262,7 @@ for(seed in seeds[seed.inds]){
     charger.buildout <- subset(charger.buildout.history,penetration==start.pen & iter==start.iter)
     charger.buildout <- charger.buildout[,-grep('penetration|iter',names(charger.buildout))]
 		load(file=pp(path.to.outputs,'optimization-history.Rdata'))
+		load(file=pp(path.to.outputs,'winner-history.Rdata'))
     load(file=pp(path.to.outputs,'build-result-history.Rdata'))
   }else{
     #	Initialize the starting infrastructure and write the file to the inputs dir.
@@ -193,6 +270,7 @@ for(seed in seeds[seed.inds]){
 
     charger.buildout.history <- data.frame()
     opt.history <- data.frame()
+    winner.history <- data.frame()
     build.result.history <- data.frame()
   }
   write.table(charger.buildout,charger.file,quote=FALSE,sep='\t',row.names=FALSE)
@@ -231,6 +309,8 @@ for(seed in seeds[seed.inds]){
         reference.delay.cost <- subset(opt.history,penetration==start.pen & iteration==build.i)$mean.delay.cost[1] 
         opt.history <- subset(opt.history,!(penetration==start.pen & iteration>=start.iter))
 			  save(opt.history,file=pp(path.to.outputs,'optimization-history.Rdata'))
+        winner.history <- subset(winner.history,!(penetration==start.pen & iteration>=start.iter))
+			  save(winner.history,file=pp(path.to.outputs,'winner-history.Rdata'))
         charger.buildout.history <- subset(charger.buildout.history,!(penetration==start.pen & iter>=start.iter))
 			  save(charger.buildout.history,file=pp(path.to.outputs,'charger-buildout-history.Rdata'))
         if(nrow(build.result.history)>0) build.result.history <- subset(build.result.history,!(penetration==start.pen & iteration>=start.iter))
@@ -282,6 +362,16 @@ for(seed in seeds[seed.inds]){
       opt.iter$iteration <- build.i
       opt.history <- rbind(opt.history,opt.iter)
 			save(opt.history,file=pp(path.to.outputs,'optimization-history.Rdata'))
+      winner.history <- rbind(winner.history,data.frame(opt.iter[1,],cost=NA,num.added=NA,cum.cost=NA))
+      winner.history$num.added[nrow(winner.history)] <- build.increment[grep(tail(winner.history$level,1),names(build.increment))]
+      if(nrow(winner.history)==1){
+        winner.history$cost[1] <- winner.history$mean.charger.cost[1]
+        winner.history$cum.cost[1] <- winner.history$cost[1]
+      }else{
+        winner.history$cost[nrow(winner.history)] <- diff(tail(winner.history$mean.charger.cost,2))
+        winner.history$cum.cost[nrow(winner.history)] <- winner.history$cost[nrow(winner.history)] + winner.history$cum.cost[nrow(winner.history)-1]
+      }
+			save(winner.history,file=pp(path.to.outputs,'winner-history.Rdata'))
       build.result$penetration <- pev.penetration
       build.result$iteration <- build.i
       build.result.history <- rbind(build.result.history,build.result)
@@ -294,8 +384,9 @@ for(seed in seeds[seed.inds]){
       reference.delay.cost <- taz.charger.combos$mean.delay.cost[1] 
 			
       if(nl.obj == 'marginal-cost-to-reduce-delay'){
-        # If our objective value is 0 or greater, we're done.
-        if(taz.charger.combos$obj[1] < 0){
+        # If the 5-pt slope of delay/cost is greater than -10, we're done 
+        slope.of.obj <- lm('mean.delay.cost ~ cum.cost',tail(subset(winner.history,penetration==pev.penetration),5))$coefficients[2]
+        if(slope.of.obj < -10){
           current.obj <- taz.charger.combos$obj[1]
         } else {
           current.obj <- Inf

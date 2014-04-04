@@ -160,6 +160,9 @@ if(push.end){
     load(pp(path.to.outputs,'optimization-history.Rdata'))
     opt.history <- subset(opt.history,penetration <= pen.to.trunc)
     save(opt.history,file=pp(path.to.outputs,'optimization-history.Rdata'))
+    load(pp(path.to.outputs,'winner-history.Rdata'))
+    winner.history <- subset(winner.history,penetration <= pen.to.trunc)
+    save(winner.history,file=pp(path.to.outputs,'winner-history.Rdata'))
     load(pp(path.to.outputs,'build-result-history.Rdata'))
     build.result.history <- subset(build.result.history,pen.to.trunc <= pen.to.trunc)
     save(build.result.history,file=pp(path.to.outputs,'build-result-history.Rdata'))
@@ -343,7 +346,7 @@ for(seed in seeds[seed.inds]){
 			result.means <- ddply(build.result,.(taz,level),function(df){
         if(nl.obj == 'marginal-cost-to-reduce-delay'){
           the.obj <- (mean(df$total.delay.cost) - reference.delay.cost)/(mean(df$total.charger.cost) - reference.charger.cost)
-          data.frame(obj = the.obj,cv=sd(df$obj)/the.obj,key=pp(df$taz[1],'-',df$level[1]),mean.delay.cost=mean(df$total.delay.cost),mean.charger.cost=mean(df$total.charger.cost))
+          data.frame(obj = the.obj,cv=sd(df$obj)/the.obj,key=pp(df$taz[1],'-',df$level[1]),mean.delay.cost=mean(df$total.delay.cost,na.rm=T),mean.charger.cost=mean(df$total.charger.cost,na.rm=T))
         }else{
           data.frame(obj = mean(df$obj),cv=sd(df$obj)/mean(df$obj),key=pp(df$taz[1],'-',df$level[1]),mean.delay.cost=0,mean.charger.cost=0)
         }
@@ -384,9 +387,10 @@ for(seed in seeds[seed.inds]){
       reference.delay.cost <- taz.charger.combos$mean.delay.cost[1] 
 			
       if(nl.obj == 'marginal-cost-to-reduce-delay'){
-        # If the 5-pt slope of delay/cost is greater than -10, we're done 
-        slope.of.obj <- lm('mean.delay.cost ~ cum.cost',tail(subset(winner.history,penetration==pev.penetration),5))$coefficients[2]
-        if(slope.of.obj < -10){
+        # If the 5-pt slope of delay/cost is greater than -10 (or 3-4 pt slope greater than -1), we're done 
+        win.sub <- subset(winner.history,penetration==pev.penetration)
+        slope.of.obj <- lm('mean.delay.cost ~ cum.cost',tail(win.sub,5))$coefficients[2]
+        if((nrow(win.sub) >= 5 & slope.of.obj < -10) | (nrow(win.sub) %in% 3:4 & slope.of.obj < -1) | nrow(win.sub) < 3){
           current.obj <- taz.charger.combos$obj[1]
         } else {
           current.obj <- Inf

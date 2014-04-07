@@ -390,7 +390,7 @@ for(seed in seeds[seed.inds]){
         # If the 5-pt slope of delay/cost is greater than -10 (or 3-4 pt slope greater than -1), we're done 
         win.sub <- subset(winner.history,penetration==pev.penetration)
         slope.of.obj <- lm('mean.delay.cost ~ cum.cost',tail(win.sub,5))$coefficients[2]
-        if((nrow(win.sub) >= 5 & slope.of.obj < -10) | (nrow(win.sub) %in% 3:4 & slope.of.obj < -1) | nrow(win.sub) < 3){
+        if((nrow(win.sub) >= 5 & slope.of.obj < -5) | (nrow(win.sub) %in% 3:4 & slope.of.obj < -1) | nrow(win.sub) < 3){
           current.obj <- taz.charger.combos$obj[1]
         } else {
           current.obj <- Inf

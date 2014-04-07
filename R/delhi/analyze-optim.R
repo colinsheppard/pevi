@@ -49,7 +49,7 @@ for(optim.code in scenarios){
   charger.data <- read.table(pp(pevi.shared,param.file.data$charger.type.input.file),header=T)
   names(charger.data) <- c('level',tail(names(charger.data),-1))
   charger.types[[optim.code]] <- charger.data
-  for(seed in c(20:40)){
+  for(seed in c(30:40)){
     hist.file <- pp(pevi.shared,'data/outputs/optim-new/delhi-',optim.code,'-seed',seed,'/charger-buildout-history.Rdata')
     final.evse.file <- pp(pevi.shared,'data/outputs/optim-new/delhi-',optim.code,'-seed',seed,'/delhi-',optim.code,'-seed',seed,'-pen0.5-final-infrastructure.txt')
     if(file.exists(final.evse.file)){
@@ -72,6 +72,18 @@ ch.fin <- ddply(subset(chs,TAZ>0),.(scenario,seed,penetration),function(df){
   subset(df,iter==max(iter))
 })
 ch.fin.unshaped <- ch.fin
+
+load(file=pp(pevi.shared,'data/inputs/compare/delhi-baseline-pain/mean-delay.Rdata'))
+load(file=pp(pevi.shared,'data/inputs/compare/delhi-baseline-pain/mean-delay-veh-scens.Rdata'))
+load(file=pp(pevi.shared,'data/inputs/compare/delhi-baseline-pain/mean-delay-opp-cost.Rdata'))
+orig.delay <- opts$mean.delay.cost
+opts$mean.delay.cost <- orig.delay - baseline.delay$min.delay.cost[match(opts$penetration*100,baseline.delay$penetration)]
+which.low <- which(opts$scenario=='veh-low')
+opts$mean.delay.cost[which.low] <- orig.delay[which.low] - subset(baseline.delay.veh,vehicle.scenario=='low')$min.delay.cost[match(opts$penetration[which.low]*100,subset(baseline.delay.veh,vehicle.scenario=='low')$penetration)]
+which.high <- which(opts$scenario=='veh-high')
+opts$mean.delay.cost[which.high] <- orig.delay[which.high] - subset(baseline.delay.veh,vehicle.scenario=='high')$min.delay.cost[match(opts$penetration[which.high]*100,subset(baseline.delay.veh,vehicle.scenario=='high')$penetration)]
+which.opp <- which(opts$scenario=='opp-cost-high')
+opts$mean.delay.cost[which.opp] <- orig.delay[which.opp] - baseline.delay.opp.cost$min.delay.cost[match(opts$penetration[which.opp]*100,baseline.delay.opp.cost$penetration)]
 
 winners <- ddply(opts,.(scenario,seed,penetration,iteration),function(df){
   df[which.min(df$obj),]
@@ -214,7 +226,7 @@ if(F){
   cbPalette <- tail(charger.cols,-1)
   p <- ggplot(ch.fin,aes(x=scenario.named,y=num.chargers,fill=factor(level))) + geom_bar(stat='identity') + labs(x="",y="Number of Chargers Sited",title="Chargers Sited with/without Battery Swapping",fill="Charger Level") + facet_wrap(~penetration) + theme(axis.text.x = element_text(colour='black'),plot.margin=unit(c(0.5,0.2,0.2,0.5),"cm")) + scale_fill_manual(values=cbPalette)
   ggsave(file=pp(pevi.home,'../plots/delhi-analysis/battery-swapping/swapping-num-chargers.pdf'),p,width=10,height=6)
-  p <- ggplot(ch.fin,aes(x=scenario.named,y=installed.cost,fill=factor(level))) + geom_bar(stat='identity') + labs(x="",y="Number of Chargers Sited",title="Chargers Sited with/without Battery Swapping",fill="Charger Level") + facet_wrap(~penetration) + theme(axis.text.x = element_text(colour='black'),plot.margin=unit(c(0.5,0.2,0.2,0.5),"cm")) + scale_fill_manual(values=cbPalette)
+  p <- ggplot(ch.fin,aes(x=scenario.named,y=installed.cost,fill=factor(level))) + geom_bar(stat='identity') + labs(x="",y="Cost ($M)",title="Cost of Chargers Sited with/without Battery Swapping",fill="Charger Level") + facet_wrap(~penetration) + theme(axis.text.x = element_text(colour='black'),plot.margin=unit(c(0.5,0.2,0.2,0.5),"cm")) + scale_fill_manual(values=cbPalette)
   ggsave(file=pp(pevi.home,'../plots/delhi-analysis/battery-swapping/swapping-charger-cost.pdf'),p,width=10,height=6)
 
   seeds.in.both <- ddply(subset(winners,scenario%in%c('swap','half-homeless')),.(scenario),function(df){ data.frame(seed=unique(df$seed))})$seed

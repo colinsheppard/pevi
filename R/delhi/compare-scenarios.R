@@ -3,10 +3,11 @@ options(java.parameters="-Xmx2048m")
 load.libraries(c('ggplot2','yaml','RNetLogo','plyr','reshape','stringr'))
 
 #exp.name <- commandArgs(trailingOnly=T)[1]
-exp.name <- 'delhi-battery-swap'
+exp.name <- 'delhi-baseline-pain'
 path.to.inputs <- pp(pevi.shared,'data/inputs/compare/',exp.name,'/')
 
 to.log <- c()
+#to.log <- 'pain'
 #to.log <- c('pain','charging','trip')
 #to.log <- c('pain','charging','tazs','trip')
 

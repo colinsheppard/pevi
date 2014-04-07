@@ -201,7 +201,7 @@ plur.station <- function(num,rank){
 ch.fin <- subset(melt(ch.fin.unshaped,measure.vars=pp('L',0:4),variable_name="level"),level%in%pp('L',2:3))
 mean.ch.fin <- ddply(ch.fin,.(penetration,TAZ,level,scenario),function(df){
 	#data.frame(num.chargers = mean(df$value,na.rm=TRUE))
-	data.frame(num.chargers = round(mean(df$value,na.rm=TRUE)))
+	data.frame(num.chargers = round(mean(df$value,na.rm=TRUE)),unrounded.num.chargers=mean(df$value,na.rm=TRUE))
 })
 
 for(pen in c(0.005,0.01,0.02)){
@@ -264,14 +264,14 @@ for(pen in c(0.005,0.01,0.02)){
 
   # start with the high zoom level tazs
   for(i in 1:nrow(agg.taz@data)){
-    sep.radius <- ifelse((!is.na(agg.taz$area[i]) & agg.taz$area[i] < 110000000) | agg.taz$name[i] %in% c('RED_LaytonOaks'),ifelse(agg.taz$name[i] $in$ c('RED_Bonnyview'),0.001,0.003),0.01)
+    sep.radius <- ifelse((!is.na(agg.taz$area[i]) & agg.taz$area[i] < 110000000) | agg.taz$name[i] %in% c('RED_LaytonOaks'),ifelse(agg.taz$name[i] %in% c('RED_Bonnyview'),0.001,0.003),0.01)
     appear.above.zoom <- ifelse(length(grep("_",agg.taz$name[i]))>0,'9','9')
     separator.factor <- ifelse(length(grep("RED_",agg.taz$name[i]))>0,1,2)
     vadjust <- ifelse(length(grep("SHA_BearMountain",agg.taz$name[i]))>0,-0.04,0)
     sep.i <- 1
-    if(agg.taz$L2[i] > 0) cat(sprintf(pp("  - ['%s',%f,%f,'<b>%s</b> <br/>%d proposed Level 2 charging ",plur.station(agg.taz$L2[i],agg.taz$L2.rank[i]),"',%d,%s,%s,%s,%s]\n"),agg.taz$name[i],agg.coords[i,1]+sep.radius*sins[sep.i],agg.coords[i,2]+sep.radius*coss[sep.i]+vadjust,agg.taz$name[i],agg.taz$L2[i],agg.taz$L2[i],appear.above.zoom,'null','false','false'),file=charger.data.file,append=T)
+    if(agg.taz$L2[i] > 0) cat(sprintf(pp("  - ['%s',%f,%f,'<b>%s</b> <br/>%d proposed Level 2 charging ",plur.station(agg.taz$L2[i],agg.taz$L2.rank[i]),"',%d,%s,%s,%s,%s]\n"),agg.taz$name[i],agg.coords[i,1]+sep.radius*sins[sep.i],agg.coords[i,2]+sep.radius*coss[sep.i]+vadjust,agg.taz$name[i],round(agg.taz$L2[i]),round(agg.taz$L2[i]),appear.above.zoom,'null','false','false'),file=charger.data.file,append=T)
     sep.i <- 2
-    if(agg.taz$L3[i] > 0) cat(sprintf(pp("  - ['%s',%f,%f,'<b>%s</b> <br/>%d proposed Level 3 (DC Fast) charging ",plur.station(agg.taz$L3[i],agg.taz$L3.rank[i]),"',%d,%s,%s,%s,%s]\n"),agg.taz$name[i],agg.coords[i,1]+sep.radius*sins[sep.i],agg.coords[i,2]+sep.radius*coss[sep.i]+vadjust,agg.taz$name[i],agg.taz$L3[i],agg.taz$L3[i],appear.above.zoom,'null','false','true'),file=charger.data.file,append=T)
+    if(agg.taz$L3[i] > 0) cat(sprintf(pp("  - ['%s',%f,%f,'<b>%s</b> <br/>%d proposed Level 3 (DC Fast) charging ",plur.station(agg.taz$L3[i],agg.taz$L3.rank[i]),"',%d,%s,%s,%s,%s]\n"),agg.taz$name[i],agg.coords[i,1]+sep.radius*sins[sep.i],agg.coords[i,2]+sep.radius*coss[sep.i]+vadjust,agg.taz$name[i],round(agg.taz$L3[i]),round(agg.taz$L3[i]),appear.above.zoom,'null','false','true'),file=charger.data.file,append=T)
     sep.i <- 3
     if(agg.taz$L2E[i] > 0) cat(sprintf(pp("  - ['%s',%f,%f,'<b>%s</b> <br/>%d existing Level 2 charging ",plur.station(agg.taz$L2E[i],NA),"',%d,%s,%s,%s,%s]\n"),agg.taz$name[i],agg.taz$lonE[i],agg.taz$latE[i],agg.taz$name[i],agg.taz$L2E[i],agg.taz$L2E[i],appear.above.zoom,'null','true','false'),file=charger.data.file,append=T)
     if(agg.taz$L3E[i] > 0) cat(sprintf(pp("  - ['%s',%f,%f,'<b>%s</b> <br/>%d existing Level 3 (DC Fast) charging ",plur.station(agg.taz$L3E[i],NA),"',%d,%s,%s,%s,%s]\n"),agg.taz$name[i],agg.taz$lonE[i],agg.taz$latE[i],agg.taz$name[i],agg.taz$L3E[i],agg.taz$L3E[i],appear.above.zoom,'null','true','true'),file=charger.data.file,append=T)
@@ -280,8 +280,8 @@ for(pen in c(0.005,0.01,0.02)){
   d_ply(agg.taz@data,.(med.zoom.group),function(df){
     lon <- mean(df$x)
     lat <- mean(df$y)
-    l2 <- sum(df$L2)
-    l3 <- sum(df$L3)
+    l2 <- round(sum(df$L2))
+    l3 <- round(sum(df$L3))
     l2E <- sum(df$L2E)
     l3E <- sum(df$L3E)
     if(l2 > 0) cat(sprintf(pp("  - ['%s',%f,%f,'<b>%s</b> <br/>%d proposed Level 2 charging ",plur.station(l2,NA),"',%d,%d,%d,%s,%s]\n"),df$med.zoom.group[1],lon-0.02,lat,df$med.zoom.group[1],l2,l2,8,10,'false','false'),file=charger.data.file,append=T)
@@ -294,8 +294,8 @@ for(pen in c(0.005,0.01,0.02)){
     # For the time being, take the average lat/lon values for the placement of the low zoom icon.
     lon <- mean(df$x)
     lat <- mean(df$y)
-    l2 <- sum(df$L2)
-    l3 <- sum(df$L3)
+    l2 <- round(sum(df$L2))
+    l3 <- round(sum(df$L3))
     l2E <- sum(df$L2E)
     l3E <- sum(df$L3E)
     if(l2 > 0) cat(sprintf(pp("  - ['%s',%f,%f,'<b>%s</b> <br/>%d proposed Level 2 charging ",plur.station(l2,NA),"',%d,%s,%d,%s,%s]\n"),df$low.zoom.group[1],lon-0.15,lat,df$low.zoom.group[1],l2,l2,'null',9,'false','false'),file=charger.data.file,append=T)

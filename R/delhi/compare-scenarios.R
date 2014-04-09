@@ -199,6 +199,31 @@ ggplot(subset(logs[['pain']],pain.type=="delay"),aes(x=time,y=state.of.charge,co
 ggplot(subset(logs[['pain']],pain.type=="delay" & num.simulation.days==2),aes(x=time,y=state.of.charge,colour=vehicle.type,shape=vehicle.type))+geom_point()+facet_grid(itin.scenario.named~replicate)
 ggplot(subset(logs[['pain']],pain.type%in%c("delay","stranded") & num.simulation.days==2),aes(x=time,y=state.of.charge,colour=pain.type,shape=vehicle.type))+geom_point()+facet_grid(itin.scenario.named~replicate)
 
+# why do drivers need public chargers?
+
+df <- subset(logs[['pain']],pain.type%in%c("delay","stranded") & itin.scenario=="doubled" & num.simulation.days==2 & replicate==1)
+df$pain.value[df$pain.type=="stranded"] <- 5
+ggplot(df,aes(x=time,y=location,colour=pain.type,shape=vehicle.type,size=pain.value))+geom_point()+facet_grid(itin.scenario.named~replicate)
+df <- subset(df,pain.type=='stranded')
+ggplot(df,aes(x=vehicle.type)) + geom_bar() +  labs(x="",y="",title="")
+d <- read.table('/Users/sheppardc/Dropbox/serc/pev-colin/pev-shared//data/inputs/driver-input-file/delhi-combined/doubled/driver-schedule-pen0.5-rep1-20140217.txt',header=T)
+df$home <- d$home[match(df$driver,d$X.driver)]
+load(pp(pevi.shared,'data/DELHI/road-network/routing-with-gateways.Rdata'))
+d <- data.table(d,key=c('from','to'))
+setkey(time.distance,'from','to')
+d <- time.distance[d]
+d[,driver:=X.driver]
+setkey(d,'driver')
+dd <- d[,list(daily.km=sum(km)),by="driver"]
+df <- data.table(df,key='driver')
+df <- dd[df]
+
+# sum it all up
+my.red <- '#e41a1c'
+my.blue <- '#377eb8'
+ggplot(dd,aes(x=daily.km)) + geom_histogram(binwidth=10) +  labs(x="Daily KMT",y="Frequency") + geom_histogram(binwidth=10,alpha=.5, fill=my.red,data=df) + ggtitle(expression(atop("Daily KMT for All Drivers (black) and Stranded Drivers (red)", atop("(at 0.5% Penetration, 100% Home Chargers and No Public Infrastructure)"))))
+
+
 # bulk # of delays and strandings
 ddply(subset(logs[['pain']],pain.type%in%c("delay","stranded") & num.simulation.days==2),.(pain.type,itin.scenario),nrow)
 # now plot it 

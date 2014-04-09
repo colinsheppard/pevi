@@ -262,35 +262,34 @@ for(seed in seeds[seed.inds]){
   cat(pp(whoami,' starting ',format(Sys.time(), "%Y-%m-%d %H:%M:%S"),'\n'),file=pp(path.to.outputs,'WHOAMI.txt'),append=T)
 
   if(hot.start){
-    charger.buildout <- subset(charger.buildout.history,penetration==start.pen & iter==start.iter)
-    charger.buildout <- charger.buildout[,-grep('penetration|iter',names(charger.buildout))]
 		load(file=pp(path.to.outputs,'optimization-history.Rdata'))
 		load(file=pp(path.to.outputs,'winner-history.Rdata'))
     load(file=pp(path.to.outputs,'build-result-history.Rdata'))
   }else{
-    #	Initialize the starting infrastructure and write the file to the inputs dir.
-    charger.buildout <- init.charger.buildout
-
     charger.buildout.history <- data.frame()
     opt.history <- data.frame()
     winner.history <- data.frame()
     build.result.history <- data.frame()
   }
-  write.table(charger.buildout,charger.file,quote=FALSE,sep='\t',row.names=FALSE)
 
   for(pev.penetration in pev.penetrations[pen.inds]){
   #pev.penetration <- pev.penetrations[pen.inds][1]
     print(paste("pen",pev.penetration))
     
     if(hot.start){
+      charger.buildout <- subset(charger.buildout.history,penetration==start.pen & iter==start.iter)
+      charger.buildout <- charger.buildout[,-grep('penetration|iter',names(charger.buildout))]
       taz.charger.combos <- subset(opt.history,penetration==start.pen & iteration==start.iter)[,c('taz','level','include','key','name','obj','cv')]
       current.obj <- taz.charger.combos$obj[1]
       begin.build.i <- start.iter
     }else{
+      #	Initialize the starting infrastructure and write the file to the inputs dir.
+      charger.buildout <- init.charger.buildout
       current.obj <- Inf
       begin.build.i <- 1
       taz.charger.combos$include <- T
     }
+    write.table(charger.buildout,charger.file,quote=FALSE,sep='\t',row.names=FALSE)
     
     # Note that the expectation is that all pev penetrations beyond the first are even multiples of the first
     if(pev.penetration == pev.penetrations[1]){
@@ -367,9 +366,9 @@ for(seed in seeds[seed.inds]){
 			save(opt.history,file=pp(path.to.outputs,'optimization-history.Rdata'))
       winner.history <- rbind(winner.history,data.frame(opt.iter[1,],cost=NA,num.added=NA,cum.cost=NA))
       winner.history$num.added[nrow(winner.history)] <- build.increment[grep(tail(winner.history$level,1),names(build.increment))]
-      if(nrow(winner.history)==1){
-        winner.history$cost[1] <- winner.history$mean.charger.cost[1]
-        winner.history$cum.cost[1] <- winner.history$cost[1]
+      if(build.i==1){
+        winner.history$cost[nrow(winner.history)] <- winner.history$mean.charger.cost[nrow(winner.history)]
+        winner.history$cum.cost[nrow(winner.history)] <- winner.history$cost[nrow(winner.history)]
       }else{
         winner.history$cost[nrow(winner.history)] <- diff(tail(winner.history$mean.charger.cost,2))
         winner.history$cum.cost[nrow(winner.history)] <- winner.history$cost[nrow(winner.history)] + winner.history$cum.cost[nrow(winner.history)-1]
@@ -390,7 +389,8 @@ for(seed in seeds[seed.inds]){
         # If the 5-pt slope of delay/cost is greater than -10 (or 3-4 pt slope greater than -1), we're done 
         win.sub <- subset(winner.history,penetration==pev.penetration)
         slope.of.obj <- lm('mean.delay.cost ~ cum.cost',tail(win.sub,5))$coefficients[2]
-        if((nrow(win.sub) >= 5 & slope.of.obj < -5) | (nrow(win.sub) %in% 3:4 & slope.of.obj < -1) | nrow(win.sub) < 3){
+        #if((nrow(win.sub) >= 5 & slope.of.obj < -5) | (nrow(win.sub) %in% 3:4 & slope.of.obj < -1) | nrow(win.sub) < 3){
+        if((pev.penetration == 0.005 & tail(winner.history$cum.cost,1) < 5e6) | (pev.penetration == 0.01 & tail(winner.history$cum.cost,1) < 10e6) | (pev.penetration == 0.02 & tail(winner.history$cum.cost,1) < 15e6)){
           current.obj <- taz.charger.combos$obj[1]
         } else {
           current.obj <- Inf

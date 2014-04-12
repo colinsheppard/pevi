@@ -126,7 +126,7 @@ if(push.end){
 
   make.dir(path.to.outputs)
   file.copy(pp(path.to.outputs.20,'optimization-history.Rdata'),path.to.outputs)
-  file.copy(pp(path.to.outputs.20,'build-result-history.Rdata'),path.to.outputs)
+  #file.copy(pp(path.to.outputs.20,'build-result-history.Rdata'),path.to.outputs)
   file.copy(pp(path.to.outputs.20,'buildout-progress.csv'),path.to.outputs)
   file.copy(pp(path.to.outputs.20,'charger-buildout-history.Rdata'),path.to.outputs)
   file.copy(pp(path.to.outputs.20,optim.code.20,'-pen0.5-final-infrastructure.txt'),pp(path.to.outputs,optim.code,'-pen0.5-final-infrastructure.txt'))
@@ -164,9 +164,9 @@ if(push.end){
     load(pp(path.to.outputs,'winner-history.Rdata'))
     winner.history <- subset(winner.history,penetration <= pen.to.trunc)
     save(winner.history,file=pp(path.to.outputs,'winner-history.Rdata'))
-    load(pp(path.to.outputs,'build-result-history.Rdata'))
-    build.result.history <- subset(build.result.history,pen.to.trunc <= pen.to.trunc)
-    save(build.result.history,file=pp(path.to.outputs,'build-result-history.Rdata'))
+    #load(pp(path.to.outputs,'build-result-history.Rdata'))
+    #build.result.history <- subset(build.result.history,pen.to.trunc <= pen.to.trunc)
+    #save(build.result.history,file=pp(path.to.outputs,'build-result-history.Rdata'))
     write.table(subset(read.csv(pp(path.to.outputs,'buildout-progress.csv')),penetration <= pen.to.trunc),file=pp(path.to.outputs,'buildout-progress.csv'),sep=',',row.names=F)
   }
   for(pen.to.unlink in c(0.005,0.01,0.02)[c(0.005,0.01,0.02)>=pen.to.trunc]){
@@ -187,7 +187,7 @@ if(correct.two){
       path.to.bak <- pp(path.to.outputs,'bad-2pen-backup/')
       make.dir(path.to.bak)
       file.copy(pp(path.to.outputs,'optimization-history.Rdata'),path.to.bak)
-      file.copy(pp(path.to.outputs,'build-result-history.Rdata'),path.to.bak)
+      #file.copy(pp(path.to.outputs,'build-result-history.Rdata'),path.to.bak)
       file.copy(pp(path.to.outputs,'buildout-progress.csv'),path.to.bak)
       file.copy(pp(path.to.outputs,'charger-buildout-history.Rdata'),path.to.bak)
       file.copy(final.2pen.filepath,path.to.bak)
@@ -198,9 +198,9 @@ if(correct.two){
 	    load(pp(path.to.outputs,'optimization-history.Rdata'))
       opt.history <- subset(opt.history,penetration < 0.02)
 	    save(opt.history,file=pp(path.to.outputs,'optimization-history.Rdata'))
-	    load(pp(path.to.outputs,'build-result-history.Rdata'))
-      build.result.history <- subset(build.result.history,penetration < 0.02)
-	    save(build.result.history,file=pp(path.to.outputs,'build-result-history.Rdata'))
+	    #load(pp(path.to.outputs,'build-result-history.Rdata'))
+      #build.result.history <- subset(build.result.history,penetration < 0.02)
+	    #save(build.result.history,file=pp(path.to.outputs,'build-result-history.Rdata'))
     }
   }
   hot.start <- T
@@ -265,12 +265,12 @@ for(seed in seeds[seed.inds]){
   if(hot.start){
 		load(file=pp(path.to.outputs,'optimization-history.Rdata'))
 		load(file=pp(path.to.outputs,'winner-history.Rdata'))
-    load(file=pp(path.to.outputs,'build-result-history.Rdata'))
+    #load(file=pp(path.to.outputs,'build-result-history.Rdata'))
   }else{
     charger.buildout.history <- data.frame()
     opt.history <- data.frame()
     winner.history <- data.frame()
-    build.result.history <- data.frame()
+    #build.result.history <- data.frame()
   }
 
   for(pev.penetration in pev.penetrations[pen.inds]){
@@ -316,8 +316,8 @@ for(seed in seeds[seed.inds]){
 			  save(winner.history,file=pp(path.to.outputs,'winner-history.Rdata'))
         charger.buildout.history <- subset(charger.buildout.history,!(penetration==start.pen & iter>=start.iter))
 			  save(charger.buildout.history,file=pp(path.to.outputs,'charger-buildout-history.Rdata'))
-        if(nrow(build.result.history)>0) build.result.history <- subset(build.result.history,!(penetration==start.pen & iteration>=start.iter))
-			  save(build.result.history,file=pp(path.to.outputs,'build-result-history.Rdata'))
+        #if(nrow(build.result.history)>0) build.result.history <- subset(build.result.history,!(penetration==start.pen & iteration>=start.iter))
+			  #save(build.result.history,file=pp(path.to.outputs,'build-result-history.Rdata'))
         write.table(subset(read.csv(pp(path.to.outputs,'buildout-progress.csv')),!(penetration==start.pen & iteration>=start.iter)),file=pp(path.to.outputs,'buildout-progress.csv'),sep=',',row.names=F)
         hot.start <- F
       }
@@ -377,8 +377,8 @@ for(seed in seeds[seed.inds]){
 			save(winner.history,file=pp(path.to.outputs,'winner-history.Rdata'))
       build.result$penetration <- pev.penetration
       build.result$iteration <- build.i
-      build.result.history <- rbind(build.result.history,build.result)
-			save(build.result.history,file=pp(path.to.outputs,'build-result-history.Rdata'))
+      #build.result.history <- rbind(build.result.history,build.result)
+			#save(build.result.history,file=pp(path.to.outputs,'build-result-history.Rdata'))
 
       #	Winner determined by lowest objective function
 			print(pp('winner taz = ',taz.charger.combos$taz[1],' level = ',taz.charger.combos$level[1]))

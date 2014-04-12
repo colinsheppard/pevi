@@ -135,6 +135,26 @@ if(F){
   write.csv(ddply(winners,.(scenario),function(df){ data.frame(num.seeds=length(unique(df$seed)))}),file=pp(pevi.home,'../plots/delhi-analysis/sample-size.csv'))
 
   ###############
+  # Base Scenario
+  ###############
+  cbPalette <- charger.cols
+  winners$scenario.named <- refactor.scen(winners$scenario)
+  winners$penetration.named <- pp(winners$penetration*100,"%")
+  p <- ggplot(subset(winners,scenario%in%c('half-homeless')),aes(x=cum.cost/1e3,y=delay/1e6,shape=scenario.named,colour=scenario.named)) + geom_point() + labs(x="Infrastructure Cost ($M)",y="PV of Driver Delay ($M)",title="",color="Scenario",shape="Scenario")+facet_wrap(~penetration.named) + scale_color_manual(values=cbPalette[2])+theme(legend.position=c(0,1), legend.justification = c(0, 1))
+  ggsave(file=pp(pevi.home,'../plots/delhi-analysis/base/base-optimality-curves.pdf'),p,width=10,height=6)
+
+  ch.fin <- ddply(subset(melt(subset(ch.fin.unshaped,scenario %in% c('half-homeless')),measure.vars=pp('L',0:4),variable_name="level"),level%in%pp('L',1:3)),.(scenario,level,penetration),function(df) { data.frame(num.chargers=sum(df$value)/length(unique(df$seed))) })
+  ch.fin <- ddply(ch.fin,.(scenario),num.ch.to.cost)
+  ch.fin$level <- revalue(ch.fin$level,c('L1'='Level 1','L2'='Level 2','L3'='DC Fast','L4'='Battery Swapping'))
+  ch.fin$penetration <- pp(ch.fin$penetration*100,'%')
+  ch.fin$scenario.named <- refactor.scen(ch.fin$scenario,base='50% Home Chargers')
+  cbPalette <- tail(charger.cols,-1)
+  p <- ggplot(ch.fin,aes(x=penetration,y=num.chargers,fill=factor(level))) + geom_bar(stat='identity') + labs(x="",y="Number of Chargers Sited",title="Chargers Sited for Base Scenario",fill="Charger Level") +  theme(axis.text.x = element_text(colour='black'),plot.margin=unit(c(0.5,0.2,0.2,1),"cm")) + scale_fill_manual(values=cbPalette)
+  ggsave(file=pp(pevi.home,'../plots/delhi-analysis/base/base-num-chargers.pdf'),p,width=6,height=6)
+  p <- ggplot(ch.fin,aes(x=penetration,y=installed.cost,fill=factor(level))) + geom_bar(stat='identity') + labs(x="",y="Cost of Installed Chargers  ($M)",title="Charger Cost for Base Scenario",fill="Charger Level") + theme(axis.text.x = element_text(colour='black'),plot.margin=unit(c(0.5,0.2,0.2,1),"cm")) + scale_fill_manual(values=cbPalette)
+  ggsave(file=pp(pevi.home,'../plots/delhi-analysis/base/base-charger-cost.pdf'),p,width=6,height=6)
+
+  ###############
   # Vehicle Type
   ###############
   cbPalette <- charger.cols

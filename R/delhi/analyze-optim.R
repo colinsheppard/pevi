@@ -49,7 +49,7 @@ for(optim.code in scenarios){
   charger.data <- read.table(pp(pevi.shared,param.file.data$charger.type.input.file),header=TRUE)
   names(charger.data) <- c('level',tail(names(charger.data),-1))
   charger.types[[optim.code]] <- charger.data
-  for(seed in c(20:40)){
+  for(seed in c(40:49)){
     if(seed < 30 & optim.code != 'swap')next
     hist.file <- pp(pevi.shared,'data/outputs/optim-new/delhi-',optim.code,'-seed',seed,'/charger-buildout-history.Rdata')
     final.evse.file <- pp(pevi.shared,'data/outputs/optim-new/delhi-',optim.code,'-seed',seed,'/delhi-',optim.code,'-seed',seed,'-pen0.5-final-infrastructure.txt')
@@ -68,11 +68,6 @@ for(optim.code in scenarios){
 }
 names(chs) <- c('TAZ',tail(names(chs),-1))
 chs <- data.table(chs,key=c('scenario','seed','penetration','iter'))
-
-ch.fin <- ddply(subset(chs,TAZ>0),.(scenario,seed,penetration),function(df){
-  subset(df,iter==max(iter))
-})
-ch.fin.unshaped <- ch.fin
 
 load(file=pp(pevi.shared,'data/inputs/compare/delhi-baseline-pain/mean-delay.Rdata'))
 load(file=pp(pevi.shared,'data/inputs/compare/delhi-baseline-pain/mean-delay-veh-scens.Rdata'))
@@ -95,13 +90,39 @@ winners <- ddply(winners,.(scenario,seed),function(df){
   cost.per.iter <- build.increment * charger.type$installed.cost[match(1:4,charger.type$level)]
   df$cost <- cost.per.iter[match(df$level,1:4)]
   df$num.added <- build.increment[match(df$level,1:4)]
-  df <- as.data.frame(data.table(df,key=c('penetration','iteration')))
-  data.frame(df,cum.cost=cumsum(df$cost))
+  dt <- data.table(df,key=c('penetration','iteration'))
+  df <- as.data.frame(dt)
+  if(df$seed[1]>=40){
+    df$cum.cost <- dt[,list(cum.cost=cumsum(cost)),by='penetration']$cum.cost
+  }else{
+    df$cum.cost <- cumsum(df$cost)
+  }
+  df
 })
 winners$delay <- winners$mean.delay.cost
 winners <- ddply(winners,.(scenario,seed,penetration),function(df){
   data.frame(df,marginal.cost=c(NA,abs(diff(df$cum.cost*1e3) / diff(df$delay))))
 })
+
+# for seeds >= 40 we need to find the right stopping point and get rid of the extraneous results
+winners <- ddply(winners,.(scenario,penetration,seed),function(df){
+  if(df$seed[1] >= 40){
+    # drop all the data beyond the point at which the derivative estimate from locfit is greater than -1
+    # note, -1000 here corresponds to a slope of -1 if the units of delay and cum.cost were the same
+    first.to.drop <- which(predict(locfit(as.formula('delay ~ lp(cum.cost, nn=0.5)'),data=df,deriv=1),newdata=df) > -1000)[1]
+    if(!is.na(first.to.drop)){
+      df <- df[1:(first.to.drop-1),]
+      iteration.to.drop <- df$iteration[first.to.drop]
+      chs <- subset(chs,!(scenario==df$scenario[1] & penetration==df$penetration[1] & iter >= iteration.to.drop))
+    }
+  }
+  df
+})
+
+ch.fin <- ddply(subset(chs,TAZ>0),.(scenario,seed,penetration),function(df){
+  subset(df,iter==max(iter))
+})
+ch.fin.unshaped <- ch.fin
 
 ################################################
 # ANALYSIS

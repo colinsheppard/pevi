@@ -391,7 +391,14 @@ for(seed in seeds[seed.inds]){
         win.sub <- subset(winner.history,penetration==pev.penetration)
         slope.of.obj <- lm('mean.delay.cost ~ cum.cost',tail(win.sub,5))$coefficients[2]
         #if((nrow(win.sub) >= 5 & slope.of.obj < -5) | (nrow(win.sub) %in% 3:4 & slope.of.obj < -1) | nrow(win.sub) < 3){
-        if((pev.penetration == 0.005 & tail(winner.history$cum.cost,1) < 5e6) | (pev.penetration == 0.01 & tail(winner.history$cum.cost,1) < 10e6) | (pev.penetration == 0.02 & tail(winner.history$cum.cost,1) < 15e6)){
+        # break if requested
+        if(file.exists(pp(path.to.outputs,'BREAK'))){
+          unlink(pp(path.to.outputs,'BREAK'))
+          system(pp('touch ',path.to.outputs,'BREAK-SUCCESS'))
+          current.obj <- Inf
+          break
+        }
+        if((pev.penetration == 0.005 & tail(winner.history$cum.cost,1) < 4e6) | (pev.penetration == 0.01 & tail(winner.history$cum.cost,1) < 6e6) | (pev.penetration == 0.02 & tail(winner.history$cum.cost,1) < 8e6)){
           current.obj <- taz.charger.combos$obj[1]
         } else {
           current.obj <- Inf
@@ -426,11 +433,11 @@ for(seed in seeds[seed.inds]){
         taz.charger.combos$include[ind.banks[[bank.i]]] <- ind.banks.seq[[bank.i]][build.i+1]
       }
 
-      # break if requested
-      if(file.exists(pp(path.to.outputs,'BREAK'))){
-        unlink(pp(path.to.outputs,'BREAK'))
-        system(pp('touch ',path.to.outputs,'STOPPED'))
-        stop('BREAK file found, stopping')
+      # stop if requested
+      if(file.exists(pp(path.to.outputs,'STOP'))){
+        unlink(pp(path.to.outputs,'STOP'))
+        system(pp('touch ',path.to.outputs,'STOP-SUCCESS'))
+        stop('stopped by user')
       }
     } # end iteration loop
     

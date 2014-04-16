@@ -263,6 +263,7 @@ to initialize-drivers
       update-itinerary
       set state-of-charge master-state-of-charge
       set electric-fuel-consumption master-electric-fuel-consumption
+      time:schedule-event self task morning-charge 0
       itinerary-event-scheduler
     ][
       set current-itin-row -1
@@ -303,6 +304,7 @@ to initialize-drivers
       set gasoline-used 0 
       set itin-complete? false
       if [id] of self = 1036 [print trip-distance]
+      time:schedule-event self task morning-charge 0
       itinerary-event-scheduler
     ]
   ]

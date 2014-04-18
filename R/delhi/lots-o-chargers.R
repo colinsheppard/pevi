@@ -50,6 +50,7 @@ res <- ddply(res,.(penetration,infrastructure.scenario),function(df){
   data.frame(delay=mean(df$total.delay/df$num.drivers),strands=mean(df$num.stranded/df$num.drivers))
 })
 res$strands[res$strands<0] <- 0
+res$delay[res$delay<0] <- 0
 res$scen <- revalue(factor(res$infrastructure.scenario),c('0.5'='With EVSE','1'='With EVSE','2'='With EVSE','external'='Without EVSE'))
 res$penetration <- revalue(factor(res$penetration),c('0.5'='0.5%','1'='1%','2'='2%'))
 
@@ -62,5 +63,9 @@ charger.cols <- c(my.green,my.blue,my.purp,my.oran,my.red)
 p <- ggplot(res,aes(x=factor(penetration),y=delay,fill=scen)) + geom_bar(stat='identity',position='dodge') + labs(x="Fleet Penetration",y="Average Daily Hours of Delay per Driver",title="Delay",fill="")+scale_fill_manual(values=charger.cols) # +theme(axis.text.x = element_text(colour='black',size=14),axis.text.y = element_text(colour='black',size=14),plot.title = element_text(size=16))
 ggsave(file=pp(pevi.home,'../plots/delhi-analysis/base/base-mean-delay.pdf'),p,width=6,height=6)
 p <- ggplot(res,aes(x=factor(penetration),y=strands,fill=scen)) + geom_bar(stat='identity',position='dodge') + labs(x="Fleet Penetration",y="Average Daily Incidence of Strandings per Driver",title="Strandings",fill="")+scale_fill_manual(values=charger.cols)
+ggsave(file=pp(pevi.home,'../plots/delhi-analysis/base/base-mean-standings.pdf'),p,width=6,height=6)
+p <- ggplot(res,aes(x=scen,fill=factor(penetration),y=delay)) + geom_bar(stat='identity',position='dodge') + labs(x="Fleet Penetration",y="Average Daily Hours of Delay per Driver",title="Delay",fill="")+scale_fill_manual(values=charger.cols) # +theme(axis.text.x = element_text(colour='black',size=14),axis.text.y = element_text(colour='black',size=14),plot.title = element_text(size=16))
+ggsave(file=pp(pevi.home,'../plots/delhi-analysis/base/base-mean-delay.pdf'),p,width=6,height=6)
+p <- ggplot(res,aes(x=scen,fill=factor(penetration),y=strands)) + geom_bar(stat='identity',position='dodge') + labs(x="Fleet Penetration",y="Average Daily Incidence of Strandings per Driver",title="Strandings",fill="")+scale_fill_manual(values=charger.cols)
 ggsave(file=pp(pevi.home,'../plots/delhi-analysis/base/base-mean-standings.pdf'),p,width=6,height=6)
 

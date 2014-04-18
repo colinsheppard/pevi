@@ -263,7 +263,11 @@ to initialize-drivers
       update-itinerary
       set state-of-charge master-state-of-charge
       set electric-fuel-consumption master-electric-fuel-consumption
+<<<<<<< HEAD
       time:schedule-event self task morning-charge 0
+=======
+      time:schedule-event self task morning-charge 0 
+>>>>>>> master
       itinerary-event-scheduler
     ][
       set current-itin-row -1
@@ -303,8 +307,12 @@ to initialize-drivers
       set time-until-end-charge 0
       set gasoline-used 0 
       set itin-complete? false
+<<<<<<< HEAD
       if [id] of self = 1036 [print trip-distance]
       time:schedule-event self task morning-charge 0
+=======
+      time:schedule-event self task morning-charge 0 
+>>>>>>> master
       itinerary-event-scheduler
     ]
   ]
@@ -361,7 +369,11 @@ to setup-itinerary
         set itin-from n-values 1 [file-read]
         set itin-to n-values 1 [file-read]
         set itin-depart n-values 1 [file-read]
+<<<<<<< HEAD
         set home-taz taz file-read
+=======
+        set home-taz table:get taz-table file-read
+>>>>>>> master
         let #rand-draw random-float 1
         set external-time interpolate-from-draw #rand-draw ext-taz-cumulative-fraction external-time-bound
         set external-dist interpolate-from-draw #rand-draw ext-taz-cumulative-fraction external-dist-bound
@@ -387,7 +399,11 @@ to setup-itinerary
             if max-dwell-time < (item itin-row itin-depart - ((item (itin-row - 1) itin-depart) + (item (od-index item itin-row itin-to item itin-row itin-from) od-time))) [
               set max-dwell-time (item itin-row itin-depart - ((item (itin-row - 1) itin-depart) + (item (od-index item itin-row itin-to item itin-row itin-from) od-time)))
             ]
+<<<<<<< HEAD
             if not (home-taz = taz file-read) [ error (word "Inconsistent home taz specified for driver " id ) ]
+=======
+            if not (home-taz = table:get taz-table file-read) [ error (word "Inconsistent home taz specified for driver " id ) ]
+>>>>>>> master
             ifelse file-at-end? [ set next-driver -1][ set next-driver file-read ]
           ] ; end while this-itin
         ]

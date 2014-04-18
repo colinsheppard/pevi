@@ -14,12 +14,13 @@ option_list <- list(
   make_option(c("-s", "--seed"), type="integer", default=-1, help="Override seeds in params.R with a single value, a negative integer means do not override [%default]"),
   make_option(c("-t", "--hotstart"),action="store_true", type="logical", default=F, help="Set hot.start to TRUE, overriding the value in params.R [%default]"),
   make_option(c("-c", "--correcttwo"),action="store_true", type="logical", default=F, help="Correct 2%, this will delete all 2% results and hot start from iter 1 [%default]"),
+  make_option(c("-v", "--version"),type="character", default='2.0', help="Version number of PEVI to use [%default]"),
   make_option(c("-p", "--pushend"),action="store_true", type="logical", default=F, help="Push the stopping criterion [%default]")
 )
 if(interactive()){
   setwd(pp(pevi.shared,'data/inputs/optim-new/delhi-half-homeless/'))
   #setwd(pp(pevi.shared,'data/inputs/optim-new/delhi-swap/'))
-  args<-c('-s','31','-p')
+  args<-c('-s','51','-v','2.1')
   args <- parse_args(OptionParser(option_list = option_list,usage = "optimize-pevi.R [options]"),positional_arguments=F,args=args)
 }else{
   args <- parse_args(OptionParser(option_list = option_list,usage = "optimize-pevi.R [options]"),positional_arguments=F)
@@ -235,7 +236,8 @@ if(hot.start){
 }
 
 # configure cluster and get RNetLogo running
-model.path <- paste(pevi.home,"netlogo/PEVI-nolog.nlogo",sep='')
+pevi.ver <- ifelse(args$version=="2.0","",pp("-v",args$version))
+model.path <- pp(pevi.home,"netlogo/PEVI",pevi.ver,"-nolog.nlogo")
 if(!exists('cl')){
   print('starting new cluster')
   cl <- makeCluster(c(rep(list(list(host="localhost")),num.cpu)),type="SOCK")
@@ -259,6 +261,7 @@ for(seed in seeds[seed.inds]){
   make.dir(path.to.outputs)
   file.copy(param.file,path.to.outputs)
   file.copy(pp(args$experimentdir,'params.R'),path.to.outputs)
+  file.copy(pp(args$experimentdir,'vary.yaml'),path.to.outputs)
   cat(pp(whoami,' starting ',format(Sys.time(), "%Y-%m-%d %H:%M:%S"),'\n'),file=pp(path.to.outputs,'WHOAMI.txt'),append=T)
 
   if(hot.start){
@@ -292,14 +295,14 @@ for(seed in seeds[seed.inds]){
     write.table(charger.buildout,charger.file,quote=FALSE,sep='\t',row.names=FALSE)
     
     # Note that the expectation is that all pev penetrations beyond the first are even multiples of the first
-    if(pev.penetration == pev.penetrations[1]){
-      vary.tab <- vary.tab.original
-    }else{
-      pen.ratio <- pev.penetration/pev.penetrations[1]
+    #if(pev.penetration == pev.penetrations[1]){
+      #vary.tab <- vary.tab.original
+    #}else{
+      pen.ratio <- pev.penetration/0.005
     	new.vary <- vary
     	new.vary$'driver-input-file' <- new.vary$'driver-input-file'[1:round(length(vary$'driver-input-file')/pen.ratio)]
     	vary.tab <- expand.grid(new.vary,stringsAsFactors=F)
-    }
+    #}
     vary.tab$`driver-input-file` <- str_replace(vary.tab$`driver-input-file`,"penXXX",paste("pen",pev.penetration*100,sep=""))
 
     # Start for loop for overall penetration level optimization
@@ -397,7 +400,7 @@ for(seed in seeds[seed.inds]){
           current.obj <- Inf
           break
         }
-        if((pev.penetration == 0.005 & tail(winner.history$cum.cost,1) < 4e6) | (pev.penetration == 0.01 & tail(winner.history$cum.cost,1) < 6e6) | (pev.penetration == 0.02 & tail(winner.history$cum.cost,1) < 8e6)){
+        if((pev.penetration == 0.005 & tail(winner.history$cum.cost,1) < 3e6) | (pev.penetration == 0.01 & tail(winner.history$cum.cost,1) < 5e6) | (pev.penetration == 0.02 & tail(winner.history$cum.cost,1) < 7e6)){
           current.obj <- taz.charger.combos$obj[1]
         } else {
           current.obj <- Inf
@@ -425,7 +428,18 @@ for(seed in seeds[seed.inds]){
 			save(charger.buildout.history,file=pp(path.to.outputs,'charger-buildout-history.Rdata'))
 
       # finally, a status update on the state of the optimization run
-      write.table(data.frame(timestamp=format(Sys.time(), "%Y-%m-%d %H:%M:%S"),seed=seed,penetration=pev.penetration,iteration=build.i,n.alternatives.evaluated=sum(taz.charger.combos$include),obj=current.obj,winner.taz=taz.charger.combos$taz[1],winner.name=taz.charger.combos$name[1],winner.level=taz.charger.combos$level[1],t(taz.charger.combos$obj)),append=file.exists(pp(path.to.outputs,'buildout-progress.csv')),col.names=!file.exists(pp(path.to.outputs,'buildout-progress.csv')),file=pp(path.to.outputs,'buildout-progress.csv'),sep=',',row.names=F)
+      write.table(data.frame(timestamp=format(Sys.time(), "%Y-%m-%d %H:%M:%S"),
+        seed=seed,
+        penetration=pev.penetration,
+        iteration=build.i,
+        num.evaluated=sum(taz.charger.combos$include),
+        delay=tail(winner.history$mean.delay.cost,1),
+        cum.cost=tail(winner.history$cum.cost,1),
+        obj=current.obj,
+        winner.taz=taz.charger.combos$taz[1],
+        winner.name=taz.charger.combos$name[1],
+        winner.level=taz.charger.combos$level[1]),
+      append=file.exists(pp(path.to.outputs,'buildout-progress.csv')),col.names=!file.exists(pp(path.to.outputs,'buildout-progress.csv')),file=pp(path.to.outputs,'buildout-progress.csv'),sep=',',row.names=F)
 
       # Finally update taz.charger.combos to include/exclude poorly performing alternatives
       for(bank.i in 1:length(ind.banks)){

@@ -3,11 +3,12 @@ options(java.parameters="-Xmx2048m")
 load.libraries(c('ggplot2','yaml','RNetLogo','plyr','reshape','stringr'))
 
 #exp.name <- commandArgs(trailingOnly=T)[1]
-exp.name <- 'delhi-baseline-pain'
+exp.name <- 'consistent-vs-quadrupled'
 path.to.inputs <- pp(pevi.shared,'data/inputs/compare/',exp.name,'/')
 
 to.log <- c()
 #to.log <- 'pain'
+to.log <- c('pain','charging')
 #to.log <- c('pain','charging','trip')
 #to.log <- c('pain','charging','tazs','trip')
 
@@ -72,7 +73,7 @@ if("vehicle-type-input-file" %in% names(vary)){
     }
   }
 }
-if(exp.name=='delhi-battery-swap'){
+if(exp.name=='delhi-battery-swap' | exp.name=='consistent-vs-quadrupled'){
   results <- subset(results,(penetration==0.5 & infrastructure.scenario=='delhi-final-rec-pen-0.5') | 
                     (penetration==1 & infrastructure.scenario=='delhi-final-rec-pen-1') | 
                     (penetration==2 & infrastructure.scenario=='delhi-final-rec-pen-2') |
@@ -84,6 +85,7 @@ if(exp.name=='delhi-battery-swap'){
 # start NL
 tryCatch(NLStart(nl.path, gui=F),error=function(err){ NA })
 model.path <- paste(pevi.home,"netlogo/PEVI.nlogo",sep='')
+#model.path <- paste(pevi.home,"netlogo/PEVI_v2.1.nlogo",sep='')
 NLLoadModel(model.path)
 
 for(cmd in paste('set log-',logfiles,' false',sep='')){ NLCommand(cmd) }
@@ -223,9 +225,26 @@ my.red <- '#e41a1c'
 my.blue <- '#377eb8'
 ggplot(dd,aes(x=daily.km)) + geom_histogram(binwidth=10) +  labs(x="Daily KMT",y="Frequency") + geom_histogram(binwidth=10,alpha=.5, fill=my.red,data=df) + ggtitle(expression(atop("Daily KMT for All Drivers (black) and Stranded Drivers (red)", atop("(at 0.5% Penetration, 100% Home Chargers and No Public Infrastructure)"))))
 
+# comparing consistent vs quadrupled itins before after 2.0 to 2.1 fixes
+
+all.logs <- list()
+for(log in c('pain','charging','results')){
+  all.logs[[log]] <- data.frame()
+}
+load(pp(pevi.shared,"data/inputs/compare/consistent-vs-quadrupled/logs-v2.0.Rdata")) # base version
+for(log in c('pain','charging','results')){
+  logs[[log]]$pevi <- '2.0 Base'
+  all.logs[[log]] <- rbind(all.logs[[log]],logs[[log]])
+}
+load(pp(pevi.shared,"data/inputs/compare/consistent-vs-quadrupled/logs-v2.0.1.Rdata")) # after morning charging and external homelessness fixes
+for(log in c('pain','charging','results')){
+  logs[[log]]$pevi <- '2.0.1 Morning/Extern Fixes'
+  all.logs[[log]] <- rbind(all.logs[[log]],logs[[log]])
+}
 
 # bulk # of delays and strandings
-ddply(subset(logs[['pain']],pain.type%in%c("delay","stranded") & num.simulation.days==2),.(pain.type,itin.scenario),nrow)
+ddply(subset(logs[['pain']],pain.type%in%c("delay","stranded") & num.simulation.days==2),.(pain.type,itin.scenario),function(df){ data.frame(num.pain=nrow(df),sum.pain=sum(df$pain.value))})
+ddply(subset(logs[['results']],T),.(itin.scenario),function(df){ data.frame(delay.cost=mean(df$total.delay.cost),delay=mean(df$total.delay))})
 # now plot it 
 logs[['pain']]$vehicle.scenario.named <- factor(logs[['pain']]$vehicle.scenario.named,c("All Low","Low/Med/High (33/33/33)","All High"))
 ggplot(ddply(subset(logs[['pain']],pain.type%in%c("delay","stranded")),.(pain.type,vehicle.scenario.named),nrow),aes(x=vehicle.scenario.named,y=V1,fill=pain.type))+geom_bar(stat='identity',position='dodge')+labs(title="Number of Delay and Stranding Events Over 5 Replicates and a Constant Infrastructure",x="Scenario",y="Number of Events",fill="Event Type")

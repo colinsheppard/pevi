@@ -259,16 +259,12 @@ to initialize-drivers
       set itin-complete? false
       set current-itin-row -1
       set itin-complete? false
-      set journey-distance master-journey-distance
+      set journey-distance item 0 master-journey-distance-list
+      set total-journey-distance master-total-journey-distance
       update-itinerary
       set state-of-charge master-state-of-charge
       set electric-fuel-consumption master-electric-fuel-consumption
-<<<<<<< HEAD
-      time:schedule-event self task morning-charge 0
-=======
       time:schedule-event self task morning-charge 0 
->>>>>>> master
-      itinerary-event-scheduler
     ][
       set current-itin-row -1
       set shape "car"
@@ -307,13 +303,7 @@ to initialize-drivers
       set time-until-end-charge 0
       set gasoline-used 0 
       set itin-complete? false
-<<<<<<< HEAD
-      if [id] of self = 1036 [print trip-distance]
-      time:schedule-event self task morning-charge 0
-=======
       time:schedule-event self task morning-charge 0 
->>>>>>> master
-      itinerary-event-scheduler
     ]
   ]
 end ;initialize-drivers
@@ -369,18 +359,15 @@ to setup-itinerary
         set itin-from n-values 1 [file-read]
         set itin-to n-values 1 [file-read]
         set itin-depart n-values 1 [file-read]
-<<<<<<< HEAD
-        set home-taz taz file-read
-=======
         set home-taz table:get taz-table file-read
->>>>>>> master
         let #rand-draw random-float 1
         set external-time interpolate-from-draw #rand-draw ext-taz-cumulative-fraction external-time-bound
         set external-dist interpolate-from-draw #rand-draw ext-taz-cumulative-fraction external-dist-bound
         set wait-threshold interpolate-from-draw random-float 1 [0 1] [0.5 2]
         let itin-row 0
-        set journey-distance (distance-from-to item itin-row itin-to item itin-row itin-from)
-        set max-trip-distance journey-distance
+        set total-journey-distance (distance-from-to item itin-row itin-to item itin-row itin-from)
+        set master-journey-distance-list n-values 1 [total-journey-distance]
+        set max-trip-distance total-journey-distance
         set max-dwell-time 0
         set this-vehicle-type nobody
         if file-at-end? = false [
@@ -392,18 +379,19 @@ to setup-itinerary
             set itin-depart lput file-read itin-depart
             set itin-row itin-row + 1
             let #this-trip-distance (distance-from-to item itin-row itin-to item itin-row itin-from)
-            set journey-distance (journey-distance + #this-trip-distance)
+            set total-journey-distance (total-journey-distance + #this-trip-distance)
+            ifelse floor (item itin-row itin-depart / 24) > (length master-journey-distance-list - 1) [
+              set master-journey-distance-list lput #this-trip-distance master-journey-distance-list
+            ][
+              set master-journey-distance-list replace-item (floor (item itin-row itin-depart / 24)) master-journey-distance-list (item floor (item itin-row itin-depart / 24) master-journey-distance-list + #this-trip-distance)
+            ]
             if max-trip-distance < #this-trip-distance [
               set max-trip-distance #this-trip-distance
             ]
             if max-dwell-time < (item itin-row itin-depart - ((item (itin-row - 1) itin-depart) + (item (od-index item itin-row itin-to item itin-row itin-from) od-time))) [
               set max-dwell-time (item itin-row itin-depart - ((item (itin-row - 1) itin-depart) + (item (od-index item itin-row itin-to item itin-row itin-from) od-time)))
             ]
-<<<<<<< HEAD
-            if not (home-taz = taz file-read) [ error (word "Inconsistent home taz specified for driver " id ) ]
-=======
             if not (home-taz = table:get taz-table file-read) [ error (word "Inconsistent home taz specified for driver " id ) ]
->>>>>>> master
             ifelse file-at-end? [ set next-driver -1][ set next-driver file-read ]
           ] ; end while this-itin
         ]
@@ -412,7 +400,8 @@ to setup-itinerary
         set master-itin-from itin-from ; set master variables for batch setup
         set master-itin-to itin-to
         set master-itin-depart itin-depart
-        set master-journey-distance journey-distance
+        set journey-distance item 0 master-journey-distance-list
+        set master-total-journey-distance total-journey-distance
         set permission-list []
       ] ; end create-drivers
     ] ; end while file-at-end

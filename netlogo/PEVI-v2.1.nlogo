@@ -960,10 +960,6 @@ end
 ;;;;;;;;;;;;;;;;;;;;
 
 to end-charge-then-itin
-  if self = driver 4751 [
-    print ticks
-    print current-charger
-  ]
   end-charge
   itinerary-event-scheduler
 end
@@ -1184,8 +1180,10 @@ end
 ;;;;;;;;;;;;;;;;;;;;
 ; At the start of the model day, have the driver check to see if they need a charge BEFORE they are about to depart. Logic is same as if they arrived at a location.
 to morning-charge
-  if need-to-charge "arrive" [
+  ifelse need-to-charge "arrive" [
     seek-charger
+  ][
+    itinerary-event-scheduler
   ]
 end
 
@@ -1230,8 +1228,6 @@ end
 
 to return-charger [#taz #level #charger]
   if ([alt-energy-price] of #charger = 0) [
-    if #charger = charger 4868 [ 
-      print #taz ]
     ask #taz [
       if not structs:stack-contains item #level available-chargers-by-type #charger [
       structs:stack-push item #level available-chargers-by-type #charger
@@ -1252,7 +1248,7 @@ to-report selected-charger [#taz #level]
   let #selected-charger 0
   ask #taz[
     set #selected-charger structs:stack-pop item #level available-chargers-by-type
-    ;if #level = 0 [structs:stack-push item #level available-chargers-by-type #selected-charger]
+    if #level = 0 [structs:stack-push item #level available-chargers-by-type #selected-charger]
   ]
   report #selected-charger
 end
@@ -1266,8 +1262,6 @@ to-report num-existing-chargers [#taz #level]
 end
 
 to-report charge-rate-of [#charger]
-  ;print self
-  ;print #charger
   report [charge-rate] of ([this-charger-type] of #charger)
 end
 

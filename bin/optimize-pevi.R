@@ -19,8 +19,7 @@ option_list <- list(
   make_option(c("-p", "--pushend"),action="store_true", type="logical", default=F, help="Push the stopping criterion [%default]")
 )
 if(interactive()){
-  setwd(pp(pevi.shared,'data/inputs/optim-new/delhi-half-homeless/'))
-  #setwd(pp(pevi.shared,'data/inputs/optim-new/delhi-swap/'))
+  setwd(pp(pevi.shared,'data/inputs/optim-new/delhi-homeless/'))
   args<-c('-s','51','-v','2.1')
   args <- parse_args(OptionParser(option_list = option_list,usage = "optimize-pevi.R [options]"),positional_arguments=F,args=args)
 }else{

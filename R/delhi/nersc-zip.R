@@ -23,7 +23,9 @@ optim.scenarios <- c('homeless','half-homeless','no-homeless','veh-low','veh-hig
 
 setwd(pevi.shared)
 
+unlink('pevi-files.zip')
 #zip('pevi-files.zip',c('data/inputs/starting-soc','data/inputs/external-time-distance','data/inputs/charger-input-file/delhi/delhi-existing-chargers.txt','data/inputs/charger-type-input-file','data/inputs/driver-input-file/delhi-combined','data/inputs/OD-delhi','data/inputs/vehicle-type-input-file'),extras='-x data/inputs/driver-input-file/delhi-combined/old')
+zip('pevi-files.zip',c('data/inputs/driver-input-file/delhi-combined'),extras='-x data/inputs/driver-input-file/delhi-combined/old')
 unlink('pevi-experiments.zip')
 zip('pevi-experiments.zip',c(pp('data/inputs/optim-new/delhi-',optim.scenarios)))
 

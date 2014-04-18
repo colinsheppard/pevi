@@ -1112,9 +1112,18 @@ end
 ;; TRAVEL TIME EVENT SCHEDULER
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 to travel-time-event-scheduler
-  set state "traveling" 
-  set trip-time item current-od-index od-time
-  time:schedule-event self task arrive (ticks + trip-time)
+  ; If the driver has added 10 trips to their itinerary consider them soft-stranded. Otherwise, continue.
+  ifelse sum [itin-change-flag] of self > 9 [
+    set state "stranded"
+    set itin-delay-amount replace-item current-itin-row itin-delay-amount (item current-itin-row itin-delay-amount + soft-strand-penalty)
+    log-data "wait-time" (sentence ticks id [name] of this-vehicle-type state-of-charge trip-distance journey-distance time-until-depart "stranded" -1 electric-fuel-consumption) ;;;LOG
+    log-data "trip-journey-timeuntildepart" (sentence ticks departure-time id [name] of this-vehicle-type state-of-charge [id] of current-taz [id] of destination-taz true false (departure-time - ticks) "stranded" remaining-range sum map weight-delay itin-delay-amount) ;;;LOG
+    log-data "pain" (sentence ticks id [id] of current-taz [name] of this-vehicle-type "stranded" "" state-of-charge) ;;;LOG
+  ][
+    set state "traveling" 
+    set trip-time item current-od-index od-time
+    time:schedule-event self task arrive (ticks + trip-time)
+  ]
 end
 
 ;;;;;;;;;;;;;;;;;;;;

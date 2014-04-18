@@ -395,6 +395,7 @@ to setup-itinerary
             ifelse file-at-end? [ set next-driver -1][ set next-driver file-read ]
           ] ; end while this-itin
         ]
+        set master-journey-distance-list lput item (length master-journey-distance-list - 1) master-journey-distance-list master-journey-distance-list
         set itin-change-flag n-values length itin-depart [0]
         set itin-delay-amount n-values length itin-depart [0]
         set master-itin-from itin-from ; set master variables for batch setup

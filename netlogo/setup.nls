@@ -301,7 +301,8 @@ to initialize-drivers
       set full-charge-time-need 0
       set time-until-end-charge 0
       set gasoline-used 0 
-      set itin-complete? false 
+      set itin-complete? false
+      if [id] of self = 1036 [print trip-distance]
       itinerary-event-scheduler
     ]
   ]

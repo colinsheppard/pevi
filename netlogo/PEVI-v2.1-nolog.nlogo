@@ -1708,7 +1708,7 @@ INPUTBOX
 832
 253
 starting-seed
-21
+51
 1
 0
 Number

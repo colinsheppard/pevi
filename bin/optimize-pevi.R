@@ -1,5 +1,4 @@
-#!/usr/bin/Rscript --no-save --no-restore
-
+#!/usr/common/usg/R/R-2.15.2/bin/Rscript --no-save --no-restore
 ##############################################################################################################################################
 # Script to conduct the buildout optimization
 ##############################################################################################################################################
@@ -230,7 +229,7 @@ if(hot.start){
   }
   my.cat(pp("HOT START: seed ",start.seed,", pen ",start.pen,", iter ",start.iter))
 }else{
-  my.cat(pp("COLD START: seed ",seeds[1],", pen 0.005 iter 1"))
+  my.cat(pp("COLD START: seed ",seeds[1],", pen ",pev.penetrations[1]," iter 1"))
   seed.inds <- 1:(length(seeds))
   pen.inds <- 1:(length(pev.penetrations))
 }

@@ -113,7 +113,8 @@ drivers-own [
   wait-threshold            ; How long a driver is willing to wait before they are considered soft-stranded.
 
 ;; CONVENIENCE VARIABLES
-  journey-distance
+  total-journey-distance    ; The total length of the driver's multi-day travels
+  journey-distance          ; The length of the drivers daily travels in the first 24 hours.
   trip-distance
   remaining-range
   departure-time
@@ -143,7 +144,8 @@ drivers-own [
 ;; BATCH MODE
   master-state-of-charge
   master-electric-fuel-consumption
-  master-journey-distance
+  master-journey-distance-list
+  master-total-journey-distance
   master-itin-from          
   master-itin-to             
   master-itin-depart        
@@ -463,7 +465,7 @@ end
 ;;;;;;;;;;;;;;;;;;;;
 to-report need-to-charge [calling-event]
   set charging-on-a-whim? false
-  ;set trip-distance item current-od-index od-dist ; drivers hould already have trip-distance calculated
+  ;set trip-distance item current-od-index od-dist ; drivers should already have trip-distance calculated
   set time-until-depart departure-time - ticks
   set departure-time item current-itin-row itin-depart
   ifelse is-bev? [
@@ -947,6 +949,7 @@ to add-trip-to-itinerary [new-destination-taz]
     distance-from-to (item (current-itin-row + 1) itin-from) (item (current-itin-row + 1) itin-to) - 
     distance-from-to (item current-itin-row itin-from) (item (current-itin-row + 1) itin-to) )
   set journey-distance journey-distance + #added-journey-distance
+  set total-journey-distance total-journey-distance + #added-journey-distance
   
   log-data "pain" (sentence ticks id [id] of current-taz [name] of this-vehicle-type "unscheduled-trip" #added-journey-distance state-of-charge) ;;;LOG
 ;  file-print (word precision ticks 3 " " self " add-trip-to-itinerary new-taz: " new-destination-taz " for row: " current-itin-row " itin-depart: " itin-depart " itin-from: " itin-from " itin-to: " itin-to)      
@@ -957,6 +960,10 @@ end
 ;;;;;;;;;;;;;;;;;;;;
 
 to end-charge-then-itin
+  if self = driver 4751 [
+    print ticks
+    print current-charger
+  ]
   end-charge
   itinerary-event-scheduler
 end
@@ -1109,7 +1116,7 @@ end
 ;; TRAVEL TIME EVENT SCHEDULER
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 to travel-time-event-scheduler
-  set state "traveling"
+  set state "traveling" 
   set trip-time item current-od-index od-time
   time:schedule-event self task arrive (ticks + trip-time)
 end
@@ -1135,13 +1142,17 @@ to arrive
     set state-of-charge max (sentence 0 (state-of-charge - #charge-used))
     set energy-used energy-used + #charge-used * battery-capacity
   ]
-  
-  let #completed-journey journey-distance  ;;;LOG
+  let #completed-journey total-journey-distance  ;;;LOG
   let #completed-trip trip-distance        ;;;LOG
   let #from-taz [id] of current-taz        ;;;LOG
   set journey-distance journey-distance - trip-distance
+  set total-journey-distance total-journey-distance - trip-distance
   log-driver "arriving" ;;;LOG
   update-itinerary 
+  
+  ; If journey-distance = 0, then we are at the end of day 1, and we need to reset journey-distance.
+  if journey-distance < small-num [set journey-distance item (floor (item current-itin-row itin-depart / 24)) master-journey-distance-list]
+    
   let #to-taz [id] of current-taz
   ifelse not itin-complete? [
     ifelse need-to-charge "arrive" [
@@ -1171,15 +1182,10 @@ end
 ;;;;;;;;;;;;;;;;;;;;
 ;; MORNING CHARGE
 ;;;;;;;;;;;;;;;;;;;;
-; At the start of the model day, have the driver check to see if they need a charge BEFORE they are about to depart.
-; EDIT NEEDED: Base whether or not the charge on their journey energy need ONLY. 
+; At the start of the model day, have the driver check to see if they need a charge BEFORE they are about to depart. Logic is same as if they arrived at a location.
 to morning-charge
-  if current-taz = home-taz and (state-of-charge < (journey-distance * electric-fuel-consumption) / battery-capacity)  [
-    set current-charger (one-of item 0 [chargers-by-type] of current-taz)
-    set full-charge-time-need (1 - state-of-charge) * battery-capacity / charge-rate-of current-charger
-    time:schedule-event self task end-charge ticks + full-charge-time-need 
-    set time-until-end-charge full-charge-time-need
-    log-data "charging" (sentence ticks [who] of current-charger level-of current-charger [id] of current-taz [id] of self [name] of this-vehicle-type full-charge-time-need (full-charge-time-need * charge-rate-of current-charger) state-of-charge (state-of-charge + (full-charge-time-need * charge-rate-of current-charger) / battery-capacity ) "stop" false) ;;;LOG
+  if need-to-charge "arrive" [
+    seek-charger
   ]
 end
 
@@ -1224,6 +1230,8 @@ end
 
 to return-charger [#taz #level #charger]
   if ([alt-energy-price] of #charger = 0) [
+    if #charger = charger 4868 [ 
+      print #taz ]
     ask #taz [
       if not structs:stack-contains item #level available-chargers-by-type #charger [
       structs:stack-push item #level available-chargers-by-type #charger
@@ -1244,6 +1252,7 @@ to-report selected-charger [#taz #level]
   let #selected-charger 0
   ask #taz[
     set #selected-charger structs:stack-pop item #level available-chargers-by-type
+    ;if #level = 0 [structs:stack-push item #level available-chargers-by-type #selected-charger]
   ]
   report #selected-charger
 end
@@ -1257,6 +1266,8 @@ to-report num-existing-chargers [#taz #level]
 end
 
 to-report charge-rate-of [#charger]
+  ;print self
+  ;print #charger
   report [charge-rate] of ([this-charger-type] of #charger)
 end
 

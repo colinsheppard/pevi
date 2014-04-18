@@ -259,7 +259,8 @@ to initialize-drivers
       set itin-complete? false
       set current-itin-row -1
       set itin-complete? false
-      set journey-distance master-journey-distance
+      set journey-distance item 0 master-journey-distance-list
+      set total-journey-distance master-total-journey-distance
       update-itinerary
       set state-of-charge master-state-of-charge
       set electric-fuel-consumption master-electric-fuel-consumption
@@ -366,8 +367,9 @@ to setup-itinerary
         set external-dist interpolate-from-draw #rand-draw ext-taz-cumulative-fraction external-dist-bound
         set wait-threshold interpolate-from-draw random-float 1 [0 1] [0.5 2]
         let itin-row 0
-        set journey-distance (distance-from-to item itin-row itin-to item itin-row itin-from)
-        set max-trip-distance journey-distance
+        set total-journey-distance (distance-from-to item itin-row itin-to item itin-row itin-from)
+        set master-journey-distance-list n-values 1 [total-journey-distance]
+        set max-trip-distance total-journey-distance
         set max-dwell-time 0
         set this-vehicle-type nobody
         if file-at-end? = false [
@@ -379,7 +381,12 @@ to setup-itinerary
             set itin-depart lput file-read itin-depart
             set itin-row itin-row + 1
             let #this-trip-distance (distance-from-to item itin-row itin-to item itin-row itin-from)
-            set journey-distance (journey-distance + #this-trip-distance)
+            set total-journey-distance (total-journey-distance + #this-trip-distance)
+            ifelse floor (item itin-row itin-depart / 24) > (length master-journey-distance-list - 1) [
+              set master-journey-distance-list lput #this-trip-distance master-journey-distance-list
+            ][
+              set master-journey-distance-list replace-item (floor (item itin-row itin-depart / 24)) master-journey-distance-list (item floor (item itin-row itin-depart / 24) master-journey-distance-list + #this-trip-distance)
+            ]
             if max-trip-distance < #this-trip-distance [
               set max-trip-distance #this-trip-distance
             ]
@@ -395,7 +402,8 @@ to setup-itinerary
         set master-itin-from itin-from ; set master variables for batch setup
         set master-itin-to itin-to
         set master-itin-depart itin-depart
-        set master-journey-distance journey-distance
+        set journey-distance item 0 master-journey-distance-list
+        set master-total-journey-distance total-journey-distance
         set permission-list []
       ] ; end create-drivers
     ] ; end while file-at-end

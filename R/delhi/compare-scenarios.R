@@ -3,12 +3,12 @@ options(java.parameters="-Xmx2048m")
 load.libraries(c('ggplot2','yaml','RNetLogo','plyr','reshape','stringr'))
 
 #exp.name <- commandArgs(trailingOnly=T)[1]
-exp.name <- 'consistent-vs-quadrupled'
+exp.name <- 'delhi-baseline-pain'
 path.to.inputs <- pp(pevi.shared,'data/inputs/compare/',exp.name,'/')
 
 to.log <- c()
 #to.log <- 'pain'
-to.log <- c('pain','charging')
+#to.log <- c('pain','charging')
 #to.log <- c('pain','charging','trip')
 #to.log <- c('pain','charging','tazs','trip')
 
@@ -84,8 +84,8 @@ if(exp.name=='delhi-battery-swap' | exp.name=='consistent-vs-quadrupled'){
 
 # start NL
 tryCatch(NLStart(nl.path, gui=F),error=function(err){ NA })
-model.path <- paste(pevi.home,"netlogo/PEVI.nlogo",sep='')
-#model.path <- paste(pevi.home,"netlogo/PEVI_v2.1.nlogo",sep='')
+#model.path <- paste(pevi.home,"netlogo/PEVI.nlogo",sep='')
+model.path <- paste(pevi.home,"netlogo/PEVI-v2.1.nlogo",sep='')
 NLLoadModel(model.path)
 
 for(cmd in paste('set log-',logfiles,' false',sep='')){ NLCommand(cmd) }
@@ -120,7 +120,7 @@ for(results.i in 1:nrow(results)){
     }
   }
   if("tazs" %in% to.log)NLCommand('set log-taz-time-interval 5')
-  NLCommand('set go-until-time 55')
+  NLCommand('set go-until-time 125')
   NLCommand('setup')
 
   NLCommand('time:go-until go-until-time')
@@ -236,11 +236,16 @@ for(log in c('pain','charging','results')){
   logs[[log]]$pevi <- '2.0 Base'
   all.logs[[log]] <- rbind(all.logs[[log]],logs[[log]])
 }
-load(pp(pevi.shared,"data/inputs/compare/consistent-vs-quadrupled/logs-v2.0.1.Rdata")) # after morning charging and external homelessness fixes
+load(pp(pevi.shared,"data/inputs/compare/consistent-vs-quadrupled/logs-v2.1.Rdata")) # after morning charging and external homelessness fixes
 for(log in c('pain','charging','results')){
-  logs[[log]]$pevi <- '2.0.1 Morning/Extern Fixes'
+  logs[[log]]$pevi <- '2.1 Fixes'
   all.logs[[log]] <- rbind(all.logs[[log]],logs[[log]])
 }
+ggplot(subset(all.logs[['pain']],pain.type%in%c("delay","stranded") & penetration==2),aes(x=time,y=state.of.charge,colour=pain.type,shape=vehicle.type))+geom_point()+facet_grid(pevi ~ itin.scenario.named)
+ggplot(subset(all.logs[['pain']],pain.type%in%c("delay","stranded") & pevi=='2.1 Fixes' & penetration==2 & itin.scenario=='quadrupled'),aes(x=time,y=state.of.charge,colour=vehicle.type,shape=vehicle.type))+geom_point()+facet_wrap(~ pain.type)
+dev.new()
+ggplot(subset(all.logs[['charging']],penetration==2),aes(x=time,y=begin.soc,colour=factor(charger.level)))+geom_point()+facet_grid(pevi ~ itin.scenario.named)
+ggplot(subset(all.logs[['charging']],pevi=='2.1 Fixes' & penetration==2 & itin.scenario=='quadrupled'),aes(x=time,y=begin.soc,colour=))+geom_point()+facet_wrap(~charger.level)
 
 # bulk # of delays and strandings
 ddply(subset(logs[['pain']],pain.type%in%c("delay","stranded") & num.simulation.days==2),.(pain.type,itin.scenario),function(df){ data.frame(num.pain=nrow(df),sum.pain=sum(df$pain.value))})

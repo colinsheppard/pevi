@@ -9,35 +9,31 @@ for(n in c(5,10,20,50,100,1000)){
   write.table(c,file=pp(pevi.shared,'data/inputs/charger-input-file/delhi/chargers-lots-',n,'.txt'),quote=F,row.names=F,sep='\t')
 }
 
-#load(pp(pevi.shared,'data/inputs/compare/delhi-baseline-pain/logs-5-to-1000.Rdata'))
+all.res <- data.frame()
+load(pp(pevi.shared,'data/inputs/compare/delhi-baseline-pain/logs-no-homeless.Rdata'))
+logs[['results']]$scen <- 'no-homeless'
+all.res <- rbind(all.res,logs[['results']])
+load(pp(pevi.shared,'data/inputs/compare/delhi-baseline-pain/logs-homeless.Rdata'))
+logs[['results']]$scen <- 'homeless'
+all.res <- rbind(all.res,logs[['results']])
+load(pp(pevi.shared,'data/inputs/compare/delhi-baseline-pain/logs-opp-cost-high.Rdata'))
+logs[['results']]$scen <- 'opp-cost'
+all.res <- rbind(all.res,logs[['results']])
+all.res$vehicle.type.input.file <- NA
+all.res$vehicle.scenario <- NA
+all.res$vehicle.scenario.named <- NA
+all.res$vehicle.scenario.order <- NA
+load(pp(pevi.shared,'data/inputs/compare/delhi-baseline-pain/logs-veh-scens.Rdata'))
+logs[['results']]$scen <- logs[['results']]$vehicle.scenario.named
+logs[['results']]$scen[logs[['results']]$scen=='Low/Med/High'] <- 'base'
+all.res <- rbind(all.res,logs[['results']])
 
-logs[['results']]$infrastructure.scenario <- as.numeric(unlist(lapply(str_split(logs[['results']]$charger.input.file,'.txt'),function(x){ tail(str_split(x,"-")[[1]],1)})))
-
-ggplot(logs[['results']],aes(x=factor(penetration),y=total.delay.cost/1e6))+geom_point()+facet_wrap(~infrastructure.scenario)
-
-baseline.delay <- ddply(subset(logs[['results']],infrastructure.scenario==1000),.(penetration),function(df){
+baseline.delay <- ddply(all.res,.(penetration,scen),function(df){
   data.frame(delay.cost=mean(df$total.delay.cost),min.delay.cost=min(df$total.delay.cost),total.delay=mean(df$total.delay),num.stranded=mean(df$num.stranded))
 })
+save(baseline.delay,file=pp(pevi.shared,'data/inputs/compare/delhi-baseline-pain/mean-delay-and-strand.Rdata'))
 
-save(baseline.delay,file=pp(pevi.shared,'data/inputs/compare/delhi-baseline-pain/mean-delay.Rdata'))
-
-
-# for veh scens
-
-logs[['results']]$vehicle.scenario <- unlist(lapply(str_split(logs[['results']]$vehicle.type.input.file,'.txt'),function(x){ tail(str_split(x,"-")[[1]],1)}))
-logs[['results']]$infrastructure.scenario <- as.numeric(unlist(lapply(str_split(logs[['results']]$charger.input.file,'.txt'),function(x){ tail(str_split(x,"-")[[1]],1)})))
-baseline.delay.veh <- ddply(subset(logs[['results']],infrastructure.scenario==1000),.(penetration,vehicle.scenario),function(df){
-  data.frame(delay.cost=mean(df$total.delay.cost),min.delay.cost=min(df$total.delay.cost))
-})
-save(baseline.delay.veh,file=pp(pevi.shared,'data/inputs/compare/delhi-baseline-pain/mean-delay-veh-scens.Rdata'))
-
-# for opp cost high
-
-baseline.delay.opp.cost <- ddply(logs[['results']],.(penetration),function(df){
-  data.frame(delay.cost=mean(df$total.delay.cost),min.delay.cost=min(df$total.delay.cost))
-})
-
-save(baseline.delay.opp.cost,file=pp(pevi.shared,'data/inputs/compare/delhi-baseline-pain/mean-delay-opp-cost.Rdata'))
+ggplot(baseline.delay,aes(x=scen,y=delay.cost)) + geom_bar(stat='identity') + facet_wrap(~penetration) + labs(x="",y="",title="")
 
 # make plots of pain for base scenario
 load(pp(pevi.shared,'data/inputs/compare/delhi-baseline-pain/logs-delay-final-infrastructure.Rdata'))

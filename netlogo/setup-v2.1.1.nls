@@ -309,7 +309,8 @@ to initialize-drivers
       ]
       set master-state-of-charge state-of-charge
       
-      set wait-threshold interpolate-from-draw #rand-draw wait-threshold-cumulative-fraction wait-threshold-value
+      let #rand-draw-wait random-float 1
+      set wait-threshold interpolate-from-draw #rand-draw-wait wait-threshold-cumulative-fraction wait-threshold-value
           
       update-itinerary
       

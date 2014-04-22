@@ -20,6 +20,8 @@ globals [
   
   soc-cumulative-fraction
   start-soc
+  wait-threshold-cumulative-fraction
+  wait-threshold-value
   ext-taz-cumulative-fraction
   external-time-bound
   external-dist-bound
@@ -37,6 +39,7 @@ globals [
   vehicle-type-input-file
   outputs-directory
   starting-soc-file
+  wait-threshold-file
   ext-dist-time-file
   charger-permission-file
   

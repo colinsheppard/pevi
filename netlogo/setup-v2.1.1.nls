@@ -28,6 +28,7 @@ to read-parameter-file
       ifelse param-name = "weekend-factor" [ set weekend-factor file-read ][
       ifelse param-name = "discount" [ set discount file-read ][
       ifelse param-name = "starting-soc-file" [set starting-soc-file word param-file-base file-read ][
+      ifelse param-name = "wait-threshold-file" [set wait-threshold-file word param-file-base file-read ][
       ifelse param-name = "ext-dist-time-file" [set ext-dist-time-file word param-file-base file-read ][
       ifelse param-name = "charger-input-file" [ set charger-input-file word param-file-base file-read ][
       ifelse param-name = "charger-type-input-file" [ set charger-type-input-file word param-file-base file-read ][
@@ -40,7 +41,7 @@ to read-parameter-file
       ifelse param-name = "charger-permission-file" [set charger-permission-file word param-file-base file-read ][ 
       ifelse param-name = "assign-phevs-to-extreme-drivers" [set assign-phevs-to-extreme-drivers file-read ][ 
       ifelse param-name = "num-simulation-days" [set num-simulation-days file-read ][
-      ]]]]]]]]]]]]]]]]]]]]]]]]]]]
+      ]]]]]]]]]]]]]]]]]]]]]]]]]]]]
     ]
     file-close
   ][ 
@@ -236,6 +237,8 @@ end ; setup-drivers
 to initialize-drivers
   set soc-cumulative-fraction   n-values 1 [0] 
   set start-soc     n-values 1 [0] 
+  set wait-threshold-cumulative-fraction   n-values 1 [0] 
+  set wait-threshold-value    n-values 1 [0] 
   ifelse (file-exists? starting-soc-file) [
     file-close
     file-open starting-soc-file
@@ -247,6 +250,18 @@ to initialize-drivers
     set soc-cumulative-fraction   remove-item 0 soc-cumulative-fraction 
     set start-soc    remove-item 0 start-soc
   ][print(word "Input file '" starting-soc-file "' not found, defaulting to uniform distribution")]
+
+  ifelse (file-exists? wait-threshold-file) [
+    file-close
+    file-open wait-threshold-file
+    while [not file-at-end?] [
+     set wait-threshold-cumulative-fraction lput file-read wait-threshold-cumulative-fraction
+     set wait-threshold-value lput file-read wait-threshold-value
+    ]
+    file-close
+    set wait-threshold-cumulative-fraction   remove-item 0 wait-threshold-cumulative-fraction 
+    set wait-threshold-value   remove-item 0 wait-threshold-value
+  ][print(word "Input file '" wait-threshold-cumulative-fraction "' not found, defaulting to uniform distribution")]
   
   ; finally initialize driver state variables
   ask drivers [    
@@ -293,6 +308,8 @@ to initialize-drivers
         set state-of-charge 1
       ]
       set master-state-of-charge state-of-charge
+      
+      set wait-threshold interpolate-from-draw #rand-draw wait-threshold-cumulative-fraction wait-threshold-value
           
       update-itinerary
       
@@ -367,7 +384,7 @@ to setup-itinerary
         let #rand-draw random-float 1
         set external-time interpolate-from-draw #rand-draw ext-taz-cumulative-fraction external-time-bound
         set external-dist interpolate-from-draw #rand-draw ext-taz-cumulative-fraction external-dist-bound
-        set wait-threshold interpolate-from-draw random-float 1 [0 1] [0.5 2]
+        ;set wait-threshold interpolate-from-draw random-float 1 [0 1] [0.5 2]
         let itin-row 0
         set total-journey-distance (distance-from-to item itin-row itin-to item itin-row itin-from)
         set master-journey-distance-list n-values 1 [total-journey-distance]

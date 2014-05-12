@@ -178,10 +178,22 @@ intra.td <- data.table(from=unique(time.distance$from),to=unique(time.distance$f
 intra.td[,time:=km/median(net.data$LINK_LEN_M/1000/net.data$RUNTIME,na.rm=T)]
 time.distance <- rbind(time.distance,intra.td[,list(from,to,enroute,km,time)])
 
-#finally, write it out for the Netlogo
+# write it out for the Netlogo
 setkey(time.distance,'from','to')
 for.nl <- data.frame(time.distance[,list(from,to,km,time,enroute=pp('"',enroute,'"'),perf=1)])
 names(for.nl) <- c(';from','to','km','time','enroute','perf')
 write.table(for.nl,file=pp(pevi.shared,'data/inputs/OD-delhi/delhi-od-data.txt'),row.names=F,quote=F,sep='\t')
 
-save(routes,time.distance,file=pp(pevi.shared,'data/DELHI/road-network/routing.Rdata'))
+# oh yes, and produce a delayed time.distance version
+time.distance.delayed <- routes[,list(km=sum(distance),time=sum(time_delayed)),by=c('from_taz','to_taz')]
+time.distance.delayed[,':='(from=from_taz,to=to_taz,from_taz=NULL,to_taz=NULL)]
+setkey(time.distance.delayed,'from','to')
+time.distance.delayed <- time.distance.delayed[time.distance]
+time.distance.delayed[,':='(time=ifelse(is.na(time),time.1,time),time.1=NULL,km=km.1,km.1=NULL)]
+# write it out for the Netlogo
+setkey(time.distance.delayed,'from','to')
+for.nl <- data.frame(time.distance.delayed[,list(from,to,km,time,enroute=pp('"',enroute,'"'),perf=1)])
+names(for.nl) <- c(';from','to','km','time','enroute','perf')
+write.table(for.nl,file=pp(pevi.shared,'data/inputs/OD-delhi/delhi-od-data-congested.txt'),row.names=F,quote=F,sep='\t')
+
+save(routes,time.distance,time.distance.delayed,file=pp(pevi.shared,'data/DELHI/road-network/routing.Rdata'))

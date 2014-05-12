@@ -1484,7 +1484,7 @@ SWITCH
 222
 log-charging
 log-charging
-1
+0
 1
 -1000
 
@@ -1528,7 +1528,7 @@ SWITCH
 359
 log-seek-charger
 log-seek-charger
-0
+1
 1
 -1000
 
@@ -1676,7 +1676,7 @@ SWITCH
 180
 log-summary
 log-summary
-1
+0
 1
 -1000
 

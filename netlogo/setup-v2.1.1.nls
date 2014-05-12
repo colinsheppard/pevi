@@ -299,7 +299,7 @@ to initialize-drivers
 
  ;     ifelse is-bev? [
       let #rand-draw random-float 1
-      ifelse [id] of home-taz >= 0 [ ; v. 2.1.1 change: external-TAZ home drivers start with a full state of charge.
+      ifelse not (home-taz = taz 0 and item 0 itin-from < 0) [ ; v. 2.1.1 change: external-TAZ homeless drivers start with a full state of charge.
         ifelse file-exists? starting-soc-file [
           set state-of-charge interpolate-from-draw #rand-draw soc-cumulative-fraction start-soc
         ][
@@ -310,7 +310,8 @@ to initialize-drivers
       ]
       set master-state-of-charge state-of-charge
       
-      set wait-threshold interpolate-from-draw #rand-draw wait-threshold-cumulative-fraction wait-threshold-value
+      let #rand-draw-wait random-float 1
+      set wait-threshold interpolate-from-draw #rand-draw-wait wait-threshold-cumulative-fraction wait-threshold-value
           
       update-itinerary
       

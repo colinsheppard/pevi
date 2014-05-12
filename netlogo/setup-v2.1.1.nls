@@ -49,6 +49,7 @@ to read-parameter-file
   ]
   ;; ASSING DEFAULT VALUES TO UNSET VARIABLES OR IMPOSSIBLE VALUES
   if num-simulation-days <= 0 [ set num-simulation-days 1 ]
+  if wait-threshold-file = 0 [ set wait-threshold-file "data/inputs/wait-threshold/wait-threshold.txt" ]
 end
 
 ;;;;;;;;;;;;;;;;;;;;

@@ -166,7 +166,7 @@ agg.taz$y <- agg.coords[,2]
 agg.taz$low.zoom.group <- agg.taz.data$low.zoom.group[match(agg.taz$agg.id,agg.taz.data$agg.id)]
 agg.taz$med.zoom.group <- agg.taz.data$med.zoom.group[match(agg.taz$agg.id,agg.taz.data$agg.id)]
 
-win <- data.table(subset(winners,scenario=='new-obj' & penetration==0.5),key=c('seed','penetration','iteration'))
+win <- data.table(subset(winners,scenario=='base' & penetration==0.005),key=c('seed','penetration','iteration'))
 win[,rank:=(1:length(iteration))/length(iteration),by='seed']
 setkey(win,'taz','level','seed')
 best.ranks <- win[,list(rank=min(rank)),by=c('taz','level','seed')]
@@ -206,9 +206,9 @@ mean.ch.fin <- ddply(ch.fin,.(penetration,TAZ,level,scenario),function(df){
 
 for(pen in c(0.005,0.01,0.02)){
   setkey(best.ranks,'taz','level')
-  l2.scenario <- subset(mean.ch.fin,penetration==pen & level=='L2' & scenario=='new-obj',select=c('TAZ','num.chargers'))
+  l2.scenario <- subset(mean.ch.fin,penetration==pen & level=='L2' & scenario=='base',select=c('TAZ','num.chargers'))
   agg.taz$L2 <- l2.scenario$num.chargers[match(agg.taz$new.id,l2.scenario$TAZ)]
-  l3.scenario <- subset(mean.ch.fin,penetration==pen & level=='L3' & scenario=='new-obj',select=c('TAZ','num.chargers'))
+  l3.scenario <- subset(mean.ch.fin,penetration==pen & level=='L3' & scenario=='base',select=c('TAZ','num.chargers'))
   agg.taz$L3 <- l3.scenario$num.chargers[match(agg.taz$new.id,l3.scenario$TAZ)]
   agg.taz$L2E <- agg.taz.data$L2E
   agg.taz$L3E <- agg.taz.data$L3E
@@ -216,21 +216,21 @@ for(pen in c(0.005,0.01,0.02)){
   agg.taz$latE <- agg.taz.data$latE
 
   # Here we override the model results for a bunch of TAZs, moving them somewhere else
-  if(pen==0.005){
-    agg.taz$L3[which(agg.taz$name=="MtShasta")] <- 1
-  }
-  agg.taz$L3[which(agg.taz$name=="Lakehead")] <- 1
-  agg.taz$L2[which(agg.taz$name=="Gerber")] <- 0
-  agg.taz$L2[which(agg.taz$name=="Corning")] <- agg.taz$L2[which(agg.taz$name=="Corning")] + 1
-  agg.taz$L2[which(agg.taz$name=="Red Bluff")] <- agg.taz$L2[which(agg.taz$name=="Red Bluff")] + 1
-  agg.taz$L2[which(agg.taz$name=="Shasta")] <- agg.taz$L2[which(agg.taz$name=="Shasta")] + agg.taz$L2[which(agg.taz$name=="FrenchGulch")]
-  agg.taz$L2[which(agg.taz$name=="FrenchGulch")] <- 0
-  agg.taz$L2[which(agg.taz$name=="HappyValley")] <- agg.taz$L2[which(agg.taz$name=="HappyValley")] + agg.taz$L2[which(agg.taz$name=="OnoIgo")]
-  agg.taz$L2[which(agg.taz$name=="OnoIgo")] <- 0
-  agg.taz$L2[which(agg.taz$name=="Millville")] <- agg.taz$L2[which(agg.taz$name=="Millville")] + agg.taz$L2[which(agg.taz$name=="Whitmore")]
-  agg.taz$L2[which(agg.taz$name=="Whitmore")] <- 0
-  agg.taz$L2[which(agg.taz$name=="Burney")] <- agg.taz$L2[which(agg.taz$name=="Burney")] + agg.taz$L2[which(agg.taz$name=="BigBend")]
-  agg.taz$L2[which(agg.taz$name=="BigBend")] <- 0
+  #if(pen==0.005){
+    #agg.taz$L3[which(agg.taz$name=="MtShasta")] <- 1
+  #}
+  #agg.taz$L3[which(agg.taz$name=="Lakehead")] <- 1
+  #agg.taz$L2[which(agg.taz$name=="Gerber")] <- 0
+  #agg.taz$L2[which(agg.taz$name=="Corning")] <- agg.taz$L2[which(agg.taz$name=="Corning")] + 1
+  #agg.taz$L2[which(agg.taz$name=="Red Bluff")] <- agg.taz$L2[which(agg.taz$name=="Red Bluff")] + 1
+  #agg.taz$L2[which(agg.taz$name=="Shasta")] <- agg.taz$L2[which(agg.taz$name=="Shasta")] + agg.taz$L2[which(agg.taz$name=="FrenchGulch")]
+  #agg.taz$L2[which(agg.taz$name=="FrenchGulch")] <- 0
+  #agg.taz$L2[which(agg.taz$name=="HappyValley")] <- agg.taz$L2[which(agg.taz$name=="HappyValley")] + agg.taz$L2[which(agg.taz$name=="OnoIgo")]
+  #agg.taz$L2[which(agg.taz$name=="OnoIgo")] <- 0
+  #agg.taz$L2[which(agg.taz$name=="Millville")] <- agg.taz$L2[which(agg.taz$name=="Millville")] + agg.taz$L2[which(agg.taz$name=="Whitmore")]
+  #agg.taz$L2[which(agg.taz$name=="Whitmore")] <- 0
+  #agg.taz$L2[which(agg.taz$name=="Burney")] <- agg.taz$L2[which(agg.taz$name=="Burney")] + agg.taz$L2[which(agg.taz$name=="BigBend")]
+  #agg.taz$L2[which(agg.taz$name=="BigBend")] <- 0
 
   # now complete the rankings and save to file
   agg.taz.data.for.join <- data.table(melt(agg.taz@data,id.vars=c('new.id'),measure.vars=c('L2','L3')))

@@ -4,13 +4,14 @@ load.libraries(c('ggplot2','yaml','RNetLogo','plyr','reshape','stringr'))
 
 #exp.name <- commandArgs(trailingOnly=T)[1]
 exp.name <- 'delhi-baseline-pain'
+#exp.name <- 'delhi-animation'
 path.to.inputs <- pp(pevi.shared,'data/inputs/compare/',exp.name,'/')
 
 to.log <- c()
 #to.log <- 'pain'
 #to.log <- c('pain','charging')
 #to.log <- c('pain','charging','trip')
-#to.log <- c('pain','charging','tazs','trip')
+#to.log <- c('pain','charging','tazs','trip') # use this for animations
 
 # load the reporters and loggers needed to summarize runs and disable logging
 source(paste(pevi.home,"R/reporters-loggers.R",sep=''))
@@ -73,7 +74,7 @@ if("vehicle-type-input-file" %in% names(vary)){
     }
   }
 }
-if(exp.name=='delhi-battery-swap' | exp.name=='consistent-vs-quadrupled'){
+if(exp.name=='delhi-animation' | exp.name=='delhi-battery-swap' | exp.name=='consistent-vs-quadrupled'){
   results <- subset(results,(penetration==0.5 & infrastructure.scenario=='delhi-final-rec-pen-0.5') | 
                     (penetration==1 & infrastructure.scenario=='delhi-final-rec-pen-1') | 
                     (penetration==2 & infrastructure.scenario=='delhi-final-rec-pen-2') |
@@ -85,7 +86,7 @@ if(exp.name=='delhi-battery-swap' | exp.name=='consistent-vs-quadrupled'){
 # start NL
 tryCatch(NLStart(nl.path, gui=F),error=function(err){ NA })
 #model.path <- paste(pevi.home,"netlogo/PEVI.nlogo",sep='')
-model.path <- paste(pevi.home,"netlogo/PEVI-v2.1.nlogo",sep='')
+model.path <- paste(pevi.home,"netlogo/PEVI-v2.1.1.nlogo",sep='')
 NLLoadModel(model.path)
 
 for(cmd in paste('set log-',logfiles,' false',sep='')){ NLCommand(cmd) }

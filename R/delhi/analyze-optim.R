@@ -13,7 +13,7 @@ charger.cols <- c(my.green,my.blue,my.purp,my.oran,my.red)
 # unfortunately, results from res-none are worthless
 #scenarios <- c('base','res-none','homeless','half-homeless')
 #scenarios <- c('homeless','half-homeless','no-homeless')
-scenarios <- c('homeless','half-homeless','no-homeless','swap','veh-high','veh-low','opp-cost-high',pp('cheap-l',1:4))
+scenarios <- c('homeless','half-homeless','no-homeless','swap','veh-high','veh-low','opp-cost-high',pp('cheap-l',1:4),'congested')
 scen.names <- yaml.load(readChar(pp(pevi.shared,'data/inputs/optim-new/scenarios.yaml'),file.info(pp(pevi.shared,'data/inputs/optim-new/scenarios.yaml'))$size))
 
 refactor.scen <- function(x,base='Base'){
@@ -50,9 +50,7 @@ for(optim.code in scenarios){
   charger.data <- read.table(pp(pevi.shared,param.file.data$charger.type.input.file),header=TRUE)
   names(charger.data) <- c('level',tail(names(charger.data),-1))
   charger.types[[optim.code]] <- charger.data
-  for(seed in c(50:59)){
-  #for(seed in c(30:39)){
-    if(seed < 30 & optim.code != 'swap')next
+  for(seed in c(70:79)){
     hist.file <- pp(pevi.shared,'data/outputs/optim-new/delhi-',optim.code,'-seed',seed,'/charger-buildout-history.Rdata')
     final.evse.file <- pp(pevi.shared,'data/outputs/optim-new/delhi-',optim.code,'-seed',seed,'/delhi-',optim.code,'-seed',seed,'-pen2-final-infrastructure.txt')
     if(file.exists(hist.file)){
@@ -153,7 +151,7 @@ winners <- ddply(winners,.(scenario,penetration,seed),function(df){
       #}else if(df$scenario[1]=='veh-low' & df$penetration[1]==0.02){
         #thresh <- -500
       #}else{
-        thresh <- -10000
+        thresh <- -1000
       #}
       first.to.drop <- which(predict(fit,newdata=df) > thresh)[1]
       if(!is.na(first.to.drop)){
@@ -201,6 +199,14 @@ if(F){
 # PLOTTING
 ################################################
 if(F){
+  make.dir(pp(pevi.shared,'data/DELHI/results/base'))
+  make.dir(pp(pevi.shared,'data/DELHI/results/vehicle-composition'))
+  make.dir(pp(pevi.shared,'data/DELHI/results/residential-capacity'))
+  make.dir(pp(pevi.shared,'data/DELHI/results/battery-swapping'))
+  make.dir(pp(pevi.shared,'data/DELHI/results/opportunity-cost'))
+  make.dir(pp(pevi.shared,'data/DELHI/results/cheap-chargers'))
+  make.dir(pp(pevi.shared,'data/DELHI/results/congestion'))
+
   num.ch.to.cap <- function(df){ 
     df$capacity <- df$num.chargers * c(1.5,6.6,50,400)[as.numeric(substr(df$level,2,2))]
     df
@@ -212,7 +218,7 @@ if(F){
   }
   
   # What are my sample sizes?
-  write.csv(ddply(winners,.(scenario),function(df){ data.frame(num.seeds=length(unique(df$seed)))}),file=pp(pevi.shared,'data/DELHI/results//sample-size.csv'))
+  write.csv(ddply(winners,.(scenario),function(df){ data.frame(num.seeds=length(unique(df$seed)))}),file=pp(pevi.shared,'data/DELHI/results/sample-size.csv'))
 
   ###############
   # Assess state of runs
@@ -226,8 +232,8 @@ if(F){
   ###############
   winners$scenario.named <- refactor.scen(winners$scenario)
   winners$penetration.named <- pp(winners$penetration*100,"%")
-  p <- gplot(subset(winners,seed==53 & scenario%in%c('half-homeless')),aes(x=cum.cost/1e3,y=delay/1e6,colour=factor(penetration.named))) + geom_point() + labs(x="Infrastructure Investment ($M)",y="PV of Driver Delay ($M)",title="",color="Fleet Penetration") + scale_color_manual(values=charger.cols)
-  ggsave(file=pp(pevi.shared,'data/DELHI/results//base/base-optimality-curves.pdf'),p,width=10,height=6)
+  p <- ggplot(subset(winners,seed==73 & scenario%in%c('half-homeless')),aes(x=cum.cost/1e3,y=delay/1e6,colour=factor(penetration.named))) + geom_point() + labs(x="Infrastructure Investment ($M)",y="PV of Driver Delay ($M)",title="",color="Fleet Penetration") + scale_color_manual(values=charger.cols)
+  ggsave(file=pp(pevi.shared,'data/DELHI/results/base/base-optimality-curves.pdf'),p,width=10,height=6)
 
   ch.fin <- ddply(subset(melt(subset(ch.fin.unshaped,scenario %in% c('half-homeless')),measure.vars=pp('L',0:4),variable_name="level"),level%in%pp('L',1:3)),.(scenario,level,penetration),function(df) { data.frame(num.chargers=sum(df$value)/length(unique(df$seed))) })
   ch.fin <- ddply(ch.fin,.(scenario),num.ch.to.cost)
@@ -235,18 +241,18 @@ if(F){
   ch.fin$level <- revalue(ch.fin$level,c('L1'='Level 1','L2'='Level 2','L3'='DC Fast','L4'='Battery Swapping'))
   ch.fin$penetration <- pp(ch.fin$penetration*100,'%')
   ch.fin$scenario.named <- refactor.scen(ch.fin$scenario,base='50% Home Chargers')
-  p <- ggplot(ch.fin,aes(x=penetration,y=capacity,fill=factor(level))) + geom_bar(stat='identity') + labs(x="",y="Capacity of Installed Chargers (kW)",title="Capacity of Chargers for Base Scenario",fill="Charger Level") +  theme(axis.text.x = element_text(colour='black'),plot.margin=unit(c(0.5,0.2,0.2,1),"cm")) + scale_fill_manual(values=tail(charger.cols,-1))
-  ggsave(file=pp(pevi.shared,'data/DELHI/results//base/base-charger-capacity.pdf'),p,width=6,height=6)
-  p <- ggplot(ch.fin,aes(x=penetration,y=num.chargers,fill=factor(level))) + geom_bar(stat='identity') + labs(x="",y="Number of Chargers Sited",title="Chargers Sited for Base Scenario",fill="Charger Level") +  theme(axis.text.x = element_text(colour='black'),plot.margin=unit(c(0.5,0.2,0.2,1),"cm")) + scale_fill_manual(values=tail(charger.cols,-1))
-  ggsave(file=pp(pevi.shared,'data/DELHI/results//base/base-num-chargers.pdf'),p,width=6,height=6)
-  p <- ggplot(ch.fin,aes(x=penetration,y=installed.cost,fill=factor(level))) + geom_bar(stat='identity') + labs(x="",y="Cost of Installed Chargers  ($M)",title="Charger Cost for Base Scenario",fill="Charger Level") + theme(axis.text.x = element_text(colour='black'),plot.margin=unit(c(0.5,0.2,0.2,1),"cm")) + scale_fill_manual(values=tail(charger.cols,-1))
-  ggsave(file=pp(pevi.shared,'data/DELHI/results//base/base-charger-cost.pdf'),p,width=6,height=6)
+  p <- ggplot(ch.fin,aes(x=penetration,y=num.chargers,fill=factor(level))) + geom_bar(stat='identity') + labs(x="",y="Number of Chargers",title="Number of Chargers",fill="Charger Level") +  theme(axis.text.x = element_text(colour='black'),plot.margin=unit(c(0.5,0.2,0.2,1),"cm")) + scale_fill_manual(values=tail(charger.cols,-1))
+  ggsave(file=pp(pevi.shared,'data/DELHI/results/base/base-num-chargers.pdf'),p,width=6,height=6)
+  p <- ggplot(ch.fin,aes(x=penetration,y=capacity,fill=factor(level))) + geom_bar(stat='identity') + labs(x="",y="Capacity (kW)",title="Capacity of Chargers",fill="Charger Level") +  theme(axis.text.x = element_text(colour='black'),plot.margin=unit(c(0.5,0.2,0.2,1),"cm")) + scale_fill_manual(values=tail(charger.cols,-1))
+  ggsave(file=pp(pevi.shared,'data/DELHI/results/base/base-charger-capacity.pdf'),p,width=6,height=6)
+  p <- ggplot(ch.fin,aes(x=penetration,y=installed.cost,fill=factor(level))) + geom_bar(stat='identity') + labs(x="",y="Cost ($M)",title="Cost of Chargers",fill="Charger Level") + theme(axis.text.x = element_text(colour='black'),plot.margin=unit(c(0.5,0.2,0.2,1),"cm")) + scale_fill_manual(values=tail(charger.cols,-1))
+  ggsave(file=pp(pevi.shared,'data/DELHI/results/base/base-charger-cost.pdf'),p,width=6,height=6)
   ch.fin$pen <- as.numeric(substr(ch.fin$penetration,1,nchar(ch.fin$penetration)-1))
   ch.fin.per.cap <- ddply(ch.fin,.(pen),function(df){
     data.frame(per.cap=sum(df$installed.cost)*1e6/(df$pen[1]*10e3))
   })
   p <- ggplot(ch.fin.per.cap,aes(x=pen,y=per.cap)) +  geom_point(colour=charger.cols[2]) + geom_line(colour=charger.cols[2]) + labs(x="Fleet Penetration (%)",y="Investment per Electric Vehicle ($)",title="Total Public Infrastructure Investment per Electric Vehicle") + scale_x_continuous(limits=c(0,max(ch.fin.per.cap$pen)*1.05)) + scale_y_continuous(limits=c(0,max(ch.fin.per.cap$per.cap)*1.05))
-  ggsave(file=pp(pevi.shared,'data/DELHI/results//base/base-per-cap-cost.pdf'),p,width=6,height=6)
+  ggsave(file=pp(pevi.shared,'data/DELHI/results/base/base-per-cap-cost.pdf'),p,width=6,height=6)
 
   # hours of delay per 1$M of total delay cost is 232.4047
 
@@ -256,7 +262,7 @@ if(F){
   winners$scenario.named <- refactor.scen(winners$scenario,base='Low/Med/High Capacity Vehicles')
   winners$penetration.named <- pp(winners$penetration*100,"%")
   p <- ggplot(subset(winners,scenario%in%c('veh-high','veh-low','half-homeless') & penetration==.01),aes(x=cum.cost/1e3,y=delay/1e6,shape=scenario.named,colour=scenario.named)) + geom_point() + labs(x="Infrastructure Cost ($M)",y="PV of Driver Delay ($M)",title="",color="Scenario",shape="Scenario") + scale_color_manual(values=charger.cols)+theme(legend.position=c(0,1), legend.justification = c(-1, 1))
-  ggsave(file=pp(pevi.shared,'data/DELHI/results//vehicle-composition/vehicle-type-optimality-curves.pdf'),p,width=10,height=6)
+  ggsave(file=pp(pevi.shared,'data/DELHI/results/vehicle-composition/vehicle-type-optimality-curves.pdf'),p,width=10,height=6)
 
   winners <- ddply(winners,.(scenario,penetration,seed),function(df){
     df$delay.frac <- df$delay/max(df$delay)
@@ -295,12 +301,12 @@ if(F){
   num.ch.at.transects$level <- pp('L',num.ch.at.transects$level)
   num.ch.at.transects <- ddply(num.ch.at.transects,.(scenario),num.ch.to.cost)
   num.ch.at.transects <- ddply(num.ch.at.transects,.(scenario),num.ch.to.cap)
-  p <- ggplot(subset(num.ch.at.transects,penetration==0.01 & level!="L4" & scenario%in%c('veh-high','veh-low','half-homeless')),aes(x=factor(scenario.named),y=num.chargers,fill=level.named)) + geom_bar(stat='identity') + labs(x="",y="Number of Chargers Sited",title="Number of Chargers Sited to Reduce PV of Delay to $20M at 1% Penetration",fill='Charger Level') + scale_fill_manual(values=tail(charger.cols,-1))+ theme(axis.text.x = element_text(angle = 25, hjust = 1, colour='black'),plot.margin=unit(c(0.5,0.2,0.2,1),"cm"))
-  ggsave(file=pp(pevi.shared,'data/DELHI/results//vehicle-composition/vehicle-type-num-chargers-at-25M-delay.pdf'),p,width=6,height=6)
+  p <- ggplot(subset(num.ch.at.transects,penetration==0.01 & level!="L4" & scenario%in%c('veh-high','veh-low','half-homeless')),aes(x=factor(scenario.named),y=num.chargers,fill=level.named)) + geom_bar(stat='identity') + labs(x="",y="Number of Chargers",title=pp("Number of Chargers to Reduce PV of Delay to $",equi.delay/1e6,"M at 1% Penetration"),fill='Charger Level') + scale_fill_manual(values=tail(charger.cols,-1))+ theme(axis.text.x = element_text(angle = 25, hjust = 1, colour='black'),plot.margin=unit(c(0.5,0.2,0.2,1),"cm"))
+  ggsave(file=pp(pevi.shared,'data/DELHI/results/vehicle-composition/vehicle-type-num-chargers-at-',equi.delay/1e6,'M-delay.pdf'),p,width=6,height=6)
   p <- ggplot(subset(num.ch.at.transects,penetration==0.01 & level!="L4" & scenario%in%c('veh-high','veh-low','half-homeless')),aes(x=factor(scenario.named),y=installed.cost,fill=level.named)) + geom_bar(stat='identity') + labs(x="",y="Cost ($M)",title="Cost of Chargers",fill='Charger Level') + scale_fill_manual(values=tail(charger.cols,-1))+ theme(axis.text.x = element_text(angle = 25, hjust = 1, colour='black'),plot.margin=unit(c(0.5,0.2,0.2,1),"cm"))
-  ggsave(file=pp(pevi.shared,'data/DELHI/results//vehicle-composition/vehicle-type-charger-cost-at-25M-delay.pdf'),p,width=6,height=6)
+  ggsave(file=pp(pevi.shared,'data/DELHI/results/vehicle-composition/vehicle-type-charger-cost-at-',equi.delay/1e6,'M-delay.pdf'),p,width=6,height=6)
   p <- ggplot(subset(num.ch.at.transects,penetration==0.01 & level!="L4" & scenario%in%c('veh-high','veh-low','half-homeless')),aes(x=factor(scenario.named),y=capacity,fill=level.named)) + geom_bar(stat='identity') + labs(x="",y="Capacity (kW)",title="Capacity of Chargers",fill='Charger Level') + scale_fill_manual(values=tail(charger.cols,-1))+ theme(axis.text.x = element_text(angle = 25, hjust = 1, colour='black'),plot.margin=unit(c(0.5,0.2,0.2,1),"cm"))
-  ggsave(file=pp(pevi.shared,'data/DELHI/results//vehicle-composition/vehicle-type-charger-capacity-at-25M-delay.pdf'),p,width=6,height=6)
+  ggsave(file=pp(pevi.shared,'data/DELHI/results/vehicle-composition/vehicle-type-charger-capacity-at-',equi.delay/1e6,'M-delay.pdf'),p,width=6,height=6)
 
   ch.fin <- ddply(subset(melt(subset(ch.fin.unshaped,scenario %in% c('veh-high','veh-low','half-homeless')),measure.vars=pp('L',0:4),variable_name="level"),level%in%pp('L',1:3)),.(scenario,level,penetration,seed),function(df) { data.frame(num.chargers=sum(df$value)) })
   ch.fin <- ddply(subset(melt(subset(ch.fin.unshaped,scenario %in% c('veh-high','veh-low','half-homeless')),measure.vars=pp('L',0:4),variable_name="level"),level%in%pp('L',1:3)),.(scenario,level,penetration),function(df) { data.frame(num.chargers=sum(df$value)/length(unique(df$seed))) })
@@ -310,11 +316,11 @@ if(F){
   ch.fin$penetration <- pp(ch.fin$penetration*100,'%')
   ch.fin$scenario.named <- refactor.scen(ch.fin$scenario,base='50% Home Chargers')
   p <- ggplot(subset(ch.fin,penetration=="1%"),aes(x=scenario.named,y=capacity,fill=factor(level))) + geom_bar(stat='identity') + labs(x="",y="Charging Capacity (kW)",title="Charging Capacity for Three Vehicle Composition Scenarios",fill="Charger Level") + facet_wrap(~penetration) + theme(axis.text.x = element_text(angle = 35, hjust = 1,colour='black'),plot.margin=unit(c(0.5,0.2,0.2,1),"cm")) + scale_fill_manual(values=tail(charger.cols,-1))
-  ggsave(file=pp(pevi.shared,'data/DELHI/results//vehicle-composition/vehicle-type-charger-capacity.pdf'),p,width=10,height=6)
+  ggsave(file=pp(pevi.shared,'data/DELHI/results/vehicle-composition/vehicle-type-charger-capacity.pdf'),p,width=6,height=6)
   p <- ggplot(subset(ch.fin,penetration=="1%"),aes(x=scenario.named,y=num.chargers,fill=factor(level))) + geom_bar(stat='identity') + labs(x="",y="Number of Chargers Sited",title="Chargers Sited for Three Vehicle Composition Scenarios",fill="Charger Level") + facet_wrap(~penetration) + theme(axis.text.x = element_text(angle = 35, hjust = 1,colour='black'),plot.margin=unit(c(0.5,0.2,0.2,1),"cm")) + scale_fill_manual(values=tail(charger.cols,-1))
-  ggsave(file=pp(pevi.shared,'data/DELHI/results//vehicle-composition/vehicle-type-num-chargers.pdf'),p,width=10,height=6)
+  ggsave(file=pp(pevi.shared,'data/DELHI/results/vehicle-composition/vehicle-type-num-chargers.pdf'),p,width=6,height=6)
   p <- ggplot(subset(ch.fin,penetration=="1%"),aes(x=scenario.named,y=installed.cost,fill=factor(level))) + geom_bar(stat='identity') + labs(x="",y="Cost of Installed Chargers  ($M)",title="Charger Cost for Three Vehicle Composition Scenarios",fill="Charger Level") + facet_wrap(~penetration) + theme(axis.text.x = element_text(angle = 35, hjust = 1,colour='black'),plot.margin=unit(c(0.5,0.2,0.2,1),"cm")) + scale_fill_manual(values=tail(charger.cols,-1))
-  ggsave(file=pp(pevi.shared,'data/DELHI/results//vehicle-composition/vehicle-type-charger-cost.pdf'),p,width=10,height=6)
+  ggsave(file=pp(pevi.shared,'data/DELHI/results/vehicle-composition/vehicle-type-charger-cost.pdf'),p,width=6,height=6)
 
   ######################
   # Residential Capacity
@@ -322,9 +328,9 @@ if(F){
   winners$scenario.named <- refactor.scen(winners$scenario,base='50% Home Chargers')
   winners$penetration.named <- pp(winners$penetration*100,"%")
   p <- ggplot(subset(winners,penetration==.01 & scenario%in%c('homeless','no-homeless','half-homeless')),aes(x=cum.cost/1e3,y=delay/1e6,shape=scenario.named,colour=scenario.named)) + geom_point() + labs(x="Infrastructure Cost ($M)",y="PV of Driver Delay ($M)",title="",shape="Scenario",color="Scenario")+facet_wrap(~penetration.named) + scale_color_manual(values=charger.cols)+theme(legend.position=c(0,1), legend.justification = c(0, 1))
-  ggsave(file=pp(pevi.shared,'data/DELHI/results//residential-capacity/residential-capacity-optim-curves.pdf'),p,width=10,height=6)
+  ggsave(file=pp(pevi.shared,'data/DELHI/results/residential-capacity/residential-capacity-optim-curves.pdf'),p,width=10,height=6)
 
-  equi.delay <- 15e6 # horizontal transect of the above plot where we will make comparable num.charger plots
+  equi.delay <- 5e6 # horizontal transect of the above plot where we will make comparable num.charger plots
   win.sub <- ddply(subset(winners,penetration == .01 & scenario%in%c('no-homeless','half-homeless','homeless')),.(scenario,penetration,seed),function(df){
     df <- df[order(df$iteratio),]
     df$tmp <- df$num.added
@@ -356,11 +362,11 @@ if(F){
   num.ch.at.transects <- ddply(num.ch.at.transects,.(scenario),num.ch.to.cost)
   num.ch.at.transects <- ddply(num.ch.at.transects,.(scenario),num.ch.to.cap)
   p <- ggplot(subset(num.ch.at.transects,level!="L4"),aes(x=factor(scenario.named),y=num.chargers,fill=level.named)) + geom_bar(stat='identity') + labs(x="",y="Number of Chargers Sited",title=pp('Number of Chargers Sited to Reduce PV of Delay to $',equi.delay/1e6,'M at 1% Penetration'),fill='Charger Level') + scale_fill_manual(values=tail(charger.cols,-1))+ theme(axis.text.x = element_text(angle = 25, hjust = 1, colour='black'),plot.margin=unit(c(0.5,0.2,0.2,1),"cm"))
-  ggsave(file=pp(pevi.shared,'data/DELHI/results//residential-capacity/residential-capacity-num-chargers-at-',equi.delay/1e6,'M-delay.pdf'),p,width=6,height=6)
+  ggsave(file=pp(pevi.shared,'data/DELHI/results/residential-capacity/residential-capacity-num-chargers-at-',equi.delay/1e6,'M-delay.pdf'),p,width=6,height=6)
   p <- ggplot(subset(num.ch.at.transects,penetration==0.01 & level!="L4"),aes(x=factor(scenario.named),y=installed.cost,fill=level.named)) + geom_bar(stat='identity') + labs(x="",y="Cost ($M)",title="Cost of Chargers",fill='Charger Level') + scale_fill_manual(values=tail(charger.cols,-1))+ theme(axis.text.x = element_text(angle = 25, hjust = 1, colour='black'),plot.margin=unit(c(0.5,0.2,0.2,1),"cm"))
-  ggsave(file=pp(pevi.shared,'data/DELHI/results//residential-capacity/residential-capacity-charger-cost-at-',equi.delay/1e6,'M-delay.pdf'),p,width=6,height=6)
+  ggsave(file=pp(pevi.shared,'data/DELHI/results/residential-capacity/residential-capacity-charger-cost-at-',equi.delay/1e6,'M-delay.pdf'),p,width=6,height=6)
   p <- ggplot(subset(num.ch.at.transects,level!="L4"),aes(x=factor(scenario.named),y=capacity,fill=level.named)) + geom_bar(stat='identity') + labs(x="",y="Capacity (kW)",title="Capacity of Chargers",fill='Charger Level') + scale_fill_manual(values=tail(charger.cols,-1))+ theme(axis.text.x = element_text(angle = 25, hjust = 1, colour='black'),plot.margin=unit(c(0.5,0.2,0.2,1),"cm"))
-  ggsave(file=pp(pevi.shared,'data/DELHI/results//residential-capacity/residential-capacity-charger-capacity-at-',equi.delay/1e6,'M-delay.pdf'),p,width=6,height=6)
+  ggsave(file=pp(pevi.shared,'data/DELHI/results/residential-capacity/residential-capacity-charger-capacity-at-',equi.delay/1e6,'M-delay.pdf'),p,width=6,height=6)
 
   # how about installed capacity
   ch.fin <- ddply(subset(melt(subset(ch.fin.unshaped,scenario %in% c('homeless','no-homeless','half-homeless')),measure.vars=pp('L',0:4),variable_name="level"),level%in%pp('L',1:3)),.(scenario,level,penetration,seed),function(df) { data.frame(num.chargers=sum(df$value)) })
@@ -380,11 +386,11 @@ if(F){
   ch.fin$penetration <- pp(ch.fin$penetration*100,'%')
   ch.fin$scenario.named <- refactor.scen(ch.fin$scenario,base='50% Home Chargers')
   p <- ggplot(ch.fin,aes(x=scenario.named,y=capacity,fill=factor(level))) + geom_bar(stat='identity') + labs(x="",y="Charging Capacity (kW)",title="Charging Capacity for Three Residential Capacity Scenarios",fill="Charger Level")  + theme(axis.text.x = element_text(angle = 35, hjust = 1,colour='black'),plot.margin=unit(c(0.5,0.2,0.2,1),"cm")) + scale_fill_manual(values=tail(charger.cols,-1))
-  ggsave(file=pp(pevi.shared,'data/DELHI/results//residential-capacity/residential-capacity-charger-capacity.pdf'),p,width=10,height=6)
+  ggsave(file=pp(pevi.shared,'data/DELHI/results/residential-capacity/residential-capacity-charger-capacity.pdf'),p,width=6,height=6)
   p <- ggplot(ch.fin,aes(x=scenario.named,y=num.chargers,fill=factor(level))) + geom_bar(stat='identity') + labs(x="",y="Number of Chargers Sited",title="Chargers Sited for Three Residential Capacity Scenarios",fill="Charger Level") + theme(axis.text.x = element_text(angle = 35, hjust = 1,colour='black'),plot.margin=unit(c(0.5,0.2,0.2,1),"cm")) + scale_fill_manual(values=tail(charger.cols,-1))
-  ggsave(file=pp(pevi.shared,'data/DELHI/results//residential-capacity/residential-capacity-num-chargers.pdf'),p,width=10,height=6)
+  ggsave(file=pp(pevi.shared,'data/DELHI/results/residential-capacity/residential-capacity-num-chargers.pdf'),p,width=6,height=6)
   p <- ggplot(ch.fin,aes(x=scenario.named,y=installed.cost,fill=factor(level))) + geom_bar(stat='identity') + labs(x="",y="Cost of Installed Chargers  ($M)",title="Charger Cost for Three Residential Capacity Scenarios",fill="Charger Level") + theme(axis.text.x = element_text(angle = 35, hjust = 1,colour='black'),plot.margin=unit(c(0.5,0.2,0.2,1),"cm")) + scale_fill_manual(values=tail(charger.cols,-1))
-  ggsave(file=pp(pevi.shared,'data/DELHI/results//residential-capacity/residential-capacity-charger-cost.pdf'),p,width=10,height=6)
+  ggsave(file=pp(pevi.shared,'data/DELHI/results/residential-capacity/residential-capacity-charger-cost.pdf'),p,width=6,height=6)
 
   ######################
   # Battery Swapping
@@ -393,10 +399,10 @@ if(F){
   winners$scenario.named <- refactor.scen(winners$scenario)
   winners$penetration.named <- pp(winners$penetration*100,"%")
   p <- ggplot(subset(winners,scenario%in%c('swap','half-homeless')),aes(x=cum.cost/1e3,y=delay/1e6,shape=scenario.named,colour=scenario.named)) + geom_point() + labs(x="Infrastructure Cost ($M)",y="PV of Driver Delay ($M)",title="",color="Scenario",shape="Scenario")+facet_wrap(~penetration.named) + scale_color_manual(values=cbPalette[c(2,5)])+theme(legend.position=c(1,0), legend.justification = c(1,0))
-  ggsave(file=pp(pevi.shared,'data/DELHI/results//battery-swapping/swapping-optim-curves.pdf'),p,width=10,height=6)
+  ggsave(file=pp(pevi.shared,'data/DELHI/results/battery-swapping/swapping-optim-curves.pdf'),p,width=10,height=6)
   # marginal cost of swapping
   p <- ggplot(subset(winners,marginal.cost < 100 & scenario%in%c('swap','half-homeless')),aes(x=cum.cost/1e3,y=1/marginal.cost,shape=scenario.named,colour=scenario.named)) + geom_point(alpha=0.5) + labs(x="Infrastructure Cost ($M)",y="Marginal Return on Investment ($ saved / $ spent)",title="",color="Scenario",shape="Scenario")+facet_wrap(~penetration.named) + scale_color_manual(values=cbPalette[c(2,5)])+geom_smooth(se=F,method='loess',size=1.5)+scale_y_log10(labels=c(0.01,0.1,1,10,100,1000),breaks=c(0.01,0.1,1,10,100,1000))+ theme(panel.grid.minor = element_line(colour = NA),legend.position=c(0,1), legend.justification = c(0, 1))
-  ggsave(file=pp(pevi.shared,'data/DELHI/results//battery-swapping/marginal-roi.pdf'),p,width=10,height=6)
+  ggsave(file=pp(pevi.shared,'data/DELHI/results/battery-swapping/marginal-roi.pdf'),p,width=10,height=6)
 
   ch.fin <- ddply(subset(melt(subset(ch.fin.unshaped,scenario %in% c('swap','half-homeless')),measure.vars=pp('L',0:4),variable_name="level"),level%in%pp('L',1:4)),.(scenario,level,penetration),function(df) { data.frame(num.chargers=sum(df$value)/length(unique(df$seed))) })
   ch.fin <- ddply(ch.fin,.(scenario),num.ch.to.cost)
@@ -405,9 +411,9 @@ if(F){
   ch.fin$scenario.named <- refactor.scen(ch.fin$scenario)
   cbPalette <- tail(charger.cols,-1)
   p <- ggplot(ch.fin,aes(x=scenario.named,y=num.chargers,fill=factor(level))) + geom_bar(stat='identity') + labs(x="",y="Number of Chargers Sited",title="Chargers Sited with/without Battery Swapping",fill="Charger Level") + facet_wrap(~penetration) + theme(axis.text.x = element_text(colour='black'),plot.margin=unit(c(0.5,0.2,0.2,0.5),"cm")) + scale_fill_manual(values=cbPalette)
-  ggsave(file=pp(pevi.shared,'data/DELHI/results//battery-swapping/swapping-num-chargers.pdf'),p,width=10,height=6)
+  ggsave(file=pp(pevi.shared,'data/DELHI/results/battery-swapping/swapping-num-chargers.pdf'),p,width=10,height=6)
   p <- ggplot(ch.fin,aes(x=scenario.named,y=installed.cost,fill=factor(level))) + geom_bar(stat='identity') + labs(x="",y="Cost ($M)",title="Cost of Chargers Sited with/without Battery Swapping",fill="Charger Level") + facet_wrap(~penetration) + theme(axis.text.x = element_text(colour='black'),plot.margin=unit(c(0.5,0.2,0.2,0.5),"cm")) + scale_fill_manual(values=cbPalette)
-  ggsave(file=pp(pevi.shared,'data/DELHI/results//battery-swapping/swapping-charger-cost.pdf'),p,width=10,height=6)
+  ggsave(file=pp(pevi.shared,'data/DELHI/results/battery-swapping/swapping-charger-cost.pdf'),p,width=10,height=6)
 
   seeds.in.both <- ddply(subset(winners,scenario%in%c('swap','half-homeless')),.(scenario),function(df){ data.frame(seed=unique(df$seed))})$seed
   delay.reduced <- ddply(subset(winners,scenario%in%c('swap','half-homeless') & seed %in% seeds.in.both[duplicated(seeds.in.both)]),.(penetration,seed),function(df){
@@ -418,7 +424,7 @@ if(F){
   delay.reduced <- melt(delay.reduced,id.vars='penetration.named',measure.vars=c('reduced','cost'))
   delay.reduced$variable <- revalue(delay.reduced$variable,c('reduced'='Value of Reduced Delay','cost'='Additional Cost')) 
   p <- ggplot(delay.reduced,aes(x=penetration.named,y=value,fill=variable)) + geom_bar(stat='identity',position='dodge') + labs(x="Penetration",y="Value ($M)",title="Value vs Cost of Using Battery Swap Stations to Reduce Driver Delay",fill="")+scale_fill_manual(values=charger.cols)
-  ggsave(file=pp(pevi.shared,'data/DELHI/results//battery-swapping/value-vs-cost-to-reduce-delay.pdf'),p,width=10,height=6)
+  ggsave(file=pp(pevi.shared,'data/DELHI/results/battery-swapping/value-vs-cost-to-reduce-delay.pdf'),p,width=10,height=6)
 
   equi.cost <- c(1.75,2,2)*1e3 # transects of the above plot where we will make comparable num.charger plots
   names(equi.cost) <- c('0.5%','1%','2%')
@@ -451,7 +457,7 @@ if(F){
   })
   num.ch.at.transects$level.named <- refactor.lev(num.ch.at.transects$level)
   p <- ggplot(subset(num.ch.at.transects,penetration==0.005 & scenario%in%c('swap','half-homeless')),aes(x=factor(scenario.named),y=num.chargers,fill=level.named)) + geom_bar(stat='identity',position='dodge') + facet_wrap(~level.named,scales='free_y') + labs(x="",y="Number of Chargers Sited",title="Number of Chargers Sited for $1M at 0.5% Penetration for Three Vehicle Composition Scenarios",fill='Charger Level') + scale_fill_manual(values=cbPalette)+ theme(axis.text.x = element_text(angle = 25, hjust = 1, colour='black'),plot.margin=unit(c(0.5,0.2,0.2,1),"cm"))
-  ggsave(file=pp(pevi.shared,'data/DELHI/results//battery-swapping/num-chargers-at-1M.pdf'),p,width=10,height=6)
+  ggsave(file=pp(pevi.shared,'data/DELHI/results/battery-swapping/num-chargers-at-1M.pdf'),p,width=10,height=6)
 
   #ch.fin <- ddply(subset(ch.fin.unshaped,scenario=='swap'),.(TAZ,penetration),function(df){ data.frame(num.L4=mean(df$L4)) })
   #load(pp(pevi.shared,'data/inputs/compare/delhi-battery-swap/logs.Rdata'))
@@ -466,8 +472,8 @@ if(F){
   cbPalette <- charger.cols
   winners$scenario.named <- refactor.scen(winners$scenario,base='Base')
   winners$penetration.named <- pp(winners$penetration*100,"%")
-  p <- ggplot(subset(winners,penetration==.01 & scenario%in%c('opp-cost-high','half-homeless')),aes(x=cum.cost/1e3,y=delay/1e6,shape=scenario.named,colour=scenario.named)) + geom_point() + labs(x="Infrastructure Cost ($M)",y="PV of Driver Delay ($M)",title="",color="Scenario",shape="Scenario")+facet_wrap(~penetration.named) + scale_color_manual(values=cbPalette)+theme(legend.position=c(0,1), legend.justification = c(0,1))
-  ggsave(file=pp(pevi.shared,'data/DELHI/results//opportunity-cost/opp-cost-optim-curves.pdf'),p,width=10,height=6)
+  p <- ggplot(subset(winners,penetration==.01 & scenario%in%c('congested','half-homeless')),aes(x=cum.cost/1e3,y=delay/1e6,shape=scenario.named,colour=scenario.named)) + geom_point() + labs(x="Infrastructure Cost ($M)",y="PV of Driver Delay ($M)",title="",color="Scenario",shape="Scenario")+facet_wrap(~penetration.named) + scale_color_manual(values=cbPalette)+theme(legend.position=c(0,1), legend.justification = c(0,1))
+  ggsave(file=pp(pevi.shared,'data/DELHI/results/opportunity-cost/opp-cost-optim-curves.pdf'),p,width=10,height=6)
   
   ch.fin <- ddply(subset(melt(subset(ch.fin.unshaped,penetration == 0.01 & scenario %in% c('opp-cost-high','half-homeless')),measure.vars=pp('L',0:4),variable_name="level"),level%in%pp('L',1:3)),.(scenario,level,penetration),function(df) { data.frame(num.chargers=sum(df$value)/length(unique(df$seed))) })
   ch.fin <- ddply(ch.fin,.(scenario),num.ch.to.cost)
@@ -477,11 +483,11 @@ if(F){
   ch.fin$scenario.named <- refactor.scen(ch.fin$scenario)
   cbPalette <- tail(charger.cols,-1)
   p <- ggplot(ch.fin,aes(x=scenario.named,y=num.chargers,fill=factor(level))) + geom_bar(stat='identity') + labs(x="",y="Number of Chargers",title="Number of Chargers",fill="Charger Level") + theme(axis.text.x = element_text(colour='black'),plot.margin=unit(c(0.5,0.2,0.2,0.5),"cm")) + scale_fill_manual(values=cbPalette)
-  ggsave(file=pp(pevi.shared,'data/DELHI/results//opportunity-cost/opp-cost-num-chargers.pdf'),p,width=6,height=6)
+  ggsave(file=pp(pevi.shared,'data/DELHI/results/opportunity-cost/opp-cost-num-chargers.pdf'),p,width=6,height=6)
   p <- ggplot(ch.fin,aes(x=scenario.named,y=capacity,fill=factor(level))) + geom_bar(stat='identity') + labs(x="",y="Capacity (kW)",title="Capacity of Chargers",fill="Charger Level") + theme(axis.text.x = element_text(colour='black'),plot.margin=unit(c(0.5,0.2,0.2,0.5),"cm")) + scale_fill_manual(values=cbPalette)
-  ggsave(file=pp(pevi.shared,'data/DELHI/results//opportunity-cost/opp-cost-charger-capacity.pdf'),p,width=6,height=6)
-  p <- ggplot(ch.fin,aes(x=scenario.named,y=installed.cost,fill=factor(level))) + geom_bar(stat='identity') + labs(x="",y="Cost ($M)",title="Cost of Chargers",fill="Charger Level") + facet_wrap(~penetration) + theme(axis.text.x = element_text(colour='black'),plot.margin=unit(c(0.5,0.2,0.2,0.5),"cm")) + scale_fill_manual(values=cbPalette)
-  ggsave(file=pp(pevi.shared,'data/DELHI/results//opportunity-cost/opp-cost-charger-cost.pdf'),p,width=6,height=6)
+  ggsave(file=pp(pevi.shared,'data/DELHI/results/opportunity-cost/opp-cost-charger-capacity.pdf'),p,width=6,height=6)
+  p <- ggplot(ch.fin,aes(x=scenario.named,y=installed.cost,fill=factor(level))) + geom_bar(stat='identity') + labs(x="",y="Cost ($M)",title="Cost of Chargers",fill="Charger Level") + theme(axis.text.x = element_text(colour='black'),plot.margin=unit(c(0.5,0.2,0.2,0.5),"cm")) + scale_fill_manual(values=cbPalette)
+  ggsave(file=pp(pevi.shared,'data/DELHI/results/opportunity-cost/opp-cost-charger-cost.pdf'),p,width=6,height=6)
 
   equi.cost <- c(0.5,1.25,2)*1e3 # transects of the above plot where we will make comparable num.charger plots
   names(equi.cost) <- c('0.5%','1%','2%')
@@ -514,7 +520,69 @@ if(F){
   #})
   num.ch.at.transects$level.named <- refactor.lev(num.ch.at.transects$level)
   p <- ggplot(subset(num.ch.at.transects,level<4),aes(x=factor(scenario.named),y=num.chargers,fill=level.named)) + geom_bar(stat='identity',position='dodge') + facet_grid(level.named~ penetration.named,scales='free_y') + labs(x="",y="Number of Chargers Sited",title="",fill='Charger Level') + scale_fill_manual(values=cbPalette)+ theme(axis.text.x = element_text(colour='black'))
-  ggsave(file=pp(pevi.shared,'data/DELHI/results//opportunity-cost/opp-cost-chargers-at-fixed-investments.pdf'),p,width=10,height=6)
+  ggsave(file=pp(pevi.shared,'data/DELHI/results/opportunity-cost/opp-cost-chargers-at-fixed-investments.pdf'),p,width=10,height=6)
+
+  ######################
+  # Congestion
+  ######################
+  cbPalette <- charger.cols
+  winners$scenario.named <- refactor.scen(winners$scenario,base='Base')
+  winners$penetration.named <- pp(winners$penetration*100,"%")
+  p <- ggplot(subset(winners,penetration==.01 & scenario%in%c('congested','half-homeless')),aes(x=cum.cost/1e3,y=delay/1e6,shape=scenario.named,colour=scenario.named)) + geom_point() + labs(x="Infrastructure Cost ($M)",y="PV of Driver Delay ($M)",title="",color="Scenario",shape="Scenario")+facet_wrap(~penetration.named) + scale_color_manual(values=cbPalette)+theme(legend.position=c(0,1), legend.justification = c(0,1))
+  ggsave(file=pp(pevi.shared,'data/DELHI/results/congestion/congestion-optim-curves.pdf'),p,width=10,height=6)
+  
+  ch.fin <- ddply(subset(melt(subset(ch.fin.unshaped,penetration == 0.01 & scenario %in% c('congested','half-homeless')),measure.vars=pp('L',0:4),variable_name="level"),level%in%pp('L',1:3)),.(scenario,level,penetration),function(df) { data.frame(num.chargers=sum(df$value)/length(unique(df$seed))) })
+  ch.fin <- ddply(ch.fin,.(scenario),num.ch.to.cost)
+  ch.fin <- ddply(ch.fin,.(scenario),num.ch.to.cap)
+  ch.fin$level <- revalue(ch.fin$level,c('L1'='Level 1','L2'='Level 2','L3'='DC Fast','L4'='Battery Swapping'))
+  ch.fin$penetration <- pp(ch.fin$penetration*100,'%')
+  ch.fin$scenario.named <- refactor.scen(ch.fin$scenario)
+  cbPalette <- tail(charger.cols,-1)
+  p <- ggplot(ch.fin,aes(x=scenario.named,y=num.chargers,fill=factor(level))) + geom_bar(stat='identity') + labs(x="",y="Number of Chargers",title="Number of Chargers",fill="Charger Level") + theme(axis.text.x = element_text(colour='black'),plot.margin=unit(c(0.5,0.2,0.2,0.5),"cm")) + scale_fill_manual(values=cbPalette)
+  ggsave(file=pp(pevi.shared,'data/DELHI/results/congestion/congestion-num-chargers.pdf'),p,width=6,height=6)
+  p <- ggplot(ch.fin,aes(x=scenario.named,y=capacity,fill=factor(level))) + geom_bar(stat='identity') + labs(x="",y="Capacity (kW)",title="Capacity of Chargers",fill="Charger Level") + theme(axis.text.x = element_text(colour='black'),plot.margin=unit(c(0.5,0.2,0.2,0.5),"cm")) + scale_fill_manual(values=cbPalette)
+  ggsave(file=pp(pevi.shared,'data/DELHI/results/congestion/congestion-charger-capacity.pdf'),p,width=6,height=6)
+  p <- ggplot(ch.fin,aes(x=scenario.named,y=installed.cost,fill=factor(level))) + geom_bar(stat='identity') + labs(x="",y="Cost ($M)",title="Cost of Chargers",fill="Charger Level") + theme(axis.text.x = element_text(colour='black'),plot.margin=unit(c(0.5,0.2,0.2,0.5),"cm")) + scale_fill_manual(values=cbPalette)
+  ggsave(file=pp(pevi.shared,'data/DELHI/results/congestion/congestion-charger-cost.pdf'),p,width=6,height=6)
+
+  equi.delay <- 40e6 # horizontal transect of the above plot where we will make comparable num.charger plots
+  win.sub <- ddply(subset(winners,penetration == .01 & scenario%in%c('congested','half-homeless')),.(scenario,penetration,seed),function(df){
+    df <- df[order(df$iteratio),]
+    df$tmp <- df$num.added
+    df$tmp[df$level!=1] <- 0
+    df$cum.l1 <- cumsum(df$tmp)
+    df$tmp <- df$num.added
+    df$tmp[df$level!=2] <- 0
+    df$cum.l2 <- cumsum(df$tmp)
+    df$tmp <- df$num.added
+    df$tmp[df$level!=3] <- 0
+    df$cum.l3 <- cumsum(df$tmp)
+    df$tmp <- df$num.added
+    df$tmp[df$level!=4] <- 0
+    df$cum.l4 <- cumsum(df$tmp)
+    df
+  })
+  win.sub.m <- melt(win.sub,id.vars=c('scenario','penetration','seed','cum.cost','delay','scenario.named','penetration.named'),variable_name='level.str',measure.vars=c('cum.l1','cum.l2','cum.l3','cum.l4'))
+  win.sub.m$level <- (1:4)[match(win.sub.m$level.str,pp('cum.l',1:4))]
+  num.ch.at.transects <- ddply(subset(win.sub.m,abs(delay-equi.delay)<2e6),.(scenario,penetration,level),function(df){
+    data.frame(num.chargers=round(mean(df$value)),tot.cost=mean(df$cum.cost),delay.fin=mean(df$delay),scenario.named=df$scenario.named[1],penetration.named=df$penetration.named[1])
+  })
+  num.ch.at.transects <- ddply(num.ch.at.transects,.(scenario,level),function(df){
+    df <- df[order(df$penetration),]
+    df$num.chargers <- cumsum(df$num.chargers)
+    df
+  })
+  num.ch.at.transects$level.named <- refactor.lev(num.ch.at.transects$level)
+  num.ch.at.transects$level <- pp('L',num.ch.at.transects$level)
+  num.ch.at.transects <- ddply(num.ch.at.transects,.(scenario),num.ch.to.cost)
+  num.ch.at.transects <- ddply(num.ch.at.transects,.(scenario),num.ch.to.cap)
+  p <- ggplot(subset(num.ch.at.transects,level!="L4"),aes(x=factor(scenario.named),y=num.chargers,fill=level.named)) + geom_bar(stat='identity') + labs(x="",y="Number of Chargers Sited",title=pp('Number of Chargers Sited to Reduce PV of Delay to $',equi.delay/1e6,'M at 1% Penetration'),fill='Charger Level') + scale_fill_manual(values=tail(charger.cols,-1))+ theme(axis.text.x = element_text(angle = 25, hjust = 1, colour='black'),plot.margin=unit(c(0.5,0.2,0.2,1),"cm"))
+  ggsave(file=pp(pevi.shared,'data/DELHI/results/congestion/congestion-num-chargers-at-',equi.delay/1e6,'M-delay.pdf'),p,width=6,height=6)
+  p <- ggplot(subset(num.ch.at.transects,penetration==0.01 & level!="L4"),aes(x=factor(scenario.named),y=installed.cost,fill=level.named)) + geom_bar(stat='identity') + labs(x="",y="Cost ($M)",title="Cost of Chargers",fill='Charger Level') + scale_fill_manual(values=tail(charger.cols,-1))+ theme(axis.text.x = element_text(angle = 25, hjust = 1, colour='black'),plot.margin=unit(c(0.5,0.2,0.2,1),"cm"))
+  ggsave(file=pp(pevi.shared,'data/DELHI/results/congestion/congestion-charger-cost-at-',equi.delay/1e6,'M-delay.pdf'),p,width=6,height=6)
+  p <- ggplot(subset(num.ch.at.transects,level!="L4"),aes(x=factor(scenario.named),y=capacity,fill=level.named)) + geom_bar(stat='identity') + labs(x="",y="Capacity (kW)",title="Capacity of Chargers",fill='Charger Level') + scale_fill_manual(values=tail(charger.cols,-1))+ theme(axis.text.x = element_text(angle = 25, hjust = 1, colour='black'),plot.margin=unit(c(0.5,0.2,0.2,1),"cm"))
+  ggsave(file=pp(pevi.shared,'data/DELHI/results/congestion/congestion-charger-capacity-at-',equi.delay/1e6,'M-delay.pdf'),p,width=6,height=6)
+
 
   ######################
   # Cheap Chargers
@@ -523,9 +591,9 @@ if(F){
   winners$scenario.named <- refactor.scen(winners$scenario)
   winners$penetration.named <- pp(winners$penetration*100,"%")
   p <- ggplot(subset(winners,penetration == 0.01 & scenario%in%c(pp('cheap-l',1:3),'half-homeless')),aes(x=cum.cost/1e3,y=delay/1e6,shape=scenario.named,colour=scenario.named)) + geom_point() + labs(x="Infrastructure Cost ($M)",y="PV of Driver Delay ($M)",title="",color="Scenario",shape="Scenario")+facet_wrap(~penetration.named) + scale_color_manual(values=cbPalette)+theme(legend.position=c(0,1), legend.justification = c(-10,1))
-  ggsave(file=pp(pevi.shared,'data/DELHI/results//cheap-chargers/cheap-chargers-optim-curves.pdf'),p,width=10,height=6)
+  ggsave(file=pp(pevi.shared,'data/DELHI/results/cheap-chargers/cheap-chargers-optim-curves.pdf'),p,width=10,height=6)
   p <- ggplot(subset(winners,penetration == 0.01 & scenario%in%c(pp('cheap-l',4),'swap')),aes(x=cum.cost/1e3,y=delay/1e6,shape=scenario.named,colour=scenario.named)) + geom_point() + labs(x="Infrastructure Cost ($M)",y="PV of Driver Delay ($M)",title="",color="Scenario",shape="Scenario")+facet_wrap(~penetration.named) + scale_color_manual(values=cbPalette)+theme(legend.position=c(0,1), legend.justification = c(-10,1))
-  ggsave(file=pp(pevi.shared,'data/DELHI/results//cheap-chargers/cheap-chargers-swapping-optim-curves.pdf'),p,width=10,height=6)
+  ggsave(file=pp(pevi.shared,'data/DELHI/results/cheap-chargers/cheap-chargers-swapping-optim-curves.pdf'),p,width=10,height=6)
 
   ch.fin <- ddply(subset(melt(subset(ch.fin.unshaped,scenario %in% c(pp('cheap-l',1:4),'half-homeless','swap')),measure.vars=pp('L',0:4),variable_name="level"),level%in%pp('L',1:4)),.(scenario,level,penetration),function(df) { data.frame(num.chargers=sum(df$value)/length(unique(df$seed))) })
   ch.fin <- ddply(ch.fin,.(scenario),num.ch.to.cost)
@@ -535,15 +603,15 @@ if(F){
   ch.fin$scenario.named <- factor(ch.fin$scenario.named,)
   cbPalette <- tail(charger.cols,-1)
   p <- ggplot(subset(ch.fin,!scenario%in%c('swap','cheap-l4')),aes(x=scenario.named,y=num.chargers,fill=factor(level))) + geom_bar(stat='identity') + labs(x="",y="Number of Chargers Sited",title="",fill="Charger Level") + facet_wrap(~penetration.named) + theme(axis.text.x = element_text(angle = 25, hjust = 1, colour='black'),plot.margin=unit(c(0.5,0.2,0.2,1),"cm")) + scale_fill_manual(values=cbPalette)
-  ggsave(file=pp(pevi.shared,'data/DELHI/results//cheap-chargers/cheap-chargers-num-chargers.pdf'),p,width=10,height=6)
+  ggsave(file=pp(pevi.shared,'data/DELHI/results/cheap-chargers/cheap-chargers-num-chargers.pdf'),p,width=10,height=6)
   p <- ggplot(subset(ch.fin,!scenario%in%c('swap','cheap-l4')),aes(x=scenario.named,y=installed.cost,fill=factor(level))) + geom_bar(stat='identity') + labs(x="",y="Cost of Chargers Sited ($M)",title="",fill="Charger Level") + facet_wrap(~penetration.named) + theme(axis.text.x = element_text(angle = 25, hjust = 1, colour='black'),plot.margin=unit(c(0.5,0.2,0.2,1),"cm")) + scale_fill_manual(values=cbPalette)
-  ggsave(file=pp(pevi.shared,'data/DELHI/results//cheap-chargers/cheap-chargers-charger-cost.pdf'),p,width=10,height=6)
+  ggsave(file=pp(pevi.shared,'data/DELHI/results/cheap-chargers/cheap-chargers-charger-cost.pdf'),p,width=10,height=6)
   p <- ggplot(subset(ch.fin,!scenario%in%c('swap','cheap-l4') & level!="Battery Swapping"),aes(x=scenario.named,y=num.chargers,fill=factor(level))) + geom_bar(stat='identity') + labs(x="",y="Number of Chargers Sited",title="",fill="Charger Level") + facet_grid(level~ penetration.named,scales="free_y") + theme(axis.text.x = element_text(angle = 25, hjust = 1, colour='black'),plot.margin=unit(c(0.5,0.2,0.2,1),"cm")) + scale_fill_manual(values=cbPalette)
-  ggsave(file=pp(pevi.shared,'data/DELHI/results//cheap-chargers/cheap-chargers-num-chargers-zoomed.pdf'),p,width=10,height=6)
+  ggsave(file=pp(pevi.shared,'data/DELHI/results/cheap-chargers/cheap-chargers-num-chargers-zoomed.pdf'),p,width=10,height=6)
   p <- ggplot(subset(ch.fin,scenario%in%c('swap','cheap-l4')),aes(x=scenario.named,y=num.chargers,fill=factor(level))) + geom_bar(stat='identity') + labs(x="",y="Number of Chargers Sited",title="",fill="Charger Level") + facet_wrap(~penetration.named) + theme(axis.text.x = element_text(angle = 25, hjust = 1, colour='black'),plot.margin=unit(c(0.5,0.2,0.2,1),"cm")) + scale_fill_manual(values=cbPalette)
-  ggsave(file=pp(pevi.shared,'data/DELHI/results//cheap-chargers/cheap-chargers-swapping-num-chargers.pdf'),p,width=10,height=6)
+  ggsave(file=pp(pevi.shared,'data/DELHI/results/cheap-chargers/cheap-chargers-swapping-num-chargers.pdf'),p,width=10,height=6)
   p <- ggplot(subset(ch.fin,scenario%in%c('swap','cheap-l4') & penetration==0.02),aes(x=scenario.named,y=num.chargers,fill=factor(level))) + geom_bar(stat='identity') + labs(x="",y="Number of Chargers Sited",title="",fill="Charger Level") + facet_wrap(~level,scales='free_y') + theme(axis.text.x = element_text(colour='black')) + scale_fill_manual(values=cbPalette)
-  ggsave(file=pp(pevi.shared,'data/DELHI/results//cheap-chargers/cheap-chargers-swapping-num-chargers-zoomed-pen2.pdf'),p,width=10,height=6)
+  ggsave(file=pp(pevi.shared,'data/DELHI/results/cheap-chargers/cheap-chargers-swapping-num-chargers-zoomed-pen2.pdf'),p,width=10,height=6)
 
   ######################
   # Old Plots
@@ -689,7 +757,7 @@ for(pen in c(0.005,0.01,0.02)){
     setkey(best.ranks,'taz','level')
     best.ranks <- agg.taz.data.for.join[best.ranks]
     setkey(best.ranks,'rank')
-    write.csv(best.ranks,pp(pevi.shared,'data/DELHI/results/charger-priorities/charger-priorities-',scen,'-pen',pen*100,'.csv'))
+    write.csv(best.ranks,pp(pevi.shared,'data/DELHI/results/maps/charger-priorities/charger-priorities-',scen,'-pen',pen*100,'.csv'))
 
     # prep info for separating the icons
     angs <- head(seq(0,2*pi,length.out=num.levels+1),-1)

@@ -38,7 +38,7 @@ ggplot(baseline.delay,aes(x=scen,y=delay.cost)) + geom_bar(stat='identity') + fa
 # make plots of pain for base scenario
 load(pp(pevi.shared,'data/inputs/compare/delhi-baseline-pain/logs-delay-final-infrastructure.Rdata'))
 load(pp(pevi.shared,'data/inputs/compare/delhi-baseline-pain/mean-delay-and-strand.Rdata'))
-logs[['results']]$infrastructure.scenario <- unlist(lapply(str_split(unique(logs[['results']]$infrastructure.scenario),"-"),function(x){ tail(x,1)}))
+logs[['results']]$infrastructure.scenario <- unlist(lapply(str_split(logs[['results']]$infrastructure.scenario,"-"),function(x){ tail(x,1)}))
 logs[['results']]$infrastructure.scenario[is.na(logs[['results']]$infrastructure.scenario)] <- 'no-chargers'
 res <- subset(logs[['results']],as.character(penetration)==infrastructure.scenario | infrastructure.scenario=="no-chargers")
 base.delay <- subset(baseline.delay,scen=="base")

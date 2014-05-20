@@ -18,8 +18,10 @@ option_list <- list(
   make_option(c("-p", "--pushend"),action="store_true", type="logical", default=F, help="Push the stopping criterion [%default]")
 )
 if(interactive()){
-  setwd(pp(pevi.shared,'data/inputs/optim-new/delhi-homeless/'))
-  args<-c('-s','51','-v','2.1')
+  #setwd(pp(pevi.shared,'data/inputs/optim-new/delhi-homeless/'))
+  #args<-c('-s','51','-v','2.1')
+  setwd(pp(pevi.shared,'data/inputs/optim-new/upstate-base/'))
+  args<-c('-s','1','-v','2.1.1')
   args <- parse_args(OptionParser(option_list = option_list,usage = "optimize-pevi.R [options]"),positional_arguments=F,args=args)
 }else{
   args <- parse_args(OptionParser(option_list = option_list,usage = "optimize-pevi.R [options]"),positional_arguments=F)
@@ -399,7 +401,7 @@ for(seed in seeds[seed.inds]){
           current.obj <- Inf
           break
         }
-        if((pev.penetration == 0.005 & tail(winner.history$cum.cost,1) < 3e6) | (pev.penetration == 0.01 & tail(winner.history$cum.cost,1) < 5e6) | (pev.penetration == 0.02 & tail(winner.history$cum.cost,1) < 7e6)){
+        if((pev.penetration == 0.005 & tail(winner.history$cum.cost,1) < 3e6) | (pev.penetration == 0.01 & tail(winner.history$cum.cost,1) < 8e6) | (pev.penetration == 0.02 & tail(winner.history$cum.cost,1) < 9e6)){
           current.obj <- taz.charger.combos$obj[1]
         } else {
           current.obj <- Inf

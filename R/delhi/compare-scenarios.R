@@ -114,10 +114,11 @@ for(results.i in 1:nrow(results)){
   NLCommand('set batch-setup? false')
   NLCommand('read-parameter-file')
   for(param in names(vary.tab)){
+    param.dot <- str_replace_all(param,"-",".") 
     if(is.character(vary.tab[1,param])){
-      NLCommand(paste('set ',param,' "',vary.tab[results.i,param],'"',sep=''))
+      NLCommand(paste('set ',param,' "',results[results.i,param.dot],'"',sep=''))
     }else{
-      NLCommand(paste('set ',param,' ',vary.tab[results.i,param],'',sep=''))
+      NLCommand(paste('set ',param,' ',results[results.i,param.dot],'',sep=''))
     }
   }
   if("tazs" %in% to.log)NLCommand('set log-taz-time-interval 5')
@@ -189,6 +190,32 @@ save(logs,file=paste(path.to.inputs,'logs.Rdata',sep=''))
 #######################################
 # ANALYSIS
 #######################################
+
+# Charger utilization for pen 1%
+ggplot(ddply(subset(logs[['charging']],penetration==1 & charger.level>0),.(charger.id),nrow),aes(x=V1/2))+geom_histogram(binwidth=1)+labs(x="# of Drivers Served by Individual Chargers per Day")
+
+num.chargers <- list()
+for(charger.file in unique(as.character(logs[['charging']]$charger.input.file))){
+  scen.named <- logs[['charging']]$infrastructure.scenario.named[which(logs[['charging']]$charger.input.file == charger.file)[1]]
+  num.chargers[[scen.named]] <- read.table(str_replace(charger.file,"sheppardc","critter"),skip=1)
+  names(num.chargers[[scen.named]]) <- c('taz','L0','L1','L2','L3','L4')
+}
+charge.sum <- na.omit(ddply(logs[['charging']],.(charger.level,penetration),function(df){
+  num.reps <- length(unique(df$replicate))
+  if(df$charger.level[1]==0){
+    num.chs <- length(unique(subset(logs[['trip']],penetration==df$penetration[1])$driver))/2
+  }else{
+    num.chs <- sum(num.chargers[[df$infrastructure.scenario.named[1]]][,pp('L',df$charger.level[1])])
+  }
+  duty.factor <- sum(df$duration)/(48*num.reps*num.chs)
+  data.frame(duty.factor=ifelse(duty.factor==Inf,NA,duty.factor))
+}))
+p <- ggplot(df,aes(x=factor(charger.level),fill=factor(penetration),y=duty.factor))+geom_bar(stat='identity',position="dodge")+facet_wrap(~taz)+labs(title=df$infrastructure.scenario.named[1],x="Charger Level",y="Duty Factor")
+
+ggplot(ddply(ddply(logs[['trip']],.(vehicle.type,replicate),function(df){ sum(df$distance)/length(unique(df$driver)) }),.(vehicle.type),function(df){ data.frame(miles.per.day=mean(df$V1))}),
+  aes(x=1,y=miles.per.day))+geom_bar(stat="identity")+ xlab('') + labs(fill='Level') + facet_wrap(~vehicle.type)
+
+
 # ANALYZE PAIN
 ggplot(subset(logs[['pain']],replicate==1 & pain.type%in%c("stranded","delay")),aes(x=time,y=state.of.charge,colour=pain.type,shape=location>0))+geom_point()+facet_grid(~vehicle.scenario.named)
 

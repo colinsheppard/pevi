@@ -266,8 +266,14 @@ demand <- data.frame(logs[['tazs']][,c('replicate','time','penetration','taz')],
 names(demand) <- c('replicate','time','taz','pow.L0','pow.L1','pow.L2','pow.L3')
 save(demand,file=pp(pevi.shared,'data/inputs/compare/upstate-ghg/demand.Rdata')
 
-demand.sum <- data.table(demand.sum)
-setkey(dema
+save(worst.peaks,file=pp(pevi.shared,'data/inputs/compare/upstate-ghg/peak-demand-from-humboldt.Rdata'))
+worst.peaks[,hour:=strftime(peak.datetime,"%H")]
+setkey(worst.peaks,'file')
+# categorize the circuits as 1 = Urban, 2 = Semi-Urban (small towns), 3 = Rural
+worst.peaks[,region.type:=c(1,1,1,1,1,3,3,2,1,1,1,1,1,2,2,3,3,2,2,1,3,2,2,2,3,3,3,3,3,3,2,1,2,2)]
+
+#demand.sum <- data.table(demand.sum)
+#setkey(dema
 
 demand.sum <- ddply(ddply(demand,.(time,replicate,infrastructure.scenario.named,penetration),function(df){ colSums(df[,c('pow.L0','pow.L1','pow.L2','pow.L3')]) }),
                     .(time,infrastructure.scenario.named,penetration),function(df){ rbind( data.frame(level=0,min=min(df$pow.L0),max=max(df$pow.L0),median=median(df$pow.L0),mean=mean(df$pow.L0)),

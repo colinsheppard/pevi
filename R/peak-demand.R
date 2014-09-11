@@ -467,6 +467,8 @@ theme(plot.title = element_text(size = rel(2),colour='black'),axis.text.y = elem
 
 ggplot(peaks.m,aes(x=name,y=value/1e3,fill=variable))+geom_bar(stat='identity')+theme(plot.title = element_text(size = rel(2),colour='white'),plot.background = element_rect(fill = "black"), axis.text.y = element_text(colour='white',size = rel(2)) ,axis.text.x = element_text(colour='white',size = rel(1.5),angle = 45, hjust = 1),axis.title.x = element_text(colour='white',size = rel(2)),axis.title.y = element_text(colour='white',size = rel(2)),legend.text=element_text(size = rel(1.5)),legend.key.size=unit(1.5,'cm'))+labs(x="Distribution Circuit Name and Feeder Number",y="Power (MW)",title="Impact on Peak Humboldt Demand of PEV Charging at 2% Penetration",fill="")+scale_fill_manual(values=cbPalette)
 
+save(worst.peaks,file=pp(pevi.shared,'data/inputs/compare/upstate-ghg/peak-demand-from-humboldt.Rdata'))
+
 #ggplot(melt(worst.peaks,id.vars='fdr.num',measure.vars=c('peak.before','peak.after','projected','kva.capability')),aes(x=factor(fdr.num),y=value,colour=variable))+geom_point()
 
 # Tabular results

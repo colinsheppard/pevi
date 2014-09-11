@@ -272,18 +272,29 @@ demand.sum$time <- as.numeric(demand.sum$time)
 # Make sure that we remove unmatching data; i.e. 1% penetration with 2% buildout
 demand.sum <- subset(demand.sum,str_detect(infrastructure.scenario.named,as.character(penetration))|infrastructure.scenario.named=='Existing Chargers')
 
+# Add a variable for exisiting vs. planned chargers that we can facet on
+demand.sum$charger.status <- "Existing Chargers"
+
 # Separate levels into "residential" (level 0) and "public" (everything else). I know there is a quicker way to do this.
 for(i in 1:nrow(demand.sum)){
 	ifelse(demand.sum$level[i]==0,demand.sum$level[i]<-'residential',demand.sum$level[i]<-'public')
+	if(demand.sum$infrastructure.scenario.named[i]!='Existing Chargers') {demand.sum$charger.status[i]<-"New Chargers"}
 }
 
+# Factor charger.status
+demand.sum$charger.status <- as.factor(demand.sum$charger.status)
+
 # Sum the public charging; divide by 1000 to get it in MW. Yes, I know I need to be better about using data.table
-demand.sum <- ddply(demand.sum,.(time,infrastructure.scenario.named,penetration,level),function(df){
-	data.frame(mean=sum(df$mean)/1000)})
+demand.sum <- ddply(demand.sum,.(time,infrastructure.scenario.named,penetration,level,charger.status),function(df){
+	data.frame(max=sum(df$max)/1000)})
+	
+# Do some renaming
+demand.sum$penetration <- as.factor(pp(demand.sum$penetration,'% Fleet Penetration'))
+names(demand.sum) <- c('Time','Infrastructure.Scenario.Named','Penetration','Charger.Type','Charger.Status','Max')
 
 # Plot it and save it.
 pdf(pp(pevi.shared,'data/UPSTATE/results/Charging Demand/upstate_charging_demand.pdf'),width=11,height=8.5)
-ggplot(subset(melt(demand.sum,id.vars=c('time','level','penetration','infrastructure.scenario.named')),variable=='mean'),aes(x=time,y=value,group=level,colour=level))+geom_line()+facet_wrap(penetration~infrastructure.scenario.named)+scale_x_continuous(breaks=c(0,10,20,30,40,50,60,70,80,90,100))+ylab("Charging Demand (MW)")+xlab("Simulation Time (hours)")
+ggplot(subset(melt(demand.sum,id.vars=c('Time','Charger.Type','Penetration','Infrastructure.Scenario.Named','Charger.Status')),variable=='Max'),aes(x=Time,y=value,group=Charger.Type,colour=Charger.Type))+geom_line()+facet_grid(Charger.Status~Penetration)+scale_x_continuous(limits=c(0,35),breaks=c(0,5,10,15,20,25,30,35))+ylab("Charging Demand (MW)")+xlab("Simulation Time (hours)")
 dev.off()
 
 demand.sum <- ddply(demand,.(time,taz),function(df){ rbind( data.frame(level=0,min=min(df$pow.L0),max=max(df$pow.L0),median=median(df$pow.L0),mean=mean(df$pow.L0)),

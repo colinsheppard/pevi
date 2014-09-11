@@ -1,6 +1,6 @@
 #Plug-in Electric Vehicle Infrastructure Model Description
 
-####Version 2.0
+####Version 2.1.1
 
 ####Authors: Colin Sheppard, Andy Harris
 ####Contributors: Allison Campbell, Jim Zoellick, Charles Chamberlin

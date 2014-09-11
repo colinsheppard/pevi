@@ -695,6 +695,7 @@ to seek-charger
       log-data "seek-charger-result" (sentence ticks seek-charger-index id -1 "" -1 -1)  ;;;LOG
       log-data "pain" (sentence ticks id [id] of current-taz [name] of this-vehicle-type "denial" (num-denials + 1) state-of-charge) ;;;LOG
       set num-denials (num-denials + 1)
+      ;; check here for soft-stranding due to too much time spent waiting
       wait-time-event-scheduler
     ][
       set state "stranded"
@@ -720,6 +721,7 @@ to seek-charger
       ifelse #min-taz = destination-taz [
         change-depart-time ticks
       ][
+        ;; check here for soft-stranding due to looped trips
         add-trip-to-itinerary #min-taz
         travel-time-event-scheduler
       ]

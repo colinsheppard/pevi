@@ -166,13 +166,13 @@ agg.taz$y <- agg.coords[,2]
 agg.taz$low.zoom.group <- agg.taz.data$low.zoom.group[match(agg.taz$agg.id,agg.taz.data$agg.id)]
 agg.taz$med.zoom.group <- agg.taz.data$med.zoom.group[match(agg.taz$agg.id,agg.taz.data$agg.id)]
 
-win <- data.table(subset(winners,scenario=='new-obj' & penetration==0.5),key=c('seed','penetration','iteration'))
-win[,rank:=(1:length(iteration))/length(iteration),by='seed']
-setkey(win,'taz','level','seed')
-best.ranks <- win[,list(rank=min(rank)),by=c('taz','level','seed')]
-best.ranks <- best.ranks[,list(rank=mean(rank)),by=c('taz','level')]
+win <- data.table(subset(winners,scenario=='base'),key=c('seed','penetration','iteration'))
+win[,rank:=(1:length(iteration))/length(iteration),by=c('seed','penetration')]
+setkey(win,'penetration','taz','level','seed')
+best.ranks <- win[,list(rank=min(rank)),by=c('penetration','taz','level','seed')]
+best.ranks <- best.ranks[,list(rank=mean(rank)),by=c('penetration','taz','level')]
 setkey(best.ranks,'rank')
-best.ranks[,percentile:=(1:length(rank))/length(rank)]
+best.ranks[,percentile:=(1:length(rank))/length(rank),by='penetration']
 best.ranks[,quartile:=ifelse(percentile<=0.25,1,ifelse(percentile<=0.5,2,ifelse(percentile<=0.75,3,4)))]
 best.ranks$name <- agg.taz.data$name[match(best.ranks$taz,agg.taz$new.id)]
 
@@ -201,15 +201,21 @@ plur.station <- function(num,rank){
 ch.fin <- subset(melt(ch.fin.unshaped,measure.vars=pp('L',0:4),variable_name="level"),level%in%pp('L',2:3))
 mean.ch.fin <- ddply(ch.fin,.(penetration,TAZ,level,scenario),function(df){
 	#data.frame(num.chargers = mean(df$value,na.rm=TRUE))
-	data.frame(num.chargers = round(mean(df$value,na.rm=TRUE)),unrounded.num.chargers=mean(df$value,na.rm=TRUE))
+  mean.num <- mean(df$value,na.rm=TRUE)
+  if(df$penetration[1]==0.02){
+    data.frame(num.chargers = round(mean.num),unrounded.num.chargers=mean.num)
+  }else{
+    data.frame(num.chargers = ifelse(mean.num>=0.4 & mean.num<0.5,1,round(mean.num)),unrounded.num.chargers=mean.num)
+  }
 })
 
 for(pen in c(0.005,0.01,0.02)){
-  setkey(best.ranks,'taz','level')
-  l2.scenario <- subset(mean.ch.fin,penetration==pen & level=='L2' & scenario=='new-obj',select=c('TAZ','num.chargers'))
+  l2.scenario <- subset(mean.ch.fin,penetration==pen & level=='L2' & scenario=='base',select=c('TAZ','num.chargers','unrounded.num.chargers'))
   agg.taz$L2 <- l2.scenario$num.chargers[match(agg.taz$new.id,l2.scenario$TAZ)]
-  l3.scenario <- subset(mean.ch.fin,penetration==pen & level=='L3' & scenario=='new-obj',select=c('TAZ','num.chargers'))
+  agg.taz$L2.unrounded <- l2.scenario$unrounded.num.chargers[match(agg.taz$new.id,l2.scenario$TAZ)]
+  l3.scenario <- subset(mean.ch.fin,penetration==pen & level=='L3' & scenario=='base',select=c('TAZ','num.chargers','unrounded.num.chargers'))
   agg.taz$L3 <- l3.scenario$num.chargers[match(agg.taz$new.id,l3.scenario$TAZ)]
+  agg.taz$L3.unrounded <- l3.scenario$unrounded.num.chargers[match(agg.taz$new.id,l3.scenario$TAZ)]
   agg.taz$L2E <- agg.taz.data$L2E
   agg.taz$L3E <- agg.taz.data$L3E
   agg.taz$lonE <- agg.taz.data$lonE
@@ -218,11 +224,26 @@ for(pen in c(0.005,0.01,0.02)){
   # Here we override the model results for a bunch of TAZs, moving them somewhere else
   if(pen==0.005){
     agg.taz$L3[which(agg.taz$name=="MtShasta")] <- 1
+    agg.taz$L3[which(agg.taz$name=="Dunsmuir")] <- 0
+    agg.taz$L3[which(agg.taz$name=="Lakehead")] <- 1
+    agg.taz$L3[which(agg.taz$name=="Castella")] <- 0
+  }else if(pen==0.01){
+    agg.taz$L3[which(agg.taz$name=="MtShasta")] <- 1
+    agg.taz$L3[which(agg.taz$name=="Dunsmuir")] <- 0
+    agg.taz$L3[which(agg.taz$name=="Yreka")] <- 1
+    agg.taz$L3[which(agg.taz$name=="Weed")] <- 0
+    agg.taz$L3[which(agg.taz$name=="Lakehead")] <- 1
+    agg.taz$L3[which(agg.taz$name=="SHA_BearMountain")] <- 0
+  }else if(pen==0.02){
+    agg.taz$L3[which(agg.taz$name=="RoundMountain")] <- 1
+    agg.taz$L3[which(agg.taz$name=="BigBend")] <- 0
+    agg.taz$L3[which(agg.taz$name=="Lakehead")] <- 1
+    agg.taz$L3[which(agg.taz$name=="Castella")] <- 1
+    agg.taz$L3[which(agg.taz$name=="FrenchGulch")] <- 0
+    agg.taz$L3[which(agg.taz$name=="Shasta")] <- 1
   }
-  agg.taz$L3[which(agg.taz$name=="Lakehead")] <- 1
+  agg.taz$L2[which(agg.taz$name=="Red Bluff")] <- agg.taz$L2[which(agg.taz$name=="Red Bluff")] + agg.taz$L2[which(agg.taz$name=="Gerber")]
   agg.taz$L2[which(agg.taz$name=="Gerber")] <- 0
-  agg.taz$L2[which(agg.taz$name=="Corning")] <- agg.taz$L2[which(agg.taz$name=="Corning")] + 1
-  agg.taz$L2[which(agg.taz$name=="Red Bluff")] <- agg.taz$L2[which(agg.taz$name=="Red Bluff")] + 1
   agg.taz$L2[which(agg.taz$name=="Shasta")] <- agg.taz$L2[which(agg.taz$name=="Shasta")] + agg.taz$L2[which(agg.taz$name=="FrenchGulch")]
   agg.taz$L2[which(agg.taz$name=="FrenchGulch")] <- 0
   agg.taz$L2[which(agg.taz$name=="HappyValley")] <- agg.taz$L2[which(agg.taz$name=="HappyValley")] + agg.taz$L2[which(agg.taz$name=="OnoIgo")]
@@ -233,20 +254,40 @@ for(pen in c(0.005,0.01,0.02)){
   agg.taz$L2[which(agg.taz$name=="BigBend")] <- 0
 
   # now complete the rankings and save to file
-  agg.taz.data.for.join <- data.table(melt(agg.taz@data,id.vars=c('new.id'),measure.vars=c('L2','L3')))
+  agg.taz.data.for.join <- data.table(melt(agg.taz@data,id.vars=c('new.id'),measure.vars=pp(c('L2','L3'),'.unrounded')))
   agg.taz.data.for.join[,taz:=new.id]
-  agg.taz.data.for.join[,level:=ifelse(variable=="L2",2,3)]
+  agg.taz.data.for.join[,level:=ifelse(variable=="L2.unrounded",2,3)]
   setkey(agg.taz.data.for.join,'taz','level')
-  best.ranks <- best.ranks.sav
+  setkey(best.ranks.sav,'penetration')
+  best.ranks <- best.ranks.sav[J(pen)]
   setkey(best.ranks,'taz','level')
   best.ranks <- agg.taz.data.for.join[best.ranks]
   setkey(best.ranks,'rank')
   write.csv(best.ranks,pp(pevi.shared,'data/UPSTATE/results/charger-priorities-',pen*100,'.csv'))
 
+  setkey(best.ranks,'taz','level')
   agg.taz$L2.rank <- best.ranks[J(agg.taz.data$new.id,2),quartile]$quartile
   agg.taz$L3.rank <- best.ranks[J(agg.taz.data$new.id,3),quartile]$quartile
-  if(pen==0.005)agg.taz$L3.rank[which(agg.taz$name=="MtShasta")] <- 4
-  agg.taz$L3.rank[which(agg.taz$name=="Lakehead")] <- 4
+  if(pen==0.005){
+    agg.taz$L3.rank[which(agg.taz$name=="MtShasta")] <- 4
+    agg.taz$L3.rank[which(agg.taz$name=="Lakehead")] <- 4
+  }else if(pen==0.01){
+    agg.taz$L3.rank[which(agg.taz$name=="MtShasta")] <- 4
+    agg.taz$L3.rank[which(agg.taz$name=="Weed")] <- 4
+    agg.taz$L3.rank[which(agg.taz$name=="Lakehead")] <- 4
+  }
+
+  # save to recommended charger files
+  for.ch.file <- agg.taz@data[order(agg.taz$new.id),c('new.id','L2','L3','L2E','L3E')]
+  for.ch.file$L2 <- for.ch.file$L2 + for.ch.file$L2E
+  for.ch.file$L3 <- for.ch.file$L3 + for.ch.file$L3E
+  for.ch.file$L0 <- 1
+  for.ch.file$L1 <- 0
+  for.ch.file$L4 <- 0
+  for.ch.file <- for.ch.file[,c('new.id','L0','L1','L2','L3','L4')]
+  for.ch.file <- rbind(for.ch.file,data.frame(new.id=-c(7,11,12,20,63,65,71,73),L0=1,L1=0,L2=10,L3=10,L4=0))
+  names(for.ch.file) <- c(';TAZ',pp('L',0:4))
+  write.table(for.ch.file,file=pp(pevi.shared,'data/inputs/charger-input-file/upstate/final-recommendations/upstate-final-rec-pen-',pen*100,'.txt'),sep='\t',row.names=F,quote=F)
 
   #shp.to.kml(agg.taz,pp(pevi.shared,'data/UPSTATE/results/maps/tazs-',pen,'.kml'),pp('Upstate ',100*pen,'% Results'),'',borders="black",colors='#FFFFFF33',id.col="shp.id",name.col="name",description.cols=c('L2','L2.rank','L3','L3.rank'))
 
@@ -304,7 +345,6 @@ for(pen in c(0.005,0.01,0.02)){
     if(l3E > 0) cat(sprintf(pp("  - ['%s',%f,%f,'<b>%s</b> <br/>%d existing Level 3 (DC Fast) charging ",plur.station(l3E,NA),"',%d,%s,%d,%s,%s]\n"),df$low.zoom.group[1],lon,lat-0.15,df$low.zoom.group[1],l3E,l3E,'null',9,'true','true'),file=charger.data.file,append=T)
   })
 }
-
 
 
 #path.to.google <- paste(base.path,'pev-shared/data/google-earth/',sep='')

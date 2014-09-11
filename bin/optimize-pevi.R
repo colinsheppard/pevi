@@ -401,7 +401,7 @@ for(seed in seeds[seed.inds]){
           current.obj <- Inf
           break
         }
-        if((pev.penetration == 0.005 & tail(winner.history$cum.cost,1) < 3e6) | (pev.penetration == 0.01 & tail(winner.history$cum.cost,1) < 8e6) | (pev.penetration == 0.02 & tail(winner.history$cum.cost,1) < 9e6)){
+        if((pev.penetration == 0.005 & tail(winner.history$cum.cost,1) < 2.25e6) | (pev.penetration == 0.01 & tail(winner.history$cum.cost,1) < 3e6) | (pev.penetration == 0.02 & tail(winner.history$cum.cost,1) < 5e6)){
           current.obj <- taz.charger.combos$obj[1]
         } else {
           current.obj <- Inf

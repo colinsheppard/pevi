@@ -39,6 +39,57 @@ setkey(schedule.reps,'ft')
 schedule.reps <- time.distance[schedule.reps]
 schedule.reps.up <- schedule.reps
 
+# for comparing jurisdictions against each other
+load(pp(pevi.shared,"/data/UPSTATE/shapefiles/AggregatedTAZsWithPointTAZs.Rdata"))
+jurisdiction <- agg.taz$jurisdiction
+jurisdiction[!jurisdiction%in%c('Redding','Siskiyou','Tehama')] <- 'Shasta'
+schedule.reps.up$jurisdiction <- jurisdiction[match(schedule.reps.up$from,agg.taz$agg.id)]
+compare.counties <- ddply(subset(schedule.reps.up,jurisdiction%in%c('Tehama','Siskiyou')),.(jurisdiction,rep),function(df){
+  data.frame(miles=sum(df$miles),ntrip=nrow(df),uniq.drivers=length(unique(df$driver)))
+})
+ddply(compare.counties,.(jurisdiction),function(df){
+  data.frame(miles=mean(df$miles),ntrip=mean(df$ntrip),uniq.drivers=mean(df$uniq.drivers))
+})
+load(file=pp(pevi.shared,"data/UPSTATE/demographics/frac-homes-and-nearest-10.Rdata"))
+home.dist$jurisdiction <- jurisdiction[match(home.dist$agg.id,agg.taz$agg.id)]
+home.dist$jurisdiction.with.ext <- jurisdiction[match(abs(home.dist$agg.id),agg.taz$agg.id)]
+ddply(home.dist,.(jurisdiction),function(df){
+  data.frame(frac.home=sum(df$frac.home),trips=sum(df$tot))
+})
+ddply(home.dist,.(jurisdiction.with.ext),function(df){
+  data.frame(frac.home=sum(df$frac.home))
+})
+ddply(agg.taz.data,.(jurisdiction),function(df){
+  data.frame(pop=sum(df$population,na.rm=T),employment=sum(df$employment,na.rm=T))
+})
+od.agg.all$jurisdiction <- jurisdiction[match(od.agg.all$from,agg.taz$agg.id)]
+od.agg.all$jurisdiction.with.ext <- jurisdiction[match(abs(od.agg.all$from),agg.taz$agg.id)]
+ddply(od.agg.all,.(jurisdiction),function(df){
+  data.frame(trips=sum(df$tot))
+})
+load("/Users/sheppardc/Dropbox/serc/pev-colin/pev-shared/data/inputs/compare/upstate-animation/logs.Rdata")
+logs[['trip']]$from.old <- od.converter$old.id[match(logs[['trip']]$origin,od.converter$new.id)]
+logs[['trip']]$to.old <- od.converter$old.id[match(logs[['trip']]$destination,od.converter$new.id)]
+logs[['trip']]$jurisdiction <- jurisdiction[match(logs[['trip']]$from.old,agg.taz$agg.id)]
+logs[['trip']]$jurisdiction.to <- jurisdiction[match(logs[['trip']]$to.old,agg.taz$agg.id)]
+ddply(subset(logs[['trip']],jurisdiction==jurisdiction.to & jurisdiction%in%c('Tehama','Siskiyou')),.(jurisdiction),function(df){
+  data.frame(trips=nrow(df),miles=sum(df$distance))
+})
+ggplot(subset(logs[['trip']],jurisdiction%in%c('Tehama','Siskiyou')),aes(x=distance)) + geom_histogram() + facet_wrap(jurisdiction~jurisdiction.to)
+
+logs[['tazs']]$L2 <- (logs[['tazs']]$num.L2-logs[['tazs']]$num.avail.L2)/logs[['tazs']]$num.L2
+logs[['tazs']]$L2[is.nan(logs[['tazs']]$L2)] <- NA
+logs[['tazs']]$L3 <- (logs[['tazs']]$num.L3-logs[['tazs']]$num.avail.L3)/logs[['tazs']]$num.L3
+logs[['tazs']]$L3[is.nan(logs[['tazs']]$L3)] <- NA
+logs[['tazs']]$taz.old <- od.converter$old.id[match(logs[['tazs']]$taz,od.converter$new.id)]
+logs[['tazs']]$jurisdiction <- jurisdiction[match(logs[['tazs']]$taz.old,agg.taz$agg.id)]
+
+ddply(logs[['tazs']],.(jurisdiction),function(df){
+  data.frame(duty.factor.L2=weighted.mean(df$L2,df$num.L2,na.rm=T),duty.factor.L3=weighted.mean(df$L3,df$num.L3,na.rm=T))
+})
+
+
+
 # now load the comparable data from the Humboldt model
 
 do.or.load(pp(pevi.shared,'/data/inputs/driver-input-file/humboldt-uncombined-schedule-replicates-20130219.Rdata'),function(){
@@ -89,6 +140,7 @@ summary(rur.tours$TOT_MILS)
 setkey(rur.tours,'journey.id')
 by.per <- rur.tours[,list(tot.dist=sum(TOT_MILS)),by=c('journey.id')]
 summary(by.per$tot.dist)
+
 
 
 # Humboldt 

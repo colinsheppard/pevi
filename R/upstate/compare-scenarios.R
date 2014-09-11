@@ -1,4 +1,4 @@
-Sys.setenv(NOAWT=1)
+amndSys.setenv(NOAWT=1)
 options(java.parameters="-Xmx2048m")
 load.libraries(c('ggplot2','yaml','RNetLogo','plyr','reshape','stringr'))
 
@@ -10,7 +10,7 @@ path.to.inputs <- pp(pevi.shared,'data/inputs/compare/',exp.name,'/')
 #to.log <- c('pain','charging','tazs','trip')
 #to.log <- c('pain','charging')
 #to.log <- c('tazs','charging')
-to.log <- c()
+to.log <- c('tazs')
 
 # load the reporters and loggers needed to summarize runs and disable logging
 source(paste(pevi.home,"R/reporters-loggers.R",sep=''))
@@ -134,7 +134,7 @@ if(length(grep("animation",path.to.inputs))>0){
     file.remove(paste(outputs.dir,logger,"-out.csv",sep=''))
   }
 }
-save(logs,file=paste(path.to.inputs,'logs.Rdata',sep=''))
+save(logs,file=paste(path.to.inputs,'logs-tazonly.Rdata',sep=''))
 #load(paste(path.to.inputs,'logs.Rdata',sep=''))
 
 #######################################
@@ -154,7 +154,7 @@ for(log.file in to.log){
     }
   }
 }
-save(logs,file=paste(path.to.inputs,'logs.Rdata',sep=''))
+save(logs,file=paste(path.to.inputs,'logs-tazonly.Rdata',sep=''))
 #load(paste(path.to.inputs,'logs.Rdata',sep=''))
 
 #######################################
@@ -260,12 +260,11 @@ ggplot(soc.at.beg,aes(x=up.to,y=percent,fill=factor(at.home)))+geom_bar(stat='id
 
 # Home charging power demand
 caps <- c(6.6,2.4,6.6,50)
-demand <- ddply(logs[['tazs']],.(replicate,time),function(df){ colSums(df[,paste('num.L',0:3,sep='')] - df[,paste('num.avail.L',0:3,sep='')]) * caps })
-demand <- logs[['tazs']][,c('infrastructure.scenario','infrastructure.scenario.named','penetration','replicate','time','taz',paste('num.avail.L',0:3,sep=''),paste('num.L',0:3,sep=''))]
-demand$pow.L0 <- caps[1] * (demand$num.L0 - demand$num.avail.L0)
-demand$pow.L1 <- caps[2] * (demand$num.L1 - demand$num.avail.L1)
-demand$pow.L2 <- caps[3] * (demand$num.L2 - demand$num.avail.L2)
-demand$pow.L3 <- caps[4] * (demand$num.L3 - demand$num.avail.L3)
+demand <- ddply(logs[['tazs']],.(replicate,time,penetration),function(df){ colSums(df[,paste('num.L',0:3,sep='')] - df[,paste('num.avail.L',0:3,sep='')]) * caps })
+load(pp(pevi.shared,'data/inputs/compare/upstate-ghg/logs-tazonly.Rdata'))
+demand <- data.frame(logs[['tazs']][,c('replicate','time','penetration','taz')],t(apply(logs[['tazs']][,paste('num.L',0:3,sep='')] - logs[['tazs']][,paste('num.avail.L',0:3,sep='')],1,function(x){ x * caps })))
+names(demand) <- c('replicate','time','taz','pow.L0','pow.L1','pow.L2','pow.L3')
+save(demand,file=pp(pevi.shared,'data/inputs/compare/upstate-ghg/demand.Rdata')
 
 demand.sum <- data.table(demand.sum)
 setkey(dema
@@ -275,8 +274,40 @@ demand.sum <- ddply(ddply(demand,.(time,replicate,infrastructure.scenario.named,
                                                         data.frame(level=1,min=min(df$pow.L1),max=max(df$pow.L1),median=median(df$pow.L1),mean=mean(df$pow.L1)),
                                                         data.frame(level=2,min=min(df$pow.L2),max=max(df$pow.L2),median=median(df$pow.L2),mean=mean(df$pow.L2)),
                                                         data.frame(level=3,min=min(df$pow.L3),max=max(df$pow.L3),median=median(df$pow.L3),mean=mean(df$pow.L3))) })
-ggplot(melt(subset(demand.sum,level==0),id.vars=c('time','level')),aes(x=time,y=value,colour=variable,group=variable))+geom_line()+facet_wrap(~level)
-ggplot(melt(subset(demand.sum,level>0),id.vars=c('time','level')),aes(x=time,y=value,colour=variable))+geom_line()+facet_wrap(~level)
+#ggplot(melt(subset(demand.sum,level==0),id.vars=c('time','level','penetration','infrastructure.scenario.named')),aes(x=as.numeric(time),y=value,group=variable,colour=variable))+geom_line()+facet_wrap(penetration~infrastructure.scenario.named)+scale_x_continuous(breaks=c(0,10,20,30,40,50,60,70,80,90,100))
+#ggplot(melt(subset(demand.sum,level>0),id.vars=c('time','level')),aes(x=as.numeric(time),y=value,group=variable,colour=variable))+geom_line()+facet_wrap(~level)+scale_x_continuous(breaks=c(0,10,20,30,40,50,60,70,80,90,100))
+
+# Time. Gotta be numeric.
+demand.sum$time <- as.numeric(demand.sum$time)
+
+# Make sure that we remove unmatching data; i.e. 1% penetration with 2% buildout
+demand.sum <- subset(demand.sum,str_detect(infrastructure.scenario.named,as.character(penetration))|infrastructure.scenario.named=='Existing Chargers')
+
+# Add a variable for exisiting vs. planned chargers that we can facet on
+demand.sum$charger.status <- "Existing Chargers"
+
+# Separate levels into "residential" (level 0) and "public" (everything else). I know there is a quicker way to do this.
+for(i in 1:nrow(demand.sum)){
+	ifelse(demand.sum$level[i]==0,demand.sum$level[i]<-'residential',demand.sum$level[i]<-'public')
+	if(demand.sum$infrastructure.scenario.named[i]!='Existing Chargers') {demand.sum$charger.status[i]<-"New Chargers"}
+}
+
+# Factor charger.status
+demand.sum$charger.status <- as.factor(demand.sum$charger.status)
+
+# Sum the public charging; divide by 1000 to get it in MW. Yes, I know I need to be better about using data.table
+demand.sum <- ddply(demand.sum,.(time,infrastructure.scenario.named,penetration,level,charger.status),function(df){
+	data.frame(max=sum(df$max)/1000)})
+	
+# Do some renaming
+demand.sum$penetration <- as.factor(pp(demand.sum$penetration,'% Fleet Penetration'))
+names(demand.sum) <- c('Time','Infrastructure.Scenario.Named','Penetration','Charger.Type','Charger.Status','Max')
+
+# Plot it and save it.
+pdf(pp(pevi.shared,'data/UPSTATE/results/Charging Demand/upstate_charging_demand.pdf'),width=11,height=8.5)
+ggplot(subset(melt(demand.sum,id.vars=c('Time','Charger.Type','Penetration','Infrastructure.Scenario.Named','Charger.Status')),variable=='Max'),aes(x=Time,y=value,group=Charger.Type,colour=Charger.Type))+geom_line()+facet_grid(Charger.Status~Penetration)+scale_x_continuous(limits=c(0,35),breaks=c(0,5,10,15,20,25,30,35))+ylab("Charging Demand (MW)")+xlab("Simulation Time (hours)")
+dev.off()
+
 demand.sum <- ddply(demand,.(time,taz),function(df){ rbind( data.frame(level=0,min=min(df$pow.L0),max=max(df$pow.L0),median=median(df$pow.L0),mean=mean(df$pow.L0)),
                                                         data.frame(level=1,min=min(df$pow.L1),max=max(df$pow.L1),median=median(df$pow.L1),mean=mean(df$pow.L1)),
                                                         data.frame(level=2,min=min(df$pow.L2),max=max(df$pow.L2),median=median(df$pow.L2),mean=mean(df$pow.L2)),

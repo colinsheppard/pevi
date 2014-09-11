@@ -4,6 +4,7 @@ registerDoMC(num.cpu)
 
 make.plots  <- T
 
+path.to.outputs <- pp(pevi.shared,'~/data/inputs/driver-input-file/delhi-uncombined/')
 path.to.plots <- pp(pevi.nondrop,'itin-plots/delhi/')
 
 # load and pre-process the survey data
@@ -99,20 +100,10 @@ do.or.load(pp(pevi.shared,'data/DELHI/road-network/routing-with-gateways.Rdata')
     nearest[to==-gate,to:=gate]
     nearest <- rbind(nearest,data.table(from=c(gate,-gate),to=c(-gate,gate),enroute='',km=10,time=0.25))
     time.distance <- rbind(time.distance,nearest)
-
-    nearest <- time.distance.delayed[from==-gate | to==-gate]
-    nearest[,km:=km+10]    # add 10 km 
-    nearest[,time:=time+10/40] # assume they're on outskirts and can drive 40 kph
-    nearest[,enroute:=ifelse(enroute=='',as.character(-gate),pp(enroute,",",-gate))] # assume they're on outskirts and can drive 40 kph
-    nearest[from==-gate,from:=gate]
-    nearest[to==-gate,to:=gate]
-    nearest <- rbind(nearest,data.table(from=c(gate,-gate),to=c(-gate,gate),enroute='',km=10,time=0.25))
-    time.distance.delayed <- rbind(time.distance.delayed,nearest)
   }
   # grab integer value of km for binning data
   time.distance$km.int <- round(time.distance$km)
-  time.distance.delayed$km.int <- round(time.distance.delayed$km)
-  list('time.distance'=time.distance,'time.distance.delayed'=time.distance.delayed)
+  list('time.distance'=time.distance)
 })
 
 # Make some plots to describe the HH data and OD distance distribution
@@ -202,11 +193,9 @@ pev.pens <- c(0.005,0.01,0.02)
 replicate <- 1
 source(pp(pevi.home,'R/delhi/itin-functions.R',sep=''))
 
-time.distance <- time.distance.delayed
-
 num.replicates <- 80
 time.distance$ft <- pp(time.distance$from,' ',time.distance$to)
-date.code <- '20140422'
+date.code <- '20140217'
 pev.penetration <- 0.005
 pev.pen.char <- roundC(pev.penetration,3)
 if(file.exists(pp(pevi.shared,'data/inputs/driver-input-file/delhi-uncombined-schedule-replicates-',date.code,'.Rdata',sep=''))){
@@ -218,7 +207,8 @@ if(is.null(schedule.reps[[pev.pen.char]]))schedule.reps[[pev.pen.char]] <- list(
 for(replicate in 1:num.replicates){
   print(paste('Penetration ',pev.penetration,' replicate ',replicate,sep=''))
   schedule.reps[[pev.pen.char]][[as.character(replicate)]] <- create.schedule(pev.penetration,2,frac.end.at.home,frac.include.home)
-  sched <- schedule.reps[[pev.pen.char]][[as.character(replicate)]]
+  sched <- schedule.reps[[pev.pen.char]][[as.character(replicate)]][,c('driver','from','to','depart','home')]
+  #sched <- read.table(file=paste(path.to.shared.inputs,"driver-schedule-pen",pev.penetration*100,"-rep",replicate,"-20130129.txt",sep=''),sep='\t',header=T)
   sched$ft <- pp(sched$from,' ',sched$to)
 
   sched <- join(sched,time.distance,by="ft")
@@ -233,8 +223,9 @@ for(replicate in 1:num.replicates){
     }
     df
   })
-  schedule.reps[[pev.pen.char]][[as.character(replicate)]] <- sched[,c('driver','from','to','depart','home')]
-  save(schedule.reps,file=pp(pevi.shared,'data/inputs/driver-input-file/delhi-uncombined-schedule-replicates-',date.code,'.Rdata',sep=''))
+  sched <- sched[,c('driver','from','to','depart','home')]
+  names(sched) <- c(';driver','from','to','depart','home')
+  write.table(sched,pp(pevi.shared,"data/inputs/driver-input-file/delhi-uncombined/driver-schedule-pen",pev.penetration*100,"-rep",replicate,"-",date.code,".txt",sep=''),sep="\t",row.names=F,quote=F)
 }
 save(schedule.reps,file=pp(pevi.shared,'data/inputs/driver-input-file/delhi-uncombined-schedule-replicates-',date.code,'.Rdata',sep=''))
 

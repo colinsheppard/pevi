@@ -5,13 +5,9 @@
 #path.to.combined.inputs <- pp(pevi.shared,'data/inputs/driver-input-file/upstate-combined/')
 
 load(pp(pevi.shared,'data/inputs/driver-input-file/delhi-uncombined-schedule-replicates-20140217.Rdata'))
-load(pp(pevi.shared,'data/inputs/driver-input-file/delhi-uncombined-schedule-replicates-20140422.Rdata'))
-
-# ANDY make sure to change file paths to a "congested" directory
-
-path.to.combined.inputs <- pp(pevi.shared,'data/inputs/driver-input-file/delhi-combined/congested/doubled/')
-path.to.combined.homeless.inputs <- pp(pevi.shared,'data/inputs/driver-input-file/delhi-combined//congested/homeless/')
-path.to.combined.half.homeless.inputs <- pp(pevi.shared,'data/inputs/driver-input-file/delhi-combined/congested/half-homeless/')
+path.to.combined.inputs <- pp(pevi.shared,'data/inputs/driver-input-file/delhi-combined/doubled/')
+path.to.combined.homeless.inputs <- pp(pevi.shared,'data/inputs/driver-input-file/delhi-combined/homeless/')
+path.to.combined.half.homeless.inputs <- pp(pevi.shared,'data/inputs/driver-input-file/delhi-combined/half-homeless/')
 
 pens <- c(0.005,0.01,0.02)
 schedule.reps[['0.01']] <- list()
@@ -66,7 +62,7 @@ for (pen in pens){
         new.sched$home <- 0
       }
       names(new.sched) <- c(';driver',tail(names(new.sched),-1))
-      write.table(new.sched[,c(';driver','from','to','depart','home')],file=pp(path.to.combined,"driver-schedule-pen",pen*100,"-rep",final.replicate,"-20140422.txt"),sep='\t',row.names=F,quote=F)
+      write.table(new.sched[,c(';driver','from','to','depart','home')],file=pp(path.to.combined,"driver-schedule-pen",pen*100,"-rep",final.replicate,"-20140217.txt"),sep='\t',row.names=F,quote=F)
       print(pp(path.to.combined,"driver-schedule-pen",pen*100,"-rep",final.replicate,"-20140217.txt"))
       print(h(new.sched))
       print(sum(new.sched$home==0))
@@ -83,8 +79,8 @@ for (pen in pens){
         quad.sched$home <- 0
       }
       names(quad.sched) <- c(';driver',tail(names(quad.sched),-1))
-      write.table(quad.sched[,c(';driver','from','to','depart','home')],file=pp(path.to.combined,"driver-schedule-pen",pen*100,"-rep",final.replicate,"-20140422.txt"),sep='\t',row.names=F,quote=F)
-      print(pp(path.to.combined,"driver-schedule-pen",pen*100,"-rep",final.replicate,"-20140422.txt"))
+      write.table(quad.sched[,c(';driver','from','to','depart','home')],file=pp(path.to.combined,"driver-schedule-pen",pen*100,"-rep",final.replicate,"-20140217.txt"),sep='\t',row.names=F,quote=F)
+      print(pp(path.to.combined,"driver-schedule-pen",pen*100,"-rep",final.replicate,"-20140217.txt"))
       print(h(quad.sched))
       print(sum(quad.sched$home==0))
     }

@@ -128,7 +128,7 @@ my.red <- '#e41a1c'
 my.blue <- '#377eb8'
 my.green <- '#4daf4a'
 charger.cols <- c(my.green,my.blue,my.purp,my.oran,my.red)
-charger.caps <- c(6.6,1.5,6.6,50,400)
+charger.caps <- c(1.5,1.5,6.6,50,400)
 
 trip.locs <- function(trips,t,is.pain=F){
   ddply(trips,.(driver),function(df){
@@ -187,7 +187,6 @@ ani.routes <- function(){
 
 step.size = 2.5/60
 evses <- c(0.5,1,2)
-evses <- 1
 start.t <- 6
 
 for(evse.i in evses){

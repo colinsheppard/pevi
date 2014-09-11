@@ -7,9 +7,9 @@ exp.name <- 'delhi-baseline-pain'
 #exp.name <- 'delhi-animation'
 path.to.inputs <- pp(pevi.shared,'data/inputs/compare/',exp.name,'/')
 
-to.log <- c()
+#to.log <- c()
 #to.log <- 'pain'
-#to.log <- c('pain','charging')
+to.log <- c('pain','charging')
 #to.log <- c('pain','charging','trip')
 #to.log <- c('pain','charging','tazs','trip') # use this for animations
 
@@ -75,12 +75,14 @@ if("vehicle-type-input-file" %in% names(vary)){
   }
 }
 if(exp.name=='delhi-animation' | exp.name=='delhi-battery-swap' | exp.name=='consistent-vs-quadrupled'){
-  results <- subset(results,(penetration==0.5 & infrastructure.scenario=='delhi-final-rec-pen-0.5') | 
-                    (penetration==1 & infrastructure.scenario=='delhi-final-rec-pen-1') | 
+  results <- subset(results,(penetration==0.5 & infrastructure.scenario=='delhi-final-rec-pen-0.5') |                     (penetration==1 & infrastructure.scenario=='delhi-final-rec-pen-1') | 
                     (penetration==2 & infrastructure.scenario=='delhi-final-rec-pen-2') |
                     (penetration==0.5 & infrastructure.scenario=='delhi-final-with-swap-pen-0.5') | 
                     (penetration==1 & infrastructure.scenario=='delhi-final-with-swap-pen-1') | 
-                    (penetration==2 & infrastructure.scenario=='delhi-final-with-swap-pen-2'))
+                    (penetration==2 & infrastructure.scenario=='delhi-final-with-swap-pen-2')) &
+                    ((num.simulation.days==2 & itin.scenario=='consistent') |
+                    (num.simulation.days==4 & itin.scenario=='quadrupled'))
+                    )
 }
 
 # start NL
@@ -184,7 +186,7 @@ for(log.file in to.log){
     }
   }
 }
-save(logs,file=paste(path.to.inputs,'logs.Rdata',sep=''))
+save(logs,file=paste(path.to.inputs,'logs-v2.1.1.Rdata',sep=''))
 #load(paste(path.to.inputs,'logs.Rdata',sep=''))
 
 #######################################
@@ -259,18 +261,26 @@ all.logs <- list()
 for(log in c('pain','charging','results')){
   all.logs[[log]] <- data.frame()
 }
-load(pp(pevi.shared,"data/inputs/compare/consistent-vs-quadrupled/logs-v2.0.Rdata")) # base version
+load(pp(pevi.shared,"data/inputs/compare/delhi-consistent-vs-quadrupled/logs-v2.0.Rdata")) # base version
 for(log in c('pain','charging','results')){
   logs[[log]]$pevi <- '2.0 Base'
+  logs[[log]]$num.simulation.days <- 2
   all.logs[[log]] <- rbind(all.logs[[log]],logs[[log]])
 }
-load(pp(pevi.shared,"data/inputs/compare/consistent-vs-quadrupled/logs-v2.1.Rdata")) # after morning charging and external homelessness fixes
+load(pp(pevi.shared,"data/inputs/compare/delhi-consistent-vs-quadrupled/logs-v2.1.Rdata")) # after morning charging and external homelessness fixes
 for(log in c('pain','charging','results')){
   logs[[log]]$pevi <- '2.1 Fixes'
+  logs[[log]]$num.simulation.days <- 2
   all.logs[[log]] <- rbind(all.logs[[log]],logs[[log]])
 }
-ggplot(subset(all.logs[['pain']],pain.type%in%c("delay","stranded") & penetration==2),aes(x=time,y=state.of.charge,colour=pain.type,shape=vehicle.type))+geom_point()+facet_grid(pevi ~ itin.scenario.named)
+load(pp(pevi.shared,"data/inputs/compare/delhi-consistent-vs-quadrupled/logs-v2.1.1.Rdata")) # after morning charging and external homelessness fixes
+for(log in c('pain','charging','results')){
+  logs[[log]]$pevi <- '2.1.1 Fixes'
+  all.logs[[log]] <- rbind(all.logs[[log]],logs[[log]])
+}
+ggplot(subset(all.logs[['pain']],pain.type%in%c("delay","stranded") & penetration==1 & replicate==1),aes(x=time,y=state.of.charge,colour=pain.type,shape=vehicle.type))+geom_point()+facet_grid(pevi ~ itin.scenario.named)
 ggplot(subset(all.logs[['pain']],pain.type%in%c("delay","stranded") & pevi=='2.1 Fixes' & penetration==2 & itin.scenario=='quadrupled'),aes(x=time,y=state.of.charge,colour=vehicle.type,shape=vehicle.type))+geom_point()+facet_wrap(~ pain.type)
+ggplot(subset(all.logs[['pain']],pain.type%in%c("delay","stranded") & pevi=='2.1.1 Fixes' & penetration==1 & itin.scenario=='quadrupled'),aes(x=time,y=state.of.charge,colour=vehicle.type,shape=vehicle.type))+geom_point()+facet_wrap(~ pain.type)
 dev.new()
 ggplot(subset(all.logs[['charging']],penetration==2),aes(x=time,y=begin.soc,colour=factor(charger.level)))+geom_point()+facet_grid(pevi ~ itin.scenario.named)
 ggplot(subset(all.logs[['charging']],pevi=='2.1 Fixes' & penetration==2 & itin.scenario=='quadrupled'),aes(x=time,y=begin.soc,colour=))+geom_point()+facet_wrap(~charger.level)

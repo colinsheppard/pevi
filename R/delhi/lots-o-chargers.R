@@ -67,3 +67,26 @@ ggsave(file=pp(pevi.shared,'data/DELHI/results/base/base-mean-delay.pdf'),p,widt
 p <- ggplot(res,aes(x=scen,fill=factor(penetration),y=strands)) + geom_bar(stat='identity',position='dodge') + labs(x="Fleet Penetration",y="Average Daily Incidence of Strandings per Driver",title="Strandings",fill="")+scale_fill_manual(values=charger.cols)
 ggsave(file=pp(pevi.shared,'data/DELHI/results/base/base-mean-standings.pdf'),p,width=6,height=6)
 
+# Additional plots to determine baseline delay, added 6/11/14. Step one: get the data right.
+baseline.delay.stats <- data.frame(driver.scenario=all.res$driver.input.file,penetration=all.res$penetration,replicate=all.res$replicate,itin.scenario.named=all.res$itin.scenario.named,num.drivers=all.res$num.drivers,num.trips=all.res$num.trips,frac.drivers.delayed=all.res$frac.drivers.delayed,num.stranded.by.delay=all.res$num.stranded.by.delay,frac.stranded.by.delay=all.res$frac.stranded.by.delay)
+baseline.delay.stats$driver.scenario <- as.character(baseline.delay.stats$driver.scenario)
+for (i in 2:nrow(baseline.delay.stats)){
+  baseline.delay.stats$driver.scenario[i] <- str_split(baseline.delay.stats$driver.scenario[i],'/')[[1]][13]
+}
+baseline.delay.stats$driver.scenario <- as.factor(baseline.delay.stats$driver.scenario)
+
+# By frac drivers delayed
+p <- ggplot(baseline.delay.stats,aes(x=factor(penetration),y=frac.drivers.delayed)) + geom_bar(stat='identity',position='dodge') + labs(x="Fleet Penetration",y="Fraction of Drivers Delayed",title="Fraction Delayed",fill="")+scale_fill_manual(values=charger.cols) # +theme(axis.text.x = element_text(colour='black',size=14),axis.text.y = element_text(colour='black',size=14),plot.title = element_text(size=16))
+ggsave(file=pp(pevi.shared,'data/DELHI/results/base/base-frac-delayed.pdf'),p,width=6,height=6)# By frac drivers stranded by delay
+
+# By frac drivers stranded by delayed
+p <- ggplot(baseline.delay.stats,aes(x=factor(penetration),y=frac.stranded.by.delay)) + geom_bar(stat='identity',position='dodge') + labs(x="Fleet Penetration",y="Fraction of Drivers Stranded by Delay",title="Fraction Stranded by Delay",fill="")+scale_fill_manual(values=charger.cols) # +theme(axis.text.x = element_text(colour='black',size=14),axis.text.y = element_text(colour='black',size=14),plot.title = element_text(size=16))
+ggsave(file=pp(pevi.shared,'data/DELHI/results/base/base-frac-stranded-by-delay.pdf'),p,width=6,height=6)# By frac drivers stranded by delay
+
+# By frac drivers delayed, separating homeless scenario
+p <- ggplot(baseline.delay.stats,aes(x=factor(penetration),y=frac.drivers.delayed,fill=driver.scenario)) + geom_bar(stat='identity',position='dodge') + labs(x="Fleet Penetration",y="Fraction of Drivers Delayed",title="Fraction Delayed",fill="")+scale_fill_manual(values=charger.cols) # +theme(axis.text.x = element_text(colour='black',size=14),axis.text.y = element_text(colour='black',size=14),plot.title = element_text(size=16))
+ggsave(file=pp(pevi.shared,'data/DELHI/results/base/base-frac-delayed-by-homeless.pdf'),p,width=6,height=6)# By frac drivers stranded by delay
+
+# By frac drivers stranded by delayed, separating homeless scenario
+p <- ggplot(baseline.delay.stats,aes(x=factor(penetration),y=frac.stranded.by.delay,fill=driver.scenario)) + geom_bar(stat='identity',position='dodge') + labs(x="Fleet Penetration",y="Fraction of Drivers Stranded by Delay",title="Fraction Stranded by Delay",fill="")+scale_fill_manual(values=charger.cols) # +theme(axis.text.x = element_text(colour='black',size=14),axis.text.y = element_text(colour='black',size=14),plot.title = element_text(size=16))
+ggsave(file=pp(pevi.shared,'data/DELHI/results/base/base-frac-stranded-by-delay-by-homeless.pdf'),p,width=6,height=6)# By frac drivers stranded by delay

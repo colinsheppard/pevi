@@ -302,7 +302,7 @@ setkey(demand.sum,taz)
 for(taz.i in unique(demand.sum$taz)){
   taz.name <- demand.sum[J(taz.i)]$name[1]
 
-	pdf(pp(pevi.shared,'data/UPSTATE/results/Charging Demand/Peak-Demand-TAZ-',taz.i,'-',taz.name,'.pdf'),width=11,height=8.5)
+	pdf(pp(pevi.shared,'data/UPSTATE/results/Charging Demand/Peak-Demand-TAZ-',taz.i,'-',taz.name,'.pdf'),width=8,height=5)
 	print(ggplot(melt(demand.sum[J(taz.i)][Charger.Status=="New Chargers"],id.vars=c('Time','Penetration','Infrastructure.Scenario.Named','Charger.Status'),measure.vars=c('Residential','Public','Total'),variable_name='Charger.Type'),aes(x=Time,y=value,group=Charger.Type,colour=Charger.Type))+geom_line()+facet_grid(Charger.Status~Penetration)+scale_x_continuous(limits=c(6,30),breaks=c(0,6,12,18,24,30))+ylab("Peak Charging Demand (kW)")+xlab("Simulation Time (hours)")+labs(title = taz.name))
 	dev.off()
 }

@@ -273,6 +273,48 @@ setkey(worst.peaks,'file')
 worst.peaks[,region.type:=c(1,1,1,1,1,3,3,2,1,1,1,1,1,2,2,3,3,2,2,1,3,2,2,2,3,3,3,3,3,3,2,1,2,2)]
 
 #(Load the demand data if you are starting from a load file)
+load(pp(pevi.shared,'data/inputs/compare/upstate-ghg/demand data/demand.Rdata'))
+# remove data that is not needed
+demand <- subset(demand,taz > 0 & ((infrastructure.scenario =='upstate-final-rec-pen-0.5' & penetration==0.5) |(infrastructure.scenario =='upstate-final-rec-pen-1' & penetration==1.0) | (infrastructure.scenario =='upstate-final-rec-pen-2' & penetration==2.0) | (infrastructure.scenario =='upstate-existing-chargers')))
+demand <- data.table(demand)
+demand[,time:=as.numeric(time)]
+demand[,time:=round(time*4)/4] # round to nearest quarter hour
+# convert num chargers to demand
+demand[,':='(L0=num.L0-num.avail.L0,L2=num.L2-num.avail.L2,L3=num.L3-num.avail.L3,num.L0=NULL,num.L1=NULL,num.L2=NULL,num.L3=NULL,num.avail.L0=NULL,num.avail.L1=NULL,num.avail.L2=NULL,num.avail.L3=NULL)]
+demand[,':='(residential=L0*6.6,public=L2*6.6+L3*50,public.2=L2*6.6,public.3=L3*50)]
+# deal with time being off by 6 hours
+demand[,time:=time-6]
+demand <- demand[time >= 0]
+demand[,penetration:=ifelse(penetration==0.5,"0.5% Fleet Penetration",ifelse(penetration==1,"1% Fleet Penetration","2% Fleet Penetration"))]
+
+# extract the max demand from all data in each quarter hour time slot
+setkey(demand,infrastructure.scenario.named,penetration,taz,time)
+demand.sum <- demand[,list(peak.L0=max(pow.L0),peak.L2=max(pow.L2),peak.L3=max(pow.L3),Residential=max(residential),Public=max(public),peak.public.2=max(public.2),peak.public.3=max(public.3)),by=c('infrastructure.scenario.named','penetration','taz','time')]
+demand.sum[,':='(Total=peak.L0+peak.L2+peak.L3,charger.status=ifelse(infrastructure.scenario.named=='Existing Chargers','Existing Chargers','New Chargers'))]
+
+# naming stuff
+load(pp(pevi.shared,'data/UPSTATE/od.converter.Rdata'))
+demand.sum[,name:=od.converter$name[match(taz,od.converter$new.id)]]
+demand.sum[,':='(Time=time,time=NULL,Infrastructure.Scenario.Named=infrastructure.scenario.named,infrastructure.scenario.named=NULL,Penetration=penetration,penetration=NULL,Charger.Status=factor(charger.status),charger.status=NULL)]
+
+setkey(demand.sum,taz)
+
+for(taz.i in unique(demand.sum$taz)){
+  taz.name <- demand.sum[J(taz.i)]$name[1]
+
+	pdf(pp(pevi.shared,'data/UPSTATE/results/Charging Demand/Peak-Demand-TAZ-',taz.i,'-',taz.name,'.pdf'),width=11,height=8.5)
+	print(ggplot(melt(demand.sum[J(taz.i)][Charger.Status=="New Chargers"],id.vars=c('Time','Penetration','Infrastructure.Scenario.Named','Charger.Status'),measure.vars=c('Residential','Public','Total'),variable_name='Charger.Type'),aes(x=Time,y=value,group=Charger.Type,colour=Charger.Type))+geom_line()+facet_grid(Charger.Status~Penetration)+scale_x_continuous(limits=c(6,30),breaks=c(0,6,12,18,24,30))+ylab("Peak Charging Demand (kW)")+xlab("Simulation Time (hours)")+labs(title = taz.name))
+	dev.off()
+}
+
+# categorize as urban rural semi.urban
+demand.sum[,Zone.Type:=od.converter$type[match(taz,od.converter$new.id)]]
+levels(demand.sum$Zone.Type)<-c('Rural','Semiurban','Urban')
+setkey(demand.sum,Infrastructure.Scenario.Named,Penetration,Zone.Type,Time)
+
+demand.sum.sum <- demand.sum[Charger.Status=="New Chargers",list(p0=min(Total),p25=quantile(Total,.25),p50=median(Total),p75=quantile(Total,.75),p100=max(Total),Charger.Status=Charger.Status[1]),by=c('Infrastructure.Scenario.Named','Penetration','Zone.Type','Time')]
+
+ggplot(melt(demand.sum.sum,id.vars=c('Time','Penetration','Infrastructure.Scenario.Named','Zone.Type'),measure.vars=c('p0','p25','p50','p75','p100'),variable_name='Percentile'),aes(x=Time,y=value,group=Percentile,colour=Percentile))+geom_line()+facet_wrap(Zone.Type~Penetration)+scale_x_continuous(limits=c(6,30),breaks=c(0,6,12,18,24,30))+ylab("Peak Charging Demand (kW)")+xlab("Simulation Time (hours)")
 
 # Start the wrapper to pull out individual TAZ data
 for(taz.i in unique(demand$taz)){

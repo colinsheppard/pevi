@@ -144,3 +144,32 @@ ggsave(file=pp(pevi.shared,'data/UPSTATE/results/ghg/emt.pdf'),p,width=8,height=
 ddply(scens,.(penetration),function(df){
   data.frame(percent.of.light.duty=sum(df$co2.regs)/sum(subset(scens.1,is.na(penetration))$co2.regs)*100)
 })
+
+# load results from the excel based analysis (the final version of this work)
+
+for(fleet.scen in c('Total Vehicle Fleet','Light Duty Fleet')){
+  if(fleet.scen=='Light Duty Fleet'){
+    scens <- read.csv(pp(pevi.shared,'data/UPSTATE/ghg/GHG-Emissions-Analysis-Results.csv'))
+  }else{
+    scens <- read.csv(pp(pevi.shared,'data/UPSTATE/ghg/GHG-Emissions-Analysis-Results-WHOLE-FLEET.csv'))
+  }
+  no.pevs <- subset(scens,Scenario=="No PEVs")
+  for(scen in grep("No PEVs",unique(scens$Scenario),value=T,invert=T)){
+    no.pevs$Scenario <- scen
+    scens <- rbind(scens,no.pevs)
+  }
+  scens <- subset(scens,Scenario!="No PEVs")
+  #scens <- subset(scens,Scenario=="PEVS w/ EVSE")
+  scens$TOT <- scens$BEV + scens$GAS + scens$PHEV + scens$DSL
+  scens <- ddply(scens,.(County,Scenario),function(df){
+                 df$p.diff <- pp(roundC((1 - df$TOT / subset(df,Penetration==0)$TOT) * 100,2),'%')
+                 df
+  })
+  scens.m <- melt(scens[,1:(ncol(scens)-2)],id.vars=c('Scenario','Penetration','County'))
+  scens.m$variable <- factor(scens.m$variable,rev(c('BEV','PHEV','DSL','GAS')))
+  scens.m$value <- scens.m$value/1e3
+  p <- ggplot(scens.m,aes(x=factor(Penetration),y=value,fill=variable,order=variable)) + geom_bar(stat='identity',position='stack') + labs(x="Total Vehicle Fleet Penetration (%)",y=expression(paste("1000's Metric Tons ",CO[2],"e")),title=pp("Upstate ",fleet.scen," GHG Emissions with EVSE"),fill="Vehicle Type")+scale_fill_manual(values=c(my.grey,my.blue,my.purp,my.green)) + geom_text(aes(label=p.diff,y=1.03*max(scens$TOT)/1e3,fill=NA,order=NA),data=scens)
+  #p <- p + facet_wrap(~ County) 
+  p <- p + facet_grid(Scenario ~ County) 
+  ggsave(file=pp(pevi.shared,'data/UPSTATE/results/ghg/emissions-',fleet.scen,'.pdf'),p,width=10,height=8)
+}

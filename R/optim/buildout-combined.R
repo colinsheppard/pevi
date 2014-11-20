@@ -6,7 +6,7 @@ seed <- 20
 
 #optim.code <- 'min-cost-constrained-by-frac-stranded-50-50'
 #optim.code <- 'min-cost-constrained-by-frac-stranded-50-50-seed9'
-optim.code <- paste('linked2-50-50-seed',seed,sep='')
+optim.code <- paste('massive-test',seed,sep='')
 #optim.code <- 'linked-min-cost-constrained-by-frac-stranded-50-50'
 #optim.code <- 'linked-min-cost-constrained-by-frac-stranded-25-75'
 #optim.code <- 'linked-min-cost-constrained-by-frac-stranded-75-25'
@@ -16,8 +16,8 @@ optim.code <- paste('linked2-50-50-seed',seed,sep='')
 link.pens <- str_detect(optim.code,"linked")  # should the infrastructure from lower pens be used as starting place for higher? otherwise,
                 # infrastructure is reset to zero
 
-path.to.inputs <- pp(pevi.shared,'data/inputs/buildout/',optim.code,'/')
-path.to.outputs <- pp(pevi.shared,'data/outputs/buildout/',optim.code,'/')
+path.to.inputs <- pp(pevi.shared,'data/inputs/optim-new/',optim.code,'/')
+path.to.outputs <- pp(pevi.shared,'data/outputs/optim-new/',optim.code,'/')
 
 source(pp(pevi.home,"R/optim/buildout-functions.R"))
 source(pp(pevi.home,"R/reporters-loggers.R"))
@@ -29,11 +29,11 @@ if(!file.exists(pp(path.to.inputs,'params.txt'))){
 make.dir(path.to.outputs)
 
 # read the parameters and values to vary in the experiment
-vary <- yaml.load(readChar(pp(path.to.inputs,'../vary-linked2.yaml'),file.info(pp(path.to.inputs,'../vary-linked2.yaml'))$size))
+vary <- yaml.load(readChar(pp(path.to.inputs,'vary.yaml'),file.info(pp(path.to.inputs,'vary.yaml'))$size))
 for(file.param in names(vary)[grep("-file",names(vary))]){
   vary[[file.param]] <- pp(pevi.home,'netlogo/',vary[[file.param]])
 }
-naming <- yaml.load(readChar(pp(path.to.inputs,'../naming.yaml'),file.info(pp(path.to.inputs,'../naming.yaml'))$size))
+naming <- yaml.load(readChar(pp(path.to.inputs,'naming.yaml'),file.info(pp(path.to.inputs,'naming.yaml'))$size))
 
 # setup the data frame containing all combinations of those parameter values
 vary.tab.original <- expand.grid(vary,stringsAsFactors=F)

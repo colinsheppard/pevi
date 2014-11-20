@@ -297,8 +297,8 @@ to setup-in-batch-mode-from-gui
   clear-all-and-initialize
   set starting-seed 21
   set fix-seed TRUE
-  set param-file-base "/Users/critter/Dropbox/serc/pev-colin/pev-shared/"
-  set parameter-file "/Users/critter/Dropbox/serc/pev-colin/pevi/netlogo/params.txt"
+  set param-file-base "/Users/andy/Dropbox/serc/pev-shared/";"/Users/critter/Dropbox/serc/pev-colin/pev-shared/"
+  set parameter-file "/Users/andy/Dropbox/serc/pevi/netlogo/params.txt";"/Users/critter/Dropbox/serc/pev-colin/pevi/netlogo/params.txt"
   read-parameter-file
   set reference-charger-cost 0
   set reference-delay-cost 0

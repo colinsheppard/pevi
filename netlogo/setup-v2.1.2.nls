@@ -1,0 +1,623 @@
+;;;;;;;;;;;;;;;;;;;;;;;
+;; READ PARAMETER FILE
+;;;;;;;;;;;;;;;;;;;;;;;
+to read-parameter-file
+  ;print "read-parameter-file"
+  if parameter-file = 0 [ set parameter-file "params.txt" ]
+  if model-directory = 0 [ set model-directory "./" ]
+  if param-file-base = 0 [ user-message "Please select the pev-shared directory"
+    set param-file-base user-directory ]
+  set stranded-delay-threshold 3
+  ifelse (file-exists? parameter-file) [ 
+    file-close
+    file-open parameter-file
+    while [not file-at-end?][
+      let param-name file-read
+      ifelse param-name = "n-charger-types" [ set n-charger-types file-read ][  ; TODO, infer this from the od input file
+      ifelse param-name = "charge-safety-factor" [ set charge-safety-factor file-read ][
+      ifelse param-name = "charger-search-distance" [ set charger-search-distance file-read ][
+      ifelse param-name = "wait-time-mean" [ set wait-time-mean file-read ][
+      ifelse param-name = "time-opportunity-cost" [ set time-opportunity-cost file-read ][
+      ifelse param-name = "willing-to-roam-time-threshold" [ set willing-to-roam-time-threshold file-read ][
+      ifelse param-name = "frac-phev" [ set frac-phev file-read ][
+      ifelse param-name = "electric-fuel-consumption-sd" [ set electric-fuel-consumption-sd file-read ][
+      ifelse param-name = "electric-fuel-consumption-range" [ set electric-fuel-consumption-range file-read ][
+      ifelse param-name = "soft-strand-penalty" [ set soft-strand-penalty file-read ][
+      ifelse param-name = "hard-strand-penalty" [ set hard-strand-penalty file-read ][
+      ifelse param-name = "charger-lifetime" [ set charger-lifetime file-read ][
+      ifelse param-name = "weekend-factor" [ set weekend-factor file-read ][
+      ifelse param-name = "discount" [ set discount file-read ][
+      ifelse param-name = "starting-soc-file" [set starting-soc-file word param-file-base file-read ][
+      ifelse param-name = "wait-threshold-file" [set wait-threshold-file word param-file-base file-read ][
+      ifelse param-name = "ext-dist-time-file" [set ext-dist-time-file word param-file-base file-read ][
+      ifelse param-name = "charger-input-file" [ set charger-input-file word param-file-base file-read ][
+      ifelse param-name = "charger-type-input-file" [ set charger-type-input-file word param-file-base file-read ][
+      ifelse param-name = "driver-input-file" [ set driver-input-file word param-file-base file-read ][
+      ifelse param-name = "od-input-file" [ set od-input-file word param-file-base file-read ][
+      ifelse param-name = "vehicle-type-input-file" [ set vehicle-type-input-file word param-file-base file-read ][
+      ifelse param-name = "outputs-directory" [ set outputs-directory word model-directory file-read ][
+      ifelse param-name = "probability-of-unneeded-charge" [ set probability-of-unneeded-charge file-read ][
+      ifelse param-name = "stranded-delay-threshold" [ set stranded-delay-threshold file-read ][
+      ifelse param-name = "charger-permission-file" [set charger-permission-file word param-file-base file-read ][ 
+      ifelse param-name = "assign-phevs-to-extreme-drivers" [set assign-phevs-to-extreme-drivers file-read ][ 
+      ifelse param-name = "num-simulation-days" [set num-simulation-days file-read ][
+      ]]]]]]]]]]]]]]]]]]]]]]]]]]]]
+    ]
+    file-close
+  ][ 
+    error (word "Input file '" parameter-file "' not found!") 
+  ]
+  ;; ASSING DEFAULT VALUES TO UNSET VARIABLES OR IMPOSSIBLE VALUES
+  if num-simulation-days <= 0 [ set num-simulation-days 1 ]
+end
+
+;;;;;;;;;;;;;;;;;;;;
+;; SETUP OD DATA
+;;;;;;;;;;;;;;;;;;;;
+to setup-od-data
+  ;print "setup-od-data"
+  ; Reads in main driver input file: Origin, destination, # of trips, distance, time
+  set od-from   n-values 1 [0] 
+  set od-to     n-values 1 [0] 
+  set od-dist   n-values 1 [0] 
+  set od-time   n-values 1 [0] 
+  set od-enroute n-values 1 [n-values (0) [0]] 
+  set od-performance   n-values 1 [0]
+  
+  ifelse (file-exists? od-input-file) [
+    file-close
+    file-open od-input-file
+    while [not file-at-end?] [
+     set od-from lput file-read od-from
+     set od-to lput file-read od-to
+     set od-dist lput file-read od-dist 
+     set od-time lput file-read od-time
+     set od-enroute lput split file-read "," od-enroute
+     set od-performance lput file-read od-performance
+    ]
+    file-close
+    set od-from   remove-item 0 od-from 
+    set od-to     remove-item 0 od-to
+    set od-dist   remove-item 0 od-dist
+    set od-time   remove-item 0 od-time
+    set od-enroute remove-item 0 od-enroute 
+    set od-performance   remove-item 0 od-performance
+    set n-tazs sqrt length od-from
+  ][ 
+    error (word "Input file '" od-input-file "' not found!") 
+  ]
+end 
+
+;;;;;;;;;;;;;;;;;;;;
+;; SPLIT
+;; Helper function written by jimlyons37: http://groups.yahoo.com/group/netlogo-users/message/6490
+;; Adapted by Colin to allow empty string as argument and assumes elements are numbers, not strings
+;;;;;;;;;;;;;;;;;;;;
+to-report split [ #string #sep ] ; #sep must be non-empty string
+  let result [] ; return value
+  let w length #sep
+  if length #string = 0 [ report result ]
+  loop[ ; exit when done
+    let next-pos position #sep #string
+    if not is-number? next-pos [ report reverse (fput read-from-string #string result) ]
+    set result fput read-from-string (substring #string 0 next-pos) result
+    set #string substring #string (next-pos + w) (length #string)
+  ]
+end
+
+;;;;;;;;;;;;;;;;;;;;
+;; SETUP TAZS
+;;;;;;;;;;;;;;;;;;;;
+to setup-tazs
+  ;print "setup-tazs"
+  set taz-table table:make
+  ;create-tazs n-tazs
+  ifelse (file-exists? charger-input-file) [
+    file-close
+    file-open charger-input-file
+    while [not file-at-end?] [
+      create-tazs 1 [
+        set shape "star"
+        set color yellow
+        set size 0.5
+        set n-levels n-values n-charger-types [-99] 
+        set chargers-by-type n-values n-charger-types [0]
+        set available-chargers-by-type n-values n-charger-types [0]
+        set id file-read
+        table:put taz-table id self
+        foreach n-values n-charger-types [?] [
+          set n-levels replace-item ? n-levels file-read ; sets the number of level X chargers in each TAZ
+          set available-chargers-by-type replace-item ? available-chargers-by-type structs:new-stack
+        ]
+        set neighbor-tazs n-values 0 [0]
+      ] ; end create-taz commands
+    ] ; end while loop
+    ask tazs [
+      foreach table:keys taz-table [ ;n-values n-tazs [? + 1] [
+        if (id > 0) and (? > 0) and not (? = id) and (distance-from-to id ? <= charger-search-distance) [
+          set neighbor-tazs fput table:get taz-table ? neighbor-tazs;taz ? neighbor-tazs
+        ]
+      ]
+    ]
+  ]
+  [ error (word "Input file '" charger-input-file "' not found!")]
+  ; turn tutrle 0 into the TAZ for homeless drivers
+  ask turtle 0 [
+    set breed tazs
+    table:put taz-table 0 self
+    set n-levels n-values 6 [0]
+    set chargers-by-type n-values n-charger-types [0]
+  ] 
+end ;setup-tazs
+
+;;;;;;;;;;;;;;;;;;;;;;;
+;; CONVERT ENROUTE IDS
+;;;;;;;;;;;;;;;;;;;;;;;
+to convert-enroute-ids
+  foreach n-values length od-enroute [?] [
+    let old-enroute-list item ? od-enroute
+    foreach n-values length old-enroute-list [?] [
+      set old-enroute-list replace-item ? old-enroute-list (taz item ? old-enroute-list)
+    ]
+    set od-enroute replace-item ? od-enroute old-enroute-list
+  ]
+end
+
+;;;;;;;;;;;;;;;;;;;;
+;; SETUP DRIVERS
+;;;;;;;;;;;;;;;;;;;;
+to setup-drivers
+  ;print "setup-drivers"
+  
+  setup-vehicle-types
+  setup-itinerary
+  
+  ; assing driver vehicles to a vehicle type
+  ; first deal with drivers that must belong to certain vehicle types due to lengthy trips in their itinerary
+  let #bev-types vehicle-types with [is-bev?]
+  let #phev-types sort vehicle-types with [not is-bev?]
+  let #used-bev-types n-values 0 [?]
+  while [count #bev-types > 0][
+    ask max-one-of #bev-types [ battery-capacity / electric-fuel-consumption ][     
+      ; find the drivers that can't make their longest trip using the current bev type
+      let #impossible-drivers drivers with [
+        assign-phevs-to-extreme-drivers and this-vehicle-type = nobody and 
+        (
+          max-trip-distance * charge-safety-factor > [battery-capacity] of myself / [electric-fuel-consumption] of myself or
+          journey-distance * charge-safety-factor > (min(sentence (max-dwell-time * 6.6 / charge-safety-factor) [battery-capacity] of myself) + [battery-capacity] of myself) / [electric-fuel-consumption] of myself
+        )
+      ]
+      ;show (word (count #impossible-drivers) " needing more range")
+      
+      ; find the other vehicle types that can be assigned to this driver (must check whether their num-drivers is over quota yet)
+      let #available-types n-values 0 [?]
+      foreach (sentence #phev-types #used-bev-types) [
+        if [num-vehicles] of ? / count drivers < [frac-of-pevs] of ? [
+           set #available-types lput ? #available-types
+        ] 
+      ]
+      ;show (word "available types: " #available-types)
+      
+      ; now do the assignmnets
+      ask #impossible-drivers [
+        if length #available-types = 0 [ error "There are too many drivers with trips longer than the range of the BEVs types provided and not enough longer range BEVs and/or PHEVs to acommodate them" ]
+        set this-vehicle-type one-of #available-types
+        set type-assignment-code 1
+        ask this-vehicle-type [ set num-vehicles num-vehicles + 1 ]
+        if [num-vehicles] of this-vehicle-type / count drivers >= [frac-of-pevs] of this-vehicle-type [
+          set #available-types remove this-vehicle-type #available-types
+        ]
+      ]
+      set #bev-types #bev-types with [self != myself]
+      set #used-bev-types lput self #used-bev-types
+    ]
+  ]
+  
+  ; second assign the remaining vehicle types to drivers according to the remainder
+  let #unassinged-drivers sort drivers with [this-vehicle-type = nobody]
+  ;print length #unassinged-drivers / count drivers 
+  let #available-types vehicle-types with [(frac-of-pevs * count drivers) - num-vehicles > 0 ]
+  ask #available-types [  
+    while[(frac-of-pevs * count drivers) - num-vehicles > 0 and length #unassinged-drivers > 0 ][
+      ask one-of #unassinged-drivers [
+        set this-vehicle-type myself
+        set type-assignment-code 2
+        set #unassinged-drivers remove self #unassinged-drivers 
+      ]
+      set num-vehicles num-vehicles + 1
+    ]
+  ]
+  ; if drivers remaing unassigned, give them a PHEV
+  ask drivers with [this-vehicle-type = nobody] [
+    set this-vehicle-type one-of vehicle-types with [not is-bev?]
+    set type-assignment-code 3
+  ]
+end ; setup-drivers
+
+to initialize-drivers
+  set soc-cumulative-fraction   n-values 1 [0] 
+  set start-soc     n-values 1 [0] 
+  set wait-threshold-cumulative-fraction   n-values 1 [0] 
+  set wait-threshold-value    n-values 1 [0] 
+  ifelse (file-exists? starting-soc-file) [
+    file-close
+    file-open starting-soc-file
+    while [not file-at-end?] [
+     set soc-cumulative-fraction lput file-read soc-cumulative-fraction
+     set start-soc lput file-read start-soc
+    ]
+    file-close
+    set soc-cumulative-fraction   remove-item 0 soc-cumulative-fraction 
+    set start-soc    remove-item 0 start-soc
+  ][print(word "Input file '" starting-soc-file "' not found, defaulting to uniform distribution")]
+
+  ifelse (file-exists? wait-threshold-file) [
+    file-close
+    file-open wait-threshold-file
+    while [not file-at-end?] [
+     set wait-threshold-cumulative-fraction lput file-read wait-threshold-cumulative-fraction
+     set wait-threshold-value lput file-read wait-threshold-value
+    ]
+    file-close
+    set wait-threshold-cumulative-fraction   remove-item 0 wait-threshold-cumulative-fraction 
+    set wait-threshold-value   remove-item 0 wait-threshold-value
+  ][print(word "Input file '" wait-threshold-cumulative-fraction "' not found, defaulting to uniform distribution")]
+  
+  ; finally initialize driver state variables
+  ask drivers [    
+    ifelse batch-setup? [
+;      if this is a batch setup, reset the intinerary, go back to the starting row, clear the old variables,
+;      and schedule the first departure.
+      set itin-to master-itin-to
+      set itin-from master-itin-from
+      set itin-depart master-itin-depart
+      set itin-complete? false
+      set current-itin-row -1
+      set itin-complete? false
+      set journey-distance item 0 master-journey-distance-list
+      set total-journey-distance master-total-journey-distance
+      update-itinerary
+      set state-of-charge master-state-of-charge
+      set electric-fuel-consumption master-electric-fuel-consumption
+      time:schedule-event self task morning-charge 0 
+    ][
+      set current-itin-row -1
+      set shape "car"
+      set color green
+      set size 2
+      set is-bev? [is-bev?] of this-vehicle-type
+      set battery-capacity [battery-capacity] of this-vehicle-type
+      set hybrid-fuel-consumption [hybrid-fuel-consumption] of this-vehicle-type
+      
+      let electric-fuel-consumption-mean [electric-fuel-consumption] of this-vehicle-type
+      set electric-fuel-consumption random-normal electric-fuel-consumption-mean electric-fuel-consumption-sd
+      while [abs (electric-fuel-consumption - electric-fuel-consumption-mean) > electric-fuel-consumption-range / 2][
+        set electric-fuel-consumption random-normal electric-fuel-consumption-mean electric-fuel-consumption-sd
+      ]
+      set master-electric-fuel-consumption electric-fuel-consumption
+
+ ;     ifelse is-bev? [
+      let #rand-draw random-float 1
+      ifelse not (home-taz = taz 0 and item 0 itin-from < 0) [ ; v. 2.1.1 change: external-TAZ homeless drivers start with a full state of charge.
+        ifelse file-exists? starting-soc-file [
+          set state-of-charge interpolate-from-draw #rand-draw soc-cumulative-fraction start-soc
+        ][
+          set state-of-charge #rand-draw 
+        ]
+      ][
+        set state-of-charge 1
+      ]
+      set master-state-of-charge state-of-charge
+      
+      let #rand-draw-wait random-float 1
+      set wait-threshold interpolate-from-draw #rand-draw-wait wait-threshold-cumulative-fraction wait-threshold-value
+          
+      update-itinerary
+      
+      set state "not-charging"
+      set current-charger nobody
+      set energy-used 0
+      set energy-received 0
+      set expenses 0
+      set miles-driven 0
+      set num-denials 0
+      set full-charge-time-need 0
+      set time-until-end-charge 0
+      set gasoline-used 0 
+      set itin-complete? false
+      time:schedule-event self task morning-charge 0 
+    ]
+  ]
+end ;initialize-drivers
+
+;;;;;;;;;;;;;;;;;;;;
+;; SETUP VEHICLE TYPES
+;;;;;;;;;;;;;;;;;;;;
+to setup-vehicle-types
+  ;print "setup-vehicle-types"
+  
+  ifelse (file-exists? vehicle-type-input-file) [
+    file-close
+    file-open vehicle-type-input-file
+    let #cumul-frac-pevs 0
+    while [file-at-end? = false] [
+      create-vehicle-types 1 [
+        set name file-read
+        set electric-fuel-consumption file-read
+        set hybrid-fuel-consumption file-read
+        set battery-capacity file-read
+        set frac-of-pevs file-read
+        set #cumul-frac-pevs #cumul-frac-pevs + frac-of-pevs
+        set is-bev? (hybrid-fuel-consumption <= 0)
+        set num-vehicles 0
+      ]
+    ]
+    file-close
+    if #cumul-frac-pevs != 1 [
+       error (word "Vehicle type fractions do not sum to 1.")
+    ]
+  ][ 
+    error (word "Input file '" vehicle-type-input-file "' not found!") 
+  ]
+end 
+
+;;;;;;;;;;;;;;;;;;;;
+;; SETUP INTINERARY
+;;;;;;;;;;;;;;;;;;;;
+to setup-itinerary
+  ;print "setup-itinerary"
+  setup-external-dist-time
+  ifelse (file-exists? driver-input-file) [
+    file-close
+    file-open driver-input-file
+   
+    let this-itin true
+    let next-driver file-read
+    let this-driver 0
+    while [file-at-end? = false] [
+      set this-driver next-driver
+      create-drivers 1 [
+        set id this-driver
+        set itin-from n-values 1 [file-read]
+        set itin-to n-values 1 [file-read]
+        set itin-depart n-values 1 [file-read]
+        set home-taz table:get taz-table file-read
+        let #rand-draw random-float 1
+        set external-time interpolate-from-draw #rand-draw ext-taz-cumulative-fraction external-time-bound
+        set external-dist interpolate-from-draw #rand-draw ext-taz-cumulative-fraction external-dist-bound
+        ;set wait-threshold interpolate-from-draw random-float 1 [0 1] [0.5 2]
+        let itin-row 0
+        set total-journey-distance (distance-from-to item itin-row itin-to item itin-row itin-from)
+        set master-journey-distance-list n-values 1 [total-journey-distance]
+        set max-trip-distance total-journey-distance
+        set max-dwell-time 0
+        set this-vehicle-type nobody
+        if file-at-end? = false [
+          set next-driver file-read
+          set this-itin true
+          while [next-driver = this-driver] [  
+            set itin-from  lput file-read itin-from
+            set itin-to  lput file-read itin-to
+            set itin-depart lput file-read itin-depart
+            set itin-row itin-row + 1
+            let #this-trip-distance (distance-from-to item itin-row itin-to item itin-row itin-from)
+            set total-journey-distance (total-journey-distance + #this-trip-distance)
+            ifelse floor (item itin-row itin-depart / 24) > (length master-journey-distance-list - 1) [
+              set master-journey-distance-list lput #this-trip-distance master-journey-distance-list
+            ][
+              set master-journey-distance-list replace-item (floor (item itin-row itin-depart / 24)) master-journey-distance-list (item floor (item itin-row itin-depart / 24) master-journey-distance-list + #this-trip-distance)
+            ]
+            if max-trip-distance < #this-trip-distance [
+              set max-trip-distance #this-trip-distance
+            ]
+            if max-dwell-time < (item itin-row itin-depart - ((item (itin-row - 1) itin-depart) + (item (od-index item itin-row itin-to item itin-row itin-from) od-time))) [
+              set max-dwell-time (item itin-row itin-depart - ((item (itin-row - 1) itin-depart) + (item (od-index item itin-row itin-to item itin-row itin-from) od-time)))
+            ]
+            if not (home-taz = table:get taz-table file-read) [ error (word "Inconsistent home taz specified for driver " id ) ]
+            ifelse file-at-end? [ set next-driver -1][ set next-driver file-read ]
+          ] ; end while this-itin
+        ]
+        set master-journey-distance-list lput item (length master-journey-distance-list - 1) master-journey-distance-list master-journey-distance-list
+        set itin-change-flag n-values length itin-depart [0]
+        set itin-delay-amount n-values length itin-depart [0]
+        set master-itin-from itin-from ; set master variables for batch setup
+        set master-itin-to itin-to
+        set master-itin-depart itin-depart
+        set journey-distance item 0 master-journey-distance-list
+        set master-total-journey-distance total-journey-distance
+        set permission-list []
+      ] ; end create-drivers
+    ] ; end while file-at-end
+  ] ; end ifelse
+  [ error (word "Input file '" driver-input-file "' not found!") ]
+  file-close
+end ;setup-itinerary
+
+;;;;;;;;;;;;;;;;;;;;
+;; SETUP CHARGER-TYPES
+;;;;;;;;;;;;;;;;;;;;
+to setup-charger-types
+  ;print "setup-charger-types"
+  
+  ifelse (file-exists? charger-type-input-file) [
+    file-close
+    file-open charger-type-input-file
+    while [file-at-end? = false] [
+      create-charger-types 1 [
+        set level file-read
+        set charge-rate file-read
+        set energy-price file-read
+        set installed-cost file-read
+      ]
+    ]
+    file-close
+  ][ 
+    error (word "Input file '" charger-type-input-file "' not found!") 
+  ]
+end 
+
+;;;;;;;;;;;;;;;;;;;;
+;; SETUP CHARGERS
+;;;;;;;;;;;;;;;;;;;;
+to setup-chargers
+  ;print "setup-chargers"
+  ; The charger level, location, and quantity of chargers was read in during setup-tazs.
+  ; Now chargers of each level are created at the appropriate taz.
+  ; Charger-rate is currently a separate state variable from charger level. We may want to combine the two later, if
+  ; we do not use "charger level" for anything else.
+
+  ; At each taz,  chargers equal to "taz-chargers"are created.
+  foreach table:keys taz-table [
+    let #this-taz table:get taz-table ?
+    ; #this-taz is the taz agent #this-taz
+    ; ? is the id
+    create-chargers [item 0 n-levels] of #this-taz [  ; The location of each charger created is then set as the current TAZ location
+      set this-charger-type one-of charger-types with [level = 0]
+      set location #this-taz
+    ]
+    create-chargers [item 1 n-levels] of #this-taz [  ; The location of each charger created is then set as the current TAZ location
+      set this-charger-type one-of charger-types with [level = 1]
+      set location #this-taz
+    ]
+    create-chargers [item 2 n-levels] of #this-taz [  ; The location of each charger created is then set as the current TAZ location
+      set this-charger-type one-of charger-types with [level = 2]
+      set location #this-taz
+    ]
+    create-chargers [item 3 n-levels] of #this-taz [  ; The location of each charger created is then set as the current TAZ location
+      set this-charger-type one-of charger-types with [level = 3]
+      set location #this-taz
+    ]
+    create-chargers [item 4 n-levels] of #this-taz [  ; The location of each charger created is then set as the current TAZ location
+      set this-charger-type one-of charger-types with [level = 4]
+      set location #this-taz
+    ]
+    ;create-chargers [item 5 n-levels] of #this-taz [  ; The location of each charger created is then set as the current TAZ location
+    ;  set this-charger-type one-of charger-types with [level = 5]
+    ;  set location #this-taz
+    ;]
+    foreach n-values n-charger-types [?] [
+      ask #this-taz [
+        set chargers-by-type replace-item ? chargers-by-type chargers with [([level] of this-charger-type = ?) and (location = myself)]
+      ]
+    ]
+  ]
+  
+  setup-special-chargers
+    
+  initialize-available-chargers
+  ask chargers [
+    set shape "Circle 2"
+    set color red
+    set size 1
+    set current-driver nobody
+    let #level [level] of this-charger-type
+    set energy-delivered 0
+  ]
+end ;setup-chargers
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;; SETUP SPECIAL PERMISSION CHARGERS
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+to setup-special-chargers
+  ifelse (charger-permission-file != 0) [
+    ifelse (file-exists? charger-permission-file) [
+      file-close
+      file-open charger-permission-file
+      while [file-at-end? = false] [
+        create-chargers 1 [
+          set location taz file-read
+          let #my-level file-read
+          set this-charger-type one-of charger-types with [level = #my-level]
+          set alt-energy-price file-read
+          let priviledged-drivers read-from-string (word "[" file-read-line "]") ; handy trick from http://stackoverflow.com/questions/10244850/read-file-lines-with-spaces-into-netlogo-as-lists
+          foreach priviledged-drivers [
+            ask drivers with [id = ?] [
+              set permission-list lput myself permission-list
+            ]
+          ]
+        ]
+      ]
+      file-close
+    ][ 
+      error (word "Input file '" charger-permission-file "' not found!") 
+    ]
+  ][
+    ;print "No special-permission-charger-file specified."
+  ]
+end ;setup-special-chargers
+  
+;;;;;;;;;;;;;;;;;;;;
+;; LOG DATA
+;;;;;;;;;;;;;;;;;;;;
+to log-data [logfile data-list]
+  if (logfile = "wait-time" and log-wait-time) or
+     (logfile = "charging" and log-charging) or
+     (logfile = "pain" and log-pain) or
+     (logfile = "tazs" and log-tazs) or
+     (logfile = "trip" and log-trip) or
+     (logfile = "charge-time" and log-charge-time) or
+     (logfile = "seek-charger" and log-seek-charger) or
+     (logfile = "seek-charger-result" and log-seek-charger-result) or
+     (logfile = "need-to-charge" and log-need-to-charge) or
+     (logfile = "trip-journey-timeuntildepart" and log-trip-journey-timeuntildepart) or
+     (logfile = "break-up-trip" and log-break-up-trip) or
+     (logfile = "break-up-trip-choice" and log-break-up-trip-choice) or
+     (logfile = "available-chargers" and log-break-up-trip-choice) or     
+     (logfile = "charge-limiting-factor" and log-charge-limiting-factor) or
+     (logfile = "drivers" and log-drivers) or
+     (logfile = "summary") or 
+     (logfile = "driver-summary")
+  [
+    open-logfile logfile
+    file-print reduce [(word ?1 "," ?2)] data-list
+    file-flush
+  ]
+end
+
+;;;;;;;;;;;;;;;;;;;;
+;; OPEN LOGFILE
+;;;;;;;;;;;;;;;;;;;;
+to open-logfile [logfile]
+  file-close
+  file-open (word outputs-directory logfile "-out.csv" )
+end
+
+;;;;;;;;;;;;;;;;;;;;
+;; RESET LOGFILE
+;;;;;;;;;;;;;;;;;;;;
+to reset-logfile [logfile]
+  file-close
+  if file-exists? (word outputs-directory logfile "-out.csv") [ file-delete (word outputs-directory logfile "-out.csv") ]
+end
+
+to log-driver [event-name]
+  log-data "drivers" (sentence precision ticks 3 [id] of self event-name state-of-charge)
+end
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;; SETUP-EXTERNAL-DISTANCES
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+to setup-external-dist-time
+  set ext-taz-cumulative-fraction n-values 1 [0]
+  set external-dist-bound n-values 1 [0]
+  set external-time-bound n-values 1 [0]
+  ifelse (file-exists? ext-dist-time-file) [
+    file-close
+    file-open ext-dist-time-file
+    while [not file-at-end?] [
+     set ext-taz-cumulative-fraction lput file-read ext-taz-cumulative-fraction
+     set external-dist-bound lput file-read external-dist-bound
+     set external-time-bound lput file-read external-time-bound
+    ]
+    file-close
+    set ext-taz-cumulative-fraction   remove-item 0 ext-taz-cumulative-fraction 
+    set external-dist-bound    remove-item 0 external-dist-bound
+    set external-time-bound    remove-item 0 external-time-bound
+  ][
+    print(word "Input file '" ext-dist-time-file "' not found, using default.")
+    set ext-taz-cumulative-fraction list 0 1
+    set external-dist-bound list 0 100
+    set external-time-bound list 0 1.5
+  ]
+end

@@ -23,7 +23,8 @@ num.ch.to.cost <- function(df){
 # unfortunately, results from res-none are worthless
 #scenarios <- c('base','res-none','homeless','half-homeless')
 #scenarios <- c('homeless','half-homeless','no-homeless')
-scenarios <- c('homeless','half-homeless','no-homeless','swap','veh-high','veh-low','opp-cost-high',pp('cheap-l',1:4),'congested')
+#scenarios <- c('homeless','half-homeless','no-homeless','swap','veh-high','veh-low','opp-cost-high',pp('cheap-l',1:4),'congested')
+scenarios <- c('half-homeless')
 scen.names <- yaml.load(readChar(pp(pevi.shared,'data/inputs/optim-new/scenarios.yaml'),file.info(pp(pevi.shared,'data/inputs/optim-new/scenarios.yaml'))$size))
 
 refactor.scen <- function(x,base='Base'){
@@ -60,8 +61,8 @@ for(optim.code in scenarios){
   charger.data <- read.table(pp(pevi.shared,param.file.data$charger.type.input.file),header=TRUE)
   names(charger.data) <- c('level',tail(names(charger.data),-1))
   charger.types[[optim.code]] <- charger.data
-  for(seed in c(52:62)){
-  #for(seed in c(30:39)){
+  #for(seed in c(52:62)){
+  for(seed in c(60:63)){
     if(seed < 30 & optim.code != 'swap')next
     hist.file <- pp(pevi.shared,'data/outputs/optim-new/delhi-',optim.code,'-seed',seed,'/charger-buildout-history.Rdata')
     final.evse.file <- pp(pevi.shared,'data/outputs/optim-new/delhi-',optim.code,'-seed',seed,'/delhi-',optim.code,'-seed',seed,'-pen2-final-infrastructure.txt')

@@ -75,11 +75,12 @@ if("vehicle-type-input-file" %in% names(vary)){
   }
 }
 if(exp.name=='delhi-animation' | exp.name=='delhi-battery-swap' | exp.name=='consistent-vs-quadrupled'){
-  results <- subset(results,(penetration==0.5 & infrastructure.scenario=='delhi-final-rec-pen-0.5') |                     (penetration==1 & infrastructure.scenario=='delhi-final-rec-pen-1') | 
+  results <- subset(results,(penetration==0.5 & infrastructure.scenario=='delhi-final-rec-pen-0.5') | 
+                    (penetration==1 & infrastructure.scenario=='delhi-final-rec-pen-1') | 
                     (penetration==2 & infrastructure.scenario=='delhi-final-rec-pen-2') |
                     (penetration==0.5 & infrastructure.scenario=='delhi-final-with-swap-pen-0.5') | 
                     (penetration==1 & infrastructure.scenario=='delhi-final-with-swap-pen-1') | 
-                    (penetration==2 & infrastructure.scenario=='delhi-final-with-swap-pen-2')) &
+                    (penetration==2 & infrastructure.scenario=='delhi-final-with-swap-pen-2') &
                     ((num.simulation.days==2 & itin.scenario=='consistent') |
                     (num.simulation.days==4 & itin.scenario=='quadrupled'))
                     )
@@ -88,7 +89,7 @@ if(exp.name=='delhi-animation' | exp.name=='delhi-battery-swap' | exp.name=='con
 # start NL
 tryCatch(NLStart(nl.path, gui=F),error=function(err){ NA })
 #model.path <- paste(pevi.home,"netlogo/PEVI.nlogo",sep='')
-model.path <- paste(pevi.home,"netlogo/PEVI-v2.1.1.nlogo",sep='')
+model.path <- paste(pevi.home,"netlogo/PEVI-v2.1.2.nlogo",sep='')
 NLLoadModel(model.path)
 
 for(cmd in paste('set log-',logfiles,' false',sep='')){ NLCommand(cmd) }
@@ -152,7 +153,7 @@ if(length(grep("animation",path.to.inputs))>0){
     file.remove(paste(outputs.dir,logger,"-out.csv",sep=''))
   }
 }
-save(logs,file=paste(path.to.inputs,'logs.Rdata',sep=''))
+save(logs,file=paste(path.to.inputs,'logs-veh-scens-v2.1.2.Rdata',sep=''))
 #load(paste(path.to.inputs,'logs.Rdata',sep=''))
 
 #######################################
@@ -186,14 +187,43 @@ for(log.file in to.log){
     }
   }
 }
-save(logs,file=paste(path.to.inputs,'logs-v2.1.1.Rdata',sep=''))
+save(logs,file=paste(path.to.inputs,'logs-veh-scens-v2.1.2.Rdata',sep=''))
 #load(paste(path.to.inputs,'logs.Rdata',sep=''))
 
 #######################################
 # ANALYSIS
 #######################################
 
+############################
+# Irreducible Delay Analysis
+############################
+
+#load(paste(path.to.inputs,'logs-v2.1.2.Rdata',sep=''))
+results <- data.table(logs[['results']])
+results[,':='(driver.input.file=NULL,charger.input.file=NULL,itin.scenario=NULL,itin.scenario.named=NULL,itin.scenario.order=NULL)]
+results <- results[!is.na(infrastructure.scenario.named)]
+results <- results[pp('Chargers for ',penetration,'%') == infrastructure.scenario.named]
+setkey(results,penetration)
+mean.results <- results[,list(num.drivers=mean(num.drivers),objective=mean(objective),total.delay=mean(total.delay),total.delay.cost=mean(total.delay.cost),num.stranded=mean(num.stranded)),by='penetration']
+
+pain <- data.table(subset(logs[['pain']],pain.type%in%c("delay","stranded")))
+pain[,':='(driver.input.file=NULL,charger.input.file=NULL,itin.scenario=NULL,itin.scenario.named=NULL,itin.scenario.order=NULL)]
+pain <- pain[!is.na(infrastructure.scenario.named)]
+pain <- pain[pp('Chargers for ',penetration,'%') == infrastructure.scenario.named]
+setkey(pain,penetration,replicate,pain.type)
+pain.by.type <- pain[,list(pain.value=sum(pain.value,na.rm=T),num=length(pain.value)),by=c('penetration','replicate','pain.type')]
+pain.by.type <- pain.by.type[,list(pain.value=mean(pain.value,na.rm=T),num=mean(num)),by=c('penetration','pain.type')]
+
+#load(paste(path.to.inputs,'logs-veh-scens.Rdata',sep=''))
+results.veh <- data.table(logs[['results']])
+results.veh[,':='(driver.input.file=NULL,vehicle.type.input.file=NULL,itin.scenario=NULL,itin.scenario.named=NULL,itin.scenario.order=NULL)]
+setkey(results.veh,penetration,vehicle.scenario.named)
+mean.results.veh <- results.veh[,list(num.drivers=mean(num.drivers),objective=mean(objective),total.delay=mean(total.delay),total.delay.cost=mean(total.delay.cost),num.stranded=mean(num.stranded)),by=c('penetration','vehicle.scenario.named')]
+mean.results.veh[vehicle.scenario.named=="All High"]
+
+############################
 # Charger utilization for pen 1%
+############################
 ggplot(ddply(subset(logs[['charging']],penetration==1 & charger.level>0),.(charger.id),nrow),aes(x=V1/2))+geom_histogram(binwidth=1)+labs(x="# of Drivers Served by Individual Chargers per Day")
 
 num.chargers <- list()
@@ -276,6 +306,11 @@ for(log in c('pain','charging','results')){
 load(pp(pevi.shared,"data/inputs/compare/delhi-consistent-vs-quadrupled/logs-v2.1.1.Rdata")) # after morning charging and external homelessness fixes
 for(log in c('pain','charging','results')){
   logs[[log]]$pevi <- '2.1.1 Fixes'
+  all.logs[[log]] <- rbind(all.logs[[log]],logs[[log]])
+}
+load(pp(pevi.shared,"data/inputs/compare/delhi-consistent-vs-quadrupled/logs-v2.1.2.Rdata")) # after external time/distance and destination charging fixes
+for(log in c('pain','charging','results')){
+  logs[[log]]$pevi <- '2.1.2 Fixes'
   all.logs[[log]] <- rbind(all.logs[[log]],logs[[log]])
 }
 ggplot(subset(all.logs[['pain']],pain.type%in%c("delay","stranded") & penetration==1 & replicate==1),aes(x=time,y=state.of.charge,colour=pain.type,shape=vehicle.type))+geom_point()+facet_grid(pevi ~ itin.scenario.named)

@@ -1,4 +1,4 @@
-amndSys.setenv(NOAWT=1)
+Sys.setenv(NOAWT=1)
 options(java.parameters="-Xmx2048m")
 load.libraries(c('ggplot2','yaml','RNetLogo','plyr','reshape','stringr'))
 

@@ -13,7 +13,7 @@ dumb.time.to.hours <- function(x){
   floored + (x-floored*100)/60
 }
 
-do.or.load(pp(pevi.shared,'data/DELHI/itin-generation/hh-survey.Rdata'),function(){
+do.or.load(pp(pevi.shared,'data/DELHI/itin-generation/hh-survey-with-2wheelers.Rdata'),function(){
   mode.codes <- rbind(read.csv(pp(pevi.shared,'data/DELHI/tdfs-data/mode-codes.csv')),data.frame(mode.id=0,name=""))
   hh <- read.csv(pp(pevi.shared,'data/DELHI/tdfs-data/hh-survey.csv'))
   hh$key <- pp(hh$FORM_NO,hh$T_ZONE,hh$MEMNO,hh$TRIP_NO,sep='-')
@@ -61,7 +61,7 @@ do.or.load(pp(pevi.shared,'data/DELHI/itin-generation/hh-survey.Rdata'),function
   # inspect the resulting speed distributions
   #ggplot(hh,aes(x=speed))+geom_histogram()+facet_wrap(~mode,scales="free")
   # get rid of modes we're not interested in
-  hh <- hh[mode %in% c('Car','Auto','Shared Auto','Shared Taxi','Taxi','Pool Car')]
+  hh <- hh[mode %in% c('Car','Auto','Shared Auto','Shared Taxi','Taxi','Pool Car','Two Wheeler')]
 
   setkey(hh,'form','taz','mem')
   hh.uniq <- unique(hh)[,list(form,taz,mem)]
@@ -108,7 +108,7 @@ do.or.load(pp(pevi.shared,'data/DELHI/road-network/routing-with-gateways.Rdata')
 
 # Make some plots to describe the HH data and OD distance distribution
 if(F){
-  hh$mode <- factor(hh$mode,levels=c('Auto','Shared Auto','Car','Pool Car','Taxi','Shared Taxi'))
+  hh$mode <- factor(hh$mode,levels=c('Auto','Shared Auto','Car','Pool Car','Taxi','Shared Taxi','Two Wheeler'))
   ggplot(subset(hh,dist<100),aes(x=dist))+geom_histogram()+facet_wrap(~mode)+labs(x="Distance (km)",y="Count",title=pp("Travel Distances from RITES Household Survey (n=",nrow(subset(hh,dist<100)),")"))
   ggplot(hh.per,aes(x=factor(V1)))+geom_histogram()+labs(x="Trips per Person-Day",y="Count",title=pp("Trips per Person-Day from RITES Household Survey (n=",nrow(hh.per),")"))
   ggplot(hh,aes(x=depart))+geom_histogram(binwidth=1)+facet_wrap(~home.start)+labs(x="Departure Time",y="Count",title=pp("Departure Times by whether they begin from home")) + scale_x_continuous(limits=c(0,24))
@@ -121,7 +121,7 @@ if(F){
     data.frame(km=unlist(apply(as.matrix(df),1,function(x){ rep(as.numeric(x['km']),round(as.numeric(x['trips']))) })))
   })
   levels(od.agg.tmp$mode) <- c('Auto','Shared Auto','Car','Pool Car','Taxi','Shared Taxi','Two-Wheeler','Car-x','Two-Wheeler-x')
-  ggplot(subset(od.agg.tmp,mode%in%c('Car','Auto','Shared Auto','Shared Taxi','Taxi','Pool Car')),aes(x=km))+geom_histogram()+facet_wrap(~mode)+labs(x="Distance (km)",y="Count",title=pp("Travel Distances from RITES Travel Demand Model (n=",nrow(od.agg.tmp),")"))+scale_x_continuous(limits=c(0,100))
+  ggplot(subset(od.agg.tmp,mode%in%c('Car','Auto','Shared Auto','Shared Taxi','Taxi','Pool Car','Two-Wheeler')),aes(x=km))+geom_histogram()+facet_wrap(~mode)+labs(x="Distance (km)",y="Count",title=pp("Travel Distances from RITES Travel Demand Model (n=",nrow(od.agg.tmp),")"))+scale_x_continuous(limits=c(0,100))
 }
     
 # Load/Create the home distribution and nearest neighbors list
@@ -154,9 +154,13 @@ do.or.load(pp(pevi.shared,"data/DELHI/itin-generation/frac-homes-and-nearest-10.
 
   # Using population data from report under data/DELHI/demographics.../Delhi-population_projection_report.pdf
   pops <- data.frame(year=seq(2001,2026,by=5),pop=c(13851,16021,18451,21285,24485,27982)*1e3)
-  # Using data from 2011 census, total population of Delhi = 18.451e6 and # households = 3.34e6 and # vehicles/household = 0.2071856
+  # Using data from 2011 census, total population of Delhi = 18.451e6 and # households = 3.34e6 and # vehicles/household = 0.2071856 # vehicles+2wheelers/household = 0.5958807
   pop.2020 <- predict(lm('pop ~ year + I(year^2)',pops),newdata=data.frame(year=2020))
   num.veh.2020 <- pop.2020 * (3.34e6/18.451e6) * 0.2071856
+
+  # Synergizing with Maggie Witt's numbers we set # vehicles to match those projections
+  pop.2027 <- predict(lm('pop ~ year + I(year^2)',pops),newdata=data.frame(year=2027))
+  num.veh.2027 <- pop.2027 * 0.521582582 # gives us 15M vehicles total
 
   taz.10 <- list() # either all neighbors within 10 km or the 10 closest neighbors, whichever yields more, 54% of U.S. rural tours <= 10 km
   for(taz.i in unique(time.distance$from)){
@@ -168,7 +172,7 @@ do.or.load(pp(pevi.shared,"data/DELHI/itin-generation/frac-homes-and-nearest-10.
       taz.10[[as.character(taz.i)]] <- closest10
     }
   } 
-  list('home.dist'=home.dist,'taz.10'=taz.10,'pop.2020'=pop.2020,'num.veh.2020'=num.veh.2020)
+  list('home.dist'=home.dist,'taz.10'=taz.10,'pop.2020'=pop.2020,'num.veh.2020'=num.veh.2020,'pop.2027'=pop.2027,'num.veh.2027'=num.veh.2027)
 })
 
 do.or.load(pp(pevi.shared,"data/DELHI/itin-generation/departure-time-dists.Rdata"),function(){
@@ -189,24 +193,22 @@ do.or.load(pp(pevi.shared,"data/DELHI/itin-generation/departure-time-dists.Rdata
 # GENERATE THE ITINS
 ######################################################
 
-pev.pens <- c(0.005,0.01,0.02)
-replicate <- 1
 source(pp(pevi.home,'R/delhi/itin-functions.R',sep=''))
 
-num.replicates <- 80
+replicates <- 1:8
 time.distance$ft <- pp(time.distance$from,' ',time.distance$to)
-date.code <- '20140217'
-pev.penetration <- 0.005
+date.code <- '20150128'
+pev.penetration <- 0.05
 pev.pen.char <- roundC(pev.penetration,3)
-if(file.exists(pp(pevi.shared,'data/inputs/driver-input-file/delhi-uncombined-schedule-replicates-',date.code,'.Rdata',sep=''))){
-  load(file=pp(pevi.shared,'data/inputs/driver-input-file/delhi-uncombined-schedule-replicates-',date.code,'.Rdata',sep=''))
-}else{
+#if(file.exists(pp(pevi.shared,'data/inputs/driver-input-file/delhi-uncombined-schedule-replicates-',date.code,'.Rdata',sep=''))){
+  #load(file=pp(pevi.shared,'data/inputs/driver-input-file/delhi-uncombined-schedule-replicates-',date.code,'.Rdata',sep=''))
+#}else{
   schedule.reps <- list()
-}
+#}
 if(is.null(schedule.reps[[pev.pen.char]]))schedule.reps[[pev.pen.char]] <- list()
-for(replicate in 1:num.replicates){
+for(replicate in replicates){
   print(paste('Penetration ',pev.penetration,' replicate ',replicate,sep=''))
-  schedule.reps[[pev.pen.char]][[as.character(replicate)]] <- create.schedule(pev.penetration,2,frac.end.at.home,frac.include.home)
+  schedule.reps[[pev.pen.char]][[as.character(replicate)]] <- data.frame(create.schedule(pev.penetration,2,frac.end.at.home,frac.include.home))
   sched <- schedule.reps[[pev.pen.char]][[as.character(replicate)]][,c('driver','from','to','depart','home')]
   #sched <- read.table(file=paste(path.to.shared.inputs,"driver-schedule-pen",pev.penetration*100,"-rep",replicate,"-20130129.txt",sep=''),sep='\t',header=T)
   sched$ft <- pp(sched$from,' ',sched$to)
@@ -226,8 +228,16 @@ for(replicate in 1:num.replicates){
   sched <- sched[,c('driver','from','to','depart','home')]
   names(sched) <- c(';driver','from','to','depart','home')
   write.table(sched,pp(pevi.shared,"data/inputs/driver-input-file/delhi-uncombined/driver-schedule-pen",pev.penetration*100,"-rep",replicate,"-",date.code,".txt",sep=''),sep="\t",row.names=F,quote=F)
+  save(schedule.reps,file=pp(pevi.shared,'data/inputs/driver-input-file/delhi-uncombined/delhi-uncombined-schedule-replicates-',date.code,'-rep-',replicate,'.Rdata',sep=''))
 }
-save(schedule.reps,file=pp(pevi.shared,'data/inputs/driver-input-file/delhi-uncombined-schedule-replicates-',date.code,'.Rdata',sep=''))
+schedule.reps.all <- list()
+if(is.null(schedule.reps.all[[pev.pen.char]]))schedule.reps.all[[pev.pen.char]] <- list()
+for(replicate in 1:8){
+  load(pp(pevi.shared,'data/inputs/driver-input-file/delhi-uncombined/delhi-uncombined-schedule-replicates-',date.code,'-rep-',replicate,'.Rdata',sep=''))
+  schedule.reps.all[[pev.pen.char]][[as.character(replicate)]] <- schedule.reps[[pev.pen.char]][[as.character(replicate)]]
+}
+schedule.reps <- schedule.reps.all
+save(schedule.reps,file=pp(pevi.shared,'data/inputs/driver-input-file/delhi-uncombined/delhi-uncombined-schedule-replicates-',date.code,'.Rdata',sep=''))
 
 
 ###############################################################
@@ -244,8 +254,8 @@ time.distance$ft <- pp(time.distance$from,' ',time.distance$to)
 date.code <- '20140217'
 pev.penetration <- 0.005
 pev.pen.char <- roundC(pev.penetration,3)
-if(file.exists(pp(pevi.shared,'data/inputs/driver-input-file/delhi-uncombined-schedule-replicates-',date.code,'.Rdata',sep=''))){
-  load(file=pp(pevi.shared,'data/inputs/driver-input-file/delhi-uncombined-schedule-replicates-',date.code,'.Rdata',sep=''))
+if(file.exists(pp(pevi.shared,'data/inputs/driver-input-file/delhi-uncombined/delhi-uncombined-schedule-replicates-',date.code,'.Rdata',sep=''))){
+  load(file=pp(pevi.shared,'data/inputs/driver-input-file/delhi-uncombined/delhi-uncombined-schedule-replicates-',date.code,'.Rdata',sep=''))
 }
 for(replicate in 1:num.replicates){
   sched <- schedule.reps[[pev.pen.char]][[as.character(replicate)]][,c('driver','from','to','depart','home')]

@@ -44,11 +44,6 @@ run.buildout.batch <- function(driver.input.file){
   NLCommand(paste('set parameter-file "',param.file,'"',sep=''))
   NLCommand('read-parameter-file')
       
-  # If a parameter change exists in vary.tab, we go through and read in the new parameters.
-  # Given how we are parallel programming batch-mode, I can't think of a way to do this without
-  # the blanket assumption that only driver input files are in vary.tab, as names aren't preserved
-  # when we break apart vary.tab for processing.
-      
   if(is.character(driver.input.file)){
     NLCommand(pp('set driver-input-file "',driver.input.file,'"'))
   }else{

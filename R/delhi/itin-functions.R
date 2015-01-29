@@ -9,7 +9,7 @@ create.schedule <- function(pev.penetration,scale.dist.thresh=1,frac.end.at.home
 
   setkey(od.agg,'o','d')
   # note, these modes were chosen so that the final # trips per driver matched hh, which had an average value of 2.015
-  od.counts <- od.agg[mode%in%c('car','pool-car','taxi','taxi-shared','x-car'),list(trip.mean=sum(trips)*pev.penetration),by=c('o','d')]
+  od.counts <- od.agg[mode%in%c('car','pool-car','taxi','taxi-shared','x-car','two-wheeler'),list(trip.mean=sum(trips)*pev.penetration),by=c('o','d')]
   od.counts[,':='(from=o,to=d,o=NULL,d=NULL)]
   # explode the od.counts frame to be on an hourly basis scaled by the epdfs
   od.counts <- data.table(from    = rep(od.counts$from,each=24),
@@ -41,7 +41,7 @@ create.schedule <- function(pev.penetration,scale.dist.thresh=1,frac.end.at.home
     available.drivers[[as.character(taz.i)]][['drivers']] <- data.frame(driver.id=rep(NA,num.counts),at.home=NA,hour=NA)
     available.drivers[[as.character(taz.i)]][['count']] <- 0
   }
-  expected.num.drivers <- pev.penetration * num.veh.2020
+  expected.num.drivers <- pev.penetration * num.veh.2027
 
   home.drivers <- list()
   driver.count <- 0
@@ -122,16 +122,16 @@ create.schedule <- function(pev.penetration,scale.dist.thresh=1,frac.end.at.home
     # for delhi, we use a random draw to assume they start from home based on the fraction of trips starting from home in hh (55.45%)
     if(runif(1) > frac.include.home){
       type <- 'ow'
-      cands <- na.omit(hh.by.home[['non.home.start']][J(hours.to.search,dists.to.search),index]$index)
-      if(length(cands)==0)cands <- na.omit(hh.by.home[['home.start']][J(hours.to.search,dists.to.search),index]$index)
+      cands <- na.omit(hh.by.home[['non.home.start']][J(hours.to.search,dists.to.search)]$index)
+      if(length(cands)==0)cands <- na.omit(hh.by.home[['home.start']][J(hours.to.search,dists.to.search)]$index)
       if(length(cands)==0){
         print(paste('Warning: no candidate tours found for ',dists$km,' km at ',hour,' hour for type ',type,' and od.row ',od.row,' taking random cand',sep=''))
         cands <- sample(hh.by.home[['non.home.start']]$index,1)
       }
     }else{
       type <- 'hw'
-      cands <- na.omit(hh.by.home[['home.start']][J(hours.to.search,dists.to.search),index]$index)
-      if(length(cands)==0)cands <- na.omit(hh.by.home[['non.home.start']][J(hours.to.search,dists.to.search),index]$index)
+      cands <- na.omit(hh.by.home[['home.start']][J(hours.to.search,dists.to.search)]$index)
+      if(length(cands)==0)cands <- na.omit(hh.by.home[['non.home.start']][J(hours.to.search,dists.to.search),]$index)
       if(length(cands)==0){
         print(paste('Warning: no candidate tours found for ',dists$km,' km at ',hour,' hour for type ',type,' and od.row ',od.row,' taking random cand',sep=''))
         cands <- sample(hh.by.home[['home.start']]$index,1)
@@ -227,23 +227,24 @@ create.schedule <- function(pev.penetration,scale.dist.thresh=1,frac.end.at.home
   #summaryRprof(pp(pevi.nondrop,'profile5.txt'))
   #Rprof(NULL)
   schedule$type <- as.factor(schedule$type)
-  schedule <- na.omit(ddply(schedule[order(schedule$driver),],.(driver),function(df){ df[order(df$depart),] }))
+  schedule <- data.table(na.omit(schedule),key=c('driver','depart'))
+  schedule[,last.trip:=c(diff(schedule$driver),1) != 0]
+  schedule[,index:=1:nrow(schedule)]
 
   # now force drivers to go home instead of somewhere else, prioritize drivers whose final trip of the day is close in length to a 
   # trip home instead
-  final.trip.by.driver <- ddply(schedule,.(driver),function(df){ data.frame(from=df$from[nrow(df)], to=df$to[nrow(df)], trip.km=time.distance[J(df$from[nrow(df)],df$to[nrow(df)]),km]$km, home=df$home[1], home.km = time.distance[J(df$from[nrow(df)],df$home[1]),km]$km ) })
-  final.trip.by.driver <- final.trip.by.driver[order(abs(final.trip.by.driver$trip.km - final.trip.by.driver$home.km)),]
+  final.trip.by.driver <- schedule[last.trip==T]
+  final.trip.by.driver[,':='(my.from=from,my.to=to)]
+  final.trip.by.driver[,':='(trip.km=time.distance[J(my.from,my.to)]$km,home.km=time.distance[J(my.from,home)]$km,home.time=time.distance[J(my.from,home)]$time,my.from=NULL,my.to=NULL)] 
+  final.trip.by.driver[,diff.in.dists:=abs(trip.km-home.km)]
+  setkey(final.trip.by.driver,diff.in.dists)
+
   n.to.change <- round(nrow(final.trip.by.driver) * (frac.end.at.home - sum(final.trip.by.driver$to==final.trip.by.driver$home)/nrow(final.trip.by.driver)))
   if(n.to.change > 0){
-    final.trip.by.driver <- subset(final.trip.by.driver,to != home)
-    final.trip.by.driver$trip.diff <- abs(final.trip.by.driver$trip.km - final.trip.by.driver$home.km)
-    final.trip.by.driver <- final.trip.by.driver[order(final.trip.by.driver$trip.diff),][1:n.to.change,]
-    schedule <- ddply(schedule,.(driver),function(df){ 
-      if(df$driver[1] %in% final.trip.by.driver$driver){
-        df$to[nrow(df)] <- df$home[1]
-      }
-      df
-    })
+    final.trip.by.driver <- final.trip.by.driver[to != home][1:n.to.change]
+    setkey(schedule,index)
+    schedule[J(final.trip.by.driver$index),':='(to=home,arrive=depart+final.trip.by.driver$home.time)]
+    schedule[,':='(last.trip=NULL,index=NULL)]
   }
   return(schedule)
 }

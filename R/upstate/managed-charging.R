@@ -20,55 +20,48 @@ print(unique(logs[['results']]$replicate))
 print(unique(logs[['results']]$penetration))
 
 # for this analysis, pull just pen 2% and rep 1 from the mix
-trips <- data.table(subset(logs[['trip']],penetration==2 & replicate==1))
+pain <- data.table(subset(logs[['pain']],penetration==2 & replicate==1),key='driver')
+stranded.drivers <- unique(pain[pain.type=='stranded']$driver)
+trips <- data.table(subset(logs[['trip']],penetration==2 & replicate==1 & !driver%in%stranded.drivers))
 trips[,':='(driver.input.file=NULL,charger.input.file=NULL,time=time-6)]
-tazs <- data.table(subset(logs[['tazs']],penetration==2 & replicate==1 & taz>=1 & time >= 5.99999 & time <= 30),key='taz')
+tazs <- data.table(subset(logs[['tazs']],penetration==2 & replicate==1 & time >= 5.99999 & time <= 30),key='taz')
 tazs[,':='(driver.input.file=NULL,charger.input.file=NULL,time=time-6)]
-charging <- data.table(subset(logs[['charging']],penetration==2 & replicate==1))
+charging <- data.table(subset(logs[['charging']],penetration==2 & replicate==1 & !driver%in%stranded.drivers))
 charging[,':='(driver.input.file=NULL,charger.input.file=NULL,time=time-6)]
 
 # time.step defines the discritization used to bin charger availability (in hours)
 time.step <- 5/60
 time.steps <- seq(0,24,by=time.step)
-
-
-
-# make the charger availability matrix
-avail <- array(NA,c(length(unique(tazs$taz)),length(time.steps),2),list(as.character(unique(tazs$taz)),as.character(1:length(time.steps)),c('2','3')))
-num.ch <- array(NA,c(length(unique(tazs$taz)),2),list(as.character(unique(tazs$taz)),c('2','3')))
-for(level in 2:3){
-  for(this.taz in unique(tazs$taz)){
-    avail[this.taz,,as.character(level)] <- streval(pp('tazs[J(',this.taz,'),]$num.L',level)) # This will get us a fresh slate that we can fill up our own way.
-#    avail[this.taz,,as.character(level)] <- streval(pp('tazs[J(',this.taz,'),]$num.avail.L',level))
-    num.ch[this.taz,as.character(level)] <- streval(pp('tazs[J(',this.taz,')][1]$num.L',level))
-  }
-}
+soc.per.time.step <- array(charger.power*time.step/batt.caps,dimnames=list(c('leaf','volt')))
 
 # Step 1: Determine the amount of charging from level 3 charger
 # Step 2: Eliminate that range from the subsequent distances
-# Step 3: Determine what the deltaT would be for each trip. This value will be 0 for the first trip of the day.
+# Step 3: Determine what the delta.soc would be for each trip. This value will be 0 for the first trip of the day.
 
 ### I hate nested for loops - is there a way we can remove any of these?
 
-for(level.3.driver in unique(charging[charger.level==3,driver])) {
-  for (row in nrow(charging[charger.level==3&driver==level.3.driver,])) {
+setkey(charging,charger.level,driver)
+for(level.3.driver in unique(charging[J(3)]$driver)) {
+  for(row in 1:nrow(charging[J(3,level.3.driver)])){
     #### We should get the driver's actual fuel economy, in either the need-to-charge or the wait-time logs. For now, just assume it is 0.35 kWh/mile.
     # Convert the level 3 charge delivered into VMT
-    vmt <- charging[charger.level==3&driver==level.3.driver,energy][row] / kwh.per.mile
-    charge.start <- charging[charger.level==3&driver==level.3.driver,time][row]
+    vmt <- charging[J(3,level.3.driver)]$energy[row] / kwh.per.mile
+    charge.start <- charging[J(3,level.3.driver)]$time[row]
     
     # Subtract vmt from trip distances from subsequent trips
-    while (vmt>0&nrow(trips[driver==level.3.driver&time>charge.start&distance>0,])>0) {
-      min.time <- min(trips[driver==level.3.driver&time>charge.start&distance>0,time])
-      if(trips[driver==level.3.driver&time>charge.start&distance>0,distance][1]<vmt) {
+    trip.inds <- which(trips$driver==level.3.driver & trips$time>charge.start & trips$distance>0)
+    setkey(trips,time)
+    while (vmt>0&length(trip.inds)>0) {
+      if(trips[trip.inds,distance][1]<vmt) {
         # Subtract trip from VMT and set trip to 0
-        vmt <- vmt - trips[driver==level.3.driver&time>charge.start&distance>0&time==min.time,distance]
-        trips[driver==level.3.driver&time>charge.start&distance>0&time==min.time,distance:=0]
+        vmt <- vmt - trips[trip.inds,distance][1]
+        trips[trip.inds[1],distance:=0]
       } else {
         # Subtract vmt from trip and set vmt to 0
-        trips[driver==level.3.driver&time>charge.start&distance>0&time==min.time,distance:=distance - vmt]
+        trips[trip.inds[1],distance:=distance - vmt]
         vmt <- 0
       }
+      trip.inds <- trip.inds[-1]
     } # end while loop
   } # end for loop - row
 } # end for loop - level.3.driver
@@ -77,13 +70,14 @@ for(level.3.driver in unique(charging[charger.level==3,driver])) {
 trips[,soc.needed:=distance*kwh.per.mile*fact.safety/batt.caps[vehicle.type]]
 trips[vehicle.type=='volt',soc.needed:=0]
 
-# Calculate the deltaT for each trip. The first trip will have a deltaT of 0. subsequent trips are the soc.needed - end.soc from previous trip.
-trips[,':='(deltaT=0,total.trips=length(distance))]
+# Calculate the delta.soc for each trip. The first trip will have a delta.soc of 0. subsequent trips are the soc.needed - end.soc from previous trip.
+setkey(trips,driver)
+trips[,':='(delta.soc=0,total.trips=length(distance)),by=driver]
 
-# For any driver with at least 1 trip, deltaT = soc.needed - end.soc from previous trip.
-trips[total.trips>1,deltaT:=as.vector(c(0,soc.needed[2:length(distance)]-end.soc[1:(length(distance)-1)])),by=driver]
-# A negative deltaT means they had more charge from the previous trip than they needed, so we set those deltaTs to 0.
-trips[deltaT<0,deltaT:=0]
+# For any driver with more than 1 trip, delta.soc = soc.needed - end.soc from previous trip.
+trips[total.trips>1,delta.soc:=as.vector(c(0,soc.needed[2:length(distance)]-end.soc[1:(length(distance)-1)])),by=driver]
+# A negative delta.soc means they had more charge from the previous trip than they needed, so we set those delta.socs to 0.
+trips[delta.soc<0,delta.soc:=0]
 
 # grab pricing data
 
@@ -92,61 +86,69 @@ price <- c(8,rep(c(8,9,7,8,9,10,11,12,14,13,12,16,17,20,24,28,32,29,25,21,18,16,
 
 # cost of energy by driver
 setkey(charging,driver)
-
-
-# for development
-energy <- charging[J(12)]$energy
-time <- charging[J(12)]$time
-duration <- charging[J(12)]$duration
-energy <- charging[J(5266)]$energy
-time <- charging[J(5266)]$time
-duration <- charging[J(5266)]$duration
 time.to.index <- function(t){
   round(t*(1/time.step))+1
 }
-sum(unlist(lapply(alply(cbind(time,duration),1,function(x){ seq(time.to.index(x[1]),time.to.index(sum(x))) }),function(ll){ sum(price[ll],na.rm=T)/(1/time.step) })))
-
 cost.of.energy <- charging[,list(cost=sum(unlist(lapply(alply(cbind(time,duration),1,function(x){ seq(time.to.index(x[1]),time.to.index(sum(x))) }),function(ll){ sum(price[ll],na.rm=T)/(1/time.step) })))),by='driver']
+
+# for development
+#energy <- charging[J(12)]$energy
+#time <- charging[J(12)]$time
+#duration <- charging[J(12)]$duration
+#energy <- charging[J(5266)]$energy
+#time <- charging[J(5266)]$time
+#duration <- charging[J(5266)]$duration
+#sum(unlist(lapply(alply(cbind(time,duration),1,function(x){ seq(time.to.index(x[1]),time.to.index(sum(x))) }),function(ll){ sum(price[ll],na.rm=T)/(1/time.step) })))
 
 # I think we decided that ranking drivers was unecessary, so long as we handle all driver's needed charging first.
 
 # Driver's initial charge assumed to be begin.soc at start of first trip. Do not assign any charging BEFORE that point.
 
-# Use deltaT values to determine if pre-trip charge is needed. Find the time window we can work in, this will be bounded by trips schedule. Each deltaT is attached to a given trip; window is for the last arrival to the current departure time 
+# Use delta.soc values to determine if pre-trip charge is needed. Find the time window we can work in, this will be bounded by trips schedule. Each delta.soc is attached to a given trip; window is for the last arrival to the current departure time 
 # and level 3 charging (can't use those; they have already been eliminated). The charging window will be an array of indices corresponding to the 5 minute intervals, use the pricing array to sort. Go down the price-sorted array - is a chaerger avaialble? Great. Schedule it, reduce the 
-# remaining deltaT. Continue until we are done with deltaT. This will be the same process with the accounting charging, except that we lose the scedule constraints.
+# remaining delta.soc. Continue until we are done with delta.soc. This will be the same process with the accounting charging, except that we lose the scedule constraints.
 
-# Start a for loop for all drivers who have a positive deltaT somewhere in their day
+# Start a for loop for all drivers who have a positive delta.soc somewhere in their day
 
-# Test with driver 262 - multiple deltaTs
+setkey(trips,driver)
 
-for (this.driver in unique(trips[deltaT>0&origin>0,driver])) {
-print(pp('this driver is ',this.driver))
-  while (length(trips[deltaT>0&driver==this.driver&origin>0,deltaT])>0) {
-    charging.period.end <- trips[deltaT>0&driver==this.driver&origin>0,time][1]
-    charging.period.begin <- trips[driver==this.driver&origin>0&time<charging.period.end,time][nrow(trips[driver==this.driver&origin>0&time<charging.period.end,])]
-    charging.period.taz <- trips[deltaT>0&driver==this.driver&origin>0,origin][1]
+# make the charger availability matrix, all Level 2!!!
+avail <- array(NA,c(length(unique(tazs$taz)),length(time.steps)),list(as.character(unique(tazs$taz)),as.character(1:length(time.steps))))
+num.ch <- array(NA,length(unique(tazs$taz)),list(as.character(unique(tazs$taz))))
+for(this.taz in unique(tazs$taz)){
+  avail[this.taz,] <- tazs[J(this.taz)]$num.L2 # Initialize all chargers as "available" which will then get used up as the alg proceeds
+  num.ch[this.taz] <- tazs[J(this.taz)][1]$num.L2
+}
+
+# Test with driver 262 - multiple delta.socs
+this.driver <- 262
+for (this.driver in unique(trips[delta.soc>0&origin>0,driver])) {
+  print(pp('this driver is ',this.driver))
+  this.vehicle.type <- trips[J(this.driver)]$vehicle.type[1]
+  this.driver.trips <- trips[J(this.driver)]
+  for(trip.i in which(this.driver.trips$delta.soc>0)) {
+    charging.period.end <- this.driver.trips[trip.i,time]
+    charging.period.begin <- tail(this.driver.trips[time<charging.period.end,time],1)
+    charging.period.taz <- this.driver.trips[trip.i,origin]
     
     # Determine the array of 5 minute time windows that falls within the charging period.
-    charge.period.indices <- match(time.steps[time.steps>charging.period.begin&time.steps<charging.period.end],time.steps)
+    charge.period.indices <- which(time.steps>charging.period.begin&time.steps<charging.period.end)
+
+    ##### TODO
+    # Exclude intervals when this driver was in a Level 3 charge event
+    ##### /TODO
     
-    # Determine which periods have a charger available. Remember, only level 2.
-    charge.period.indices <- charge.period.indices[avail[charging.period.taz,charge.period.indices,'2']>0]
+    # Reduce the window of charging based on charger availability.
+    charge.period.indices <- charge.period.indices[avail[charging.period.taz,charge.period.indices]>0]
     
-    DelT <- trips[deltaT>0&driver==this.driver&origin>0,deltaT][1]
-	print(pp('DelT is ',DelT))
-	# Determine energy price for each charge period index. Rank.
-	# Take top ranked period. Make charger unavailable. Subtract charger power*charge period length (5/60) from deltaT until deltaT is 0.
-	while(DelT > 0) {
-	  # Refresh indicies, rank again
-	  charge.period.indices <- charge.period.indices[avail[charging.period.taz,charge.period.indices,'2']>0]
-	  ranked.charge.periods <- data.table(charge.period=charge.period.indices,cost=price[charge.period.indices])
-      setkey(ranked.charge.periods,cost)
-	  avail[charging.period.taz,ranked.charge.periods[1,charge.period],'2'] <- 0
-	  trips[driver==this.driver&origin>0&time==charging.period.end,deltaT:=deltaT-charger.power*time.step/batt.caps[vehicle.type]]
-	  DelT <- trips[driver==this.driver&origin>0&time==charging.period.end,deltaT][1]
-	} #end while DelT loop
-  } #end while length loop
+    # Determine energy price for each charge period index. Rank. Take top ranked periods.
+    # Make chargers unavailable.
+    num.time.periods.needed <- ceiling(this.driver.trips[trip.i,delta.soc]/soc.per.time.step[this.vehicle.type])
+    if(num.time.periods.needed > length(charge.period.indices))stop("Error: the charging window isn't big enough for this driver to charge!")
+    time.periods.to.use <- order(price[charge.period.indices])[1:num.time.periods.needed]
+    avail[charging.period.taz,charge.period.indices[time.periods.to.use]] <- avail[charging.period.taz,charge.period.indices[time.periods.to.use]] - 1
+
+  } #end for each trip with delta.soc to distribute 
 } # end for loop this.driver
 
 # generator charging profiles

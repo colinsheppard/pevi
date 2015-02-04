@@ -8,7 +8,7 @@ load(file=paste(path.to.inputs,'logs.Rdata',sep=''),verbose=T)
 # Read in driver schedules (we need the home TAZ) programatically and without converting to csv.
 #### TODO/
 
-driver.schedules <- data.table(read.csv('~/Dropbox/serc/pev-shared/data/inputs/compare/smart-charging-demand/driver-schedule-pen2-rep1-20140129.csv'))
+driver.schedules <- data.table(read.csv(pp(pevi.shared,'/data/inputs/compare/smart-charging-demand/driver-schedule-pen2-rep1-20140129.csv')))
 setkey(driver.schedules,driver,depart)
 driver.home <- driver.schedules[match(unique(driver.schedules[,driver]),driver.schedules[,driver]),home,by=driver]
 
@@ -57,21 +57,21 @@ for(level.3.driver in unique(charging[J(3)]$driver)) {
   for(row in 1:nrow(charging[J(3,level.3.driver)])){
     #### We should get the driver's actual fuel economy, in either the need-to-charge or the wait-time logs. For now, just assume it is 0.35 kWh/mile.
     # Convert the level 3 charge delivered into VMT
-    vmt <- charging[J(3,level.3.driver)]$energy[row] / kwh.per.mile
+    energy.delivered <- charging[J(3,level.3.driver)]$energy[row] / kwh.per.mile
     charge.start <- charging[J(3,level.3.driver)]$time[row]
     
     # Subtract vmt from trip distances from subsequent trips
-    trip.inds <- which(trips$driver==level.3.driver & trips$time>charge.start & trips$distance>0)
+    trip.inds <- which(trips$driver==level.3.driver & trips$time>charge.start & trips$elec.used>0)
     setkey(trips,time)
-    while (vmt>0&length(trip.inds)>0) {
-      if(trips[trip.inds,distance][1]<vmt) {
+    while(energy.delivered>0&length(trip.inds)>0) {
+      if(trips[trip.inds,elec.used][1]<energy.delivered) {
         # Subtract trip from VMT and set trip to 0
-        vmt <- vmt - trips[trip.inds,distance][1]
-        trips[trip.inds[1],distance:=0]
+        energy.delivered <- energy.delivered - trips[trip.inds,elec.used][1]
+        trips[trip.inds[1],elec.used:=0]
       } else {
         # Subtract vmt from trip and set vmt to 0
-        trips[trip.inds[1],distance:=distance - vmt]
-        vmt <- 0
+        trips[trip.inds[1],elec.used:=elec.used - energy.delivered]
+        energy.delivered <- 0
       }
       trip.inds <- trip.inds[-1]
     } # end while loop
@@ -79,7 +79,7 @@ for(level.3.driver in unique(charging[J(3)]$driver)) {
 } # end for loop - level.3.driver
 
 # what soc is needed for each trip
-trips[,soc.needed:=distance*kwh.per.mile*fact.safety/batt.caps[vehicle.type]]
+trips[,soc.needed:=elec.used*fact.safety/batt.caps[vehicle.type]]
 trips[vehicle.type=='volt',soc.needed:=0]
 
 # Calculate the delta.soc for each trip. The first trip will have a delta.soc of 0. subsequent trips are the soc.needed - end.soc from previous trip.
@@ -128,11 +128,12 @@ setkey(trips,driver)
 this.driver <- 262
 
 # make the charger availability matrix, all Level 2!!!
+setkey(tazs,taz)
 avail <- array(NA,c(length(unique(tazs$taz)),length(time.steps)),list(as.character(unique(tazs$taz)),roundC(time.steps,2)))
 num.ch <- array(NA,length(unique(tazs$taz)),list(as.character(unique(tazs$taz))))
 for(this.taz in unique(tazs$taz)){
-  avail[as.character(this.taz),] <- tazs[J(this.taz)]$num.L2 # Initialize all chargers as "available" which will then get used up as the alg proceeds
-  num.ch[as.character(this.taz)] <- tazs[J(this.taz)][1]$num.L2
+  avail[as.character(this.taz),] <- tazs[J(this.taz)]$num.L0 + tazs[J(this.taz)]$num.L2 # Initialize all chargers as "available" which will then get used up as the alg proceeds
+  num.ch[as.character(this.taz)] <- tazs[J(this.taz)][1]$num.L0 + tazs[J(this.taz)][1]$num.L2
 }
 
 # Ordering the drivers matters, some drivers have less flexibility and need to go first.  delta.soc is correlated with
@@ -147,7 +148,7 @@ trips[J(c(338)),loop.order:=-1]
 
 # Loop through drivers in reverse order of delta.soc which prioritizes drivers with a lot of charge to get
 for (this.driver in unique(trips[delta.soc>0&origin>0]$driver[order(trips[delta.soc>0&origin>0]$loop.order)])) {
-  print(pp('driver ',this.driver))
+  #print(pp('driver ',this.driver))
   this.vehicle.type <- trips[J(this.driver)]$vehicle.type[1]
   this.driver.trips <- trips[J(this.driver)]
   for(trip.i in which(this.driver.trips$delta.soc>0)) {
@@ -182,10 +183,14 @@ for (this.driver in unique(trips[delta.soc>0&origin>0]$driver[order(trips[delta.
 # Now we loop through for accounting charging. This will look much the same as the previous loop for trip charging, only we can consider the intervals between ALL trips.
 # Test with driver 919
 #this.driver <- 919
+trips[,accounting.soc.needed:=sum(soc.needed)-sum(delta.soc),by=driver]
+trips[,loop.order:=-accounting.soc.needed]
+trips[J(c(5233,2608)),loop.order:=-1]
+
 for (this.driver in unique(trips[origin>0]$driver[order(trips[origin>0]$loop.order)])) {  # This time we are loking at all drivers
-  print(pp('driver ',this.driver))
+  #print(pp('driver ',this.driver))
   if(this.driver==185){
-  	print("driver = 185, skipping...")
+  	#print("driver = 185, skipping...")
   	next
   }
   this.vehicle.type <- trips[J(this.driver)]$vehicle.type[1]
@@ -193,7 +198,6 @@ for (this.driver in unique(trips[origin>0]$driver[order(trips[origin>0]$loop.ord
   this.driver.home <- driver.home[driver==this.driver,home]
   # Drivers have already charged their trip charging, so the only remaining charging is to ensure that they end the day at the same SOC as they started. 
   # To get this value, we subtract the delta.soc (which will already have been charged) from the total soc.needed value.
-  accounting.soc.needed <- trips[driver==this.driver,sum(soc.needed)] - trips[driver==this.driver,sum(delta.soc)]
   charge.period.indices <- NULL
   
   # Now we make the list of charge period indices, looping through the trips and adding to the list when the driver is not travelling.
@@ -214,6 +218,7 @@ for (this.driver in unique(trips[origin>0]$driver[order(trips[origin>0]$loop.ord
   
   } else {
 	for(trip.i in 2:nrow(this.driver.trips)) {
+    accounting.soc.needed <- trips[trip.i,accounting.soc.needed]
 	  ifelse(trip.i==nrow(this.driver.trips),charging.period.end <- 30,charging.period.end <- this.driver.trips[trip.i,time])
 	  charging.period.begin <- tail(this.driver.trips[end.time<=charging.period.end,end.time],1) # <= in case the driver had to leave straightaway
 	  charging.period.taz <- as.character(this.driver.trips[trip.i,origin])
@@ -240,27 +245,33 @@ for (this.driver in unique(trips[origin>0]$driver[order(trips[origin>0]$loop.ord
   
   # Determine energy price for each charge period index. Rank. Take top ranked periods. Make chargers unavailable.
   num.time.periods.needed <- floor(accounting.soc.needed/soc.per.time.step[this.vehicle.type])
-  if(num.time.periods.needed > length(charge.period.indices$index))stop("Error: the charging window isn't big enough for this driver to charge!")
-  
-  time.periods.to.use <- order(price[charge.period.indices$index])[1:num.time.periods.needed]
-
-  #Unfortunately, charging may need to be shifted over several tazs. This means (sigh) another for loop.
-  for(charger.index in time.periods.to.use) {
-  
-  ########################
-  # Driver 185 crashes here - a volt, only ever in taz 8, where there are no chargers. Never NEEDS a charge, but the accounting charge
-  # means that we try to find that driver a charger. The crash comes when we try to see if this.charging.taz!=this.driver.home,
-  # we get a crash.
-  ########################
-  
-    this.charging.taz <- as.numeric(levels(charge.period.indices$taz[charger.index]))[charge.period.indices$taz[charger.index]]
-    if(this.charging.taz!=this.driver.home) { #Referencing by as.character(this.charging.taz) so we can deal with negative TAZs
-      avail[as.character(this.charging.taz),charge.period.indices$index[charger.index]] <- avail[as.character(this.charging.taz),charge.period.indices$index[charger.index]] - 1
-    }
+  if(num.time.periods.needed > length(charge.period.indices$index)){
+    cat(pp(this.driver,","))
+    next
+    #stop("Error: the charging window isn't big enough for this driver to charge!")
   }
   
-  # We've got a bad avail. How is this happening?
-  if(any(avail<0))stop("Bad avail, bad avail")
+  if(num.time.periods.needed>0){
+    time.periods.to.use <- order(price[charge.period.indices$index])[1:num.time.periods.needed]
+
+    #Unfortunately, charging may need to be shifted over several tazs. This means (sigh) another for loop.
+    for(charger.index in time.periods.to.use) {
+    
+    ########################
+    # Driver 185 crashes here - a volt, only ever in taz 8, where there are no chargers. Never NEEDS a charge, but the accounting charge
+    # means that we try to find that driver a charger. The crash comes when we try to see if this.charging.taz!=this.driver.home,
+    # we get a crash.
+    ########################
+    
+      this.charging.taz <- as.numeric(levels(charge.period.indices$taz[charger.index]))[charge.period.indices$taz[charger.index]]
+      if(this.charging.taz!=this.driver.home) { #Referencing by as.character(this.charging.taz) so we can deal with negative TAZs
+        avail[as.character(this.charging.taz),charge.period.indices$index[charger.index]] <- avail[as.character(this.charging.taz),charge.period.indices$index[charger.index]] - 1
+      }
+    }
+    
+    # We've got a bad avail. How is this happening?
+    if(any(avail<0))stop("Bad avail, bad avail")
+  }
   
 } #end for each trip with delta.soc to distribute 
 
@@ -268,16 +279,18 @@ for (this.driver in unique(trips[origin>0]$driver[order(trips[origin>0]$loop.ord
 # Make Pretty Graphs
 #################################
 
-# generator charging profiles
+demand.by.time <- apply(avail,2,function(av){ sum(num.ch - av)*6.6 })
+
+## generator charging profiles
 setkey(tazs,time)
 prof<-tazs[,list(L0.kw=6.6*sum(num.L0-num.avail.L0),L2.kw=6.6*sum(num.L2-num.avail.L2),L3.kw=50*sum(num.L3-num.avail.L3)),by='time']
 prof[,hour:=floor(time)]
 setkey(prof,hour)
-prof<-prof[,list(load=sum(L0.kw+L3.kw+L2.kw)),by='hour']
+prof<-prof[,list(load=sum(L0.kw+L2.kw)),by='hour']
 
-# Now come up with plots to show major events (driver, charging events, trip,s etc)
+## Now come up with plots to show major events (driver, charging events, trip,s etc)
 
-write.csv(prof,file=pp(path.to.outputs,'load-profile.csv'))
+#write.csv(prof,file=pp(path.to.outputs,'load-profile.csv'))
 
 
 

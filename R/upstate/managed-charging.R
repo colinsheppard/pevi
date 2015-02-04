@@ -8,6 +8,12 @@ load(file=paste(path.to.inputs,'logs.Rdata',sep=''),verbose=T)
 # Read in driver schedules (we need the home TAZ) programatically and without converting to csv.
 #### TODO/
 
+# Set the season for energy prices
+season <- 'Winter'
+#season <- 'Spring'
+#season <- 'Summer'
+#season <- 'Fall'
+
 driver.schedules <- data.table(read.csv('~/Dropbox/serc/pev-shared/data/inputs/compare/smart-charging-demand/driver-schedule-pen2-rep1-20140129.csv'))
 setkey(driver.schedules,driver,depart)
 driver.home <- driver.schedules[match(unique(driver.schedules[,driver]),driver.schedules[,driver]),home,by=driver]
@@ -91,10 +97,15 @@ trips[total.trips>1,delta.soc:=as.vector(c(0,soc.needed[2:length(distance)]-end.
 # A negative delta.soc means they had more charge from the previous trip than they needed, so we set those delta.socs to 0.
 trips[delta.soc<0,delta.soc:=0]
 
+####################################
 # grab pricing data
+####################################
 
-# for now fake it, this is price on 5 minute increments for 30 hours
-price <- c(8,rep(c(8,9,7,8,9,10,11,12,14,13,12,16,17,20,24,28,32,29,25,21,18,16,10,9,8,9,7,8,9,10),each=round(1/time.step)))
+# Load the price data
+price.data <- read.csv(pp(pevi.shared,'data/UPDSTATE/energy-price/MarginalCostBreakdownBySeason.csv'))
+
+# Price must be on 5 minute increments for 30 hours
+price <- price.data[,season][match(floor(time.steps),price.data$Hour)]
 names(price) <- roundC(time.steps,2)
 
 # cost of energy by driver

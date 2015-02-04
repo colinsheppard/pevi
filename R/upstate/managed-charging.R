@@ -58,6 +58,8 @@ soc.per.time.step <- array(charger.power*time.step/batt.caps,dimnames=list(c('le
 # Subtract Level 3 Charging
 #################################
 
+setkey(trips,driver)
+
 setkey(charging,charger.level,driver)
 for(level.3.driver in unique(charging[J(3)]$driver)) {
   for(row in 1:nrow(charging[J(3,level.3.driver)])){
@@ -65,6 +67,13 @@ for(level.3.driver in unique(charging[J(3)]$driver)) {
     # Convert the level 3 charge delivered into VMT
     vmt <- charging[J(3,level.3.driver)]$energy[row] / kwh.per.mile
     charge.start <- charging[J(3,level.3.driver)]$time[row]
+    charge.end <- charge.start + charging[J(3,level.3.driver)]$duration[row]
+    
+    # Create a trip for this driver with distance = 0 and elec.used = 0, with start and end time corresponding to the level 3 charging event.
+    next.trip.row <- trips[J(level.3.driver)][row]
+    next.trip.row[,':='(time=charge.start,end.time=charge.end,origin=charging[J(3,level.3.driver)]$location[row],destination=charging[J(3,level.3.driver)]$location[row],begin.soc=charging[J(3,level.3.driver)]$begin.soc[row],end.soc=charging[J(3,level.3.driver)]$end.soc[row],distance=0,elec.used=0,gas.used=0)]
+    
+    trips <- rbindlist(list(trips,next.trip.row))
     
     # Subtract vmt from trip distances from subsequent trips
     trip.inds <- which(trips$driver==level.3.driver & trips$time>charge.start & trips$distance>0)
@@ -85,11 +94,11 @@ for(level.3.driver in unique(charging[J(3)]$driver)) {
 } # end for loop - level.3.driver
 
 # what soc is needed for each trip
+setkey(trips,driver)
 trips[,soc.needed:=distance*kwh.per.mile*fact.safety/batt.caps[vehicle.type]]
 trips[vehicle.type=='volt',soc.needed:=0]
 
 # Calculate the delta.soc for each trip. The first trip will have a delta.soc of 0. subsequent trips are the soc.needed - end.soc from previous trip.
-setkey(trips,driver)
 trips[,':='(delta.soc=0,total.trips=length(distance)),by=driver]
 
 # For any driver with more than 1 trip, delta.soc = soc.needed - end.soc from previous trip.
@@ -168,10 +177,6 @@ for (this.driver in unique(trips[delta.soc>0&origin>0]$driver[order(trips[delta.
     
     # Determine the array of 5 minute time windows that falls within the charging period.
     charge.period.indices <- which(time.steps>charging.period.begin&time.steps<charging.period.end)
-
-    ##### TODO
-    # Exclude intervals when this driver was in a Level 3 charge event
-    ##### /TODO
     
     # Reduce the window of charging based on charger availability.
     charge.period.indices <- charge.period.indices[avail[charging.period.taz,charge.period.indices]>0]

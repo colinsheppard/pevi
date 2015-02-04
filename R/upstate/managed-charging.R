@@ -184,6 +184,10 @@ for (this.driver in unique(trips[delta.soc>0&origin>0]$driver[order(trips[delta.
 #this.driver <- 919
 for (this.driver in unique(trips[origin>0]$driver[order(trips[origin>0]$loop.order)])) {  # This time we are loking at all drivers
   print(pp('driver ',this.driver))
+  if(this.driver==185){
+  	print("driver = 185, skipping...")
+  	next
+  }
   this.vehicle.type <- trips[J(this.driver)]$vehicle.type[1]
   this.driver.trips <- trips[J(this.driver)]
   this.driver.home <- driver.home[driver==this.driver,home]
@@ -194,11 +198,9 @@ for (this.driver in unique(trips[origin>0]$driver[order(trips[origin>0]$loop.ord
   
   # Now we make the list of charge period indices, looping through the trips and adding to the list when the driver is not travelling.
   if(nrow(this.driver.trips)==1) {
-  	print("In first if loop")
     charging.period.end <- 30
     charging.period.begin <- this.driver.trips[,end.time]
     charging.period.taz <- as.character(this.driver.trips[,origin])
-    print(pp("Charging taz is ",charging.period.taz))
     
     new.indices <- which(time.steps>charging.period.begin&time.steps<charging.period.end)
 	

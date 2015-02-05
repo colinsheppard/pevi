@@ -10,10 +10,10 @@ path.to.outputs <- pp(pevi.shared,'data/UPSTATE/results/managed-charging')
 #### TODO/
 
 # Set the season for energy prices
-season <- 'Winter'
+#season <- 'Winter'
 #season <- 'Spring'
 #season <- 'Summer'
-#season <- 'Fall'
+season <- 'Fall'
 
 driver.schedules <- data.table(read.csv(pp(pevi.shared,'/data/inputs/compare/smart-charging-demand/driver-schedule-pen2-rep10-20140129.csv')))
 setkey(driver.schedules,driver,depart)
@@ -295,7 +295,8 @@ for (this.driver in unique(trips[origin>0]$driver[order(trips[origin>0]$loop.ord
 # Make Pretty Graphs
 #################################
 
-managed <- apply(avail,2,function(av){ sum(num.ch - av)*6.6 })
+#managed <- apply(avail,2,function(av){ sum(num.ch - av)*6.6 })
+managed <- data.table(hour=time.steps,load=apply(avail,2,function(av){ sum(num.ch - av)*6.6 }))
 
 ## generator charging profiles
 setkey(tazs,time)
@@ -306,9 +307,26 @@ unmanaged <- prof[,list(load=sum(L0.kw+L2.kw)/12),by='hour']
 
 ## Now come up with plots to show major events (driver, charging events, trip,s etc)
 
+#Aggregate managed to the hour
+
+managed[,hour:=floor(hour)]
+managed.by.hour <- managed[,sum(load),by=hour]
+setnames(managed.by.hour,'V1','load')
+
+# Scale managed and unmanaged to 40212.96 kWh total energy delivered. (sum elec.used before we remove level 3 charging)
+managed.by.hour[,load:=load * 40212.96/sum(load)]
+unmanaged[,load:=load * 40212.96/sum(load)]
+
+# Take the final 24 hours to make a 1 day schedule
+one.day.managed <- managed.by.hour[hour>=6&hour<30]
+one.day.unmanaged <- unmanaged[hour>=6]
+
+write.csv(one.day.managed,pp(path.to.outputs,'/',season,'-managed.csv'),row.names=F)
+write.csv(one.day.unmanaged,pp(path.to.outputs,'/',season,'-unmanaged.csv'),row.names=F)
+
 #write.csv(prof,file=pp(path.to.outputs,'load-profile.csv'))
 
 
-# Scale managed and unmanaged to 40212.96 kWh total energy delivered.
+
 
 

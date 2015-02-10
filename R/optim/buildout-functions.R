@@ -4,14 +4,15 @@ evaluate.fitness <- function(){
     stop('no cluster started')
   }
   #clusterEvalQ(cl,rm(list=ls()))
-  clusterExport(cl,c( 'run.buildout.batch','pev.penetration','path.to.inputs','optim.code','nl.path','path.to.outputs','seed','param.file','taz.charger.combos','charger.file','write.charger.file','reporters','pevi.home','vary.tab','streval','try.nl','debug.reporters','pevi.shared','build.increment','nl.obj','reference.charger.cost','reference.delay.cost'))
+  clusterExport(cl,c( 'run.buildout.batch','run.buildout.batch.one.itin','pev.penetration','path.to.inputs','optim.code','nl.path','path.to.outputs','seed','param.file','taz.charger.combos','charger.file','write.charger.file','reporters','pevi.home','vary.tab','streval','try.nl','debug.reporters','pevi.shared','build.increment','nl.obj','reference.charger.cost','reference.delay.cost','add.charger'))
   if(exists('batch.results'))rm('batch.results')
-  batch.results<-clusterApplyLB(cl,vary.tab$`driver-input-file`,fun='run.buildout.batch')
-  build.result<-batch.results[[1]]
-  for(i in 2:length(batch.results)){
-  	build.result <- rbind(build.result,batch.results[[i]])
+  if(length(vary.tab$`driver-input-file`)==1){
+    taz.charger.combos.inds <- which(taz.charger.combos$include)
+    batch.results<-clusterApplyLB(cl,taz.charger.combos.inds,fun='run.buildout.batch.one.itin')
+  }else{
+    batch.results<-clusterApplyLB(cl,vary.tab$`driver-input-file`,fun='run.buildout.batch')
   }
-  return(build.result)
+  return(ldply(batch.results,function(ll){ ll }))
 }
 
 init.netlogo <- function(){
@@ -22,6 +23,10 @@ init.netlogo <- function(){
 quit.netlogo <- function(){
   #	Quit the NetLogo instance
 	NLQuit()
+}
+
+add.charger <- function(new.taz,new.level){
+  NLCommand(paste('add-charger',new.taz,new.level,build.increment[pp('l',new.level)]))
 }
 
 run.buildout.batch <- function(driver.input.file){
@@ -78,23 +83,103 @@ run.buildout.batch <- function(driver.input.file){
   return(data.frame(input.i.result,rep=rep))
 }
 
+run.buildout.batch.one.itin <- function(taz.charger.combos.inds){
+  driver.input.file <- vary.tab$`driver-input-file`[1]
+  rep <- as.numeric(strsplit(strsplit(driver.input.file,'rep')[[1]][2],'-')[[1]][1])
+
+  # set the reference charger and delay costs
+  NLCommand(pp('set reference-charger-cost ',reference.charger.cost))
+  NLCommand(pp('set reference-delay-cost ',reference.delay.cost))
+
+  # Now we start a batch-run, and iterate through potential infrastructures.
+  NLCommand('setup-in-batch-mode')
+              
+  #	Iterate through every taz/charger combo
+  input.i.result <- ddply(taz.charger.combos[taz.charger.combos.inds,],.(taz,level),function(df) {
+      #	Add the candidate charger, then run the model.
+      NLCommand(paste('add-charger',df$taz,df$level,build.increment[pp('l',df$level)]))
+      NLCommand('time:go-until 500')
+          
+      total.charger.cost <-  tryCatch(NLReport('total-charger-cost'),error=function(e){ NA })
+      total.delay.cost <-  tryCatch(NLReport('total-delay-cost'),error=function(e){ NA })
+      objective <-  tryCatch(NLReport(nl.obj),error=function(e){ NA })
+
+      #	Reset for the next run, and delete the charger we added.
+      NLCommand('setup-in-batch-mode')	
+      NLCommand(paste('remove-charger',df$taz,df$level,build.increment[pp('l',df$level)]))
+      data.frame(obj = objective, total.charger.cost = total.charger.cost, total.delay.cost = total.delay.cost)
+  }) # end infrastructure testing - charger type count
+  
+  return(data.frame(input.i.result,rep=rep))
+}
+
 evaluate.baseline <- function(){
   if(!exists('cl')){
     stop('no cluster started')
   }
   #clusterEvalQ(cl,rm(list=ls()))
-  clusterExport(cl,c( 'run.baseline.batch','pev.penetration','path.to.inputs','optim.code','nl.path','path.to.outputs','seed','param.file','taz.charger.combos',
-                      'charger.file','write.charger.file','reporters','pevi.home','vary.tab','streval','try.nl','debug.reporters','pevi.shared','build.increment'
-                      ))
+  clusterExport(cl,c( 'run.baseline.batch','run.baseline.batch.one.itin','pev.penetration','path.to.inputs','optim.code','nl.path','path.to.outputs','seed','param.file','taz.charger.combos','charger.file','write.charger.file','reporters','pevi.home','vary.tab','streval','try.nl','debug.reporters','pevi.shared','build.increment','add.charger'))
   if(exists('batch.results'))rm('batch.results')
-  batch.results<-clusterApplyLB(cl,vary.tab$`driver-input-file`,fun='run.baseline.batch')
+  if(length(vary.tab$`driver-input-file`)==1){
+    # note this does redundant runs, but we need every node to do the setup actions, but we only keep one result
+    batch.results<-clusterCall(cl,fun='run.baseline.batch.one.itin')
+    batch.results <- batch.results[1]
+  }else{
+    batch.results<-clusterApplyLB(cl,vary.tab$`driver-input-file`,fun='run.baseline.batch')
+  }
   build.result<-batch.results[[1]]
-  for(i in 2:length(batch.results)){
-  	build.result <- rbind(build.result,batch.results[[i]])
+  if(length(batch.results)>1){
+    for(i in 2:length(batch.results)){
+      build.result <- rbind(build.result,batch.results[[i]])
+    }
   }
   return(build.result)
 }
 
+run.baseline.batch.one.itin <- function(){
+  driver.input.file <- vary.tab$`driver-input-file`
+  rep <- as.numeric(strsplit(strsplit(driver.input.file,'rep')[[1]][2],'-')[[1]][1])
+
+  NLCommand('clear-all-and-initialize') # Clear out the old file
+
+  # Set to fixed-seed if applicable.
+  if(!is.na(seed)){
+    NLCommand(paste('set starting-seed',seed))      
+    NLCommand('set fix-seed TRUE')
+  } else {
+    NLCommand('set fix-seed FALSE')
+  }
+      
+  # The params file pathways are all assumed to be based from pev-shared. We set a param-base variable in NetLogo
+  # to make this happen. The outputs folder is unchanged.
+  NLCommand(pp('set param-file-base "',pevi.shared,'"'))
+  NLCommand(paste('set parameter-file "',param.file,'"',sep=''))
+  NLCommand('read-parameter-file')
+      
+  # If a parameter change exists in vary.tab, we go through and read in the new parameters.
+  # Given how we are parallel programming batch-mode, I can't think of a way to do this without
+  # the blanket assumption that only driver input files are in vary.tab, as names aren't preserved
+  # when we break apart vary.tab for processing.
+      
+  if(is.character(driver.input.file)){
+    NLCommand(pp('set driver-input-file "',driver.input.file,'"'))
+  }else{
+    NLCommand(pp('set driver-input-file ',driver.input.file,''))
+  }
+
+  # set the charger input file
+  NLCommand(pp('set charger-input-file "',charger.file,'"'))
+
+  # Now we start a batch-run, and iterate through potential infrastructures.
+  NLCommand('setup-in-batch-mode')
+              
+  NLCommand('time:go-until 500')
+          
+  total.charger.cost <-  tryCatch(NLReport('total-charger-cost'),error=function(e){ NA })
+  total.delay.cost <-  tryCatch(NLReport('total-delay-cost'),error=function(e){ NA })
+
+  data.frame(total.charger.cost = total.charger.cost, total.delay.cost = total.delay.cost, rep=rep)
+}
 run.baseline.batch <- function(driver.input.file){
 
   rep <- as.numeric(strsplit(strsplit(driver.input.file,'rep')[[1]][2],'-')[[1]][1])

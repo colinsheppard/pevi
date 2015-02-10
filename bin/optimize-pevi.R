@@ -237,6 +237,7 @@ if(hot.start){
 # configure cluster and get RNetLogo running
 pevi.ver <- ifelse(args$version=="2.0","",pp("-v",args$version))
 model.path <- pp(pevi.home,"netlogo/PEVI",pevi.ver,"-nolog.nlogo")
+print(model.path)
 if(!exists('cl')){
   print('starting new cluster')
   cl <- makeCluster(c(rep(list(list(host="localhost")),num.cpu)),type="SOCK")

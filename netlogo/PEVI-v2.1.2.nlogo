@@ -1487,7 +1487,7 @@ SWITCH
 222
 log-charging
 log-charging
-1
+0
 1
 -1000
 
@@ -1631,7 +1631,7 @@ SWITCH
 92
 log-pain
 log-pain
-1
+0
 1
 -1000
 
@@ -1642,7 +1642,7 @@ SWITCH
 620
 log-tazs
 log-tazs
-1
+0
 1
 -1000
 
@@ -1655,7 +1655,7 @@ log-taz-time-interval
 log-taz-time-interval
 0
 60
-60
+5
 1
 1
 minutes
@@ -1668,7 +1668,7 @@ SWITCH
 94
 log-trip
 log-trip
-1
+0
 1
 -1000
 
@@ -2068,7 +2068,7 @@ Polygon -7500403 true true 270 75 225 30 30 225 75 270
 Polygon -7500403 true true 30 75 75 30 270 225 225 270
 
 @#$#@#$#@
-NetLogo 5.0.4
+NetLogo 5.0.5
 @#$#@#$#@
 @#$#@#$#@
 @#$#@#$#@

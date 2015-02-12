@@ -153,7 +153,7 @@ if(length(grep("animation",path.to.inputs))>0){
     file.remove(paste(outputs.dir,logger,"-out.csv",sep=''))
   }
 }
-save(logs,file=paste(path.to.inputs,'logs-veh-scens-v2.1.2.Rdata',sep=''))
+save(logs,file=paste(path.to.inputs,'logs-delhi-smart.Rdata',sep=''))
 #load(paste(path.to.inputs,'logs.Rdata',sep=''))
 
 #######################################

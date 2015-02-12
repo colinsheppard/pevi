@@ -3,14 +3,14 @@ options(java.parameters="-Xmx2048m")
 load.libraries(c('ggplot2','yaml','RNetLogo','plyr','reshape','stringr'))
 
 #exp.name <- commandArgs(trailingOnly=T)[1]
-exp.name <- 'upstate-ghg'
+exp.name <- 'smart-charging-demand'
 path.to.inputs <- pp(pevi.shared,'data/inputs/compare/',exp.name,'/')
 
 #to.log <- c('pain','charging','need-to-charge')
-#to.log <- c('pain','charging','tazs','trip')
+to.log <- c('pain','charging','tazs','trip')
 #to.log <- c('pain','charging')
 #to.log <- c('tazs','charging')
-to.log <- c('tazs')
+#to.log <- c('tazs')
 
 # load the reporters and loggers needed to summarize runs and disable logging
 source(paste(pevi.home,"R/reporters-loggers.R",sep=''))
@@ -134,7 +134,7 @@ if(length(grep("animation",path.to.inputs))>0){
     file.remove(paste(outputs.dir,logger,"-out.csv",sep=''))
   }
 }
-save(logs,file=paste(path.to.inputs,'logs-tazonly.Rdata',sep=''))
+save(logs,file=paste(path.to.inputs,'logs.Rdata',sep=''))
 #load(paste(path.to.inputs,'logs.Rdata',sep=''))
 
 #######################################

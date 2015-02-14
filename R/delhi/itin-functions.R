@@ -6,10 +6,12 @@ create.schedule <- function(pev.penetration,scale.dist.thresh=1,frac.end.at.home
    #scale.dist.thresh <- 2
    #frac.end.at.home <- 0.922
    #set.seed(1)
+  expected.num.drivers <- pev.penetration * num.veh.2027
 
   setkey(od.agg,'o','d')
   # note, these modes were chosen so that the final # trips per driver matched hh, which had an average value of 2.015
   od.counts <- od.agg[mode%in%c('car','pool-car','taxi','taxi-shared','x-car','two-wheeler'),list(trip.mean=sum(trips)*pev.penetration),by=c('o','d')]
+  od.counts[,trip.mean:=trip.mean*avg.trips.per.person.day*expected.num.drivers/sum(trip.mean)]
   od.counts[,':='(from=o,to=d,o=NULL,d=NULL)]
   # explode the od.counts frame to be on an hourly basis scaled by the epdfs
   od.counts <- data.table(from    = rep(od.counts$from,each=24),
@@ -41,7 +43,6 @@ create.schedule <- function(pev.penetration,scale.dist.thresh=1,frac.end.at.home
     available.drivers[[as.character(taz.i)]][['drivers']] <- data.frame(driver.id=rep(NA,num.counts),at.home=NA,hour=NA)
     available.drivers[[as.character(taz.i)]][['count']] <- 0
   }
-  expected.num.drivers <- pev.penetration * num.veh.2027
 
   home.drivers <- list()
   driver.count <- 0

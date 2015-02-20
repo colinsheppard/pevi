@@ -169,9 +169,12 @@ end
 to setup-drivers
   ;print "setup-drivers"
   
+  ;print "setup-vehicle-types"
   setup-vehicle-types
+  ;print "setup-itinerary"
   setup-itinerary
   
+  ;print "start-assigning"
   ; assing driver vehicles to a vehicle type
   ; first deal with drivers that must belong to certain vehicle types due to lengthy trips in their itinerary
   let #bev-types vehicle-types with [is-bev?]
@@ -213,20 +216,27 @@ to setup-drivers
     ]
   ]
   
+  ;print "assign remaining"
   ; second assign the remaining vehicle types to drivers according to the remainder
-  let #unassinged-drivers sort drivers with [this-vehicle-type = nobody]
-  ;print length #unassinged-drivers / count drivers 
+  let #unassinged-drivers structs:new-stack
+  ask drivers with [this-vehicle-type = nobody][
+    structs:stack-push #unassinged-drivers self
+  ]
+  ;print structs:stack-count #unassinged-drivers 
   let #available-types vehicle-types with [(frac-of-pevs * count drivers) - num-vehicles > 0 ]
   ask #available-types [  
-    while[(frac-of-pevs * count drivers) - num-vehicles > 0 and length #unassinged-drivers > 0 ][
-      ask one-of #unassinged-drivers [
+    while[(frac-of-pevs * count drivers) - num-vehicles > 0 and structs:stack-count #unassinged-drivers > 0 ][
+      let #unassinged-driver structs:stack-pop #unassinged-drivers
+      ask #unassinged-driver [
         set this-vehicle-type myself
-        set type-assignment-code 2
-        set #unassinged-drivers remove self #unassinged-drivers 
+        set type-assignment-code 2 
       ]
       set num-vehicles num-vehicles + 1
+      ;if num-vehicles mod 10000 = 0 [print num-vehicles]
     ]
   ]
+  ;print "give PHEV to remaining"
+  ;print count drivers with [this-vehicle-type = nobody]
   ; if drivers remaing unassigned, give them a PHEV
   ask drivers with [this-vehicle-type = nobody] [
     set this-vehicle-type one-of vehicle-types with [not is-bev?]
@@ -376,6 +386,7 @@ to setup-itinerary
     let this-driver 0
     while [file-at-end? = false] [
       set this-driver next-driver
+      ;if this-driver mod 10000 = 0 [print this-driver]
       create-drivers 1 [
         set id this-driver
         set itin-from n-values 1 [file-read]

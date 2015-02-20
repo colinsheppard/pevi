@@ -1,7 +1,7 @@
 
 exp.name <- 'smart-charging-demand'
 path.to.inputs <- pp(pevi.shared,'data/inputs/compare/',exp.name,'/')
-path.to.outputs <- pp(pevi.shared,'data/UPSTATE/results/managed-charging')
+path.to.outputs <- pp(pevi.shared,'data/DELHI/results/managed-charging')
 
 driver.schedules <- data.table(read.csv(pp(pevi.shared,'/data/inputs/compare/smart-charging-demand/driver-schedule-pen2-rep10-20140129.csv')))
 setkey(driver.schedules,driver,depart)
@@ -27,15 +27,10 @@ pain[,':='(time=time-6)]
 stranded.drivers <- unique(pain[pain.type=='stranded']$driver)
 trips <- data.table(subset(read.csv(pp(path.to.inputs,'trip-out.csv')), !driver%in%stranded.drivers))
 trips[,':='(time=time-6,end.time=end.time-6)]
-tazs <- data.table(subset(read.csv(pp(path.to.inputs,'tazs-out.csv')), time >= 5.99999 & time <= 36),key='taz')
-tazs[,':='(time=time-6)]
+#tazs <- data.table(subset(read.csv(pp(path.to.inputs,'tazs-out.csv')), time >= 5.99999 & time <= 36),key='taz')
+#tazs[,':='(time=time-6)]
 charging <- data.table(subset(read.csv(pp(path.to.inputs,'charging-out.csv')), !driver%in%stranded.drivers))
 charging[,':='(time=time-6)]
-
-# time.step defines the discritization used to bin charger availability (in hours)
-time.step <- 5/60
-time.steps <- seq(0,30,by=time.step)
-soc.per.time.step <- array(charger.power*time.step/batt.caps,dimnames=list(c('leaf','volt')))
 
 trips <- trips[vehicle.type=='leaf']
 # what soc is needed for each trip
@@ -108,7 +103,29 @@ tot.energy <- 50*750e3*.033 # 50 km/day, 750k drivers, 33Wh/km
 profile[,power:=power*tot.energy/sum(power)/1000] # now in MW
 
 # now convert to Plexos format
+ann.profile <- data.frame(hour=1:8760,frac.shiftable=NA,power=NA)
 
+ann.profile$frac.shiftable <- rep(profile$frac.shiftable,365)
+ann.profile$power <- rep(profile$power,365)
 
+weekend.inds <- c()
+for(i in 1:52){
+  if(i%%2==0){
+    weekend.inds <- c(weekend.inds,(25:48)+(i-2)*(24*7))
+  }else{
+    weekend.inds <- c(weekend.inds,(1:24)+(i-1)*(24*7))
+  }
+}
+# Based on PM measurements in Delhi:
+#http://www.academia.edu/9093533/WEEKDAY_WEEKEND_DIFFERENCES_IN_AIR_QUALITY_PARAMETERS_IN_DELHI_INDIA
+ann.profile$power[weekend.inds] <- ann.profile$power[weekend.inds] * 0.87
+
+ann.profile$hour  <- rep(1:24,365)
+ann.profile$day   <- rep(1:365,each=24)
+
+plexos.format <- cast(melt(ann.profile,id.vars=c('hour','day')),day ~ hour ~ variable)
+
+write.csv(plexos.format[,,2],file=pp(path.to.outputs,'/plexos-load.csv'))
+write.csv(plexos.format[,,1],file=pp(path.to.outputs,'/plexos-frac-shiftable.csv'))
 
 

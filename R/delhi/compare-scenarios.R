@@ -1,5 +1,5 @@
 Sys.setenv(NOAWT=1)
-options(java.parameters="-Xmx2048m")
+options(java.parameters="-Xmx8192m")
 load.libraries(c('ggplot2','yaml','RNetLogo','plyr','reshape','stringr'))
 
 #exp.name <- commandArgs(trailingOnly=T)[1]
@@ -10,8 +10,8 @@ path.to.inputs <- pp(pevi.shared,'data/inputs/compare/',exp.name,'/')
 #to.log <- c()
 #to.log <- 'pain'
 #to.log <- c('pain','charging')
-#to.log <- c('pain','charging','trip')
-to.log <- c('pain','charging','tazs','trip') # use this for animations
+to.log <- c('pain','charging','trip')
+#to.log <- c('pain','charging','tazs','trip') # use this for animations
 
 # load the reporters and loggers needed to summarize runs and disable logging
 source(paste(pevi.home,"R/reporters-loggers.R",sep=''))

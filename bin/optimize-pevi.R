@@ -30,7 +30,7 @@ if(substr(args$experimentdir,nchar(args$experimentdir),nchar(args$experimentdir)
 
 Sys.setenv(NOAWT=1)
 #options(java.parameters="-Xmx1024m")
-options(java.parameters="-Xmx2048m")
+options(java.parameters="-Xmx20g")
 
 source(pp(args$experimentdir,'params.R'))
 
@@ -239,7 +239,7 @@ model.path <- pp(pevi.home,"netlogo/PEVI",pevi.ver,"-nolog.nlogo")
 if(!exists('cl')){
   print('starting new cluster')
   cl <- makeCluster(c(rep(list(list(host="localhost")),num.cpu)),type="SOCK")
-  clusterEvalQ(cl,options(java.parameters="-Xmx2048m"))
+  clusterEvalQ(cl,options(java.parameters="-Xmx20g"))
   clusterEvalQ(cl,Sys.setenv(NOAWT=1))
   clusterEvalQ(cl,library('RNetLogo'))
   clusterExport(cl,c('init.netlogo','model.path','logfiles'))

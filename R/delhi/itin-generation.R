@@ -196,7 +196,7 @@ do.or.load(pp(pevi.shared,"data/DELHI/itin-generation/departure-time-dists.Rdata
 
 source(pp(pevi.home,'R/delhi/itin-functions.R',sep=''))
 
-replicates <- 5
+replicates <- 6
 time.distance$ft <- pp(time.distance$from,' ',time.distance$to)
 date.code <- '20150212'
 pev.penetration <- 0.05

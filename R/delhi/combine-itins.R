@@ -9,7 +9,7 @@ for(rep in c(1,2,3,4)){
 
 pool <- unique(ds[[4]]$X.driver)
 used.drivers <- c()
-for(rep in 3:1){
+for(rep in 1:3){
   # 759k is our 5% pen # of drivers and we multiply by 1.08 to adjust for irreduscible strandings in the model
   num.needed <- 1.08 * 759e3 - length(unique(ds[[rep]]$X.driver))
   to.use <- sample(pool,num.needed)
@@ -19,12 +19,14 @@ for(rep in 3:1){
   pool <- pool[!pool %in% to.use]
 
   if(rep>1){
-    for(rep.j in 1:(rep-1)){
-      itins.to.use <- ds[[rep.j]]
-      itins.to.use$X.driver <- itins.to.use$X.driver + max(ds[[rep]]$X.driver)
-      ds[[rep]] <- rbind(ds[[rep]],itins.to.use)
-    }
+    rep.j <- rep-1
+    itins.to.use <- ds[[rep.j]]
+    itins.to.use$X.driver <- itins.to.use$X.driver + max(ds[[rep]]$X.driver)
+    ds[[rep]] <- rbind(ds[[rep]],itins.to.use)
   }
+}
+
+for(rep in 1:3){
   write.table(ds[[rep]],pp(pevi.shared,'/data/inputs/driver-input-file/delhi-combined/half-homeless/driver-schedule-pen',(rep*5),'-rep1-20150212.txt'),sep='\t',row.names=F)
 }
 

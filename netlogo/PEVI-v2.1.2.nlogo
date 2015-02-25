@@ -1,7 +1,7 @@
 extensions [time profiler structs table]
 __includes["setup-v2.1.2.nls" "reporters.nls"]
 
-globals [    
+globals[
   seed-list
   seed-list-index
   
@@ -541,7 +541,7 @@ to seek-charger
   let #level-3-time-penalty 0
   let #level-3-time-penalty-for-origin-or-destination 0
   let #charger-exists-but-unavailable false
-  let #available-charger-types charger-types with [ (level <= 1) or ([name] of ([this-vehicle-type] of myself) != "low") ]
+  let #available-charger-types charger-types with [ (level <= 1) or ([name] of ([this-vehicle-type] of myself) != "two-wheel") ]
   
   if trip-distance * charge-safety-factor > 0.8 * battery-capacity / electric-fuel-consumption [
     set #level-3-time-penalty-for-origin-or-destination 999
@@ -1026,7 +1026,7 @@ to break-up-trip
   let #max-dist-only 0
   let #max-dist-taz 0
   let #result-action "-from-subset"
-  let #available-charger-types charger-types with [ (level <= 1) or ([name] of ([this-vehicle-type] of myself) != "low") ]
+  let #available-charger-types charger-types with [ (level <= 1) or ([name] of ([this-vehicle-type] of myself) != "two-wheel") ]
   foreach #cand-taz-list [
     set #this-taz ?
     let #this-score 0

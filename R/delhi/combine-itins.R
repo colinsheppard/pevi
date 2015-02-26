@@ -30,3 +30,16 @@ for(rep in 1:3){
   write.table(ds[[rep]],pp(pevi.shared,'/data/inputs/driver-input-file/delhi-combined/half-homeless/driver-schedule-pen',(rep*5),'-rep1-20150212.txt'),sep='\t',row.names=F)
 }
 
+# Now we take the existing drivers, make half of them homeless, and write to a new file.
+for(rep in 1:3){
+  homeless.drivers <- sample(unique(ds[[rep]]$X.driver),0.5*length(unique(ds[[rep]]$X.driver)))
+  driver.itins <- data.table(ds[[rep]])
+  driver.itins[X.driver%in%homeless.drivers,home:=0]
+  ds[[rep]] <- driver.itins
+  #### CHANGE THIS BACK TO HALF-HOMELESS ####
+  write.table(ds[[rep]],pp(pevi.shared,'/data/inputs/driver-input-file/delhi-combined/no-homeless/driver-schedule-pen',(rep*5),'-rep1-20150212.txt'),sep='\t',row.names=F)
+}
+
+
+# Andy - for your runs, you will need to put "half-homeless" into "no-homeless". Do not change the above write script, just add.
+	

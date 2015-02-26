@@ -79,8 +79,9 @@ do.or.load(pp(pevi.shared,'data/DELHI/itin-generation/hh-survey-with-2wheelers.R
   hh.by.home[['non.home.start']] <- data.table(hh[home.start==F],key=c("begin.int","km.int"))
   frac.end.at.home <- nrow(hh[home.end & tours.left.in.journey==0])/nrow(hh[tours.left.in.journey==0])
   frac.include.home <- nrow(hh[home.start | home.end])/nrow(hh)
-  list('hh'=hh,'hh.per'=hh.per,'hh.by.home'=hh.by.home,'frac.end.at.home'=frac.end.at.home,'frac.include.home'=frac.include.home)
+  list('hh'=hh,'hh.per'=hh.per,'hh.by.home'=hh.by.home,'frac.end.at.home'=frac.end.at.home,'frac.include.home'=frac.include.home,'avg.trips.per.person.day'=avg.trips.per.person.day)
 })
+avg.trips.per.person.day <- mean(hh.per$V1)
 
 # load od.agg and agg.taz.data
 load(pp(pevi.shared,'data/DELHI/tdfs-data/od-by-mode/od-agg.Rdata'))
@@ -195,9 +196,9 @@ do.or.load(pp(pevi.shared,"data/DELHI/itin-generation/departure-time-dists.Rdata
 
 source(pp(pevi.home,'R/delhi/itin-functions.R',sep=''))
 
-replicates <- 1:8
+replicates <- 6
 time.distance$ft <- pp(time.distance$from,' ',time.distance$to)
-date.code <- '20150128'
+date.code <- '20150212'
 pev.penetration <- 0.05
 pev.pen.char <- roundC(pev.penetration,3)
 #if(file.exists(pp(pevi.shared,'data/inputs/driver-input-file/delhi-uncombined-schedule-replicates-',date.code,'.Rdata',sep=''))){
@@ -230,6 +231,8 @@ for(replicate in replicates){
   write.table(sched,pp(pevi.shared,"data/inputs/driver-input-file/delhi-uncombined/driver-schedule-pen",pev.penetration*100,"-rep",replicate,"-",date.code,".txt",sep=''),sep="\t",row.names=F,quote=F)
   save(schedule.reps,file=pp(pevi.shared,'data/inputs/driver-input-file/delhi-uncombined/delhi-uncombined-schedule-replicates-',date.code,'-rep-',replicate,'.Rdata',sep=''))
 }
+
+
 schedule.reps.all <- list()
 if(is.null(schedule.reps.all[[pev.pen.char]]))schedule.reps.all[[pev.pen.char]] <- list()
 for(replicate in 1:8){

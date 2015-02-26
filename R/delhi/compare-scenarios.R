@@ -1,5 +1,5 @@
 Sys.setenv(NOAWT=1)
-options(java.parameters="-Xmx2048m")
+options(java.parameters="-Xmx8192m")
 load.libraries(c('ggplot2','yaml','RNetLogo','plyr','reshape','stringr'))
 
 #exp.name <- commandArgs(trailingOnly=T)[1]
@@ -9,8 +9,8 @@ path.to.inputs <- pp(pevi.shared,'data/inputs/compare/',exp.name,'/')
 
 #to.log <- c()
 #to.log <- 'pain'
-to.log <- c('pain','charging')
-#to.log <- c('pain','charging','trip')
+#to.log <- c('pain','charging')
+to.log <- c('pain','charging','trip')
 #to.log <- c('pain','charging','tazs','trip') # use this for animations
 
 # load the reporters and loggers needed to summarize runs and disable logging
@@ -153,7 +153,7 @@ if(length(grep("animation",path.to.inputs))>0){
     file.remove(paste(outputs.dir,logger,"-out.csv",sep=''))
   }
 }
-save(logs,file=paste(path.to.inputs,'logs-veh-scens-v2.1.2.Rdata',sep=''))
+save(logs,file=paste(path.to.inputs,'logs-delhi-smart.Rdata',sep=''))
 #load(paste(path.to.inputs,'logs.Rdata',sep=''))
 
 #######################################

@@ -1,7 +1,7 @@
 extensions [time profiler structs table]
 __includes["setup-v2.1.2.nls" "reporters.nls"]
 
-globals [    
+globals[
   seed-list
   seed-list-index
   
@@ -82,7 +82,7 @@ breed [chargers charger]
 breed [tazs taz]
 breed [charger-types charger-type]
 
-drivers-own [
+drivers-own[
 ;; VEHICLE
   this-vehicle-type              ; e.g. 'leaf' or 'volt'
   is-bev?
@@ -236,7 +236,6 @@ to run-with-profiler
   profiler:reset
   ;Stuff
 end
-
 
 ;;;;;;;;;;;;;;;;;;;;
 ;; SETUP 
@@ -542,6 +541,7 @@ to seek-charger
   let #level-3-time-penalty 0
   let #level-3-time-penalty-for-origin-or-destination 0
   let #charger-exists-but-unavailable false
+  let #available-charger-types charger-types with [ (level <= 1) or ([name] of ([this-vehicle-type] of myself) != "two-wheel") ]
   
   if trip-distance * charge-safety-factor > 0.8 * battery-capacity / electric-fuel-consumption [
     set #level-3-time-penalty-for-origin-or-destination 999
@@ -561,7 +561,7 @@ to seek-charger
   let #trip-energy-need  max (sentence 0 (trip-distance * charge-safety-factor * electric-fuel-consumption - state-of-charge * battery-capacity))
   let #journey-energy-need  max (sentence 0 (journey-distance * charge-safety-factor * electric-fuel-consumption - state-of-charge * battery-capacity))
 
-  foreach [sentence level charge-rate] of charger-types [
+  foreach [sentence level charge-rate] of #available-charger-types [
     let #trip-energy-need-limited #trip-energy-need
     let #journey-energy-need-limited #journey-energy-need
     ifelse item 0 ? != 3 [
@@ -591,7 +591,7 @@ to seek-charger
       ]
       set #extra-energy-for-travel #extra-distance-for-travel * electric-fuel-consumption * charge-safety-factor
 
-      foreach [level] of charger-types [
+      foreach [level] of #available-charger-types [
         let #level ?
         ; check to see if any charger on priviledged lists are available
         let #min-priviledged-cost 99
@@ -604,7 +604,7 @@ to seek-charger
           ]
         ] ; end permission-list loop
        
-        ifelse (num-available-chargers #this-taz #level > 0) and ((#level > 0) or ((#this-taz = home-taz) and #level = 0)) or (#min-priviledged-charger != nobody) [ 
+        ifelse(num-available-chargers #this-taz #level > 0) and ((#level > 0) or ((#this-taz = home-taz) and #level = 0)) or (#min-priviledged-charger != nobody) [ 
           let #this-charger-type one-of charger-types with [ level = #level ]
           let #this-charge-rate [charge-rate] of #this-charger-type
           ifelse #charger-in-origin-or-destination [
@@ -677,7 +677,6 @@ to seek-charger
                 (distance-from-to [id] of #this-taz [id] of destination-taz) (time-from-to [id] of current-taz [id] of #this-taz) (time-from-to [id] of #this-taz [id] of destination-taz)  ;;;LOG
                 trip-time trip-distance journey-distance charging-on-a-whim? time-until-depart (item #level #trip-charge-time-need-by-type) #this-cost #extra-time-until-end-charge         ;;;LOG
                 #full-charge-time-need #trip-charge-time-need #mid-journey-charge-time-need #mid-state-of-charge #use-permissioned-charger)  ;;;LOG
-
               ]
             ]
           ]
@@ -1027,6 +1026,7 @@ to break-up-trip
   let #max-dist-only 0
   let #max-dist-taz 0
   let #result-action "-from-subset"
+  let #available-charger-types charger-types with [ (level <= 1) or ([name] of ([this-vehicle-type] of myself) != "two-wheel") ]
   foreach #cand-taz-list [
     set #this-taz ?
     let #this-score 0
@@ -1035,7 +1035,7 @@ to break-up-trip
     if #this-dist <= remaining-range / charge-safety-factor and 
       ( (#only-level-3 and distance-from-to [id] of #this-taz [id] of destination-taz <= 0.8 * battery-capacity / electric-fuel-consumption / charge-safety-factor)
         or (not #only-level-3 and distance-from-to [id] of #this-taz [id] of destination-taz <= battery-capacity / electric-fuel-consumption / charge-safety-factor) ) [
-      foreach [level] of charger-types [
+      foreach [level] of #available-charger-types [
         let #level ?
         if (num-available-chargers #this-taz #level > 0) [
           ifelse #level = 0 [
@@ -1056,7 +1056,7 @@ to break-up-trip
   if log-break-up-trip-choice[ ;;;LOG
       foreach #cand-taz-list [ ;;;LOG
         set #this-taz ? ;;;LOG
-        foreach [level] of charger-types [ ;;;LOG
+        foreach [level] of #available-charger-types [ ;;;LOG
           log-data "available-chargers" (sentence ticks id [id] of current-taz [id] of home-taz [id] of #this-taz ? num-available-chargers #this-taz ?) ;;;LOG
         ] ;;;LOG
       ] ;;;LOG
@@ -1071,7 +1071,7 @@ to break-up-trip
       let #this-score 0
       let #this-dist distance-from-to [id] of current-taz [id] of #this-taz
       if #this-dist <= remaining-range / charge-safety-factor [
-        foreach [level] of charger-types [
+        foreach [level] of #available-charger-types [
           let #level ?
           let #total-num-chargers num-existing-chargers #this-taz #level
           if (#total-num-chargers > 0) [
@@ -1531,7 +1531,7 @@ SWITCH
 359
 log-seek-charger
 log-seek-charger
-1
+0
 1
 -1000
 
@@ -1575,7 +1575,7 @@ SWITCH
 400
 log-seek-charger-result
 log-seek-charger-result
-1
+0
 1
 -1000
 
@@ -1655,7 +1655,7 @@ log-taz-time-interval
 log-taz-time-interval
 0
 60
-60
+5
 1
 1
 minutes
@@ -2068,7 +2068,7 @@ Polygon -7500403 true true 270 75 225 30 30 225 75 270
 Polygon -7500403 true true 30 75 75 30 270 225 225 270
 
 @#$#@#$#@
-NetLogo 5.0.4
+NetLogo 5.0.5
 @#$#@#$#@
 @#$#@#$#@
 @#$#@#$#@

@@ -3,14 +3,14 @@ options(java.parameters="-Xmx2048m")
 load.libraries(c('ggplot2','yaml','RNetLogo','plyr','reshape','stringr'))
 
 #exp.name <- commandArgs(trailingOnly=T)[1]
-exp.name <- 'upstate-ghg'
+exp.name <- 'upstate-prius'
 path.to.inputs <- pp(pevi.shared,'data/inputs/compare/',exp.name,'/')
 
 #to.log <- c('pain','charging','need-to-charge')
 #to.log <- c('pain','charging','tazs','trip')
-#to.log <- c('pain','charging')
+to.log <- c('pain','charging','trip')
 #to.log <- c('tazs','charging')
-to.log <- c('tazs')
+#to.log <- c('tazs')
 
 # load the reporters and loggers needed to summarize runs and disable logging
 source(paste(pevi.home,"R/reporters-loggers.R",sep=''))
@@ -134,7 +134,7 @@ if(length(grep("animation",path.to.inputs))>0){
     file.remove(paste(outputs.dir,logger,"-out.csv",sep=''))
   }
 }
-save(logs,file=paste(path.to.inputs,'logs-tazonly.Rdata',sep=''))
+save(logs,file=paste(path.to.inputs,'logs.Rdata',sep=''))
 #load(paste(path.to.inputs,'logs.Rdata',sep=''))
 
 #######################################
@@ -172,6 +172,15 @@ ggplot(subset(logs[['pain']],pain.type=="delay"),aes(x=time,y=state.of.charge,co
 # CHARGING
 ggplot(subset(logs[['charging']],charger.level>0),aes(x=time,y=begin.soc,colour=factor(charger.level)))+geom_point()+facet_grid(penetration~replicate)
 ggplot(subset(logs[['charging']],charger.level>0),aes(x=time,y=begin.soc,colour=factor(charger.level)))+geom_point()+facet_grid(charge.safety.factor~replicate)
+
+# VMT for PHEV
+logs[['trip']]$gas.miles <- logs[['trip']]$gas.used/0.027
+logs[['trip']]$elec.miles <- logs[['trip']]$elec.used/0.35
+ddply(subset(logs[['trip']],vehicle.type!='leaf'),.(infrastructure.scenario.named),function(df){ sum(df$elec.miles)/sum(df$distance) })
+dists <- ddply(logs[['trip']],.(driver,replicate,infrastructure.scenario.named,vehicle.type),function(df){ sum(df$distance)})
+ggplot(subset(logs[['trip']],vehicle.type!='leaf'),aes(x=infrastructure.scenario.named,y= elec.miles/distance))+geom_point()+facet_wrap(~replicate)+geom_jitter()
+ggplot(subset(logs[['trip']],vehicle.type!='leaf' & infrastructure.scenario.named=="Chargers for 2%"),aes(x= elec.miles/distance))+geom_histogram()+facet_wrap(~vehicle.type)
+ggplot(subset(logs[['trip']],vehicle.type!='leaf' & infrastructure.scenario.named=="Chargers for 2%"),aes(x=distance,y=elec.miles/distance))+geom_point()+facet_wrap(~vehicle.type)
 
 
 #  show charging spatially

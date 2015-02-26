@@ -1,7 +1,7 @@
 extensions [time profiler structs table]
 __includes["setup-v2.1.2.nls" "reporters.nls"]
 
-globals [    
+globals[
   seed-list
   seed-list-index
   
@@ -82,7 +82,7 @@ breed [chargers charger]
 breed [tazs taz]
 breed [charger-types charger-type]
 
-drivers-own [
+drivers-own[
 ;; VEHICLE
   this-vehicle-type              ; e.g. 'leaf' or 'volt'
   is-bev?
@@ -236,7 +236,6 @@ to run-with-profiler
   profiler:reset
   ;Stuff
 end
-
 
 ;;;;;;;;;;;;;;;;;;;;
 ;; SETUP 
@@ -542,6 +541,7 @@ to seek-charger
   let #level-3-time-penalty 0
   let #level-3-time-penalty-for-origin-or-destination 0
   let #charger-exists-but-unavailable false
+  let #available-charger-types charger-types with [ (level <= 1) or ([name] of ([this-vehicle-type] of myself) != "two-wheel") ]
   
   if trip-distance * charge-safety-factor > 0.8 * battery-capacity / electric-fuel-consumption [
     set #level-3-time-penalty-for-origin-or-destination 999
@@ -561,7 +561,7 @@ to seek-charger
   let #trip-energy-need  max (sentence 0 (trip-distance * charge-safety-factor * electric-fuel-consumption - state-of-charge * battery-capacity))
   let #journey-energy-need  max (sentence 0 (journey-distance * charge-safety-factor * electric-fuel-consumption - state-of-charge * battery-capacity))
 
-  foreach [sentence level charge-rate] of charger-types [
+  foreach [sentence level charge-rate] of #available-charger-types [
     let #trip-energy-need-limited #trip-energy-need
     let #journey-energy-need-limited #journey-energy-need
     ifelse item 0 ? != 3 [
@@ -591,7 +591,7 @@ to seek-charger
       ]
       set #extra-energy-for-travel #extra-distance-for-travel * electric-fuel-consumption * charge-safety-factor
 
-      foreach [level] of charger-types [
+      foreach [level] of #available-charger-types [
         let #level ?
         ; check to see if any charger on priviledged lists are available
         let #min-priviledged-cost 99
@@ -604,7 +604,7 @@ to seek-charger
           ]
         ] ; end permission-list loop
        
-        ifelse (num-available-chargers #this-taz #level > 0) and ((#level > 0) or ((#this-taz = home-taz) and #level = 0)) or (#min-priviledged-charger != nobody) [ 
+        ifelse(num-available-chargers #this-taz #level > 0) and ((#level > 0) or ((#this-taz = home-taz) and #level = 0)) or (#min-priviledged-charger != nobody) [ 
           let #this-charger-type one-of charger-types with [ level = #level ]
           let #this-charge-rate [charge-rate] of #this-charger-type
           ifelse #charger-in-origin-or-destination [
@@ -677,7 +677,6 @@ to seek-charger
 ;;;                (distance-from-to [id] of #this-taz [id] of destination-taz) (time-from-to [id] of current-taz [id] of #this-taz) (time-from-to [id] of #this-taz [id] of destination-taz)  ;;;LOG
 ;;;                trip-time trip-distance journey-distance charging-on-a-whim? time-until-depart (item #level #trip-charge-time-need-by-type) #this-cost #extra-time-until-end-charge         ;;;LOG
 ;;;                #full-charge-time-need #trip-charge-time-need #mid-journey-charge-time-need #mid-state-of-charge #use-permissioned-charger)  ;;;LOG
-
               ]
             ]
           ]
@@ -700,7 +699,7 @@ to seek-charger
     ][
       set state "stranded"
       set itin-delay-amount replace-item current-itin-row itin-delay-amount (item current-itin-row itin-delay-amount + hard-strand-penalty)
-;;;      log-data "pain" (sentence ticks id [id] of current-taz [name] of this-vehicle-type "stranded" "" state-of-charge) ;;;LOG
+;;;      log-data "pain" (sentence ticks id [id] of current-taz [name] of this-vehicle-type "stranded" hard-strand-penalty state-of-charge) ;;;LOG
     ]
   ][
 ;;;    log-data "seek-charger-result" (sentence ticks seek-charger-index id ([id] of #min-taz) (#min-taz = current-taz or #min-taz = destination-taz) ([level] of #min-charger-type) #min-cost)  ;;;LOG
@@ -745,7 +744,7 @@ to wait-time-event-scheduler
       set itin-delay-amount replace-item current-itin-row itin-delay-amount (item current-itin-row itin-delay-amount + soft-strand-penalty)
 ;;;      log-data "wait-time" (sentence ticks id [name] of this-vehicle-type state-of-charge trip-distance journey-distance time-until-depart "stranded" -1 electric-fuel-consumption) ;;;LOG
 ;;;      log-data "trip-journey-timeuntildepart" (sentence ticks departure-time id [name] of this-vehicle-type state-of-charge [id] of current-taz [id] of destination-taz true false (departure-time - ticks) "stranded" remaining-range sum map weight-delay itin-delay-amount) ;;;LOG
-;;;      log-data "pain" (sentence ticks id [id] of current-taz [name] of this-vehicle-type "stranded" "" state-of-charge) ;;;LOG
+;;;      log-data "pain" (sentence ticks id [id] of current-taz [name] of this-vehicle-type "stranded" soft-strand-penalty state-of-charge) ;;;LOG
     ][
       let event-time-from-now random-exponential wait-time-mean
       time:schedule-event self task retry-seek ticks + event-time-from-now
@@ -1027,6 +1026,7 @@ to break-up-trip
   let #max-dist-only 0
   let #max-dist-taz 0
   let #result-action "-from-subset"
+  let #available-charger-types charger-types with [ (level <= 1) or ([name] of ([this-vehicle-type] of myself) != "two-wheel") ]
   foreach #cand-taz-list [
     set #this-taz ?
     let #this-score 0
@@ -1035,7 +1035,7 @@ to break-up-trip
     if #this-dist <= remaining-range / charge-safety-factor and 
       ( (#only-level-3 and distance-from-to [id] of #this-taz [id] of destination-taz <= 0.8 * battery-capacity / electric-fuel-consumption / charge-safety-factor)
         or (not #only-level-3 and distance-from-to [id] of #this-taz [id] of destination-taz <= battery-capacity / electric-fuel-consumption / charge-safety-factor) ) [
-      foreach [level] of charger-types [
+      foreach [level] of #available-charger-types [
         let #level ?
         if (num-available-chargers #this-taz #level > 0) [
           ifelse #level = 0 [
@@ -1056,7 +1056,7 @@ to break-up-trip
 ;;;  if log-break-up-trip-choice[ ;;;LOG
 ;;;      foreach #cand-taz-list [ ;;;LOG
 ;;;        set #this-taz ? ;;;LOG
-;;;        foreach [level] of charger-types [ ;;;LOG
+;;;        foreach [level] of #available-charger-types [ ;;;LOG
 ;;;          log-data "available-chargers" (sentence ticks id [id] of current-taz [id] of home-taz [id] of #this-taz ? num-available-chargers #this-taz ?) ;;;LOG
 ;;;        ] ;;;LOG
 ;;;      ] ;;;LOG
@@ -1071,7 +1071,7 @@ to break-up-trip
       let #this-score 0
       let #this-dist distance-from-to [id] of current-taz [id] of #this-taz
       if #this-dist <= remaining-range / charge-safety-factor [
-        foreach [level] of charger-types [
+        foreach [level] of #available-charger-types [
           let #level ?
           let #total-num-chargers num-existing-chargers #this-taz #level
           if (#total-num-chargers > 0) [
@@ -1101,7 +1101,7 @@ to break-up-trip
       ;; Nothing found, this driver is hard-stranded
       set state "stranded"
       set itin-delay-amount replace-item current-itin-row itin-delay-amount (item current-itin-row itin-delay-amount + hard-strand-penalty)
-;;;      log-data "pain" (sentence ticks id [id] of current-taz [name] of this-vehicle-type "stranded" "" state-of-charge) ;;;LOG      
+;;;      log-data "pain" (sentence ticks id [id] of current-taz [name] of this-vehicle-type "stranded" hard-strand-penalty state-of-charge) ;;;LOG      
     ][ 
       ; choose the furthest along and hope
 ;;;      log-data "break-up-trip-choice" (sentence ticks id ([id] of current-taz) ([id] of destination-taz) "max-distance" ([id] of #max-dist-taz) #max-dist-only) ;;;LOG
@@ -1124,7 +1124,7 @@ to travel-time-event-scheduler
     set itin-delay-amount replace-item current-itin-row itin-delay-amount (item current-itin-row itin-delay-amount + soft-strand-penalty)
 ;;;    log-data "wait-time" (sentence ticks id [name] of this-vehicle-type state-of-charge trip-distance journey-distance time-until-depart "stranded" -1 electric-fuel-consumption) ;;;LOG
 ;;;    log-data "trip-journey-timeuntildepart" (sentence ticks departure-time id [name] of this-vehicle-type state-of-charge [id] of current-taz [id] of destination-taz true false (departure-time - ticks) "stranded" remaining-range sum map weight-delay itin-delay-amount) ;;;LOG
-;;;    log-data "pain" (sentence ticks id [id] of current-taz [name] of this-vehicle-type "stranded" "" state-of-charge) ;;;LOG
+;;;    log-data "pain" (sentence ticks id [id] of current-taz [name] of this-vehicle-type "stranded" soft-strand-penalty state-of-charge) ;;;LOG
   ][
     set state "traveling" 
     ; AH update 12/8/14: using "set trip-time item current-od-index od-time" screws us over if they have an external trip. Be sure to use time-from-to
@@ -1476,7 +1476,7 @@ SWITCH
 176
 log-wait-time
 log-wait-time
-0
+1
 1
 -1000
 
@@ -1487,7 +1487,7 @@ SWITCH
 222
 log-charging
 log-charging
-0
+1
 1
 -1000
 
@@ -1498,7 +1498,7 @@ SWITCH
 268
 log-charge-time
 log-charge-time
-0
+1
 1
 -1000
 
@@ -1509,7 +1509,7 @@ SWITCH
 313
 log-need-to-charge
 log-need-to-charge
-0
+1
 1
 -1000
 
@@ -1520,7 +1520,7 @@ SWITCH
 130
 log-trip-journey-timeuntildepart
 log-trip-journey-timeuntildepart
-0
+1
 1
 -1000
 
@@ -1542,7 +1542,7 @@ SWITCH
 443
 log-break-up-trip
 log-break-up-trip
-0
+1
 1
 -1000
 
@@ -1553,7 +1553,7 @@ SWITCH
 489
 log-break-up-trip-choice
 log-break-up-trip-choice
-0
+1
 1
 -1000
 
@@ -1564,7 +1564,7 @@ SWITCH
 532
 log-charge-limiting-factor
 log-charge-limiting-factor
-0
+1
 1
 -1000
 
@@ -1575,7 +1575,7 @@ SWITCH
 400
 log-seek-charger-result
 log-seek-charger-result
-1
+0
 1
 -1000
 
@@ -1620,7 +1620,7 @@ SWITCH
 574
 log-drivers
 log-drivers
-0
+1
 1
 -1000
 
@@ -1631,7 +1631,7 @@ SWITCH
 92
 log-pain
 log-pain
-0
+1
 1
 -1000
 
@@ -1642,7 +1642,7 @@ SWITCH
 620
 log-tazs
 log-tazs
-0
+1
 1
 -1000
 
@@ -1655,7 +1655,7 @@ log-taz-time-interval
 log-taz-time-interval
 0
 60
-60
+5
 1
 1
 minutes
@@ -1668,7 +1668,7 @@ SWITCH
 94
 log-trip
 log-trip
-0
+1
 1
 -1000
 
@@ -1679,7 +1679,7 @@ SWITCH
 180
 log-summary
 log-summary
-0
+1
 1
 -1000
 
@@ -1723,7 +1723,7 @@ INPUTBOX
 832
 253
 starting-seed
-21
+1
 1
 0
 Number
@@ -1735,7 +1735,7 @@ SWITCH
 297
 fix-seed
 fix-seed
-0
+1
 1
 -1000
 

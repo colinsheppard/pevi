@@ -30,7 +30,7 @@ if(substr(args$experimentdir,nchar(args$experimentdir),nchar(args$experimentdir)
 
 Sys.setenv(NOAWT=1)
 #options(java.parameters="-Xmx1024m")
-options(java.parameters="-Xmx2048m")
+options(java.parameters="-Xmx20g")
 
 source(pp(args$experimentdir,'params.R'))
 
@@ -110,7 +110,6 @@ for(file.param in names(vary)[grep("-file",names(vary))]){
 
 # setup the data frame containing all combinations of those parameter values
 vary.tab.original <- expand.grid(vary,stringsAsFactors=F)
-#  vary.tab.original$row <- 1:nrow(vary.tab.original)
 
 if(push.end){
   if(length(seeds)>1)stop("seeds must be of length 1 when using 'pushend'")
@@ -240,7 +239,7 @@ model.path <- pp(pevi.home,"netlogo/PEVI",pevi.ver,"-nolog.nlogo")
 if(!exists('cl')){
   print('starting new cluster')
   cl <- makeCluster(c(rep(list(list(host="localhost")),num.cpu)),type="SOCK")
-  clusterEvalQ(cl,options(java.parameters="-Xmx2048m"))
+  clusterEvalQ(cl,options(java.parameters="-Xmx20g"))
   clusterEvalQ(cl,Sys.setenv(NOAWT=1))
   clusterEvalQ(cl,library('RNetLogo'))
   clusterExport(cl,c('init.netlogo','model.path','logfiles'))
@@ -293,15 +292,17 @@ for(seed in seeds[seed.inds]){ # COMMENT FOR MANUAL
     }
     write.table(charger.buildout,charger.file,quote=FALSE,sep='\t',row.names=FALSE)
     
+    # For Smart analysis, the # drivers is so high that we are not using replicates, therefore I've commented out stuff
+    # around restricting driver input files based on pen.ratio
+
     # Note that the expectation is that all pev penetrations beyond the first are even multiples of the first
     #if(pev.penetration == pev.penetrations[1]){
-      #vary.tab <- vary.tab.original
+      vary.tab <- vary.tab.original
     #}else{
-      pen.ratio <- pev.penetration/0.005
-      pen.ratio <- 1
-    	new.vary <- vary
-    	new.vary$'driver-input-file' <- new.vary$'driver-input-file'[1:round(length(vary$'driver-input-file')/pen.ratio)]
-    	vary.tab <- expand.grid(new.vary,stringsAsFactors=F)
+      #pen.ratio <- pev.penetration/pev.penetrations[1]
+    	#new.vary <- vary
+    	#new.vary$'driver-input-file' <- new.vary$'driver-input-file'[1:round(length(vary$'driver-input-file')/pen.ratio)]
+    	#vary.tab <- expand.grid(new.vary,stringsAsFactors=F)
     #}
     vary.tab$`driver-input-file` <- str_replace(vary.tab$`driver-input-file`,"penXXX",paste("pen",pev.penetration*100,sep=""))
 
@@ -392,10 +393,6 @@ for(seed in seeds[seed.inds]){ # COMMENT FOR MANUAL
       clusterCall(cl,fun='add.charger',new.taz=taz.charger.combos$taz[1],new.level=taz.charger.combos$level[1])
 			
       if(nl.obj == 'marginal-cost-to-reduce-delay'){
-        # If the 5-pt slope of delay/cost is greater than -10 (or 3-4 pt slope greater than -1), we're done 
-        win.sub <- subset(winner.history,penetration==pev.penetration)
-        slope.of.obj <- lm('mean.delay.cost ~ cum.cost',tail(win.sub,5))$coefficients[2]
-        #if((nrow(win.sub) >= 5 & slope.of.obj < -5) | (nrow(win.sub) %in% 3:4 & slope.of.obj < -1) | nrow(win.sub) < 3){
         # break if requested
         if(file.exists(pp(path.to.outputs,'BREAK'))){
           unlink(pp(path.to.outputs,'BREAK'))
@@ -403,10 +400,9 @@ for(seed in seeds[seed.inds]){ # COMMENT FOR MANUAL
           current.obj <- Inf
           break
         }
-        #if((pev.penetration == 0.005 & tail(winner.history$cum.cost,1) < 2.25e6) | (pev.penetration == 0.01 & tail(winner.history$cum.cost,1) < 3e6) | (pev.penetration == 0.02 & tail(winner.history$cum.cost,1) < 5e6)){
-        if(pev.penetration == 0.05 & tail(winner.history$cum.cost,1) < 15e6){
+        if(taz.charger.combos$obj[1] < 3){
           current.obj <- taz.charger.combos$obj[1]
-        } else {
+        }else{
           current.obj <- Inf
           break
         }

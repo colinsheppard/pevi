@@ -1,10 +1,11 @@
 Sys.setenv(NOAWT=1)
-options(java.parameters="-Xmx8192m")
+options(java.parameters="-Xmx30g")
 load.libraries(c('ggplot2','yaml','RNetLogo','plyr','reshape','stringr'))
 
 #exp.name <- commandArgs(trailingOnly=T)[1]
-exp.name <- 'delhi-baseline-pain'
-#exp.name <- 'delhi-animation'
+#exp.name <- 'delhi-baseline-pain'
+#exp.name <- 'delhi-smart-charging-demand'
+exp.name <- 'delhi-smart-quasi-reopt'
 path.to.inputs <- pp(pevi.shared,'data/inputs/compare/',exp.name,'/')
 
 #to.log <- c()
@@ -153,7 +154,8 @@ if(length(grep("animation",path.to.inputs))>0){
     file.remove(paste(outputs.dir,logger,"-out.csv",sep=''))
   }
 }
-save(logs,file=paste(path.to.inputs,'logs-delhi-smart.Rdata',sep=''))
+save(logs,file=paste(path.to.inputs,'logs.Rdata',sep=''))
+#save(logs,file=paste(path.to.inputs,'logs-delhi-smart.Rdata',sep=''))
 #load(paste(path.to.inputs,'logs.Rdata',sep=''))
 
 #######################################
@@ -187,7 +189,8 @@ for(log.file in to.log){
     }
   }
 }
-save(logs,file=paste(path.to.inputs,'logs-veh-scens-v2.1.2.Rdata',sep=''))
+#save(logs,file=paste(path.to.inputs,'logs-veh-scens-v2.1.2.Rdata',sep=''))
+save(logs,file=paste(path.to.inputs,'logs.Rdata',sep=''))
 #load(paste(path.to.inputs,'logs.Rdata',sep=''))
 
 #######################################
@@ -220,6 +223,77 @@ results.veh[,':='(driver.input.file=NULL,vehicle.type.input.file=NULL,itin.scena
 setkey(results.veh,penetration,vehicle.scenario.named)
 mean.results.veh <- results.veh[,list(num.drivers=mean(num.drivers),objective=mean(objective),total.delay=mean(total.delay),total.delay.cost=mean(total.delay.cost),num.stranded=mean(num.stranded)),by=c('penetration','vehicle.scenario.named')]
 mean.results.veh[vehicle.scenario.named=="All High"]
+
+#########################################
+# Home charger availability 50% vs 100%
+# ANDY - START RUNNING HERE TO ANALYZE RESULTS
+#########################################
+scen.names <- c('half-homeless'='50% Home Charging','no-homeless'='100% Home Charging')
+charging <- data.table(logs[['charging']])
+charging[,':='(time=time-6)]
+trips <- data.table(logs[['trip']])
+trips[,':='(time=time-6,end.time=end.time-6)]
+pain <- data.table(logs[['pain']])
+pain[,':='(time=time-6)]
+charging[,itin.scenario.named:=scen.names[itin.scenario]]
+
+driver.schedules <- data.table(read.csv(pp(pevi.shared,'/data/inputs/driver-input-file/delhi-combined/no-homeless/driver-schedule-pen5-rep1-20150212.txt'),sep='\t'))
+driver.schedules[,':='(driver=X.X.driver,X.X.driver=NULL)]
+setkey(driver.schedules,driver,depart)
+driver.home <- driver.schedules[,list(home=home[1]),by=driver]
+driver.home[,itin.scenario:='no-homeless']
+driver.schedules.half <- data.table(read.csv(pp(pevi.shared,'/data/inputs/driver-input-file/delhi-combined/half-homeless/driver-schedule-pen5-rep1-20150212.txt'),sep='\t'))
+driver.schedules.half[,':='(driver=X.X.driver,X.X.driver=NULL)]
+setkey(driver.schedules.half,driver,depart)
+driver.home.half <- driver.schedules.half[,list(home=home[1]),by=driver]
+driver.home.half[,itin.scenario:='half-homeless']
+driver.home <- rbindlist(list(driver.home,driver.home.half),use.names=T,fill=T)
+
+setkey(trips,driver,vehicle.type,itin.scenario)
+journey.dists <- trips[,list(dist=sum(distance)),by=c('driver','itin.scenario','vehicle.type')]
+#ggplot(journey.dists,aes(x=dist))+geom_histogram()+facet_wrap(itin.scenario~vehicle.type)+labs(x="Distance (km)",y="Count",title=pp("Travel Distances from PEVI output (n=",nrow(journey.dists),")"))+scale_x_continuous(limits=c(0,100))
+sum(journey.dists$dist>41.3)/nrow(journey.dists) # 8.5% of journey dists are greater than range of two-wheeler
+
+setkey(driver.home,driver,itin.scenario)
+setkey(trips,driver,itin.scenario)
+trips <- driver.home[trips]
+setkey(charging,driver,itin.scenario)
+charging <- driver.home[charging]
+charging[,at.home:=location==home]
+charging[,list(frac.at.home=sum(at.home,na.rm=T)/length(home)),by='itin.scenario']
+#ggplot(charging,aes(x=time,y=energy,colour=factor(charger.level)))+geom_point()+facet_wrap(at.home~itin.scenario)
+setkey(charging,charger.level,itin.scenario)
+charging[,length(u(charger.id)),by=c('itin.scenario','charger.level')]
+
+ggplot(charging[charger.level<=1],aes(x=time,fill=factor(charger.level)))+geom_histogram(binwidth=1,position='dodge')+facet_wrap(itin.scenario.named~infrastructure.scenario.named)+labs(x="Hour",y="Count",title="Charging Events by Time of Day and Level",fill='Charger Level')
+
+setkey(pain,itin.scenario.named,infrastructure.scenario,pain.type)
+pain[time>24*2+6 & time<24*3+6,list(length(time)),by=c('pain.type','infrastructure.scenario','itin.scenario.named')]
+
+# ANDY - END RUNNING HERE TO ANALYZE RESULTS
+
+#charging[,length(charger.id),by=c('itin.scenario','charger.level')]
+#ggplot(charging[charger.level<=1],aes(x=time,fill=factor(charger.level)))+geom_histogram(binwidth=1,position='dodge')+facet_wrap(itin.scenario.named~charger.infrastructure.scenario.named)+labs(x="Hour",y="Count",title="Charging Events by Time of Day and Level",fill='Charger Level')+geom_hline(yintercept=c(10200),color='grey')
+#charging[time<6,length(charger.id),by=c('itin.scenario','charger.level')]
+
+#charging[,hour:=floor(time)]
+#setkey(charging,charger.level,itin.scenario,hour)
+#charging[,length(u(driver)),by=c('itin.scenario','charger.level','hour')]
+
+#charging[time<=9.5 & time+duration>=9.5,length(time),by=c('itin.scenario','charger.level')]
+
+#vehs <- data.table(read.csv(pp(pevi.shared,'/data/inputs/vehicle-type-input-file/vehicle-types-scen-delhi-smart.txt'),sep='\t'))
+#vehs[,':='(name=X.name,X.name=NULL)]
+#batt.caps <- array(vehs$battery.capacity,dimnames=list(vehs$name))
+
+#charging[,battery.cap:=batt.caps[vehicle.type]]
+#setkey(charging,itin.scenario,driver)
+#socs <- charging[,list(begin.soc=begin.soc[1],end.soc=tail(end.soc,1),type=vehicle.type[1]),by=c('itin.scenario','driver')]
+#socs[,battery.cap:=batt.caps[type]]
+#socs[,net.energy.diff:=(end.soc - begin.soc)*battery.cap]
+#socs[,list(n=length(u(driver)),avg=mean(net.energy.diff),sum=sum(net.energy.diff)),by=itin.scenario]
+# total net increase in charge for drivers that *do* charge is 1026 MWh
+
 
 ############################
 # Charger utilization for pen 1%

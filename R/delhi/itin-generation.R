@@ -110,9 +110,16 @@ do.or.load(pp(pevi.shared,'data/DELHI/road-network/routing-with-gateways.Rdata')
 # Make some plots to describe the HH data and OD distance distribution
 if(F){
   hh$mode <- factor(hh$mode,levels=c('Auto','Shared Auto','Car','Pool Car','Taxi','Shared Taxi','Two Wheeler'))
+  hh$two.or.not <- as.character(hh$mode)
+  hh$two.or.not[!hh$two.or.not == 'Two Wheeler'] <- 'Cars&Autos'
+  ggplot(subset(hh,dist<100),aes(x=dist))+geom_histogram()+facet_wrap(~two.or.not)+labs(x="Distance (km)",y="Count",title=pp("Travel Distances from RITES Household Survey (n=",nrow(subset(hh,dist<100)),")"))+geom_vline(xintercept=41.3)
   ggplot(subset(hh,dist<100),aes(x=dist))+geom_histogram()+facet_wrap(~mode)+labs(x="Distance (km)",y="Count",title=pp("Travel Distances from RITES Household Survey (n=",nrow(subset(hh,dist<100)),")"))
   ggplot(hh.per,aes(x=factor(V1)))+geom_histogram()+labs(x="Trips per Person-Day",y="Count",title=pp("Trips per Person-Day from RITES Household Survey (n=",nrow(hh.per),")"))
   ggplot(hh,aes(x=depart))+geom_histogram(binwidth=1)+facet_wrap(~home.start)+labs(x="Departure Time",y="Count",title=pp("Departure Times by whether they begin from home")) + scale_x_continuous(limits=c(0,24))
+
+  setkey(hh,journey.id,two.or.not)
+  hh.journ <- hh[,list(dist=sum(dist)),by=c('journey.id','two.or.not')]
+  ggplot(subset(hh.journ,dist<200),aes(x=dist))+geom_histogram()+facet_wrap(~two.or.not)+labs(x="Distance (km)",y="Count",title=pp("Daily Travel Distances from RITES Household Survey (n=",nrow(subset(hh.journ,dist<200)),")"))+geom_vline(xintercept=41.3)
 
   od.agg.tmp <- od.agg
   od.agg.tmp[,':='(from=o,to=d,o=NULL,d=NULL)]
@@ -122,7 +129,18 @@ if(F){
     data.frame(km=unlist(apply(as.matrix(df),1,function(x){ rep(as.numeric(x['km']),round(as.numeric(x['trips']))) })))
   })
   levels(od.agg.tmp$mode) <- c('Auto','Shared Auto','Car','Pool Car','Taxi','Shared Taxi','Two-Wheeler','Car-x','Two-Wheeler-x')
+  od.agg.tmp <- subset(od.agg.tmp,mode%in%c('Car','Auto','Shared Auto','Shared Taxi','Taxi','Pool Car','Two-Wheeler'))
+  od.agg.tmp$two.or.not <- as.character(od.agg.tmp$mode)
+  od.agg.tmp$two.or.not[!od.agg.tmp$two.or.not == 'Two-Wheeler'] <- 'Cars&Autos'
+  ggplot(od.agg.tmp,aes(x=km))+geom_histogram()+facet_wrap(~two.or.not)+labs(x="Distance (km)",y="Count",title=pp("Travel Distances from RITES Travel Demand Model (n=",nrow(od.agg.tmp),")"))+scale_x_continuous(limits=c(0,100))
   ggplot(subset(od.agg.tmp,mode%in%c('Car','Auto','Shared Auto','Shared Taxi','Taxi','Pool Car','Two-Wheeler')),aes(x=km))+geom_histogram()+facet_wrap(~mode)+labs(x="Distance (km)",y="Count",title=pp("Travel Distances from RITES Travel Demand Model (n=",nrow(od.agg.tmp),")"))+scale_x_continuous(limits=c(0,100))
+
+  #hh.journ[,list(mn=mean(dist),md=median(dist)),by='two.or.not']
+      #two.or.not       mn md
+#1:  Cars&Autos 19.55308 12
+#2: Two Wheeler 18.49478 14
+  # 9% of daily journies in two wheeler with 45 km of range (and 1.1 factor of safety) can't be made on a full battery
+
 }
     
 # Load/Create the home distribution and nearest neighbors list

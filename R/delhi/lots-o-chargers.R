@@ -9,6 +9,21 @@ for(n in c(5,10,20,50,100,1000)){
   write.table(c,file=pp(pevi.shared,'data/inputs/charger-input-file/delhi/chargers-lots-',n,'.txt'),quote=F,row.names=F,sep='\t')
 }
 
+##########################################################################################
+#Smart Delhi
+load(pp(pevi.shared,'data/inputs/compare/delhi-baseline-pain/logs-delhi-smart.Rdata'))
+logs[['results']]$vehicle.type.input.file <- NA
+logs[['results']]$scen <- logs[['results']]$itin.scenario
+logs[['results']]$scen[logs[['results']]$scen=='no-homeless'] <- 'smart-no-homeless'
+logs[['results']]$scen[logs[['results']]$scen=='half-homeless'] <- 'smart-base'
+
+baseline.delay <- ddply(logs[['results']],.(penetration,scen),function(df){
+  data.frame(delay.cost=mean(df$total.delay.cost),min.delay.cost=min(df$total.delay.cost),total.delay=mean(df$total.delay),num.stranded=mean(df$num.stranded))
+})
+save(baseline.delay,file=pp(pevi.shared,'data/inputs/compare/delhi-baseline-pain/mean-delay-and-strand-smart.Rdata'))
+##########################################################################################
+
+
 all.res <- data.frame()
 load(pp(pevi.shared,'data/inputs/compare/delhi-baseline-pain/logs-no-homeless.Rdata'))
 logs[['results']]$scen <- 'no-homeless'

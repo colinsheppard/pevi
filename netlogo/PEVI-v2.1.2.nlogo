@@ -815,7 +815,7 @@ to charge-time-event-scheduler
     ][
       set next-event-scheduled-at ticks + min (sentence (random-exponential wait-time-mean) (time-until-depart - willing-to-roam-time-threshold))
     ]
-    print (sentence "end-charge-and-retry " ticks)
+    ;print (sentence "end-charge-and-retry " ticks)
     time:schedule-event self task end-charge-then-retry next-event-scheduled-at
   ][
     set next-event-scheduled-at ticks + time-until-end-charge

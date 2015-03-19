@@ -6,7 +6,6 @@ for(rep in c(1,2,3,4)){
 }
 
 # we need to use rep 4 to get 1-3 up to ~750k drivers
-
 pool <- unique(ds[[4]]$X.driver)
 used.drivers <- c()
 for(rep in 1:3){
@@ -27,6 +26,35 @@ for(rep in 1:3){
 }
 
 for(rep in 1:3){
-  write.table(ds[[rep]],pp(pevi.shared,'/data/inputs/driver-input-file/delhi-combined/half-homeless/driver-schedule-pen',(rep*5),'-rep1-20150212.txt'),sep='\t',row.names=F)
+  names(ds[[rep]]) <- c(';driver','from','to','depart','home')
+  write.table(ds[[rep]],pp(pevi.shared,'/data/inputs/driver-input-file/delhi-combined/no-homeless/driver-schedule-pen',(rep*5),'-rep1-20150212.txt'),sep='\t',row.names=F)
 }
 
+
+for(rep in 1:3){
+  tmp <- ds[[rep]]
+  for(new.day in 1:3){
+    tmp$depart <- tmp$depart + 24
+    ds[[rep]] <- rbind(ds[[rep]],tmp)
+  }
+  names(ds[[rep]]) <- c('driver','from','to','depart','home')
+  to.write <- data.table(ds[[rep]])
+  setkey(to.write,driver,depart)
+  names(to.write) <- c(';driver','from','to','depart','home')
+  write.table(to.write,pp(pevi.shared,'/data/inputs/driver-input-file/delhi-combined/no-homeless/driver-schedule-pen',(rep*5),'-rep1-4day-20150212.txt'),sep='\t',row.names=F,quote=F)
+}
+
+ds <- list()
+for(rep in 1:3){
+  ds[[rep]] <- read.table(pp(pevi.shared,'/data/inputs/driver-input-file/delhi-combined/half-homeless/driver-schedule-pen5-rep',rep,'-20150212.txt'),header=T,sep='\t')
+  tmp <- ds[[rep]]
+  for(new.day in 1:3){
+    tmp$depart <- tmp$depart + 24
+    ds[[rep]] <- rbind(ds[[rep]],tmp)
+  }
+  names(ds[[rep]]) <- c('driver','from','to','depart','home')
+  to.write <- data.table(ds[[rep]])
+  setkey(to.write,driver,depart)
+  names(to.write) <- c(';driver','from','to','depart','home')
+  write.table(to.write,pp(pevi.shared,'/data/inputs/driver-input-file/delhi-combined/half-homeless/driver-schedule-pen',(rep*5),'-rep1-4day-20150212.txt'),sep='\t',row.names=F,quote=F)
+}

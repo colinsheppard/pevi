@@ -66,6 +66,7 @@ globals[
   discount
   assign-phevs-to-extreme-drivers
   num-simulation-days
+  sleep-duration
   
   ;; Objective Function Params needed to optimize the model
   reference-charger-cost
@@ -101,6 +102,8 @@ drivers-own[
   destination-taz
   state-of-charge
   current-charger           ; nobody if not charging
+  asleep                    ; T/F
+  bedtime                   ; hour of the day
   
   itin-from 
   itin-to
@@ -747,6 +750,10 @@ to wait-time-event-scheduler
       log-data "pain" (sentence ticks id [id] of current-taz [name] of this-vehicle-type "stranded" soft-strand-penalty state-of-charge) ;;;LOG
     ][
       let event-time-from-now random-exponential wait-time-mean
+      let bedtime-today floor (25.5 / 24) * 24 + bedtime
+      if ticks + event-time-from-now > bedtime-today and ticks + event-time-from-now < bedtime-today + sleep-duration [
+         set event-time-from-now bedtime-today + sleep-duration
+      ]
       time:schedule-event self task retry-seek ticks + event-time-from-now
       log-data "wait-time" (sentence ticks id [name] of this-vehicle-type state-of-charge trip-distance journey-distance time-until-depart "retry-seek" event-time-from-now electric-fuel-consumption) ;;;LOG
     ]
@@ -757,6 +764,10 @@ to wait-time-event-scheduler
     ][
       let event-time-from-now min(sentence (random-exponential wait-time-mean) (time-until-depart - willing-to-roam-time-threshold))
       if event-time-from-now < 0 [ set event-time-from-now 0 ]
+      let bedtime-today floor (25.5 / 24) * 24 + bedtime
+      if ticks + event-time-from-now > bedtime-today and ticks + event-time-from-now < bedtime-today + sleep-duration [
+         set event-time-from-now bedtime-today + sleep-duration
+      ]
       time:schedule-event self task retry-seek ticks + event-time-from-now
       log-data "wait-time" (sentence ticks id [name] of this-vehicle-type state-of-charge trip-distance journey-distance time-until-depart "retry-seek" event-time-from-now electric-fuel-consumption) ;;;LOG
     ]
@@ -793,7 +804,8 @@ to charge-time-event-scheduler
                                                     charger-in-origin-or-destination 
                                                     [this-charger-type] of current-charger)
   let next-event-scheduled-at 0 
-  ifelse (not charging-on-a-whim?) and (time-until-end-charge > 0) and (time-until-end-charge < full-charge-time-need) and   
+  ifelse (not charging-on-a-whim?) and ([name] of ([this-vehicle-type] of self) != "two-wheel") and (time-until-end-charge > 0) and 
+    (time-until-end-charge < full-charge-time-need) and   
          (level-of current-charger < 3) and ;I think we can leave this unchanged with level 4 charging
          ( time-until-end-charge > time-until-depart or 
            ( (time-until-end-charge < journey-charge-time-need) and (time-until-depart > willing-to-roam-time-threshold) )
@@ -803,6 +815,7 @@ to charge-time-event-scheduler
     ][
       set next-event-scheduled-at ticks + min (sentence (random-exponential wait-time-mean) (time-until-depart - willing-to-roam-time-threshold))
     ]
+    print (sentence "end-charge-and-retry " ticks)
     time:schedule-event self task end-charge-then-retry next-event-scheduled-at
   ][
     set next-event-scheduled-at ticks + time-until-end-charge
@@ -1445,8 +1458,8 @@ SLIDER
 go-until-time
 go-until-time
 0
-100
-100
+200
+200
 0.5
 1
 NIL
@@ -1476,7 +1489,7 @@ SWITCH
 176
 log-wait-time
 log-wait-time
-1
+0
 1
 -1000
 
@@ -1531,7 +1544,7 @@ SWITCH
 359
 log-seek-charger
 log-seek-charger
-0
+1
 1
 -1000
 
@@ -1575,7 +1588,7 @@ SWITCH
 400
 log-seek-charger-result
 log-seek-charger-result
-0
+1
 1
 -1000
 
@@ -2068,7 +2081,7 @@ Polygon -7500403 true true 270 75 225 30 30 225 75 270
 Polygon -7500403 true true 30 75 75 30 270 225 225 270
 
 @#$#@#$#@
-NetLogo 5.0.5
+NetLogo 5.0.4
 @#$#@#$#@
 @#$#@#$#@
 @#$#@#$#@

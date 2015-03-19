@@ -41,7 +41,8 @@ to read-parameter-file
       ifelse param-name = "charger-permission-file" [set charger-permission-file word param-file-base file-read ][ 
       ifelse param-name = "assign-phevs-to-extreme-drivers" [set assign-phevs-to-extreme-drivers file-read ][ 
       ifelse param-name = "num-simulation-days" [set num-simulation-days file-read ][
-      ]]]]]]]]]]]]]]]]]]]]]]]]]]]]
+      ifelse param-name = "sleep-duration" [set sleep-duration file-read ][
+      ]]]]]]]]]]]]]]]]]]]]]]]]]]]]]
     ]
     file-close
   ][ 
@@ -49,6 +50,7 @@ to read-parameter-file
   ]
   ;; ASSING DEFAULT VALUES TO UNSET VARIABLES OR IMPOSSIBLE VALUES
   if num-simulation-days <= 0 [ set num-simulation-days 1 ]
+  if sleep-duration <= 0 [ set sleep-duration 7.5 ]
 end
 
 ;;;;;;;;;;;;;;;;;;;;
@@ -335,6 +337,7 @@ to initialize-drivers
       set time-until-end-charge 0
       set gasoline-used 0 
       set itin-complete? false
+      set bedtime 21.5 + random-float 2
       time:schedule-event self task morning-charge 0 
     ]
   ]

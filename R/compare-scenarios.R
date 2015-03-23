@@ -1,9 +1,9 @@
 Sys.setenv(NOAWT=1)
-options(java.parameters="-Xmx2048m")
+options(java.parameters="-Xmx30g")
 load.libraries(c('ggplot2','yaml','RNetLogo','plyr','reshape','stringr'))
 
 #exp.name <- commandArgs(trailingOnly=T)[1]
-exp.name <- 'consistent-vs-quadrupled'
+exp.name <- 'delhi-smart-quasi-reopt'
 path.to.inputs <- pp(pevi.shared,'data/inputs/compare/',exp.name,'/')
 
 #to.log <- c('pain','charging','need-to-charge')
@@ -70,7 +70,7 @@ for(cmd in paste('set log-',to.log,' true',sep='')){ NLCommand(cmd) }
 logs <- list()
 
 # for every combination of parameters, run the model and capture the summary statistics
-for(results.i in 1:nrow(results)){
+for(results.i in 4:nrow(results)){
 #results.i <- 1
   cat(paste(results.i,""))
   system('sleep 0.01')

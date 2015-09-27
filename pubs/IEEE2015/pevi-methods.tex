@@ -1,0 +1,1484 @@
+%% TODO / Ideas
+%
+% Adopt a convention on indices, with i being generic / local, z representing TAZ, k the charger, v the driver, p q r for itinerary, s, t, 
+%
+% Define a function to represent the nearest neighbors within searchDist/
+%
+
+
+%% bare_jrnl.tex
+%% V1.4a
+%% 2014/09/17
+%% by Michael Shell
+%% see http://www.michaelshell.org/
+%% for current contact information.
+%%
+%% This is a skeleton file demonstrating the use of IEEEtran.cls
+%% (requires IEEEtran.cls version 1.8a or later) with an IEEE
+%% journal paper.
+%%
+%% Support sites:
+%% http://www.michaelshell.org/tex/ieeetran/
+%% http://www.ctan.org/tex-archive/macros/latex/contrib/IEEEtran/
+%% and
+%% http://www.ieee.org/
+
+%%*************************************************************************
+%% Legal Notice:
+%% This code is offered as-is without any warranty either expressed or
+%% implied; without even the implied warranty of MERCHANTABILITY or
+%% FITNESS FOR A PARTICULAR PURPOSE! 
+%% User assumes all risk.
+%% In no event shall IEEE or any contributor to this code be liable for
+%% any damages or losses, including, but not limited to, incidental,
+%% consequential, or any other damages, resulting from the use or misuse
+%% of any information contained here.
+%%
+%% All comments are the opinions of their respective authors and are not
+%% necessarily endorsed by the IEEE.
+%%
+%% This work is distributed under the LaTeX Project Public License (LPPL)
+%% ( http://www.latex-project.org/ ) version 1.3, and may be freely used,
+%% distributed and modified. A copy of the LPPL, version 1.3, is included
+%% in the base LaTeX documentation of all distributions of LaTeX released
+%% 2003/12/01 or later.
+%% Retain all contribution notices and credits.
+%% ** Modified files should be clearly indicated as such, including  **
+%% ** renaming them and changing author support contact information. **
+%%
+%% File list of work: IEEEtran.cls, IEEEtran_HOWTO.pdf, bare_adv.tex,
+%%                    bare_conf.tex, bare_jrnl.tex, bare_conf_compsoc.tex,
+%%                    bare_jrnl_compsoc.tex, bare_jrnl_transmag.tex
+%%*************************************************************************
+
+
+% *** Authors should verify (and, if needed, correct) their LaTeX system  ***
+% *** with the testflow diagnostic prior to trusting their LaTeX platform ***
+% *** with production work. IEEE's font choices and paper sizes can       ***
+% *** trigger bugs that do not appear when using other class files.       ***                          ***
+% The testflow support page is at:
+% http://www.michaelshell.org/tex/testflow/
+
+
+\documentclass[journal]{IEEEtran}
+%
+% If IEEEtran.cls has not been installed into the LaTeX system files,
+% manually specify the path to it like:
+% \documentclass[journal]{../sty/IEEEtran}
+
+
+
+% Some very useful LaTeX packages include:
+% (uncomment the ones you want to load)
+
+% *** MISC UTILITY PACKAGES ***
+%
+%\usepackage{ifpdf}
+% Heiko Oberdiek's ifpdf.sty is very useful if you need conditional
+% compilation based on whether the output is pdf or dvi.
+% usage:
+% \ifpdf
+%   % pdf code
+% \else
+%   % dvi code
+% \fi
+% The latest version of ifpdf.sty can be obtained from:
+% http://www.ctan.org/tex-archive/macros/latex/contrib/oberdiek/
+% Also, note that IEEEtran.cls V1.7 and later provides a builtin
+% \ifCLASSINFOpdf conditional that works the same way.
+% When switching from latex to pdflatex and vice-versa, the compiler may
+% have to be run twice to clear warning/error messages.
+
+
+
+
+
+
+% *** CITATION PACKAGES ***
+%
+%\usepackage{cite}
+% cite.sty was written by Donald Arseneau
+% V1.6 and later of IEEEtran pre-defines the format of the cite.sty package
+% \cite{} output to follow that of IEEE. Loading the cite package will
+% result in citation numbers being automatically sorted and properly
+% "compressed/ranged". e.g., [1], [9], [2], [7], [5], [6] without using
+% cite.sty will become [1], [2], [5]--[7], [9] using cite.sty. cite.sty's
+% \cite will automatically add leading space, if needed. Use cite.sty's
+% noadjust option (cite.sty V3.8 and later) if you want to turn this off
+% such as if a citation ever needs to be enclosed in parenthesis.
+% cite.sty is already installed on most LaTeX systems. Be sure and use
+% version 5.0 (2009-03-20) and later if using hyperref.sty.
+% The latest version can be obtained at:
+% http://www.ctan.org/tex-archive/macros/latex/contrib/cite/
+% The documentation is contained in the cite.sty file itself.
+
+
+
+
+
+
+% *** GRAPHICS RELATED PACKAGES ***
+%
+\ifCLASSINFOpdf
+   \usepackage[pdftex]{graphicx}
+  % declare the path(s) where your graphic files are
+  % \graphicspath{{../pdf/}{../jpeg/}}
+  % and their extensions so you won't have to specify these with
+  % every instance of \includegraphics
+  % \DeclareGraphicsExtensions{.pdf,.jpeg,.png}
+\else
+  % or other class option (dvipsone, dvipdf, if not using dvips). graphicx
+  % will default to the driver specified in the system graphics.cfg if no
+  % driver is specified.
+  % \usepackage[dvips]{graphicx}
+  % declare the path(s) where your graphic files are
+  % \graphicspath{{../eps/}}
+  % and their extensions so you won't have to specify these with
+  % every instance of \includegraphics
+  % \DeclareGraphicsExtensions{.eps}
+\fi
+% graphicx was written by David Carlisle and Sebastian Rahtz. It is
+% required if you want graphics, photos, etc. graphicx.sty is already
+% installed on most LaTeX systems. The latest version and documentation
+% can be obtained at: 
+% http://www.ctan.org/tex-archive/macros/latex/required/graphics/
+% Another good source of documentation is "Using Imported Graphics in
+% LaTeX2e" by Keith Reckdahl which can be found at:
+% http://www.ctan.org/tex-archive/info/epslatex/
+%
+% latex, and pdflatex in dvi mode, support graphics in encapsulated
+% postscript (.eps) format. pdflatex in pdf mode supports graphics
+% in .pdf, .jpeg, .png and .mps (metapost) formats. Users should ensure
+% that all non-photo figures use a vector format (.eps, .pdf, .mps) and
+% not a bitmapped formats (.jpeg, .png). IEEE frowns on bitmapped formats
+% which can result in "jaggedy"/blurry rendering of lines and letters as
+% well as large increases in file sizes.
+%
+% You can find documentation about the pdfTeX application at:
+% http://www.tug.org/applications/pdftex
+
+
+
+
+
+% *** MATH PACKAGES ***
+%
+\usepackage[cmex10]{amsmath}
+\usepackage{amsfonts}
+% A popular package from the American Mathematical Society that provides
+% many useful and powerful commands for dealing with mathematics. If using
+% it, be sure to load this package with the cmex10 option to ensure that
+% only type 1 fonts will utilized at all point sizes. Without this option,
+% it is possible that some math symbols, particularly those within
+% footnotes, will be rendered in bitmap form which will result in a
+% document that can not be IEEE Xplore compliant!
+%
+% Also, note that the amsmath package sets \interdisplaylinepenalty to 10000
+% thus preventing page breaks from occurring within multiline equations. Use:
+%\interdisplaylinepenalty=2500
+% after loading amsmath to restore such page breaks as IEEEtran.cls normally
+% does. amsmath.sty is already installed on most LaTeX systems. The latest
+% version and documentation can be obtained at:
+% http://www.ctan.org/tex-archive/macros/latex/required/amslatex/math/
+
+\usepackage{accents}
+\usepackage{textcomp}
+\newcommand{\ubar}[1]{\underaccent{\bar}{#1}}
+\providecommand{\myfloor}[1]{\left \lfloor #1 \right \rfloor }
+\providecommand{\myceil}[1]{\left \lceil #1 \right \rceil }
+\usepackage{bm}
+
+
+% *** SPECIALIZED LIST PACKAGES ***
+\usepackage{enumitem}
+
+%\usepackage{algorithmic}
+% algorithmic.sty was written by Peter Williams and Rogerio Brito.
+% This package provides an algorithmic environment fo describing algorithms.
+% You can use the algorithmic environment in-text or within a figure
+% environment to provide for a floating algorithm. Do NOT use the algorithm
+% floating environment provided by algorithm.sty (by the same authors) or
+% algorithm2e.sty (by Christophe Fiorio) as IEEE does not use dedicated
+% algorithm float types and packages that provide these will not provide
+% correct IEEE style captions. The latest version and documentation of
+% algorithmic.sty can be obtained at:
+% http://www.ctan.org/tex-archive/macros/latex/contrib/algorithms/
+% There is also a support site at:
+% http://algorithms.berlios.de/index.html
+% Also of interest may be the (relatively newer and more customizable)
+% algorithmicx.sty package by Szasz Janos:
+% http://www.ctan.org/tex-archive/macros/latex/contrib/algorithmicx/
+
+
+
+
+% *** ALIGNMENT PACKAGES ***
+%
+\usepackage{array}
+\usepackage{longtable}
+% Frank Mittelbach's and David Carlisle's array.sty patches and improves
+% the standard LaTeX2e array and tabular environments to provide better
+% appearance and additional user controls. As the default LaTeX2e table
+% generation code is lacking to the point of almost being broken with
+% respect to the quality of the end results, all users are strongly
+% advised to use an enhanced (at the very least that provided by array.sty)
+% set of table tools. array.sty is already installed on most systems. The
+% latest version and documentation can be obtained at:
+% http://www.ctan.org/tex-archive/macros/latex/required/tools/
+
+
+% IEEEtran contains the IEEEeqnarray family of commands that can be used to
+% generate multiline equations as well as matrices, tables, etc., of high
+% quality.
+
+
+
+
+% *** SUBFIGURE PACKAGES ***
+%\ifCLASSOPTIONcompsoc
+%  \usepackage[caption=false,font=normalsize,labelfont=sf,textfont=sf]{subfig}
+%\else
+%  \usepackage[caption=false,font=footnotesize]{subfig}
+%\fi
+% subfig.sty, written by Steven Douglas Cochran, is the modern replacement
+% for subfigure.sty, the latter of which is no longer maintained and is
+% incompatible with some LaTeX packages including fixltx2e. However,
+% subfig.sty requires and automatically loads Axel Sommerfeldt's caption.sty
+% which will override IEEEtran.cls' handling of captions and this will result
+% in non-IEEE style figure/table captions. To prevent this problem, be sure
+% and invoke subfig.sty's "caption=false" package option (available since
+% subfig.sty version 1.3, 2005/06/28) as this is will preserve IEEEtran.cls
+% handling of captions.
+% Note that the Computer Society format requires a larger sans serif font
+% than the serif footnote size font used in traditional IEEE formatting
+% and thus the need to invoke different subfig.sty package options depending
+% on whether compsoc mode has been enabled.
+%
+% The latest version and documentation of subfig.sty can be obtained at:
+% http://www.ctan.org/tex-archive/macros/latex/contrib/subfig/
+
+
+
+
+% *** FLOAT PACKAGES ***
+%
+%\usepackage{fixltx2e}
+% fixltx2e, the successor to the earlier fix2col.sty, was written by
+% Frank Mittelbach and David Carlisle. This package corrects a few problems
+% in the LaTeX2e kernel, the most notable of which is that in current
+% LaTeX2e releases, the ordering of single and double column floats is not
+% guaranteed to be preserved. Thus, an unpatched LaTeX2e can allow a
+% single column figure to be placed prior to an earlier double column
+% figure. The latest version and documentation can be found at:
+% http://www.ctan.org/tex-archive/macros/latex/base/
+
+
+%\usepackage{stfloats}
+% stfloats.sty was written by Sigitas Tolusis. This package gives LaTeX2e
+% the ability to do double column floats at the bottom of the page as well
+% as the top. (e.g., "\begin{figure*}[!b]" is not normally possible in
+% LaTeX2e). It also provides a command:
+%\fnbelowfloat
+% to enable the placement of footnotes below bottom floats (the standard
+% LaTeX2e kernel puts them above bottom floats). This is an invasive package
+% which rewrites many portions of the LaTeX2e float routines. It may not work
+% with other packages that modify the LaTeX2e float routines. The latest
+% version and documentation can be obtained at:
+% http://www.ctan.org/tex-archive/macros/latex/contrib/sttools/
+% Do not use the stfloats baselinefloat ability as IEEE does not allow
+% \baselineskip to stretch. Authors submitting work to the IEEE should note
+% that IEEE rarely uses double column equations and that authors should try
+% to avoid such use. Do not be tempted to use the cuted.sty or midfloat.sty
+% packages (also by Sigitas Tolusis) as IEEE does not format its papers in
+% such ways.
+% Do not attempt to use stfloats with fixltx2e as they are incompatible.
+% Instead, use Morten Hogholm'a dblfloatfix which combines the features
+% of both fixltx2e and stfloats:
+%
+% \usepackage{dblfloatfix}
+% The latest version can be found at:
+% http://www.ctan.org/tex-archive/macros/latex/contrib/dblfloatfix/
+
+
+
+
+%\ifCLASSOPTIONcaptionsoff
+%  \usepackage[nomarkers]{endfloat}
+% \let\MYoriglatexcaption\caption
+% \renewcommand{\caption}[2][\relax]{\MYoriglatexcaption[#2]{#2}}
+%\fi
+% endfloat.sty was written by James Darrell McCauley, Jeff Goldberg and 
+% Axel Sommerfeldt. This package may be useful when used in conjunction with 
+% IEEEtran.cls'  captionsoff option. Some IEEE journals/societies require that
+% submissions have lists of figures/tables at the end of the paper and that
+% figures/tables without any captions are placed on a page by themselves at
+% the end of the document. If needed, the draftcls IEEEtran class option or
+% \CLASSINPUTbaselinestretch interface can be used to increase the line
+% spacing as well. Be sure and use the nomarkers option of endfloat to
+% prevent endfloat from "marking" where the figures would have been placed
+% in the text. The two hack lines of code above are a slight modification of
+% that suggested by in the endfloat docs (section 8.4.1) to ensure that
+% the full captions always appear in the list of figures/tables - even if
+% the user used the short optional argument of \caption[]{}.
+% IEEE papers do not typically make use of \caption[]'s optional argument,
+% so this should not be an issue. A similar trick can be used to disable
+% captions of packages such as subfig.sty that lack options to turn off
+% the subcaptions:
+% For subfig.sty:
+% \let\MYorigsubfloat\subfloat
+% \renewcommand{\subfloat}[2][\relax]{\MYorigsubfloat[]{#2}}
+% However, the above trick will not work if both optional arguments of
+% the \subfloat command are used. Furthermore, there needs to be a
+% description of each subfigure *somewhere* and endfloat does not add
+% subfigure captions to its list of figures. Thus, the best approach is to
+% avoid the use of subfigure captions (many IEEE journals avoid them anyway)
+% and instead reference/explain all the subfigures within the main caption.
+% The latest version of endfloat.sty and its documentation can obtained at:
+% http://www.ctan.org/tex-archive/macros/latex/contrib/endfloat/
+%
+% The IEEEtran \ifCLASSOPTIONcaptionsoff conditional can also be used
+% later in the document, say, to conditionally put the References on a 
+% page by themselves.
+
+
+
+
+% *** PDF, URL AND HYPERLINK PACKAGES ***
+%
+%\usepackage{url}
+% url.sty was written by Donald Arseneau. It provides better support for
+% handling and breaking URLs. url.sty is already installed on most LaTeX
+% systems. The latest version and documentation can be obtained at:
+% http://www.ctan.org/tex-archive/macros/latex/contrib/url/
+% Basically, \url{my_url_here}.
+
+
+
+
+% *** Do not adjust lengths that control margins, column widths, etc. ***
+% *** Do not use packages that alter fonts (such as pslatex).         ***
+% There should be no need to do such things with IEEEtran.cls V1.6 and later.
+% (Unless specifically asked to do so by the journal or conference you plan
+% to submit to, of course. )
+
+
+% correct bad hyphenation here
+\hyphenation{op-tical net-works semi-conduc-tor}
+
+
+\begin{document}
+%
+% paper title
+% Titles are generally capitalized except for words such as a, an, and, as,
+% at, but, by, for, in, nor, of, on, or, the, to and up, which are usually
+% not capitalized unless they are the first or last word of the title.
+% Linebreaks \\ can be used within to get better formatting as desired.
+% Do not put math or special symbols in the title.
+\title{Cost-Optimal Siting of Electric Vehicle Charging Infrastructure with Agent-Based Modeling}
+%
+%
+% author names and IEEE memberships
+% note positions of commas and nonbreaking spaces ( ~ ) LaTeX will not break
+% a structure at a ~ so this keeps an author's name from being broken across
+% two lines.
+% use \thanks{} to gain access to the first footnote area
+% a separate \thanks must be used for each paragraph as LaTeX2e's \thanks
+% was not built to handle multiple paragraphs
+%
+
+\author{Colin J.R. Sheppard$^{1,2}$, Andrew Harris$^2$%, Anand Gopal$^3$
+\thanks{1 - Univ. of California, Berkeley, Department of Transportation Engineering; ~ 2 - Schatz Energy Research Center, Humboldt State University}}
+  %; ~ 3 - Lawrence Berkeley National Laboratory}}
+
+% note the % following the last \IEEEmembership and also \thanks - 
+% these prevent an unwanted space from occurring between the last author name
+% and the end of the author line. i.e., if you had this:
+% 
+% \author{....lastname \thanks{...} \thanks{...} }
+%                     ^------------^------------^----Do not want these spaces!
+%
+% a space would be appended to the last name and could cause every name on that
+% line to be shifted left slightly. This is one of those "LaTeX things". For
+% instance, "\textbf{A} \textbf{B}" will typeset as "A B" not "AB". To get
+% "AB" then you have to do: "\textbf{A}\textbf{B}"
+% \thanks is no different in this regard, so shield the last } of each \thanks
+% that ends a line with a % and do not let a space in before the next \thanks.
+% Spaces after \IEEEmembership other than the last one are OK (and needed) as
+% you are supposed to have spaces between the names. For what it is worth,
+% this is a minor point as most people would not even notice if the said evil
+% space somehow managed to creep in.
+
+
+
+% The paper headers
+\markboth{Journal of \LaTeX\ Class Files,~Vol.~13, No.~9, September~2014}%
+{Shell \MakeLowercase{\textit{et al.}}: Bare Demo of IEEEtran.cls for Journals}
+% The only time the second header will appear is for the odd numbered pages
+% after the title page when using the twoside option.
+% 
+% *** Note that you probably will NOT want to include the author's ***
+% *** name in the headers of peer review papers.                   ***
+% You can use \ifCLASSOPTIONpeerreview for conditional compilation here if
+% you desire.
+
+
+
+
+% If you want to put a publisher's ID mark on the page you can do it like
+% this:
+%\IEEEpubid{0000--0000/00\$00.00~\copyright~2014 IEEE}
+% Remember, if you use this you must call \IEEEpubidadjcol in the second
+% column for its text to clear the IEEEpubid mark.
+
+
+
+% use for special paper notices
+%\IEEEspecialpapernotice{(Invited Paper)}
+
+
+
+
+% make the title area
+\maketitle
+
+% As a general rule, do not put math, special symbols or citations
+% in the abstract or keywords.
+\begin{abstract}
+The abstract goes here.
+\end{abstract}
+
+% Note that keywords are not normally used for peerreview papers.
+\begin{IEEEkeywords}
+KEYWORDS HERE
+\end{IEEEkeywords}
+
+
+
+
+
+
+% For peer review papers, you can put extra information on the cover
+% page as needed:
+% \ifCLASSOPTIONpeerreview
+% \begin{center} \bfseries EDICS Category: 3-BBND \end{center}
+% \fi
+%
+% For peerreview papers, this IEEEtran command inserts a page break and
+% creates the second title. It will be ignored for other modes.
+\IEEEpeerreviewmaketitle
+
+
+
+\section{Introduction}
+% The very first letter is a 2 line initial drop letter followed
+% by the rest of the first word in caps.
+% 
+% form to use if the first word consists of a single letter:
+% \IEEEPARstart{A}{demo} file is ....
+% 
+% form to use if you need the single drop letter followed by
+% normal text (unknown if ever used by IEEE):
+% \IEEEPARstart{A}{}demo file is ....
+% 
+% Some journals put the first two words in caps:
+% \IEEEPARstart{T}{his demo} file is ....
+% 
+% Here we have the typical use of a "T" for an initial drop letter
+% and "HIS" in caps to complete the first word.
+\IEEEPARstart{P}{lug-in} electric vehicles (PEVs) represent a significant opportunity for governments to reduce emissions of both air pollutants and greenhouse gases, in addition to reducing their dependency on foreign sources of energy. Public PEV charging infrastructure is a critical component to accelerate the adoption of PEVs. Installation of infrastructure for PEV charging is typically less expensive than for petroleum fueling but still requires significant capital investment. Comprehensive planning analysis prior to the rollout of electric vehicle charging stations (EVCS) can ensure that charging stations are optimally sited, providing the best returns on investment while also meeting critical service requirements.
+
+Previous attempts to conduct charger siting and PEV/grid impact studies have fallen into three broad categories: cartographic analyses, statistical models based on travel surveys, and spatially-enabled statistical modeling. The following summarizes these approaches and presents an alternative approach, agent-based modeling, used by the authors for several regional infrastructure deployment plans.
+
+Cartographic analyses make use of transportation demand estimates, spatially explicit demographic data sets, and expected PEV adoption to develop heat maps that highlight the relative need for EVCS \cite{international_bay_2012} \cite{innovation_southern_2012} \cite{houston_electric_2011} \cite{melaina_california_2014} \cite{institute_plug-electric_2011}. These analyses are useful for broad-brush planning and policy recommendations. But because they lack any detail at the scale of individual drivers and individual transactions with EVCS, they are incapable of quantitatively assessing spatio-temporal dynamics associated with distributed demand for electricity.
+
+Statistical models based on travel surveys are common for investigating the impact of PEVs on bulk power transmission and large-scale resource adequacy, in addition to developing control algorithms for managing the charging of PEVs \cite{jansen_emissions_2010} \cite{zhang_evaluation_2013} \cite{zhang_coordinating_2014} \cite{xu_optimal_2013}. These efforts have the advantage of simulating charging behavior and other dynamics at the level of individual drivers and are temporally explicit, but they lack the spatial dimension and therefore fail to inform regional planners and policy-makers as to how their results apply within a specific region.
+
+Finally, others have developed spatially explicit models \cite{nicholas_california_2013} \cite{kearney_electric_2009} \cite{xu_optimal_2013}, which are capable of producing regionally actionable recommendations for charging infrastructure siting. Nicolous et al. used spatially explicit transportation survey results coupled with a simulation of PEV driving along those routes, to spatially located chargers throughout the California road network. What their analysis did not attempt was to simulate the interactions of PEV drivers competing for limited charging resources. Xu et al. have developed a more formalized optimization scheme for siting centralized EVCS resources. Their analysis is a rigorous approach to spatially explicit infrastructure siting, though it also lacks NEED CRIT HERE. \cite{kearney_electric_2009} expanded on a model \cite{struben_transition_2007} which only considers public charging infrastructure insofar as it facilitates or hinders diffusion of PEVs into the auto market. Their analysis is important to consider in a policy context but it does not simulate charging behavior in a manner that is suitable for high resolution EVCS siting recommendations.
+
+Stephens 2010 (ABM)?.
+Look at Dong 2014 and Yilmaz 2013
+elbanhawy-2012
+
+
+One useful tool for planning analysis is the agent-based model (ABM) - a class of computer model designed to explore macro-scale population behavior as a result of micro-scale interactions between the population members and their environment. These models create a virtual environment and populate it with ``agents", simulated individuals guided by a set of behavioral algorithms. By monitoring the agents, an ABM can be used to investigate the response of a population to changes in the virtual environment or as a framework for evaluating competing hypotheses of models for decision-making itself.
+
+ABMs have proven useful in a variety of PEV infrastructure studies - the ability to record spatially explicit data unique to each individual driver makes ABMs a powerful tool to determine when, where, and how much each driver will charge \cite{dong_charging_2014}. Multiple studies have used driver energy data generated by ABMs to formulate more effective charging schedules given the limits of the existing electrical grid \cite{waraich_plug-hybrid_2013} \cite{acha_modelling_2012}. ABMs also allow agents to affect the behavior of other agents, which has been used to model how the competition between PEVs for limited public charging infrastructure affects long-term PEV adoption rates within a community \cite{sweda_agent-based_2012}.
+
+Other models (agent-based or otherwise) simplify charging behavior by assigning chargers on easily quantified criteria, such as physical proximity to residential locations \cite{feng_electric_2012}, as a function of traffic flow along a given road segment \cite{dong_framework_2013}, or assuming that drivers can charge in any location \cite{acha_modelling_2012}. While these simplifications can still produce reasonable results when modeling aggregate grid impacts of charging or PEV adoption rates, spatially explicit driving behavior is essential for determining optimal charger placement. In their simulation of plug-in hybrid electric (PHEV) charging dynamics, \cite{dong_within-day_2012} model driver behavior by directly copying GPS travel data (miles traveled and time spent at single locations) for 229 real-world internal combustion engine (ICE) vehicles.  This approach achieves realistic spatial disaggregation for some individual drivers, but the sample size is too limited to produce regional predictions of PEV charging patterns. 
+
+A more common approach is to synthesize a schedule for drivers to follow. This approach begins by defining driver activity to be performed on a given day (such as work, school, shopping, etc.) including travel destinations.  Departure times are then scheduled based on random distributions \cite{acha_modelling_2012}, through constrained optimization over a metric of utility \cite{waraich_plug-hybrid_2013}, or based on modeler-defined schedules for work and other travel needs \cite{sweda_agent-based_2012}. Though ABMs are best qualified to accommodate individual driving schedules, non-ABM models have also used driver schedules to help determine optimal charger location \cite{xi_simulation-optimization_2013}. 
+
+Despite the advantages of using an ABM to model individual driver-charger behavior, ABMs have been underutilized in charger location optimization studies. Existing charger location optimization studies have been limited by model constraints: lack of realistic driver behavior \cite{feng_electric_2012}, or strict limitations on charger power level \cite{dong_framework_2013}, \cite{xi_simulation-optimization_2013}. This paper presents a modeling approach that utilizes real-world data to produce realistic driving behaviors in order to generate a justified charger infrastructure without arbitrary limits on charger technology.
+
+\section{Methodology}
+
+This section contains a complete description of the PEVI model, written using the ODD protocol (Overview, Design concepts, and Details) for documenting agent-based models \cite{grimm_standard_2006} \cite{grimm_odd_2010}.
+
+\subsection{Purpose}
+The purpose of this model is to simulate the interaction between a regional fleet of plug-in electric vehicle drivers with public and private charging infrastructure over any time frame.  The model accepts as input the location, quantity, and type of electric vehicle support equipment (EVSE) throughout the study region.  Drivers and their vehicles are described by inputs that specify driver activity (a departure time and destination for every trip), the distribution of vehicle types, and parameters controlling driver behavior.  PEVI then simulates the drivers as they attempt to follow their trip itinerary and interact with the EVSE throughout the region.  The experience of drivers (individually or in aggregate) and the usage of the EVSE can be summarized at the end of a model run.  The model is intended to be used as tool for analyzing the impacts of alternative EVSE infrastructure scenarios in addition to PEV adoption rates, technology advances, market trends, and driver behaviors.
+
+PEVI is a stochastic model, meaning that a variety of processes and decisions within the model are based on random chance.  The primary purpose of including stochastic processes in PEVI is to avoid reaching conclusions that are overly customized to suit one particular set of circumstances.  Instead, the model is run many times with the same set of initial conditions and performance metrics are averaged over those runs.
+
+\subsection{Entities, State Variables, and Scales}
+
+\subsubsection{Traffic Analysis Zones (TAZs)}
+TAZs are entities that describe the atomic geographic regions of the environment. All TAZs are interconnected, so a vehicle in one TAZ may travel to any other.  While they represent spatially explicit regions, the PEVI model does not store or track spatial data (polygons, lines, etc.) for each TAZ.  Instead, the spatial relationships between TAZs are encoded as a table (see $\Omega$ in Table \ref{tab:globals}) describing the distances and travel times between all combinations of TAZs. TAZs as an entity are noted in this manuscript by $Z$ and indexed by $z$ and have the state variables listed in Table \ref{tab:tazVars}.
+
+\begin{table}[!h]
+\def\colmargin{6.75cm}
+\renewcommand{\arraystretch}{1.3}
+\caption{TAZ State Variables}
+\label{tab:tazVars}
+\centering
+\begin{tabular}{|cl|}
+\hline
+Variable & Description\\
+\hline
+$z$ &	\parbox[t]{\colmargin}{ \raggedright Integer identifier (also used as an index over TAZs).}\\
+$\gamma$ &	\parbox[t]{\colmargin}{ \raggedright Chargers: a master list of all chargers in the TAZ.} \\
+$\alpha$ &	\parbox[t]{\colmargin}{ \raggedright Available chargers: a list of available chargers in the TAZ, updated during model as chargers are used.}\\
+$L$ & 	\parbox[t]{\colmargin}{ \raggedright \# Levels: a 5-value list containing the number of chargers of each level: 0 (home charging), 1, 2, 3, or 4 (battery swapping) }\\
+\hline
+\end{tabular}
+\end{table}
+
+\subsubsection{Environment}
+The environment is the entity where all the agents live and interact. In this model it is the geographic region described by the input data. The environment is defined by several global state variables and parameters, which are available to all agents in the model for reference or use, see Table \ref{tab:globals}. 
+
+\begin{table}[!h]
+\def\colmargin{6.75cm}
+\renewcommand{\arraystretch}{1.3}
+\caption{Global Variables}
+\label{tab:globals}
+\centering
+\begin{tabular}{|cl|}
+\hline
+Variable & Description\\
+\hline
+$t$ & \parbox[t]{\colmargin}{ \raggedright Time: the decimal number of hours since the beginning of the model run, 0 corresponds to midnight of the first day.}\\
+$S$ &	\parbox[t]{\colmargin}{ \raggedright Schedule: a compound variable containing the active list of scheduled events (see Section \ref{scheduling}). }\\
+\parbox[t]{1.5cm}{$\Omega_D(Z_O,Z_D)$
+$\Omega_T(Z_O,Z_D)$
+$\Omega_Z(Z_O,Z_D)$}&	\parbox[t]{\colmargin}{ \raggedright Origin-Destination Table: stored as a matrix with the following 5 columns but notated as a function taking an origin $Z_O$, a destination $Z_D$ and returning a distance, a time, or a list of en route TAZs, respectively: 
+\begin{enumerate}
+  \item	Origin TAZ
+  \item Destination TAZ
+  \item Distance in miles or km
+  \item Travel time in decimal hours
+  \item List of the TAZs along the route between the origin and destination, used for seeking en route chargers. 
+\end{enumerate}
+}\\
+\hline
+\end{tabular}
+\end{table}
+
+\subsubsection{Drivers}
+Driver agents are used in the model to simulate individual driver and vehicle characteristics combined. These entities are notated by $V$, are indexed by $v$, and contain the state variables listed in Table \ref{tab:drivers}-\ref{tab:drivers2}.
+
+\begin{table}[!h]
+\def\colmargin{6.75cm}
+\renewcommand{\arraystretch}{1.3}
+\caption{Driver State Variables}
+\label{tab:drivers}
+\centering
+\begin{tabular}{|cl|}
+\hline
+Variable & Description\\
+\hline
+$Y$ & \parbox[t]{\colmargin}{ \raggedright Vehicle Type: The name of the vehicle model upon which the other variables of this category are based (e.g. ``Leaf" or ``Volt").  }\\
+$\beta_{BEV}$ & \parbox[t]{\colmargin}{ \raggedright Is BEV?: Boolean indicating whether vehicle is a battery electric vehicle (BEV), if not, vehicle is assumed to be a plug-in hybrid electric vehicle (PHEV).}\\
+$\beta_u$ & \parbox[t]{\colmargin}{ \raggedright Unneeded Charge?: Boolean flag indicating whether the driver is seeking a charger because it is actually needed or for some other, less critical reason. }\\
+$\beta_r$ & \parbox[t]{\colmargin}{ Willing to Roam?: Boolean indicating whether the driver would consider traveling to a neighboring or en route TAZ to charge. \raggedright }\\
+$C$ & \parbox[t]{\colmargin}{ \raggedright Battery Capacity (kWh): The default quantity of stored energy by the battery bank when fully charged.  If the vehicle is a PHEV, then the battery capacity indicates the amount of energy available to drive the vehicle in charge depleting mode. }\\
+$\eta_e$ & \parbox[t]{\colmargin}{ \raggedright Electric Fuel Consumption (kWh/unit-distance): The default amount of battery electricity required to travel 1 unit of distance (e.g. miles of kilometers).}\\
+$\eta_g$ & \parbox[t]{\colmargin}{ \raggedright Hybrid Fuel Consumption (gal / mile or liter / km): The default fuel amount of gasoline required to travel 1 unit of distance for a PHEV in charge sustaining mode. (N/A for BEVs).}\\
+$H_W$ & \parbox[t]{\colmargin}{ \raggedright Wait Threshold (hours): A duration defining how long the driver will wait to find a charger before giving up (resulting in a "soft-stranding"). }\\
+$Z_H$ & \parbox[t]{\colmargin}{ \raggedright Home: The home TAZ of the driver. This is not necessarily where the driver begins the day, nor do all drivers have a home TAZ.}\\
+$\phi$ & \parbox[t]{\colmargin}{ \raggedright State: A discrete integer value that represents the current state of a driver ($Not ~Charging$, $Traveling$, $Charging$, $Stranded$).}\\
+$I$ & \parbox[t]{\colmargin}{ \raggedright Itinerary: A compound variable containing the intended itinerary of the driver for one day.  Each row of the itinerary represents a single trip and includes the following columns: 
+\begin{enumerate}
+\item Origin TAZ
+\item Destination TAZ
+\item Departure time (decimal hour of the day)
+\item Change flag that defaults to FALSE but is set to TRUE when a trip is due to a change to the driver's itinerary
+\item Delay amount for tracking delay experienced for each trip in the itinerary 
+\end{enumerate}
+}\\
+$n$ & \parbox[t]{\colmargin}{ Daily Itinerary End Row: the row in $I$ demarkating the last trip in the present day. $n$ is updated for all drivers at the beginning of each day and can dynamically change if unscheduled trips are added to a driver's itinerary.\raggedright }\\
+$r$ & \parbox[t]{\colmargin}{ Current Itinerary Row: used to keep track of the next trip in the driver's itinerary (or the current trip if the driver state is ``traveling"). \raggedright }\\
+$Z_r = I_{r,1}$ & \parbox[t]{\colmargin}{ \raggedright Current TAZ: The TAZ where the driver is currently located, set to N/A while in transit.}\\
+$\theta$ & \parbox[t]{\colmargin}{ \raggedright State of Charge: The fraction of useable energy remaining in the vehicle's battery.  A value of 1 indicates a fully charged battery and a value of 0 indicates the battery is effectively empty.  Note, if the vehicle is a PHEV, then 0 indicates charge sustaining mode which does not imply the battery is fully depleted.}\\
+$K$ & \parbox[t]{\colmargin}{ \raggedright Current Charger: The charger with which the driver is currently charging.  Set to null if the driver is not charging.}\\
+\hline
+\end{tabular}
+\end{table}
+\begin{table}[!h]
+\def\colmargin{6.75cm}
+\renewcommand{\arraystretch}{1.3}
+\caption{Driver State Variables Cont.}
+\label{tab:drivers2}
+\centering
+\begin{tabular}{|cl|}
+\hline
+Variable & Description\\
+\hline
+$D_X$ & \parbox[t]{\colmargin}{ \raggedright External Distance (miles or km): The driving distance between a TAZ external to the region of interest to a gateway TAZ within the region of interest. The result of a driver specific random draw from an externally supplied distribution function.\\~ }\\
+$T_X$ & \parbox[t]{\colmargin}{ \raggedright External Time (hours): The driving time between a TAZ external to the region of interest to a gateway TAZ within the region of interest. The result of a driver specific random draw from an externally supplied distribution function.}\\
+$M_D$ & \parbox[t]{\colmargin}{ \raggedright Number of Denials: The number of occurrences when the driver wanted/needed to charge but was unable due to a lack of available chargers.}\\
+$W_{TOT}$ & \parbox[t]{\colmargin}{ \raggedright Total Itinerary Delay Amount: The total amount of delay the driver has experienced (equivalent to $\sum_{j=1}^r I_{j,5}$). }\\
+\hline
+\end{tabular}
+\end{table}
+
+\subsubsection{Chargers}
+
+Charging agents represent the electric vehicle supply equipment installed at a given TAZ.  Charging stations can either be Level 1, Level 2, DC Fast (also referred to as Level 3), or Battery Swapping (also referred to as Level 4).  In practice, Level 2 chargers may also have a Level 1 capability, in PEVI they are represented as two separate chargers.  The charger agents are currently described by the state variables in Table \ref{tab:chargers}.
+
+\begin{table}[!h]
+\def\colmargin{6.75cm}
+\renewcommand{\arraystretch}{1.3}
+\caption{Charger State Variables}
+\label{tab:chargers}
+\centering
+\begin{tabular}{|cl|}
+\hline
+Variable & Description\\
+\hline
+$\tau$ & \parbox[t]{\colmargin}{ \raggedright Charger Type: Integer indicating the station level (0,1,2,3, or 4). }\\
+$Z$ & \parbox[t]{\colmargin}{ \raggedright Location: the TAZ where the charger is located. }\\
+$\kappa$ & \parbox[t]{\colmargin}{ \raggedright Charge Rate: The rate at which the charger delivers energy to the vehicle (kW).}\\
+$U$ & \parbox[t]{\colmargin}{ \raggedright Energy Price: The price of energy at this charger (\$ / kWh). }\\
+$E$ & \parbox[t]{\colmargin}{ \raggedright Energy Delivered: The cumulative amount of energy delivered by the charger up to the current moment (kWh). }\\
+$M_c$ & \parbox[t]{\colmargin}{ \raggedright Number of Sessions: A count of the number of discrete charging sessions with drivers. }\\
+\hline
+\end{tabular}
+\end{table}
+
+\begin{table}[!h]
+\def\colmargin{6.75cm}
+\renewcommand{\arraystretch}{1.3}
+\caption{Parameter Definitions}
+\label{tab:params}
+\centering
+\begin{tabular}{|cl|}
+\hline
+Variable & Description\\
+\hline
+$$ &	\parbox[t]{\colmargin}{ \raggedright }\\
+$f_s$ &	\parbox[t]{\colmargin}{ \raggedright Charge Safety Factor: multiplier used to approximate the safety factor drivers assume necessary to ensure a trip can be made.}\\
+$d$ &	\parbox[t]{\colmargin}{ \raggedright Charger Search Distance: the distance used to define what TAZs are considered ``neighbors" for the purpose of finding a charger. }\\
+$\mu_{T_W}$ &	\parbox[t]{\colmargin}{ \raggedright Wait Time Mean:	the average amount of time (in hours) that a driver waits before checking again to see if a charger is available.}\\
+$H_R$ &	\parbox[t]{\colmargin}{ \raggedright Willing To Roam Time Threshold:	the amount of time (in hours) at which point a driver will consider travelling to neighboring or en route TAZs in order to charge vs. only considering chargers in their current location.}\\
+$\delta$ &	\parbox[t]{\colmargin}{ \raggedright Time Opportunity Cost:	the value of a driver's time to his or herself in units of currency per hour.}\\
+$$ &	\parbox[t]{\colmargin}{ \raggedright Probability of Unneeded Charge: the probability that a driver will choose to charge despite not actually needing it.}\\
+$\sigma_{\eta}$ &	\parbox[t]{\colmargin}{ \raggedright Electric Fuel Consumption SD:standard deviation of the truncated normal distribution used to distribute electric fuel consumption amongst the drivers.  (units kWh per unit distance).}\\
+$\mu_{\eta}$ &	\parbox[t]{\colmargin}{ \raggedright Electric Fuel Consumption Range:	range of the truncated normal distribution used to distribute electric fuel consumption amongst the drivers.  (units kWh per unit distance).} \\
+$W_S$ &	\parbox[t]{\colmargin}{ \raggedright Soft Strand Penalty:	Penalty levied on drivers when they experience a "soft-stranding" or they are unable to access a needed charger after $H_W$ hours.  The penalty is in units of hours, which are added to $I_{r,5}$.}\\
+$W_H$ &	\parbox[t]{\colmargin}{ \raggedright Hard Strand Penalty:	Penalty levied on drivers when they experience a "hard-stranding" or there are no chargers within range and the driver cannot execute their next trip.  The penalty is in units of hours, which are added to $I_{r,5}$.}\\
+$F_{\theta}$ &	\parbox[t]{\colmargin}{ \raggedright Starting State of Charge Distribution: user specified cumulative probability distribution used to initialize SYMB of vehicles at the beginning of the model run.}\\
+$F_{H_W}$ &	\parbox[t]{\colmargin}{ \raggedright Wait Threshold Distribution: user specified cumulative probability distribution used to initialize each driver's wait threshold variable ($H_W$).}\\
+$F_{D_X}, F_{T_X}$ &	\parbox[t]{\colmargin}{ \raggedright External Distance Distribution and External Time Distribution used to initialize the distance and time of travel needed by the driver for an external trip.}\\
+$C_{ij}$ &	\parbox[t]{\colmargin}{ \raggedright Charger Infrastructure: matrix containing the number of chargers of level $j$ at TAZ $i$. }\\
+$A_C$ &	\parbox[t]{\colmargin}{ \raggedright Charger Type Input File: File path to the text file containing the chargers types and their associated state variables.}\\
+$A_D$ &	\parbox[t]{\colmargin}{ \raggedright Driver Input File:	File path to the text file containing the driver itineraries for the model run.}\\
+$A_O$ &	\parbox[t]{\colmargin}{ \raggedright OD Input File: File path to the text file containing the origin-destination data for the model run.  The TAZ numbers in this file must correspond to the TAZ numbers in $A_C$.}\\
+$A_V$ &	\parbox[t]{\colmargin}{ \raggedright Vehicle Type Input File: File path to the text file containing vehicle parameters (name, electric fuel consumption rate, hybrid gasoline fuel consumption rate, battery capacity, market fraction).}\\
+\hline
+\end{tabular}
+\end{table}
+
+\subsubsection{Scales}
+
+Scales refer to the spatial and temporal resolution and extent of a model. The spatial resolution and extent of the model is defined by the TAZs and therefore at the discretion of the modeler.  To date the PEVI model has been applied to regions varying in spatial extent from 1,400 km$^2$ to 34,000 km$^2$ with spatial resolutions (the average area of each TAZ) ranging from 26 km$^2$ to 430 km$^2$.  There is no limit to the number or size of TAZs that can be simulated by PEVI, though there are likely practical limits due to the computational burden of larger or higher resolution systems.
+
+The PEVI model has a continuous temporal resolution because time is modeled using discrete event simulation (see Section \ref{scheduling}).  The temporal extent of the model is also at the discretion of the modeler.  To date, the PEVI model has been used to simulate periods ranging from one to four days. 
+
+\subsection{Process Overview and Scheduling} \label{scheduling}
+
+In the PEVI model, time and actions are managed using discrete event simulation.  Model processes are maintained as an ordered schedule of events.  An event consists of a time, an agent, and an action or  block of code.  After initialization, the first event on the schedule is dispatched, at which point the specified agent performs the specified action; then the next event on the schedule is dispatched, and so on.  Events can be created during initialization or dynamically generated during model execution. In both cases, the dispatch time of the event is used to determine the placement of any new event in the schedule. Events can also be executed immediately as an outcome of some other event, in these cases the discrete event scheduling mechanism is not used in favor of direct code execution. 
+
+In PEVI, events are exclusively associated with drivers.  Figure \ref{fig:driver-flow} presents a flow chart of the driver decision logic.  The chart contains a representation of the different states that a driver can have (dark blue rectangles), the event schedulers that determine when a driver executes an event (dark yellow triangles), the events that control process flow (arrows labeled with light yellow rectangles), and the decisions that are evaluated to inform the process flow (light blue diamonds).  See Tables \ref{tab:states}, \ref{tab:schedulers}, \ref{tab:events}, and \ref{tab:decisions} for descriptions of the states, event schedulers, events, and decisions, respectively. Detailed specifications for these processes are detailed in Section \ref{submodels}. 
+
+In Figure \ref{fig:driver-flow} event schedulers are depicted as attached to states on the upstream side of the process flow.  This placement is intentional and closely tied to the management of PEVI as a discrete event simulation.  At any time, drivers have complete knowledge about the state of their vehicle (state of charge, fuel consumption, etc.) and their itinerary.  This means, that as drivers enter any state, they can determine the time at which they will exit that state and perform an event.  For example, when the Traveling state is entered, the driver knows where they are going (by virtue of their itinerary) and based on the global origin-destination table, they can determine when they will arrive.  The PEVI model takes advantage of this foresight and model scheduling is structured so that drivers schedule events as they enter a new state. 
+
+\begin{figure}[!h]
+\centering
+\includegraphics[width=3.5in]{figDriverFlowchart} 
+\caption{This flow chart illustrates the four driver states (dark blue rectangles), the events that control transitions between states (arrows labeled with light yellow rectangles), the decision logic used to inform transitions (light blue diamonds) and the event schedulers that dictate when events are executed (dark yellow triangles).}
+\label{fig:driver-flow}
+\end{figure}
+
+
+\begin{table}[!h]
+\def\colmargin{6cm}
+\renewcommand{\arraystretch}{1.3}
+\caption{Overview of driver states.}
+\label{tab:states}
+\centering
+\begin{tabular}{|ll|}
+\hline
+Name & Description \\
+\hline
+Not Charging  & \parbox[t]{\colmargin}{ \raggedright This state describes a driver that is parked but not charging.  The driver could be at home or any other TAZ in the model.} \\
+Traveling &	\parbox[t]{\colmargin}{ \raggedright Drivers in the Traveling state are on their way from one TAZ to another.  The model does not track drivers along their path, instead they ``appear" at their destination when the $Arrive$ event is executed.} \\
+Charging &	\parbox[t]{\colmargin}{ \raggedright Drivers in the $Charging$ state are parked and engaged in a charging session.} \\
+Stranded &	\parbox[t]{\colmargin}{ \raggedright The driver is unable to complete their itinerary and no more events involving the driver are scheduled.} \\
+\hline
+\end{tabular}
+\end{table}
+
+\begin{table}[!h]
+\def\colmarginA{1cm}
+\def\colmarginB{4cm}
+\def\colmarginC{2.5cm}
+\renewcommand{\arraystretch}{1.3}
+\caption{Overview of event schedulers.}
+\label{tab:schedulers}
+\centering
+\begin{tabular}{|lll|}
+\hline
+Name & Description & Results \\
+\hline
+\parbox[t]{\colmarginA}{ \raggedright Itinerary} &	\parbox[t]{\colmarginB}{ \raggedright As drivers enter the $Not ~Charging$ state through this path, they either schedule the $Depart$ or the $Complete$ event based on the Itinerary submodel (Section \ref{itinSched}).} & \parbox[t]{\colmarginC}{ \raggedright $Depart$ or $Complete$ event scheduled }\\
+\parbox[t]{\colmarginA}{ \raggedright Wait Time}  &	\parbox[t]{\colmarginB}{ \raggedright As drivers enter the $Not ~Charging$ state through this path, they schedule the $Depart$ or $Retry Seek$ event based on the Wait Time submodel (Section \ref{waitSched}) } & \parbox[t]{\colmarginC}{ \raggedright $Depart$ or $Retry ~Seek$ event Scheduled}\\
+\parbox[t]{\colmarginA}{ \raggedright Travel Time}  & \parbox[t]{\colmarginB}{ \raggedright As drivers enter the $Traveling$ state, they schedule the $Arrive$ event based on the Travel Time submodel (Section \ref{travelSched}). } & \parbox[t]{\colmarginC}{ \raggedright $Arrive$ event scheduled}\\
+\parbox[t]{\colmarginA}{ \raggedright Charge Time}  & \parbox[t]{\colmarginB}{ \raggedright As drivers enter the $Charging$ state, they schedule either the $End ~Charge$ or $Retry ~Seek$ event based on the Charge Time submodel (Section \ref{chargeSched}). } & \parbox[t]{\colmarginC}{ \raggedright $End ~Charge$ or $Retry ~Seek$ Scheduled }\\
+\parbox[t]{\colmarginA}{ \raggedright Full Charge Time}  & \parbox[t]{\colmarginB}{ \raggedright As drivers enter $Charging$ state through this path, they schedule $End ~Charge$ such that they will have a full state of charge at the end of the charging session (Section \ref{fullSched}). } & \parbox[t]{\colmarginC}{ \raggedright $End ~Charge$}\\
+\hline
+\end{tabular}
+\end{table}
+
+\begin{table}[!h]
+\def\colmarginA{1cm}
+\def\colmarginB{4cm}
+\def\colmarginC{2.5cm}
+\renewcommand{\arraystretch}{1.3}
+\caption{Overview of events.}
+\label{tab:events}
+\centering
+\begin{tabular}{|lll|}
+\hline
+Name & Description & Results \\
+\hline
+\parbox[t]{\colmarginA}{ \raggedright Depart }  & \parbox[t]{\colmarginB}{ \raggedright The driver executes the $Need ~to ~Charge$ decision.  If no charge is needed, then the driver transitions to $Traveling$.  If a charge is needed, the driver executes the $Break ~Up ~Trip$ decision and either executes the $Break ~Up ~Trip$ event and transitions to the $Traveling$ state or executes the $Seek ~Charger$ decision.} & \parbox[t]{\colmarginC}{ \raggedright Transition to $Traveling$, $Charging$, $Not ~Charging$, or $Stranded$}\\
+\parbox[t]{\colmarginA}{ \raggedright Retry Seek}  & \parbox[t]{\colmarginB}{ \raggedright The driver executes the $Seek ~Charger$ decision.} & \parbox[t]{\colmarginC}{ \raggedright Transition to $Traveling$, $Charging$, $Not ~Charging$, or $Stranded$ }\\
+\parbox[t]{\colmarginA}{ \raggedright Arrive}  & \parbox[t]{\colmarginB}{ \raggedright The driver executes the $Need to Charge$ decision, after which the driver transitions to $Not ~Charging$ or executes the $Seek Charger$ decision.} & \parbox[t]{\colmarginC}{ \raggedright Transition to $Traveling$, $Charging$, $Not ~Charging$, or $Stranded$}\\
+\parbox[t]{\colmarginA}{ \raggedright End Charge}  & \parbox[t]{\colmarginB}{ \raggedright The driver state variables are updated to reflect the charging session, then driver transitions to $Not ~Charging$.} & \parbox[t]{\colmarginC}{ \raggedright Transition to $Not ~Charging$}\\
+\parbox[t]{\colmarginA}{ \raggedright Break Up Trip}  & \parbox[t]{\colmarginB}{ \raggedright The driver breaks the next trip in their itinerary into smaller trips according to the Break Up Trip submodel (Section 5.8).} & \parbox[t]{\colmarginC}{ \raggedright Transition to $Traveling$}\\
+\parbox[t]{\colmarginA}{ \raggedright Complete}  & \parbox[t]{\colmarginB}{ \raggedright The driver executes the $Home ~Charge$ decision and either transitions to $Charging$ or stops (by scheduling no further actions).} & \parbox[t]{\colmarginC}{ \raggedright Transition to $Charging$ or stop}\\
+\hline
+\end{tabular}
+\end{table}
+\begin{table}[!h]
+\def\colmarginA{1cm}
+\def\colmarginB{4cm}
+\def\colmarginC{2.5cm}
+\renewcommand{\arraystretch}{1.3}
+\caption{Overview of decisions.}
+\label{tab:decisions}
+\centering
+\begin{tabular}{|lll|}
+\hline
+Name & Description & Results \\
+\hline
+\parbox[t]{\colmarginA}{ \raggedright Need to Charge?}  & \parbox[t]{\colmarginB}{ \raggedright The driver decides whether to seek a charger according to the $Need ~to ~Charge$ submodel (Section \ref{needDec}).}  & \parbox[t]{\colmarginC}{ \raggedright Return $TRUE$ or $FALSE$}\\
+\parbox[t]{\colmarginA}{ \raggedright Seek Charger}  & \parbox[t]{\colmarginB}{ \raggedright The driver seeks an available charger according to the Seek Charger submodel (Section \ref{seekDec}) and responds accordingly by transitioning to any of the possible states.} & \parbox[t]{\colmarginC}{ \raggedright Transition to $Traveling$, $Charging$, $Not ~Charging$, or $Stranded$.}\\
+\parbox[t]{\colmarginA}{ \raggedright Home Charge?}  & \parbox[t]{\colmarginB}{ \raggedright Returns true if the driver will engage in a charging session at home according to the Home Charge submodel (Section \ref{homeDec}).} & \parbox[t]{\colmarginC}{ \raggedright Transition to $Charging$ or stop}\\
+\parbox[t]{\colmarginA}{ \raggedright Break Up Trip?}  & \parbox[t]{\colmarginB}{ \raggedright If the battery is full ($\theta = 1$) or no chargers existing in the current TAZ, return $TRUE$, otherwise return $FALSE$.} & \parbox[t]{\colmarginC}{ \raggedright Return $TRUE$ or $FALSE$}\\
+\hline
+\end{tabular}
+\end{table}
+
+\subsection{Design Concepts}
+
+\subsubsection{Basic Principles}
+
+PEVI is designed to address the challenge of developing a defensible plan for the deployment of electric vehicle supply equipment (EVSE) throughout a region for varying levels of PEV adoption.  PEVI accomplishes this by answering the following key questions.  
+
+\begin{itemize}
+  \item	How many chargers are needed for a giving penetration of PEVs?  
+  \item	Where should the chargers be located within the region?  
+  \item	What type of charger (e.g. Level 1, Level 2, DC Fast) should be installed?  
+  \item	How can the deployment be achieved in a cost-effective manner given limited resources for new infrastructure?  
+Answering these questions requires that the following considerations all be taken into account:
+  \begin{itemize}
+    \item	How many PEVs do we expect in the region?
+    \item	Where within the region will the PEV drivers live?
+    \item	When do PEV drivers make their daily trips?  Where and how far do they go?
+    \item	How long do drivers spend at each stop in their tour?
+    \item	If drivers have a choice of EVSE to use, which will they choose?
+    \item	How do drivers impact access to EVSE for other drivers? 
+    \item	How will drivers who must charge (in order to complete their tour) be impacted by other drivers who elect to charge despite having no immediate need for the energy?
+    \item	How do drivers adapt to their circumstances (e.g. by seeking EVSE elsewhere)?
+    \item	How will a given deployment of EVSE improve the experience of drivers?  Can we quantify the improvement (e.g. in terms of the number of hours of delay experienced by drivers)?  If so, by how much does the EVSE improve their experience?
+  \end{itemize}
+\end{itemize}
+
+By simulating PEV driving and charging at the individual level, PEVI is capable of simultaneously balancing all of the above considerations. 
+
+\subsubsection{Emergence}\label{emergence}
+
+At the conclusion of a model run, all of the following metrics of service to PEV drivers from the charging infrastructure can be quantified in aggregate form or disaggregated in time, space, by charger type, by vehicle type, or by individual driver:
+\begin{itemize}
+  \item	Delay experienced by drivers
+  \item	Instantaneous power drawn by chargers
+  \item	Energy dispensed to vehicles
+  \item	Electric energy used by vehicles
+  \item	Gasoline used by plug-in hybrid electric vehicles
+  \item	Distance driven
+  \item	Electric-only distance driven
+  \item	Number of drivers stranded
+  \item	Number of drivers denied access to a charger at the time of seeking
+  \item	Duty factor of the chargers (defined as the time spent actively charging divided by the length of the model run)
+\end{itemize}
+
+\subsubsection{Objective}
+
+The objective of each driver in the PEVI model is to complete their itinerary and to do so at minimal cost. Drivers attempt to execute every trip in their itinerary, but with some discretion.  Drivers can choose when and which type of charger to use in pursuit of their objective.  When drivers make this choice, they select the charger that provides the needed energy at the least cost to the driver.  This economic decision accounts for the opportunity cost of delays in the driver's itinerary by valuing the driver's time at rate defined by the parameter $\delta$.
+
+Drivers also elect to use chargers during the day even when they don't strictly need the energy, this behavior is based on empirical evidence that PEV drivers charge their vehicle for reasons beyond strict execution of their itinerary (e.g. for convenience or to maximize electric distance driven).
+
+\subsubsection{Adaptation}
+
+The general form of a driver's experience consists of the following:
+\begin{itemize}
+  \item	Depart according to the next trip in the itinerary
+  \item	Arrive at the destination
+  \item	Decide whether to attempt a charging session
+  \item	Seek the charger that provides the energy desired at the least cost
+  \item	Engage in the charging session
+  \item	End the charging session
+  \item	Make the next departure
+\end{itemize}
+
+But drivers can be faced with unavailable chargers at their destination, either because their location has no chargers to offer or other drivers are already using the chargers.  Drivers therefore have two behaviors that allow them to adapt to their circumstances.  
+\begin{enumerate}
+  \item	While drivers still have adequate time at their destination, they reschedule the $Seek ~Charger$ decision for a later time, allowing them to access a charger that has become available.
+\item	Upon arrival, drivers first only seek chargers in their current location, but once drivers become likely to experience delay (within one hour of departure and when an available charger still cannot be found) they open up their search to include chargers in neighboring TAZs and en route to their next destination.  Drivers can therefore change the time of their departure (either departing later or earlier than planned) as well as add additional trips to their itinerary in order to find the energy they need to make their next scheduled trip. 
+\end{enumerate}
+
+Inherent to the decision logic of the drivers is the principle that they prefer above all to depart at exactly the original planned time, but they are willing to accept delays (both in the form of departing later and earlier than planned) in order to find the energy necessary to complete the full day's itinerary.    
+
+\subsubsection{Sensing}
+
+Modern PEV charging infrastructure is capable of reporting the state of the charger (available vs. in-use) to online services.  At the same time, most modern PEVs are equipped with cellular connections (or through equivalent services on smart phones) allowing drivers to instantaneously know the locations of all chargers in their vicinity and whether or not the charger is current available.  PEVI therefore assumes that drivers can sense the location, type, price, and present-moment availability of all chargers in the model.  Some chargers on the market allow drivers to make a reservation in order guarantee availability at a future time.  This capability is not implemented in PEVI.
+
+\subsubsection{Interaction}
+
+All interactions in PEVI are between drivers and chargers.  The point of interaction occurs when a driver begins or ends a charging session.  Drivers only interact with each other indirectly by competing for charging resources. When a vehicle interacts with a charger, that charger becomes unavailable for all other vehicles.  
+
+\subsubsection{Stochasticity}
+
+Several pseudorandom processes are used to introduce variability in the model:
+
+\begin{itemize}
+  \item Several state variables of drivers are initialized to the result of a random draw (Section \ref{init}). 
+  \item The $Wait ~Time$ event scheduler uses a random draw from an exponential distribution to vary the time that drivers wait before seeking available chargers after an unsuccessful search (Section \ref{waitSched}).
+  \item The $Need ~to ~Charge$ decision employs a random draw to simulate drivers who occasionally elect to charge their vehicle when they do not strictly need the energy (Section \ref{needDec}).
+\end{itemize}
+
+\subsubsection{Initialization}\label{init}
+
+Model initialization involves the following steps:
+\begin{enumerate}[label=(\alph*)]
+  \item	Model parameters (Table \ref{tab:params}) are read from a text file and initialized.
+  \item	The $A_O$ file is read and its contents are stored in the global table used by the $\Omega$ function. 
+  \item	The $A_C$ file is read and, based on its contents, TAZs are created and the $L$ state variable is set (chargers are created in a later step at which point $\gamma$ and $\alpha$ are initialized).
+  \item	The $A_V$ file is read and the vehicle properties and market fractions are stored.
+  \item	The itineraries are read from $A_D$ and the drivers are created.
+  \item	Drivers are assigned a vehicle type based on the market fractions of the vehicle types and the total number of drivers.  The result is the state variables of the drivers associated with their vehicle are set.
+  \item	Driver state variables are initialized including random draws for $\eta_e$, $\theta$, $T_X$, $D_X$, and $H_W$.
+  \item	Chargers are created at each TAZ according to the $L$ state variable.
+  \item	Finally, the first $Depart$ event of each driver's itinerary is added to the schedule $S$ for dispatch.
+\end{enumerate}
+
+\subsubsection{Observation}
+In addition to the metrics described in Section \ref{emergence}, PEVI is capable of producing detailed outputs for the following processes.  These outputs are used for conducting detailed model analysis as well as for troubleshooting and model verification:
+\begin{itemize}
+  \item	Details of every occurrence of driver inconvenience
+  \item	A trip log
+  \item	Charging session characteristics
+  \item	Details associated with all submodels including:
+  \begin{itemize}
+    \item $Wait ~Time$ event scheduler
+    \item $Charger ~Time$ event scheduler
+    \item $Need ~to ~Charge$ decision
+    \item $Seek ~Charger$ decision 
+  \end{itemize}
+\end{itemize}
+
+\subsection{Submodel Details} \label{submodels}
+The following sections provide detailed descriptions of the PEVI submodels.
+
+\subsubsection{Itinerary Event Scheduler} \label{itinSched}
+The itinerary submodel is an event scheduler.  Drivers schedule the $Depart$ event to occur at the departure time of the next trip in their itinerary $I_{r,3}$.  If $I_{r,3} < t$, the driver executes the $Depart$ event immediately. If the driver's itinerary has no more trips, then the driver executes the $Complete$ event.
+
+\subsubsection{Itinerary Generation}\label{itinGen}
+The set of driver itineraries used by PEVI are exogenous to the model and are therefore up to the user of PEVI to produce.  But because they are so critical to the realism of model results, this section will present the general approach to developing itineraries that has been used to date.  
+
+Ultimately, an activity-based model is necessary to produce driver itineraries which reflect where and when drivers travel as well as how long they spend at their destinations and how many chained trips they execute in a day.  Depending on the region of study, an established activity-based travel demand model may be available and therefore could be directly employed to generate driver itineraries for PEVI.  In the regions for which PEVI has been applied to date (Delhi, India; Humboldt County, CA; Siskiyou, Shasta, and Tehama counties, CA), there was no activity model available.  Therefore an activity model was developed using the non-parametric resampling technique described below.
+
+This approach was designed to reproduce the statistical properties of two key datasets: outputs from a travel demand model and a transportation survey relevant to the study region.  
+
+\begin{itemize}
+  \item Travel Demand: The most critical component to building a set of realistic driver itineraries for PEVI is determining where drivers go when they travel.  Fortunately, most metropolitan regions (and many rural regions as well) use regional travel demand models to project regional growth or changes in travel for transportation infrastructure planning purposes.  
+  The traditional form of a travel demand model is the ``four step" model.  These models use current and projected land-use, demographics, and local traffic counts to forecast future traffic trends.  Regions are divided into travel analysis zones (TAZs) and their output includes an estimate of the daily trip count between every pair of zones, usually disaggregated by travel mode (automobile, walking, bus, etc.), trip purpose (home-based, work-based, etc.), and time of day (hourly or AM/PM peaks).
+
+  \item Transportation Surveys: While regional travel demand data is necessary to build realistic driver itineraries, there are some critical missing components to the outputs of a four-step model.  They often provides no information about exactly when trips are made, how long drivers spend at their destinations, where the drivers live, or what trips drivers chain together into a daily tour.  Transportation survey data can fill in many of these missing components.  
+  Most regional and national transportation agencies worldwide conduct periodic surveys to assess a wide variety of transportation-related trends and behaviors.  Typical surveys involve an intake form where respondent demographic data are collected.  Surveys also ask the respondent to record a detailed log of their travel over some period of time.  Each log entry typically details the time of departure, time of arrival, time spent at the destination (dwell time), distance traveled, and trip type (home to work, work to other, etc.).
+
+  \item Travel Activity Through Non-Parametric Resampling: Driver itineraries can be synthesized by strategically blending the outputs of a four-step travel demand model with transportation survey data.  Respondents are drawn randomly from the survey pool and their tour is fit into the road network of the region in a manner consistent with the demand for trips as specified by the travel demand outputs. A complete description of this algorithm is available in \cite{sudatta_mohanty_preliminary_2015}. 
+\end{itemize}
+
+\subsubsection{Wait Time Event Scheduler}\label{waitSched}
+The wait time submodel is an event scheduler.  It is executed after a driver has performed the $Seek ~Charger$ decision and found none that are available.  The submodel decides whether the driver will attempt to retry finding a charger or, if sufficient charge is available, abandon the charging attempt and schedule a departure.  
+
+To make this determination, four values are estimated: 
+\begin{itemize}
+  \item	$R_R \equiv$ Remaining Range: the distance remaining (set to positive infinity if $\beta_{BEV}$ is false)
+    \begin{equation}\label{eqn:R_R}
+      R_R = (\theta * C)/(\eta_e f_s)
+    \end{equation}
+  \item	$D_T \equiv$ Trip Distance: the distance to complete the next trip in the driver's itinerary
+    \begin{equation}\label{eqn:D_T}
+      D_T = \Omega_D(I_{r,1},I_{r,2})
+    \end{equation}
+\item	$D_J \equiv$ Journey Distance: the distance to complete all of the remaining trips in the driver's itinerary for the current day
+    \begin{equation}\label{eqn:D_J}
+      D_J = \sum_{i=r}^{n} \Omega_D(I_{i,1},I_{i,2})
+    \end{equation}
+\item	$T_D \equiv$ Time Until Departure: the time in hours remaining before the vehicle is due to depart on its next trip
+    \begin{equation}\label{eqn:T_D}
+      T_D = I_{r,3} - t
+    \end{equation}
+\end{itemize}
+
+Table \ref{tab:waitTime} details how the decision is made and at what time the corresponding event is to be scheduled.
+
+\begin{table}[!h]
+\def\colmarginA{2.5cm}
+\def\colmarginB{5.5cm}
+\renewcommand{\arraystretch}{1.3}
+\caption{Wait Time Scheduler.}
+\label{tab:waitTime}
+\centering
+\begin{tabular}{|ll|}
+\hline
+\textbf{If} & \textbf{Then} \\
+\hline
+\parbox[t]{\colmarginA}{ \raggedright  
+    $W_{TOT} \ge T_W$
+  }  & \parbox[t]{\colmarginB}{ \raggedright 
+    Add $W_S$ to $I_{r,5}$ and do not schedule any additional actions
+} \\
+\parbox[t]{\colmarginA}{ \raggedright  
+    $R_R < T_D$
+  }  & \parbox[t]{\colmarginB}{ \raggedright 
+    Schedule $Retry Seek$ to occur after $t_W$ hours where $t_W$ is drawn from $X \sim exp(\mu = \mu_{T_W})$\\
+} \\
+\parbox[t]{\colmarginA}{ \raggedright  
+  $D_T <= R_R < D_J$
+  }  & \parbox[t]{\colmarginB}{ \raggedright 
+If $T_D > H_R$, schedule $Retry ~Seek$ event to occur after $t_W$ hours where $t_W = max[T_D - H_R, x]$ and $x$ is drawn from $X \sim exp(\mu = \mu_{T_W})$, otherwise schedule $Depart$ event to occur after $T_D$ hours.
+} \\
+\parbox[t]{\colmarginA}{ \raggedright  
+  $R_R >= D_J$
+  }  & \parbox[t]{\colmarginB}{ \raggedright 
+  Schedule $Depart$ event to occur after $T_D$ hours.
+} \\
+\hline
+\end{tabular}
+\end{table}
+
+\subsubsection{Travel Time Event Scheduler}\label{travelSched}
+
+The travel time submodel is an event scheduler.  The $Arrival$ event is scheduled for $\Omega_T(I_{r,1},I_{r,2})$ hours from the present moment. 
+
+During PEVI model execution, travel time and distance between all internal pairs of TAZs is determined (via the $\Omega$ function) by looking up the value in the appropriate row of the origin destination table indexed by the source and destination TAZ.  It is the modeler's responsibility to determine travel times using appropriate data sources (e.g. a mapping API or through GIS analysis of a road network shapefile).  To date, PEVI inputs for travel time and distance have been developed using the following techniques:
+\begin{itemize}
+\item	Google Maps API
+\item	Analysis of OpenStreetMap data with the PgRouting plug-in to a PostGIS database
+\item	Provided through previous analysis of the road network by transportation engineering consultants
+\end{itemize}
+PEVI also has the capability of representing ``external" TAZs, which are typically defined at the gateways to the region on major arterials.  In the model inputs, external TAZs are defined as having negative ID numbers.  The value of the ID corresponds to the internal TAZ which is connected to the external zone (i.e. multiplying the external ID with -1 yields the corresponding internal TAZ ID).
+Travel distances and times to/from external TAZs are determined stochastically during model initialization once per driver according to the Distribution submodel (Section \ref{distSub}) and $F_{D_X}, F_{T_X}$. 
+
+\subsubsection{Charge Time Event Scheduler}\label{chargeSched}
+
+The charge time submodel is an event scheduler.  It is executed after a driver has performed the $Seek ~Charger$ decision, selected an available charger, and optionally traveled to that charger.  The submodel decides whether the driver will attempt to retry finding a charger later in the day (necessary to allow drivers to make temporary use of lower level chargers when higher levels are currently unavailable) or to schedule the $End ~Charge$ event.
+
+To make this determination, the following values are estimated: 
+\begin{itemize}
+  \item	$\beta_{COD} \equiv$ Charger In Origin Or Destination: this Boolean describes whether the charger is located in a TAZ that is a part of the driver's itinerary vs. a neighboring TAZ or an en route TAZ.
+  \item	$T_D$: see Equation \ref{eqn:T_D}
+  \item	$D_T$: see Equation \ref{eqn:D_T}
+  \item	$N_T \equiv$ Trip Charge Time Need: the amount of charging time needed to complete the next trip in the itinerary, if $\beta_{BEV}$ is FALSE then set $N_T$ to 0 to indicate that there is no need for charge to complete the trip, otherwise use the following formula:
+    \begin{equation} N_T = max\left[0,\frac{D_T f_s \eta_e - \theta C}{\kappa} \right]
+    \end{equation}
+  \item	$D_J$: see Equation \ref{eqn:D_J} 
+  \item	$N_J \equiv$ Journey Charge Time Need: the amount of charging time needed to complete the remaining trips in the itinerary
+    \begin{equation}
+      N_J = max\left[0,\frac{D_J f_s \eta_e - \theta C}{\kappa} \right]
+    \end{equation}
+  \item	$N_F \equiv$ Full Charge Time Need: the amount of charging time to complete a full charge
+    \begin{equation}
+      N_F = 
+      \begin{cases}
+	max\left[0,\frac{(0.8 - \theta) C }{\kappa}\right] & \text{if }\tau = 3 \\
+	~ \\
+	\frac{(1 - \theta) C }{\kappa} & \text{otherwise}
+      \end{cases}
+    \end{equation}
+  \item	$T_R \equiv$ Time Until End Charge: the anticipated time in hours remaining before the driver chooses to end charging or the vehicle is fully charged.  Table \ref{tab:timeUntilEndCharge} describes how this value is calculated. 
+\end{itemize}
+
+Table \ref{tab:chargeTimeDecision} details how the $Charge ~Time$ event scheduler decision is made and at what time the corresponding event is to be scheduled.
+
+\begin{table}[!h]
+\def\colmarginA{2cm}
+\def\colmarginB{2.5cm}
+\def\colmarginC{3cm}
+\renewcommand{\arraystretch}{1.3}
+\caption{Time Until End Charge.}
+\label{tab:timeUntilEndCharge}
+\centering
+\begin{tabular}{|lll|}
+\hline
+\textbf{If} & \textbf{Then set $T_R$ to} & \textbf{Other Actions} \\
+\hline
+\parbox[t]{\colmarginA}{ \raggedright  
+    $N_F <= N_T$
+  }  & \parbox[t]{\colmarginB}{ \raggedright 
+    $N_F$
+  }  & \parbox[t]{\colmarginC}{ \raggedright 
+} \\
+\parbox[t]{\colmarginA}{ \raggedright  
+  $T_D < N_T$
+  }  & \parbox[t]{\colmarginB}{ \raggedright 
+  $N_T$
+  }  & \parbox[t]{\colmarginC}{ \raggedright 
+  Delay itinerary with next trip occurring $N_T$ hours from the present moment.
+} \\
+\parbox[t]{\colmarginA}{ \raggedright  
+  $\beta_{COD}$
+  }  & \parbox[t]{\colmarginB}{ \raggedright 
+  $min(T_D,N_F)$
+  }  & \parbox[t]{\colmarginC}{ \raggedright 
+} \\
+\parbox[t]{\colmarginA}{ \raggedright  
+  $\tau = 3$
+  }  & \parbox[t]{\colmarginB}{ \raggedright 
+  $min(T_D,N_F,N_J)$
+  }  & \parbox[t]{\colmarginC}{ \raggedright 
+} \\
+\parbox[t]{\colmarginA}{ \raggedright  
+  otherwise
+  }  & \parbox[t]{\colmarginB}{ \raggedright 
+  $min(T_D,N_T)$
+  }  & \parbox[t]{\colmarginC}{ \raggedright 
+} \\
+\hline
+\end{tabular}
+\end{table}
+
+\begin{table}[!h]
+\def\colmarginA{3.5cm}
+\def\colmarginB{4.5cm}
+\renewcommand{\arraystretch}{1.3}
+\caption{Charge Time Scheduler.}
+\label{tab:chargeTimeDecision}
+\centering
+\begin{tabular}{|ll|}
+\hline
+\textbf{If} & \textbf{Then} \\
+\hline
+\parbox[t]{\colmarginA}{ \raggedright  
+  $\neg \beta_u \cap$ $(0 < T_R < N_F) \cap$
+  $[(T_R > T_D) \cup (T_R < N_J)] \cap$ 
+  $(\tau < 3) \cap (T_D > H_R)$
+  }  & \parbox[t]{\colmarginB}{ \raggedright Schedule $Retry ~Seek$ event to occur after $t_W$ hours where $t_W = max\left[T_D - H_R, x \right]$ and $x$ is drawn from $X \sim exp(\mu = \mu_{T_W})$
+} \\
+\parbox[t]{\colmarginA}{ \raggedright  
+  otherwise
+  }  & \parbox[t]{\colmarginB}{ \raggedright 
+  Schedule $End ~Charge$ event to occur after $T_R$ hours.
+} \\
+\hline
+\end{tabular}
+\end{table}
+
+\subsubsection{Full Charge Time Event Scheduler}\label{fullSched}
+
+This event scheduler schedules the $End ~Charge$ event to occur after $N_F$ hours, where:
+\begin{equation}
+  N_F = \frac{(1 - \theta) C}{\kappa}
+\end{equation}
+
+\subsubsection{Need to Charge Decision}\label{needDec}
+
+First estimate $R_R, D_T,$ and $D_J,$ based on Equations \ref{eqn:R_R}, \ref{eqn:D_T}, and \ref{eqn:D_J}, and , respectively. Then base the decision on the logic in Table \ref{tab:needToCharge}, where $\beta_u$ is initialized to false:
+
+\begin{table}[!h]
+\def\colmarginA{5.5cm}
+\def\colmarginB{2.5cm}
+\renewcommand{\arraystretch}{1.3}
+\caption{Need to Charge Scheduler.}
+\label{tab:needToCharge}
+\centering
+\begin{tabular}{|ll|}
+\hline
+\textbf{If} & \textbf{Then} \\
+\hline
+\parbox[t]{\colmarginA}{ \raggedright  
+  (Calling event is $Arrive$) $\cap ~ R_R < D_J$
+  }  & \parbox[t]{\colmarginB}{ \raggedright 
+  Return TRUE
+} \\
+\parbox[t]{\colmarginA}{ \raggedright  
+  (Calling event is $Depart$) $\cap ~ R_R < D_T$
+  }  & \parbox[t]{\colmarginB}{ \raggedright 
+  Return TRUE
+} \\
+\parbox[t]{\colmarginA}{ \raggedright  
+  (Calling event is $Arrive$) $\cap ~ (\theta < 1)~ \cap$
+  $(T_D \ge H_R) \cap \left(x < \frac{P_U}{1 + e^{-5 + 10 \theta}}\right)$ where $x$ is drawn from $X \sim uniform(0,1)$
+  }  & \parbox[t]{\colmarginB}{ \raggedright 
+  Return TRUE and set $\beta_u$ to TRUE.
+} \\
+\parbox[t]{\colmarginA}{ \raggedright  
+  Otherwise
+  }  & \parbox[t]{\colmarginB}{ \raggedright 
+  Return FALSE
+} \\
+\hline
+\end{tabular}
+\end{table}
+
+\subsubsection{Seek Charger Decision}\label{seekDec}
+
+This submodel is based on an economic model that compares the total cost of charging (including the opportunity cost of a driver's time) from all relevant charging alternatives, selecting the least cost option. The submodel relies on use of a nearest neighbor function defined as:
+
+\begin{equation}
+  \Gamma(Z_z) = \{Z_i ~ \forall {i \ne z} ~ | ~ \Omega_D(Z_z,Z_i) < d\}
+\end{equation}
+
+The submodel consists of the following actions:
+\begin{enumerate}[label=(\alph*)]
+  \item Set $\beta_r$ to $TRUE$ if $\beta_{BEV} \cap (T_D < H_R) \cap \neg \beta_u$, otherwise set to $FALSE$.
+  \item Assemble the set of TAZs and charger type combinations available to the driver. This set of charger alternatives is denoted by $\mathbb{Z}_{z,l}$ and is found according to the following expression: 
+    \begin{equation}
+      \mathbb{Z}_{z,l} = 
+      \begin{cases}  
+	\left\{ \substack{ (Z,Z_{\alpha}) \forall Z \epsilon \\ \{ \Gamma(Z_r) \cup \Omega_Z(Z_{r,1},Z_{r,2}) \}}
+\right\} & \text{for}~ \beta_r \\
+	\{(Z_r,Z_{r,\alpha})\} & \text{otherwise}
+      \end{cases}
+    \end{equation}
+    The index $i$ will be used below to reference each combination of TAZ and charger type ($z$ and $l$) with at least one available charger.  Note that some of the variables with the subscript $x$ for ``extra" will be zero for chargers in $Z_r$ or en route as they only apply to travel that's additional to the driver's itinerary.  The one exception to this is $T_{C,x}$, which will be non-zero for en route TAZs because the time spent charging is an opportunity cost to the driver.
+
+  \item If no available chargers are found, then increment the driver variable $M_D$ and check to see if the driver has been delayed for a total time $W_{TOT}$ greater than $H_W$.  If the driver has been delayed longer than the threshold, they are soft-stranded, execute the $Strand$ event.  Otherwise, transition to the state $Not ~Charging$ and stop this action.
+
+  \item Calculate the following values: 
+  \begin{enumerate}[label=(\roman*)]
+    \item $\beta_{3f} \equiv$ Level 3 And Too Full?: This boolean value is $TRUE$ if the charger under consideration has $\tau = 3$ and $\theta >= 0.8$. If $\beta_{3f}$ for alternative $i$, then $i$ is not considered.
+    \item $W_{3T} \equiv$ Level 3 Time Penalty: Set this to $\infty$ if $D_T > 0.8 C \eta_e f_s$ (i.e. the distance to the destination is greater than how far the vehicle can go on a full level 3 charge). Otherwise set to 0.  This penalizes level 3 charging when a level 1 or 2 charge can accomodate the driver's trip without an additional stop or another charging session.
+    \item $N_E \equiv$ Trip Or Journey Energy Need: This value depends on the amount of time before the next departure in the driver's itinerary as well as the current state of charge and the charger type.  If $T_D < H_R$, then only the energy needed for the next trip is considered, otherwise the energy needed for the journey is used.  If the energy needed for the trip or journey is greater than the energy needed to fill the battery (or in the case of level 3, to achieve 80\% state of charge) then $N_E$ is set to the battery limiting value.
+
+    As a formula, the value is calculated as follows. First, if $T_D < H_W$, set $D$ to $D_T$, else set $D$ to $D_J$. 
+    \begin{equation}
+      N_E = 
+      \begin{cases}
+	min\left(\substack{ max\left[0,D f_s \eta_e - \theta C \right],\\
+	max⁡\left[0,(0.8-\theta)C \right] }\right) & \tau = 3 \\
+	min\left(\substack{max\left[0,D f_s \eta_e - \theta C \right],\\
+	max⁡\left[0,(1-\theta)C \right] }\right) & \text{otherwise}
+      \end{cases}
+    \end{equation}
+	  
+  \item $T^{\prime}_{T,i}, D^{\prime}_{T,i}, E^{\prime}_{T,i} \equiv$ Extra Time, Distance, and Energy For Travel: The additional travel time and distance needed to accommodate the detour, equal to the difference between first traveling to the intermediate TAZ, then to the destination TAZ vs. traveling straight to the destination TAZ. the energy needed to accommodate the extra travel is calculated as $E^{\prime}_{T,i} = D^{\prime}_{T,i} \eta_e f_s$.
+  \item $T^{\prime}_{C,i} \equiv$ Extra Time Until End Charge: If $\beta_{COD} $, then this value is set to the amount of delay in the driver's itinerary that would be necessary to use the charging alternative, calculated as $max(0, N_T – T_D)$ if the charger is in the origin and $0$ if the charger is in the destination TAZ. If $\neg \beta_{COD}$, then the value is an estimate of the extra time a driver would spend charging, equal to the value of $T_E$ as calculated by the Charge Time submodel (Section \ref{chargeSched}) with the following modifications:
+    \begin{enumerate}[label=(\roman*)]
+      \item $T_D$ is decreased by $\Omega_T(I_{r,1},Z_i)$
+      \item $\theta$ is decreased by $\left(\frac{\Omega_D(I_{r,1},Z_i) \eta_e}{C}\right)$ 
+      \item $D_T$ and $D_J$ are assumed to begin at $Z_i$
+    \end{enumerate}
+  \end{enumerate}
+\item Estimate the cost of the alternative:
+  \begin{equation}
+    W_i = \delta (T^{\prime}_{C,i} + T^{\prime}_{T,i} + W_{3T}) + U_i(N_E +  E^{\prime}_{T,i})
+  \end{equation}
+\item Chose the alternative $i^*$ with the minimum cost.  If $Z_{i^*} = Z_r$, execute the $Charge ~Time$ event scheduler. If $Z_{i^*} = I_{r,2}$, then update the departure time of the next trip in the driver's itinerary to be the present moment and call the $Travel ~Time$ event scheduler.
+
+  If $Z_i \ne Z_r \cap Z_i \ne I_{r,2}$, then test to ensure that the driver is not caught in an endless loop between two TAZs by testing if $\sum_{j=1}^r I_{j,4} \ge 10$ (i.e. has the driver changed their itinerary 10 or more times).  If the driver is caught in an endless loop, consider it a soft-stranding and execute the $Strand$ event.  Otherwise update the driver's itinerary to include the new destination TAZ (unless $Z_{i^*} = I_{r,2}$) with a depart time equal to $t$ and call the $Travel ~Time$ event scheduler.  
+
+If no alternatives are found, determine whether chargers exist but are just unavailable or if no chargers exist.  If no chargers exist and $\neg \beta_u $, then the driver is hard-stranded.  Execute the $Strand$ event. 
+\end{enumerate}
+
+\subsubsection{Break Up Trip Event}\label{breakEv}
+
+$Break ~Up ~Trip$ is an event which uses a scoring system to choose an intermediate destination between the driver's current taz and destination.
+\begin{itemize}
+  \item	If $(\theta = 1) \cap \left(\frac{\theta C}{\eta_e} < f_S I_{r,2} \right)$ (i.e. the driver has a full battery and cannot make the next trip) or if $\theta >= 0.8$ and $Z_r$ only has level 3 chargers available, then the driver attempts to break the trip into smaller trips with intermediate stops for charging.
+  \item	The driver only considers reachable en route TAZs $\mathbb{Z} = \{Z \epsilon \Omega_Z(I_{r,1},I_{r,2}) | \Omega_D(I_{r,1},Z) <= R_R\}$ 
+  \item	The search is first restricted to the elements of $\mathbb{Z}$ that would allow the driver to reach the ultimate destination in one trip after recharging (note that this must be based on $\theta = 0.8$ if only level 3 chargers are available in the candidate TAZ).  If no such TAZs can be found, or all of these TAZs have a score of 0, then all reachable en route TAZs are considered.
+  \item	Each reachable en route TAZ is assigned a score equal to the number of available chargers or a certain level times the level number (E.g. if two level 3 and one level 2 chargers are available then the score would be 2 * 3 + 1 * 2 = 8).  If the TAZ is the driver's home, then 8 is added to the score for that TAZ (in other words, a home charger is as valuable as 4 level 2 chargers but not as valuable as 3 level 3 chargers).  
+  \item	The TAZ with the highest score is selected (ties are broken by selecting the furthest TAZ from the current location).  The TAZ is added to the driver's itinerary with $t$ as the departure time and the $Travel ~Time$ event scheduler is executed.  If no en route TAZs have any available chargers (i.e. if they all have a score of 0), then the driver selects the most distant reachable TAZ.  If no TAZs are reachable, the driver is hard-stranded and executes the $Strand$ event.
+\end{itemize}
+
+\subsubsection{Home Charge Decision}\label{homeDec}
+
+The $Home ~Charge$ decision is executed when the driver has completed their itinerary. The decision returns $\beta_h$ where 
+\begin{equation}
+  \beta_h = \begin{cases}
+    TRUE & \text{for} (Z_r = Z_H) \cap (\theta < 1) \cap x < \frac{1}{1+e^{-5+6\theta}} \\
+    FALSE & \text{otherwise}
+  \end{cases}
+\end{equation}
+  
+\subsubsection{Strand Event}\label{strandEv}
+
+Drivers are either soft-stranded or hard-stranded.  In both cases no further actions are scheduled for the driver.  A delay penalty is levied to the driver by adding to $I_{r,5}$ the value of $W_S$ or $W_H$ for soft or hard stranding, respectively. 
+
+\subsubsection{Distribution}\label{distSub}
+
+PEVI allows the modeler to define probability distributions for certain entity state variables (e.g. $F_{D_X}, F_{T_X}, F_{\theta}$).  Distributions are provided to PEVI in the form of a text file containing two or more columns that correspond to a cumulative probability (in the first column) and the correspoding quantiles (in the subsequent columns).  During model execution, random values are drawn from a uniform distribution on the interval [0,1) and then the appropriate quantile is determined by linear interpolation between the two bracketing values in the table.
+
+\section{Discussion}
+
+Example usages / applications / what's possible.
+
+\section{Conclusion}
+
+Wrap it up fuzzball.
+
+%%% bottom
+
+\hfill mds
+ 
+\hfill September 17, 2014
+
+
+% needed in second column of first page if using \IEEEpubid
+%\IEEEpubidadjcol
+
+
+
+% An example of a floating figure using the graphicx package.
+% Note that \label must occur AFTER (or within) \caption.
+% For figures, \caption should occur after the \includegraphics.
+% Note that IEEEtran v1.7 and later has special internal code that
+% is designed to preserve the operation of \label within \caption
+% even when the captionsoff option is in effect. However, because
+% of issues like this, it may be the safest practice to put all your
+% \label just after \caption rather than within \caption{}.
+%
+% Reminder: the "draftcls" or "draftclsnofoot", not "draft", class
+% option should be used if it is desired that the figures are to be
+% displayed while in draft mode.
+%
+%\begin{figure}[!h]
+%\centering
+%\includegraphics[width=2.5in]{myfigure}
+% where an .eps filename suffix will be assumed under latex, 
+% and a .pdf suffix will be assumed for pdflatex; or what has been declared
+% via \DeclareGraphicsExtensions.
+%\caption{Simulation results for the network.}
+%\label{fig_sim}
+%\end{figure}
+
+% Note that IEEE typically puts floats only at the top, even when this
+% results in a large percentage of a column being occupied by floats.
+
+
+% An example of a double column floating figure using two subfigures.
+% (The subfig.sty package must be loaded for this to work.)
+% The subfigure \label commands are set within each subfloat command,
+% and the \label for the overall figure must come after \caption.
+% \hfil is used as a separator to get equal spacing.
+% Watch out that the combined width of all the subfigures on a 
+% line do not exceed the text width or a line break will occur.
+%
+%\begin{figure*}[!h]
+%\centering
+%\subfloat[Case I]{\includegraphics[width=2.5in]{box}%
+%\label{fig_first_case}}
+%\hfil
+%\subfloat[Case II]{\includegraphics[width=2.5in]{box}%
+%\label{fig_second_case}}
+%\caption{Simulation results for the network.}
+%\label{fig_sim}
+%\end{figure*}
+%
+% Note that often IEEE papers with subfigures do not employ subfigure
+% captions (using the optional argument to \subfloat[]), but instead will
+% reference/describe all of them (a), (b), etc., within the main caption.
+% Be aware that for subfig.sty to generate the (a), (b), etc., subfigure
+% labels, the optional argument to \subfloat must be present. If a
+% subcaption is not desired, just leave its contents blank,
+% e.g., \subfloat[].
+
+
+% An example of a floating table. Note that, for IEEE style tables, the
+% \caption command should come BEFORE the table and, given that table
+% captions serve much like titles, are usually capitalized except for words
+% such as a, an, and, as, at, but, by, for, in, nor, of, on, or, the, to
+% and up, which are usually not capitalized unless they are the first or
+% last word of the caption. Table text will default to \footnotesize as
+% IEEE normally uses this smaller font for tables.
+% The \label must come after \caption as always.
+%
+%\begin{table}[!h]
+%% increase table row spacing, adjust to taste
+%\renewcommand{\arraystretch}{1.3}
+% if using array.sty, it might be a good idea to tweak the value of
+% \extrarowheight as needed to properly center the text within the cells
+%\caption{An Example of a Table}
+%\label{table_example}
+%\centering
+%% Some packages, such as MDW tools, offer better commands for making tables
+%% than the plain LaTeX2e tabular which is used here.
+%\begin{tabular}{|c||c|}
+%\hline
+%One & Two\\
+%\hline
+%Three & Four\\
+%\hline
+%\end{tabular}
+%\end{table}
+
+
+% Note that the IEEE does not put floats in the very first column
+% - or typically anywhere on the first page for that matter. Also,
+% in-text middle ("here") positioning is typically not used, but it
+% is allowed and encouraged for Computer Society conferences (but
+% not Computer Society journals). Most IEEE journals/conferences use
+% top floats exclusively. 
+% Note that, LaTeX2e, unlike IEEE journals/conferences, places
+% footnotes above bottom floats. This can be corrected via the
+% \fnbelowfloat command of the stfloats package.
+
+
+
+
+\section{Conclusion}
+The conclusion goes here.
+
+
+
+
+
+% if have a single appendix:
+%\appendix[Proof of the Zonklar Equations]
+% or
+%\appendix  % for no appendix heading
+% do not use \section anymore after \appendix, only \section*
+% is possibly needed
+
+% use appendices with more than one appendix
+% then use \section to start each appendix
+% you must declare a \section before using any
+% \subsection or using \label (\appendices by itself
+% starts a section numbered zero.)
+%
+
+
+%\appendices
+%\section{Proof of the First Zonklar Equation}
+%Appendix one text goes here.
+
+% you can choose not to have a title for an appendix
+% if you want by leaving the argument blank
+%\section{}
+%Appendix two text goes here.
+
+
+% use section* for acknowledgment
+\section*{Acknowledgment}
+
+The authors would like to thank...
+
+
+% Can use something like this to put references on a page
+% by themselves when using endfloat and the captionsoff option.
+\ifCLASSOPTIONcaptionsoff
+  \newpage
+\fi
+
+
+% trigger a \newpage just before the given reference
+% number - used to balance the columns on the last page
+% adjust value as needed - may need to be readjusted if
+% the document is modified later
+%\IEEEtriggeratref{8}
+% The "triggered" command can be changed if desired:
+%\IEEEtriggercmd{\enlargethispage{-5in}}
+
+% references section
+
+% can use a bibliography generated by BibTeX as a .bbl file
+% BibTeX documentation can be easily obtained at:
+% http://www.ctan.org/tex-archive/biblio/bibtex/contrib/doc/
+% The IEEEtran BibTeX style support page is at:
+% http://www.michaelshell.org/tex/ieeetran/bibtex/
+\bibliographystyle{IEEEtran}
+% argument is your BibTeX string definitions and bibliography database(s)
+\bibliography{refs}
+
+%
+% <OR> manually copy in the resultant .bbl file
+% set second argument of \begin to the number of references
+% (used to reserve space for the reference number labels box)
+%\begin{thebibliography}{1}
+
+%\bibitem{IEEEhowto:kopka}
+%H.~Kopka and P.~W. Daly, \emph{A Guide to \LaTeX}, 3rd~ed.\hskip 1em plus
+  %0.5em minus 0.4em\relax Harlow, England: Addison-Wesley, 1999.
+
+%\end{thebibliography}
+
+% biography section
+% 
+% If you have an EPS/PDF photo (graphicx package needed) extra braces are
+% needed around the contents of the optional argument to biography to prevent
+% the LaTeX parser from getting confused when it sees the complicated
+% \includegraphics command within an optional argument. (You could create
+% your own custom macro containing the \includegraphics command to make things
+% simpler here.)
+%\begin{IEEEbiography}[{\includegraphics[width=1in,height=1.25in,clip,keepaspectratio]{mshell}}]{Michael Shell}
+% or if you just want to reserve a space for a photo:
+
+\begin{IEEEbiography}{Michael Shell}
+Biography text here.
+\end{IEEEbiography}
+
+% if you will not have a photo at all:
+\begin{IEEEbiographynophoto}{John Doe}
+Biography text here.
+\end{IEEEbiographynophoto}
+
+% insert where needed to balance the two columns on the last page with
+% biographies
+%\newpage
+
+\begin{IEEEbiographynophoto}{Jane Doe}
+Biography text here.
+\end{IEEEbiographynophoto}
+
+% You can push biographies down or up by placing
+% a \vfill before or after them. The appropriate
+% use of \vfill depends on what kind of text is
+% on the last page and whether or not the columns
+% are being equalized.
+
+%\vfill
+
+% Can be used to pull up biographies so that the bottom of the last one
+% is flush with the other column.
+%\enlargethispage{-5in}
+
+
+
+% that's all folks
+\end{document}
+
+

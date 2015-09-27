@@ -1175,7 +1175,20 @@ to arrive
   update-itinerary 
   
   ; If journey-distance = 0, then we are at the end of day 1, and we need to reset journey-distance.
-  if journey-distance < small-num [set journey-distance item (floor (item current-itin-row itin-depart / 24)) master-journey-distance-list]
+  ; Bug from 3/23/2015: Driver 755388 from "driver-schedule-pen5-rep1-4day-20150212.txt" tries to access index 5 (item 6) from a master-journey-distance list of length 5.
+  ; The only way this should happen is if there is an itin-depart greater than 119; this would make floor (item current-itin-row itin-depart / 24) = 5.
+  ; I think the bug occurs because this driver gets assigned a trip because of additional charging or seek charger that sends them traveling way after they should.
+  ; Until we can work in a better bug fix, we are setting the master-journey distance in this case to the last entry. I don't believe this will introduce more bugs from leaving a journey distance greater than 0.
+  
+  ; Original code: if journey-distance < small-num [set journey-distance item (floor (item current-itin-row itin-depart / 24)) master-journey-distance-list] (as of 3/23/2015)
+  
+  if journey-distance < small-num [
+    ifelse floor (item current-itin-row itin-depart / 24) <= (length master-journey-distance-list - 1) [
+      set journey-distance item (floor (item current-itin-row itin-depart / 24)) master-journey-distance-list
+    ][
+      set journey-distance item (length master-journey-distance-list - 1) master-journey-distance-list
+    ]
+  ]
     
   let #to-taz [id] of current-taz
   ifelse not itin-complete? [
@@ -2081,7 +2094,7 @@ Polygon -7500403 true true 270 75 225 30 30 225 75 270
 Polygon -7500403 true true 30 75 75 30 270 225 225 270
 
 @#$#@#$#@
-NetLogo 5.0.4
+NetLogo 5.0.5
 @#$#@#$#@
 @#$#@#$#@
 @#$#@#$#@

@@ -2,3 +2,5 @@
 *.log
 *.pdf
 *changelog.txt
+*.blg
+*.bbl

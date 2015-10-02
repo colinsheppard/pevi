@@ -4,8 +4,8 @@ load.libraries(c('ggplot2','yaml','RNetLogo','plyr','reshape','stringr'))
 
 #exp.name <- commandArgs(trailingOnly=T)[1]
 #exp.name <- 'delhi-baseline-pain'
-#exp.name <- 'delhi-smart-charging-demand'
-exp.name <- 'delhi-smart-quasi-reopt'
+exp.name <- 'delhi-smart-charging-demand'
+#exp.name <- 'delhi-smart-quasi-reopt'
 path.to.inputs <- pp(pevi.shared,'data/inputs/compare/',exp.name,'/')
 
 #to.log <- c()
@@ -231,11 +231,15 @@ mean.results.veh[vehicle.scenario.named=="All High"]
 scen.names <- c('half-homeless'='50% Home Charging','no-homeless'='100% Home Charging')
 charging <- data.table(logs[['charging']])
 charging[,':='(time=time-6)]
-trips <- data.table(logs[['trip']])
-trips[,':='(time=time-6,end.time=end.time-6)]
+#trips <- data.table(logs[['trip']])
+#trips[,':='(time=time-6,end.time=end.time-6)]
 pain <- data.table(logs[['pain']])
 pain[,':='(time=time-6)]
 charging[,itin.scenario.named:=scen.names[itin.scenario]]
+
+load(file=paste(path.to.inputs,'combined-charging-pain.Rdata',sep=''))
+charging <- charging.all
+pain <- pain.all
 
 driver.schedules <- data.table(read.csv(pp(pevi.shared,'/data/inputs/driver-input-file/delhi-combined/no-homeless/driver-schedule-pen5-rep1-20150212.txt'),sep='\t'))
 driver.schedules[,':='(driver=X.X.driver,X.X.driver=NULL)]
@@ -249,14 +253,14 @@ driver.home.half <- driver.schedules.half[,list(home=home[1]),by=driver]
 driver.home.half[,itin.scenario:='half-homeless']
 driver.home <- rbindlist(list(driver.home,driver.home.half),use.names=T,fill=T)
 
-setkey(trips,driver,vehicle.type,itin.scenario)
-journey.dists <- trips[,list(dist=sum(distance)),by=c('driver','itin.scenario','vehicle.type')]
+#setkey(trips,driver,vehicle.type,itin.scenario)
+#journey.dists <- trips[,list(dist=sum(distance)),by=c('driver','itin.scenario','vehicle.type')]
 #ggplot(journey.dists,aes(x=dist))+geom_histogram()+facet_wrap(itin.scenario~vehicle.type)+labs(x="Distance (km)",y="Count",title=pp("Travel Distances from PEVI output (n=",nrow(journey.dists),")"))+scale_x_continuous(limits=c(0,100))
 sum(journey.dists$dist>41.3)/nrow(journey.dists) # 8.5% of journey dists are greater than range of two-wheeler
 
 setkey(driver.home,driver,itin.scenario)
-setkey(trips,driver,itin.scenario)
-trips <- driver.home[trips]
+#setkey(trips,driver,itin.scenario)
+#trips <- driver.home[trips]
 setkey(charging,driver,itin.scenario)
 charging <- driver.home[charging]
 charging[,at.home:=location==home]
@@ -266,9 +270,15 @@ setkey(charging,charger.level,itin.scenario)
 charging[,length(u(charger.id)),by=c('itin.scenario','charger.level')]
 
 ggplot(charging[charger.level<=1],aes(x=time,fill=factor(charger.level)))+geom_histogram(binwidth=1,position='dodge')+facet_wrap(itin.scenario.named~infrastructure.scenario.named)+labs(x="Hour",y="Count",title="Charging Events by Time of Day and Level",fill='Charger Level')
+ggplot(charging[time>50 & time<80 & charger.level<=1],aes(x=time,fill=factor(charger.level)))+geom_histogram(binwidth=1,position='dodge')+facet_wrap(itin.scenario.named~infrastructure.scenario.named)+labs(x="Hour",y="Count",title="Charging Events by Time of Day and Level",fill='Charger Level')
 
 setkey(pain,itin.scenario.named,infrastructure.scenario,pain.type)
 pain[time>24*2+6 & time<24*3+6,list(length(time)),by=c('pain.type','infrastructure.scenario','itin.scenario.named')]
+ggplot(pain[time>24*2+6 & time<24*3+6,list(length(time)),by=c('pain.type','infrastructure.scenario','itin.scenario.named')],aes(x=itin.scenario.named,y=V1,fill=infrastructure.scenario))+geom_bar(stat='identity',position='dodge')+facet_wrap(~pain.type,scales='free_y')
+ggplot(pain[,list(length(time)),by=c('pain.type','infrastructure.scenario','itin.scenario.named')],aes(x=itin.scenario.named,y=V1,fill=infrastructure.scenario))+geom_bar(stat='identity',position='dodge')+facet_wrap(~pain.type,scales='free_y')
+pain[,day:=floor(time / 24)+1]
+ggplot(pain[day>0 & itin.scenario.named=='no-homeless',list(length(time)),by=c('day','pain.type','infrastructure.scenario','itin.scenario.named')],aes(x=day,y=V1,fill=infrastructure.scenario))+geom_bar(stat='identity',position='dodge')+facet_wrap(~pain.type,scales='free_y')
+ggplot(pain[day>0 & day<5,list(length(time)),by=c('pain.type','infrastructure.scenario','itin.scenario.named')],aes(x=itin.scenario.named,y=V1,fill=infrastructure.scenario))+geom_bar(stat='identity',position='dodge')+facet_wrap(~pain.type,scales='free_y')
 
 # ANDY - END RUNNING HERE TO ANALYZE RESULTS
 

@@ -89,7 +89,7 @@ outline.thickness <- 0.04
 x.vary <- sin(seq(0,2*pi,by=pi/8))
 y.vary <- cos(seq(0,2*pi,by=pi/8))
 make.dir(pp(path.to.icons,'l1'))
-for(l1 in (0:3)*1e3){
+for(l1 in (0:30)*1e3){
   make.dir(pp(path.to.icons,'l1/',l1)) 
   for(l1.sub in (0:9)*1e2){
     make.dir(pp(path.to.icons,'l1/',l1,'/',l1+l1.sub)) 
@@ -125,8 +125,8 @@ my.green <- '#4daf4a'
 charger.cols <- c(my.blue,my.purp,my.oran,my.red)
 
 for(lev in 1:4){
-  for(num in 0:3000){
-    if((lev == 1 & num%%5 != 0) | (lev == 2 & num > 499) | (lev == 3 & num > 99) | (lev==4 & num > 49))next
+  for(num in 3000:30000){
+    if((lev == 1 & num%%100 != 0) | (lev == 2 & num > 499) | (lev == 3 & num > 99) | (lev==4 & num > 49))next
     thou.dir <- floor(num/1e3)*1e3
     hund.dir <- thou.dir + floor((num - thou.dir)/1e2)*1e2
     ico.file <- pp(path.to.icons,'l',lev,'/',thou.dir,'/',hund.dir,'/',num,'.png')

@@ -182,6 +182,22 @@ ggplot(subset(logs[['trip']],vehicle.type!='leaf'),aes(x=infrastructure.scenario
 ggplot(subset(logs[['trip']],vehicle.type!='leaf' & infrastructure.scenario.named=="Chargers for 2%"),aes(x= elec.miles/distance))+geom_histogram()+facet_wrap(~vehicle.type)
 ggplot(subset(logs[['trip']],vehicle.type!='leaf' & infrastructure.scenario.named=="Chargers for 2%"),aes(x=distance,y=elec.miles/distance))+geom_point()+facet_wrap(~vehicle.type)
 
+external.drivers <- unique(subset(logs[['trip']],origin<0 | destination<0)$driver)
+internal.phevs <- subset(logs[['trip']],vehicle.type!='leaf' & !driver %in% external.drivers)
+external.drivers <- subset(logs[['trip']],vehicle.type!='leaf' & driver %in% external.drivers)
+ddply(internal.phevs,.(infrastructure.scenario.named),function(df){ sum(df$elec.miles)/sum(df$distance) })
+ddply(external.drivers,.(infrastructure.scenario.named),function(df){ sum(df$elec.miles)/sum(df$distance) })
+
+non.shasta.internal.drivers <- unique(subset(logs[['trip']],origin<0 | destination<0 | origin>58 | destination>58)$driver)
+shasta.drivers <- subset(logs[['trip']],vehicle.type!='leaf' & !driver %in% non.shasta.internal.drivers)
+ddply(shasta.drivers,.(infrastructure.scenario.named),function(df){ sum(df$elec.miles)/sum(df$distance) })
+
+dists <- ddply(internal.phevs,.(driver,replicate,infrastructure.scenario.named,vehicle.type),function(df){ data.frame(distance=sum(df$distance),elec.frac=sum(df$elec.miles)/sum(df$distance))})
+ggplot(dists,aes(x=distance))+geom_histogram()+facet_wrap(infrastructure.scenario.named~vehicle.type)
+ddply(dists,.(infrastructure.scenario.named,vehicle.type),function(df){ data.frame(mean.dist=mean(df$distance),mean.frac=weighted.mean(df$elec.frac,df$distance)) })
+
+i5.drivers <- ddply(subset(logs[['trip']],origin<0 & destination<0),.(infrastructure.scenario.named,replicate),function(df){ data.frame(numlength(unique(df$driver)) })
+
 
 #  show charging spatially
 source(pp(pevi.home,'R/gis-functions.R'))

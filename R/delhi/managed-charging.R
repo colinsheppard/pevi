@@ -4,10 +4,17 @@ path.to.inputs <- pp(pevi.shared,'data/inputs/compare/',exp.name,'/')
 path.to.outputs <- pp(pevi.shared,'data/DELHI/results/managed-charging')
 load(paste(path.to.inputs,'logs.Rdata',sep=''))
 
-driver.schedules <- data.table(read.csv(pp(pevi.shared,'/data/inputs/driver-input-file/delhi-combined/no-homeless/driver-schedule-pen5-rep1-20150212.txt'),sep='\t'))
-driver.schedules[,':='(driver=X.X.driver,X.X.driver=NULL)]
+driver.schedules <- data.table(read.csv(pp(pevi.shared,'/data/inputs/driver-input-file/delhi-combined/no-homeless/driver-schedule-pen5-rep1-4day-20150212.txt'),sep='\t'))
+driver.schedules.half <- data.table(read.csv(pp(pevi.shared,'/data/inputs/driver-input-file/delhi-combined/half-homeless/driver-schedule-pen5-rep1-4day-20150212.txt'),sep='\t'))
+driver.schedules[,':='(driver=X.driver,X.driver=NULL)]
+driver.schedules.half[,':='(driver=X.driver,X.driver=NULL)]
 setkey(driver.schedules,driver,depart)
+setkey(driver.schedules.half,driver,depart)
 driver.home <- driver.schedules[match(unique(driver.schedules[,driver]),driver.schedules[,driver]),home,by=driver]
+driver.home.half <- driver.schedules.half[match(unique(driver.schedules.half[,driver]),driver.schedules.half[,driver]),home,by=driver]
+driver.home[,itin.scenario:='no-homeless']
+driver.home.half[,itin.scenario:='half-homeless']
+driver.home <- rbindlist(list(driver.home,driver.home.half))
 
 # params used in the model run and needed here
 vehs <- data.table(read.csv(pp(pevi.shared,'/data/inputs/vehicle-type-input-file/vehicle-types-scen-delhi-smart.txt'),sep='\t'))
@@ -39,33 +46,33 @@ charging <- data.table(subset(logs[['charging']], !driver%in%stranded.drivers))
 charging[,':='(time=time-6)]
 
 # what soc is needed for each trip
-setkey(trips,driver)
+setkey(trips,itin.scenario,driver)
 trips[,soc.needed:=elec.used*fact.safety/batt.caps[vehicle.type]]
 
 # Calculate the delta.soc for each trip. The first trip will have a delta.soc of 0. subsequent trips are the soc.needed - end.soc from previous trip.
-trips[,':='(delta.soc=0,total.trips=length(distance)),by=driver]
+trips[,':='(delta.soc=0,total.trips=length(distance)),by=c('itin.scenario','driver')]
 
 # For any driver with more than 1 trip, delta.soc = soc.needed - end.soc from previous trip.
-trips[total.trips>1,delta.soc:=as.vector(c(0,soc.needed[2:length(distance)]-end.soc[1:(length(distance)-1)])),by=driver]
+trips[total.trips>1,delta.soc:=as.vector(c(0,soc.needed[2:length(distance)]-end.soc[1:(length(distance)-1)])),by=c('itin.scenario','driver')]
 # A negative delta.soc means they had more charge from the previous trip than they needed, so we set those delta.socs to 0.
 trips[delta.soc<0,delta.soc:=0]
 
 needy.trips <- trips[delta.soc>0]
 
-setkey(needy.trips,driver)
-setkey(charging,driver)
+setkey(needy.trips,itin.scenario,driver)
+setkey(charging,itin.scenario,driver)
 
-ch.cands <- charging[needy.trips]
+ch.cands <- charging[needy.trips,allow.cartesian=T]
 
 ch.cands[,trip.charge.time.diff:=i.time-time]
 ch.cands[,trip.charge.time.diff:=ifelse(trip.charge.time.diff<0,Inf,trip.charge.time.diff)]
-ch.cands[,most.recent:=rank(trip.charge.time.diff),by='driver']
+ch.cands[,most.recent:=rank(trip.charge.time.diff),by=c('itin.scenario','driver')]
 needy.charges <- ch.cands[most.recent==1]
 
 needy.charges[,end.needy.time:=time + soc.needed * batt.caps[vehicle.type] / charger.power[pp('L',charger.level)]]
-needy.charges[,row:=1:length(time)]
+needy.charges[,row:=1:length(time),by=itin.scenario]
 
-non.curtailable.charge <- ddply(needy.charges,.(row),function(df){ 
+non.curtailable.charge <- ddply(needy.charges,.(itin.scenario,vehicle.type,row),function(df){ 
       pow.hrs <- unlist(floor(df['time'])):unlist(floor(df['end.needy.time']))
       if(length(pow.hrs) > 1){
         fractional.pows <- charger.power[pp('L',df['charger.level'])] * unlist(c(ceiling(df['time']) - df['time'],df['end.needy.time'] - floor(df['end.needy.time'])))
@@ -75,12 +82,18 @@ non.curtailable.charge <- ddply(needy.charges,.(row),function(df){
       }
       data.frame(hour=pow.hrs,power=unlist(pow))
 })
-non.curtailable.profile <- data.table(ddply(non.curtailable.charge,.(hour),function(df){ data.frame(power=sum(df$power)) }),key='hour')
+non.curtailable.profile <- data.table(ddply(non.curtailable.charge,.(itin.scenario,vehicle.type,hour),function(df){ data.frame(power=sum(df$power)) }),key=c('itin.scenario','hour'))
 
 charging[,end.time:=time+duration]
-charging[,row:=1:length(time)]
+charging[,row:=1:length(time),by=c('itin.scenario','vehicle.type')]
 
-all.charge <- ddply(charging,.(row),function(df){ 
+setkey(charging,itin.scenario,driver)
+setkey(driver.home,itin.scenario,driver)
+charging <- driver.home[charging]
+charging[,at.home:=home==location]
+charging[is.na(at.home),at.home:=F] # NA indicates no home charger for that driver
+
+all.charge <- ddply(charging,.(itin.scenario,vehicle.type,row),function(df){ 
       pow.hrs <- unlist(floor(df['time'])):unlist(floor(df['end.time']))
       if(length(pow.hrs) > 1){
         fractional.pows <- charger.power[pp('L',df['charger.level'])] * unlist(c(ceiling(df['time']) - df['time'],df['end.time'] - floor(df['end.time'])))
@@ -88,17 +101,34 @@ all.charge <- ddply(charging,.(row),function(df){
       }else{
         pow <- charger.power[pp('L',df['charger.level'])] * (df['end.time']-df['time'])
       }
-      data.frame(hour=pow.hrs,power=unlist(pow))
+      data.frame(hour=pow.hrs,power=unlist(pow),at.home=df['at.home'])
 })
+all.charge <- data.table(all.charge)
 
-all.profile <- data.table(ddply(all.charge,.(hour),function(df){ data.frame(all.power=sum(df$power)) }),key='hour')
+all.profile <- data.table(ddply(all.charge,.(itin.scenario,vehicle.type,hour,at.home),function(df){ data.frame(all.power=sum(df$power,na.rm=T)) }),key=c('itin.scenario','hour'))
 
+# first make a plot that dissaggregates by at.home then simplify
+all.profile[,itin.scen.named:=ifelse(itin.scenario=='half-homeless','50% Home','100% Home')]
+ggplot(all.profile[hour>=6 & hour<=30],aes(x=hour,y=all.power/1e3,colour=at.home,fill=vehicle.type))+geom_bar(stat='identity')+facet_wrap(~itin.scen.named)+labs(y="Charging Demand (MW)")
+trips[,itin.scen.named:=ifelse(itin.scenario=='half-homeless','50% Home','100% Home')]
+ggplot(trips[time>=6 & time<=30],aes(x=end.time,fill=vehicle.type))+geom_histogram(binwidth=1)+facet_wrap(~itin.scen.named)+labs(x='Arrival Time')
+
+## !!!!!!!!!!!!!!!
+## TODO reaggregate all.profile here
+## !!!!!!!!!!!!!!!
+
+setkey(non.curtailable.profile,itin.scenario,vehicle.type,hour)
+setkey(all.profile,itin.scenario,vehicle.type,hour)
 profile <- non.curtailable.profile[all.profile]
 profile[,frac.shiftable:=(all.power-power)/all.power]
 profile[,frac.shiftable:=ifelse(is.na(frac.shiftable),1,frac.shiftable)]
-profile <- profile[hour>3 & hour<28] 
-profile[hour>23,hour:=hour-24]
-setkey(profile,hour)
+profile <- profile[hour>6 & hour<24*2+31] 
+profile[hour>=73,hour:=hour-72]
+
+ggplot(profile,aes(x=hour,y=all.power,colour=itin.scenario))+geom_line()
+ggplot(profile,aes(x=hour,y=all.power,shape= vehicle.type,colour=itin.scenario))+geom_point()
+
+setkey(profile,itin.scenario,vehicle.type,hour)
 profile[,power:=NULL]
 profile[,power:=all.power]
 profile[,all.power:=NULL]
@@ -108,26 +138,42 @@ profile[,all.power:=NULL]
 #profile[,power:=power*tot.energy/sum(power)/1000] # now in MW
 
 # now convert to Plexos format
-ann.profile <- data.frame(hour=1:8760,frac.shiftable=NA,power=NA)
+itin.scen <- 'no-homeless'
+veh.type <- 'two-wheel'
+for(itin.scen in u(profile$itin.scenario)){
+  for(veh.type in u(profile$vehicle.type)){
+    ann.profile <- data.frame(hour=1:8760,power.shiftable=NA,power=NA)
 
-ann.profile$frac.shiftable <- rep(profile$frac.shiftable,365)
-ann.profile$power <- rep(profile$power,365)
+    pow <- profile[J(itin.scen,veh.type)]$power / 1e3 # convert to MW
+    pow.shiftable <- pow * profile[J(itin.scen,veh.type)]$frac.shiftable # convert to MW
+    ann.profile$power.shiftable <- c(rep(pow.shiftable,365/3),pow.shiftable[1:48])
+    ann.profile$power <- c(rep(pow,365/3),pow[1:48])
 
-weekend.inds <- c()
-for(i in 1:52){
-  weekend.inds <- c(weekend.inds,(1:48)+(i-1)*(24*7))
+    weekend.inds <- c()
+    for(i in 1:52){
+      weekend.inds <- c(weekend.inds,(1:48)+(i-1)*(24*7)) 
+    }
+    weekend.inds <- weekend.inds + 72 # the 72 accounts for 1/1/2025 being a Wednesday
+
+    # Based on PM measurements in Delhi:
+    #http://www.academia.edu/9093533/WEEKDAY_WEEKEND_DIFFERENCES_IN_AIR_QUALITY_PARAMETERS_IN_DELHI_INDIA
+    ann.profile$power[weekend.inds] <- ann.profile$power[weekend.inds] * 0.87
+    ann.profile$power.shiftable[weekend.inds] <- ann.profile$power.shiftable[weekend.inds] * 0.87
+
+    ann.profile$hour  <- rep(1:24,365)
+    ann.profile$day   <- rep(1:365,each=24)
+
+    plexos.format <- acast(melt(ann.profile,id.vars=c('hour','day')),day ~ hour ~ variable)
+
+    itin.scen.named <- ifelse(itin.scen=='half-homeless','half-home-charging','full-home-charging')
+    #write.csv(plexos.format[,,2],file=pp(path.to.outputs,'/pevi-load-for-plexos-',itin.scen.named,'-',veh.type,'.csv'))
+    #write.csv(plexos.format[,,1],file=pp(path.to.outputs,'/pevi-shiftable-load-for-plexos-',itin.scen.named,'-',veh.type,'.csv'))
+  }
 }
-# Based on PM measurements in Delhi:
-#http://www.academia.edu/9093533/WEEKDAY_WEEKEND_DIFFERENCES_IN_AIR_QUALITY_PARAMETERS_IN_DELHI_INDIA
-ann.profile$power[weekend.inds] <- ann.profile$power[weekend.inds] * 0.87
 
-ann.profile$hour  <- rep(1:24,365)
-ann.profile$day   <- rep(1:365,each=24)
-
-plexos.format <- acast(melt(ann.profile,id.vars=c('hour','day')),day ~ hour ~ variable)
-
-write.csv(plexos.format[,,2],file=pp(path.to.outputs,'/plexos-load.csv'))
-write.csv(plexos.format[,,1],file=pp(path.to.outputs,'/plexos-frac-shiftable.csv'))
+setkey(charging,itin.scenario,vehicle.type)
+#write.csv(charging[,list(avg.charge.duration=mean(duration),median.charge.duration=median(duration),sd.charge.duration=sd(duration),min.charge.duration=min(duration),max.charge.duration=max(duration)),by=c('itin.scenario','vehicle.type')],file=pp(path.to.outputs,'/charging-stats-by-vehicle-type.csv'))
+ggplot(charging,aes(x=duration,y=..density..))+geom_histogram()+facet_grid(itin.scenario~vehicle.type,scales='free_x')
 
 
 # Analzing results to make sure they keep with the RITES survey data

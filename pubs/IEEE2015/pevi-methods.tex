@@ -625,7 +625,7 @@ Variable & Description\\
 $D_X$ & \parbox[t]{\colmargin}{ \raggedright External Distance (miles or km): The driving distance between a TAZ external to the region of interest to a gateway TAZ within the region of interest. The result of a driver specific random draw from an externally supplied distribution function.\\~ }\\
 $T_X$ & \parbox[t]{\colmargin}{ \raggedright External Time (hours): The driving time between a TAZ external to the region of interest to a gateway TAZ within the region of interest. The result of a driver specific random draw from an externally supplied distribution function.}\\
 $M_D$ & \parbox[t]{\colmargin}{ \raggedright Number of Denials: The number of occurrences when the driver wanted/needed to charge but was unable due to a lack of available chargers.}\\
-$W_{TOT}$ & \parbox[t]{\colmargin}{ \raggedright Total Itinerary Delay Amount: The total amount of delay the driver has experienced (equivalent to $\sum_{j=1}^r I_{j,5}$). }\\
+$W_T$ & \parbox[t]{\colmargin}{ \raggedright Total Itinerary Delay Amount: The total amount of delay the driver has experienced (equivalent to $\sum_{j=1}^r I_{j,5}$). }\\
 \hline
 \end{tabular}
 \end{table}
@@ -967,7 +967,7 @@ Table \ref{tab:waitTime} details how the decision is made and at what time the c
 \textbf{If} & \textbf{Then} \\
 \hline
 \parbox[t]{\colmarginA}{ \raggedright  
-    $W_{TOT} \ge T_W$
+    $W_T \ge T_W$
   }  & \parbox[t]{\colmarginB}{ \raggedright 
     Add $W_S$ to $I_{r,5}$ and do not schedule any additional actions
 } \\
@@ -1176,12 +1176,12 @@ The submodel consists of the following actions:
     \end{equation}
     The index $i$ will be used below to reference each combination of TAZ and charger type ($z$ and $l$) with at least one available charger.  Note that some of the variables with the subscript $x$ for ``extra" will be zero for chargers in $Z_r$ or en route as they only apply to travel that's additional to the driver's itinerary.  The one exception to this is $T_{C,x}$, which will be non-zero for en route TAZs because the time spent charging is an opportunity cost to the driver.
 
-  \item If no available chargers are found, then increment the driver variable $M_D$ and check to see if the driver has been delayed for a total time $W_{TOT}$ greater than $H_W$.  If the driver has been delayed longer than the threshold, they are soft-stranded, execute the $Strand$ event.  Otherwise, transition to the state $Not ~Charging$ and stop this action.
+  \item If no available chargers are found, then increment the driver variable $M_D$ and check to see if the driver has been delayed for a total time $W_T$ greater than $H_W$.  If the driver has been delayed longer than the threshold, they are soft-stranded, execute the $Strand$ event.  Otherwise, transition to the state $Not ~Charging$ and stop this action.
 
   \item Calculate the following values: 
   \begin{enumerate}[label=(\roman*)]
     \item $\beta_{3f} \equiv$ Level 3 And Too Full?: This boolean value is $TRUE$ if the charger under consideration has $\tau = 3$ and $\theta >= 0.8$. If $\beta_{3f}$ for alternative $i$, then $i$ is not considered.
-    \item $W_{3T} \equiv$ Level 3 Time Penalty: Set this to $\infty$ if $D_T > 0.8 C \eta_e f_s$ (i.e. the distance to the destination is greater than how far the vehicle can go on a full level 3 charge). Otherwise set to 0.  This penalizes level 3 charging when a level 1 or 2 charge can accomodate the driver's trip without an additional stop or another charging session.
+    \item $W_3 \equiv$ Level 3 Time Penalty: Set this to $\infty$ if $D_T > 0.8 C \eta_e f_s$ (i.e. the distance to the destination is greater than how far the vehicle can go on a full level 3 charge). Otherwise set to 0.  This penalizes level 3 charging when a level 1 or 2 charge can accomodate the driver's trip without an additional stop or another charging session.
     \item $N_E \equiv$ Trip Or Journey Energy Need: This value depends on the amount of time before the next departure in the driver's itinerary as well as the current state of charge and the charger type.  If $T_D < H_R$, then only the energy needed for the next trip is considered, otherwise the energy needed for the journey is used.  If the energy needed for the trip or journey is greater than the energy needed to fill the battery (or in the case of level 3, to achieve 80\% state of charge) then $N_E$ is set to the battery limiting value.
 
     As a formula, the value is calculated as follows. First, if $T_D < H_W$, set $D$ to $D_T$, else set $D$ to $D_J$. 
@@ -1205,7 +1205,7 @@ The submodel consists of the following actions:
   \end{enumerate}
 \item Estimate the cost of the alternative:
   \begin{equation}
-    W_i = \delta (T^{\prime}_{C,i} + T^{\prime}_{T,i} + W_{3T}) + U_i(N_E +  E^{\prime}_{T,i})
+    W_i = \delta (T^{\prime}_{C,i} + T^{\prime}_{T,i} + W_3) + U_i(N_E +  E^{\prime}_{T,i})
   \end{equation}
 \item Chose the alternative $i^*$ with the minimum cost.  If $Z_{i^*} = Z_r$, execute the $Charge ~Time$ event scheduler. If $Z_{i^*} = I_{r,2}$, then update the departure time of the next trip in the driver's itinerary to be the present moment and call the $Travel ~Time$ event scheduler.
 
@@ -1243,9 +1243,28 @@ Drivers are either soft-stranded or hard-stranded.  In both cases no further act
 
 PEVI allows the modeler to define probability distributions for certain entity state variables (e.g. $F_{D_X}, F_{T_X}, F_{\theta}$).  Distributions are provided to PEVI in the form of a text file containing two or more columns that correspond to a cumulative probability (in the first column) and the correspoding quantiles (in the subsequent columns).  During model execution, random values are drawn from a uniform distribution on the interval [0,1) and then the appropriate quantile is determined by linear interpolation between the two bracketing values in the table.
 
+\subsection{Optimizing EVCS}\label{distSub}
+
+\begin{equation}
+  \underset{\mathbf{k}}{\text{min}} ~ E(W) = E\left[ \sum_v \delta W_{T,v}(\mathbf{k}) \right]
+\end{equation}
+
+Subject to:
+\begin{equation}
+\sum_{z,l} U_{l} k_{z,l} \le B 
+\end{equation}
+
+\begin{equation}
+\underset{z,l}{\text{argmin}} \frac{\partial W/\partial k_{z,l}}{U_{l}} 
+\end{equation}
+
+
+
 \section{Discussion}
 
 Example usages / applications / what's possible.
+
+
 
 \section{Conclusion}
 

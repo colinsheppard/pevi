@@ -752,7 +752,7 @@ to wait-time-event-scheduler
       let event-time-from-now random-exponential wait-time-mean
       let bedtime-today floor (25.5 / 24) * 24 + bedtime
       if ticks + event-time-from-now > bedtime-today and ticks + event-time-from-now < bedtime-today + sleep-duration [
-         set event-time-from-now bedtime-today + sleep-duration
+         set event-time-from-now bedtime-today + sleep-duration - ticks
       ]
       time:schedule-event self task retry-seek ticks + event-time-from-now
       log-data "wait-time" (sentence ticks id [name] of this-vehicle-type state-of-charge trip-distance journey-distance time-until-depart "retry-seek" event-time-from-now electric-fuel-consumption) ;;;LOG
@@ -766,7 +766,7 @@ to wait-time-event-scheduler
       if event-time-from-now < 0 [ set event-time-from-now 0 ]
       let bedtime-today floor (25.5 / 24) * 24 + bedtime
       if ticks + event-time-from-now > bedtime-today and ticks + event-time-from-now < bedtime-today + sleep-duration [
-         set event-time-from-now bedtime-today + sleep-duration
+         set event-time-from-now bedtime-today + sleep-duration - ticks
       ]
       time:schedule-event self task retry-seek ticks + event-time-from-now
       log-data "wait-time" (sentence ticks id [name] of this-vehicle-type state-of-charge trip-distance journey-distance time-until-depart "retry-seek" event-time-from-now electric-fuel-consumption) ;;;LOG

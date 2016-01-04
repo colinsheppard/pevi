@@ -293,16 +293,16 @@ for(seed in seeds[seed.inds]){ # COMMENT FOR MANUAL
     write.table(charger.buildout,charger.file,quote=FALSE,sep='\t',row.names=FALSE)
     
     # For Smart analysis, the # drivers is so high that we are not using replicates, therefore I've commented out stuff
-    # around restricting driver input files based on pen.ratio
+    # around restricting driver input files based on pen.ratio.
 
     # Note that the expectation is that all pev penetrations beyond the first are even multiples of the first
     if(pev.penetration == pev.penetrations[1]){
       vary.tab <- vary.tab.original
     }else{
       pen.ratio <- pev.penetration/pev.penetrations[1]
-    	new.vary <- vary
-    	new.vary$'driver-input-file' <- new.vary$'driver-input-file'[1:round(length(vary$'driver-input-file')/pen.ratio)]
-    	vary.tab <- expand.grid(new.vary,stringsAsFactors=F)
+      new.vary <- vary
+      new.vary$'driver-input-file' <- new.vary$'driver-input-file'[1:round(length(vary$'driver-input-file')/pen.ratio)]
+      vary.tab <- expand.grid(new.vary,stringsAsFactors=F)
     }
     vary.tab$`driver-input-file` <- str_replace(vary.tab$`driver-input-file`,"penXXX",paste("pen",pev.penetration*100,sep=""))
 
@@ -327,6 +327,11 @@ for(seed in seeds[seed.inds]){ # COMMENT FOR MANUAL
 			print(paste('build.i = ',build.i))
 
       if(build.i == 1){
+      
+      #########################################################
+      # The actual running of netlogo happens here
+      #########################################################
+      
         if(nl.obj == 'marginal-cost-to-reduce-delay'){
           print('evaluate baseline cost and delay')
           baseline.results <- evaluate.baseline()
@@ -339,7 +344,11 @@ for(seed in seeds[seed.inds]){ # COMMENT FOR MANUAL
       }
       
       #	Next is the loop through driver files. the snow parallelization happens here.
-			build.result <- evaluate.fitness()
+	  build.result <- evaluate.fitness()
+
+	  #########################################################
+      # End Netlogo run
+      #########################################################
 
       # if running interactively and you want to check out the results:
       # ggplot(build.result,aes(x=factor(taz),y=obj)) + geom_point() + facet_wrap(~level) + stat_summary(fun.data = "mean_cl_boot", colour = "red")

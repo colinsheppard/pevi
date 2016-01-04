@@ -299,8 +299,8 @@ to setup-in-batch-mode-from-gui
   clear-all-and-initialize
   set starting-seed 21
   set fix-seed TRUE
-  set param-file-base "/Users/critter/Dropbox/serc/pev-colin/pev-shared/"
-  set parameter-file "/Users/critter/Dropbox/serc/pev-colin/pevi/netlogo/params.txt"
+  set param-file-base "/Users/Raskolnikovbot3001/Dropbox/serc/pev-shared/"
+  set parameter-file "/Users/Raskolnikovbot3001/Dropbox/serc/pevi/netlogo/params.txt"
   read-parameter-file
   set reference-charger-cost 0
   set reference-delay-cost 0
@@ -752,7 +752,7 @@ to wait-time-event-scheduler
       let event-time-from-now random-exponential wait-time-mean
       let bedtime-today floor (25.5 / 24) * 24 + bedtime
       if ticks + event-time-from-now > bedtime-today and ticks + event-time-from-now < bedtime-today + sleep-duration [
-         set event-time-from-now bedtime-today + sleep-duration
+         set event-time-from-now bedtime-today + sleep-duration - ticks
       ]
       time:schedule-event self task retry-seek ticks + event-time-from-now
 ;;;      log-data "wait-time" (sentence ticks id [name] of this-vehicle-type state-of-charge trip-distance journey-distance time-until-depart "retry-seek" event-time-from-now electric-fuel-consumption) ;;;LOG
@@ -766,7 +766,7 @@ to wait-time-event-scheduler
       if event-time-from-now < 0 [ set event-time-from-now 0 ]
       let bedtime-today floor (25.5 / 24) * 24 + bedtime
       if ticks + event-time-from-now > bedtime-today and ticks + event-time-from-now < bedtime-today + sleep-duration [
-         set event-time-from-now bedtime-today + sleep-duration
+         set event-time-from-now bedtime-today + sleep-duration - ticks
       ]
       time:schedule-event self task retry-seek ticks + event-time-from-now
 ;;;      log-data "wait-time" (sentence ticks id [name] of this-vehicle-type state-of-charge trip-distance journey-distance time-until-depart "retry-seek" event-time-from-now electric-fuel-consumption) ;;;LOG
@@ -1749,7 +1749,7 @@ INPUTBOX
 832
 253
 starting-seed
-1
+21
 1
 0
 Number
@@ -1761,7 +1761,7 @@ SWITCH
 297
 fix-seed
 fix-seed
-1
+0
 1
 -1000
 

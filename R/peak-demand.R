@@ -486,3 +486,10 @@ save(worst.peaks,file=pp(pevi.shared,'data/inputs/compare/upstate-ghg/peak-deman
 #Min. 1st Qu.  Median    Mean 3rd Qu.    Max. 
 #0.9155  0.9882  0.9941  0.9897  0.9989  1.0000 
 
+
+# for IEEE Paper
+if(F){
+  dem[,tazname:=ifelse(taz<10,"1",ifelse(taz<20,"2",ifelse(taz<30,"3",ifelse(taz<40,"4","NA"))))]
+  dem.agg <- dem[tazname!="NA",list(load=sum(public)),by=c('time','tazname')]
+
+}

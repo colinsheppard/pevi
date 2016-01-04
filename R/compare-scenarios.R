@@ -9,8 +9,8 @@ exp.name <- 'delhi-test-revised'
 path.to.inputs <- pp(pevi.shared,'data/inputs/compare/',exp.name,'/')
 
 #to.log <- c('pain','charging','need-to-charge')
-#to.log <- c('pain','charging','tazs','trip')
-to.log <- c('pain','charging')
+to.log <- c('pain','charging','tazs','trip')
+#to.log <- c('pain','charging')
 
 # load the reporters and loggers needed to summarize runs and disable logging
 source(paste(pevi.home,"R/reporters-loggers.R",sep=''))
@@ -30,6 +30,13 @@ results <- data.frame(vary.tab)
 if("driver-input-file" %in% names(vary)){
   results$penetration <- as.numeric(unlist(lapply(strsplit(as.character(results$driver.input.file),'-pen',fixed=T),function(x){ unlist(strsplit(x[2],"-rep",fixed=T)[[1]][1]) })))
   results$replicate <- as.numeric(unlist(lapply(strsplit(as.character(results$driver.input.file),'-rep',fixed=T),function(x){ unlist(strsplit(x[2],"-",fixed=T)[[1]][1]) })))
+  results$itin.scenario <- unlist(lapply(strsplit(as.character(results$driver.input.file),'/driver-schedule',fixed=T),function(x){ tail(unlist(strsplit(x[1],"/",fixed=T)[[1]]),1) }))
+  results$itin.scenario.named <- results$itin.scenario
+  results$itin.scenario.order <- results$itin.scenario
+  for(scen.i in names(naming$`driver-input-file`)){
+    results$itin.scenario.named[results$itin.scenario == scen.i] <- naming$`driver-input-file`[[scen.i]][[1]]
+    results$itin.scenario.order[results$itin.scenario == scen.i] <- as.numeric(naming$`driver-input-file`[[as.character(scen.i)]][[2]])
+  }
 }
 if("charger-input-file" %in% names(vary)){
   results$infrastructure.scenario <- unlist(lapply(strsplit(as.character(results$charger.input.file),'-scen',fixed=T),function(x){ unlist(strsplit(x[2],".txt",fixed=T)) }))
@@ -45,8 +52,6 @@ if("charger-input-file" %in% names(vary)){
     for(scen.i in as.numeric(names(naming$`charger-input-file`))){
       results$infrastructure.scenario.named[results$infrastructure.scenario == scen.i] <- naming$`charger-input-file`[[as.character(scen.i)]][[1]]
       results$infrastructure.scenario.order[results$infrastructure.scenario == scen.i] <- as.numeric(naming$`charger-input-file`[[as.character(scen.i)]][[2]])
-      # For some reason, these aren't traslating as numeric.
-      results$infrastructure.scenario.order <- as.numeric(results$infrastructure.scenario.order)
     }
   }
   results$infrastructure.scenario.named  <- reorder(factor(results$infrastructure.scenario.named),results$infrastructure.scenario.order)
@@ -55,10 +60,29 @@ if("vehicle-type-input-file" %in% names(vary)){
   results$vehicle.scenario <- as.numeric(unlist(lapply(strsplit(as.character(results$vehicle.type.input.file),'-scen',fixed=T),function(x){ unlist(strsplit(x[2],".txt",fixed=T)) })))
   results$vehicle.scenario.named <- results$vehicle.scenario
   results$vehicle.scenario.order <- results$vehicle.scenario
-  for(scen.i in as.numeric(names(naming$`vehicle-type-input-file`))){
-    results$vehicle.scenario.named[results$vehicle.scenario == scen.i] <- naming$`vehicle-type-input-file`[[as.character(scen.i)]][[1]]
-    results$vehicle.scenario.order[results$vehicle.scenario == scen.i] <- as.numeric(naming$`vehicle-type-input-file`[[as.character(scen.i)]][[2]])
+  if(all(is.na(results$vehicle.scenario))){
+    for(scen.i in names(naming$`vehicle-type-input-file`)){
+      results$vehicle.scenario[grep(scen.i,as.character(results$vehicle.type.input.file))] <- scen.i
+      results$vehicle.scenario.named[results$vehicle.scenario == scen.i] <- naming$`vehicle-type-input-file`[[scen.i]][[1]]
+      results$vehicle.scenario.order[results$vehicle.scenario == scen.i] <- as.numeric(naming$`vehicle-type-input-file`[[scen.i]][[2]])
+    }
+  }else{
+    for(scen.i in as.numeric(names(naming$`vehicle-type-input-file`))){
+      results$vehicle.scenario.named[results$vehicle.scenario == scen.i] <- naming$`vehicle-type-input-file`[[as.character(scen.i)]][[1]]
+      results$vehicle.scenario.order[results$vehicle.scenario == scen.i] <- as.numeric(naming$`vehicle-type-input-file`[[as.character(scen.i)]][[2]])
+    }
   }
+}
+if(exp.name=='delhi-animation' | exp.name=='delhi-battery-swap' | exp.name=='consistent-vs-quadrupled'){
+  results <- subset(results,(penetration==0.5 & infrastructure.scenario=='delhi-final-rec-pen-0.5') | 
+                    (penetration==1 & infrastructure.scenario=='delhi-final-rec-pen-1') | 
+                    (penetration==2 & infrastructure.scenario=='delhi-final-rec-pen-2') |
+                    (penetration==0.5 & infrastructure.scenario=='delhi-final-with-swap-pen-0.5') | 
+                    (penetration==1 & infrastructure.scenario=='delhi-final-with-swap-pen-1') | 
+                    (penetration==2 & infrastructure.scenario=='delhi-final-with-swap-pen-2') &
+                    ((num.simulation.days==2 & itin.scenario=='consistent') |
+                    (num.simulation.days==4 & itin.scenario=='quadrupled'))
+                    )
 }
 
 # start NL
@@ -70,6 +94,10 @@ for(cmd in paste('set log-',logfiles,' false',sep='')){ NLCommand(cmd) }
 for(cmd in paste('set log-',to.log,' true',sep='')){ NLCommand(cmd) }
 
 logs <- list()
+logs[['results']] <- results
+for(reporter in names(reporters)){
+  logs[['results']][,reporter] <- NA
+}
 
 # for every combination of parameters, run the model and capture the summary statistics
 for(results.i in 1:nrow(results)){
@@ -81,23 +109,25 @@ for(results.i in 1:nrow(results)){
   }
   NLCommand('clear-all-and-initialize')
   NLCommand('random-seed 1')
-  NLCommand(pp('set param-file-base "',pevi.shared,'"'))
-  NLCommand(paste('set parameter-file "',path.to.inputs,'params.txt"',sep=''))
+  NLCommand(paste('set param-file-base "',pevi.shared,'"',sep=''))
+  NLCommand(paste('set parameter-file "',path.to.inputs,'/params.txt"',sep=''))
   NLCommand(paste('set model-directory "',pevi.home,'netlogo/"',sep=''))
   NLCommand('set batch-setup? false')
   NLCommand('read-parameter-file')
   for(param in names(vary.tab)){
+    param.dot <- str_replace_all(param,"-",".") 
     if(is.character(vary.tab[1,param])){
-      NLCommand(paste('set ',param,' "',vary.tab[results.i,param],'"',sep=''))
+      NLCommand(paste('set ',param,' "',results[results.i,param.dot],'"',sep=''))
     }else{
-      NLCommand(paste('set ',param,' ',vary.tab[results.i,param],'',sep=''))
+      NLCommand(paste('set ',param,' ',results[results.i,param.dot],'',sep=''))
     }
   }
-  if("tazs" %in% to.log)NLCommand('set log-taz-time-interval 15')
-  NLCommand('set go-until-time 100')
+  if("tazs" %in% to.log)NLCommand('set log-taz-time-interval 5')
+  NLCommand('set go-until-time 125')
   NLCommand('setup')
 
   NLCommand('time:go-until go-until-time')
+  logs[['results']][results.i,names(reporters)] <- tryCatch(NLDoReport(1,"",reporter = paste("(sentence",paste(reporters,collapse=' '),")"),as.data.frame=T,df.col.names=names(reporters)),error=function(e){ NA })
   if(results.i == 1){
     outputs.dir <- NLReport('outputs-directory')
     for(logger in to.log){

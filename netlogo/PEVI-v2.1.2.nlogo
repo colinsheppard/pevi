@@ -1119,12 +1119,13 @@ to break-up-trip
       ; choose the furthest along and hope
       log-data "break-up-trip-choice" (sentence ticks id ([id] of current-taz) ([id] of destination-taz) "max-distance" ([id] of #max-dist-taz) #max-dist-only) ;;;LOG
       add-trip-to-itinerary #max-dist-taz
+      travel-time-event-scheduler
     ]
   ][
     log-data "break-up-trip-choice" (sentence ticks id ([id] of current-taz) ([id] of destination-taz) (word "max-score" #result-action) ([id] of #max-taz) #max-score) ;;;LOG
     add-trip-to-itinerary #max-taz
+    travel-time-event-scheduler
   ]
-  travel-time-event-scheduler
 end
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;

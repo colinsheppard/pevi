@@ -56,7 +56,7 @@ if(!exists('cl')){
 #nl.path <- "/Applications/NetLogo\ 5.0.3"
 nl.path <- "/Applications/NetLogo\ 5.0.4"
 tryCatch(NLStart(nl.path, gui=F),error=function(err){ NA })
-model.path <- paste(path.to.pevi,"netlogo/PEVI-nolog.nlogo",sep='')
+model.path <- paste(path.to.pevi,"netlogo/PEVI-v2.1.2-nolog.nlogo",sep='')
 NLLoadModel(model.path)
 
 for(cmd in paste('set log-',logfiles,' false',sep='')){ NLCommand(cmd) }

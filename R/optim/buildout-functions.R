@@ -4,7 +4,7 @@ evaluate.fitness <- function(){
     stop('no cluster started')
   }
   #clusterEvalQ(cl,rm(list=ls()))
-  clusterExport(cl,c( 'run.buildout.batch','run.buildout.batch.one.itin','pev.penetration','path.to.inputs','optim.code','nl.path','path.to.outputs','seed','param.file','taz.charger.combos','charger.file','write.charger.file','reporters','pevi.home','vary.tab','streval','try.nl','debug.reporters','pevi.shared','build.increment','nl.obj','reference.charger.cost','reference.delay.cost','add.charger'))
+  clusterExport(cl,c( 'run.buildout.batch','run.buildout.batch.one.itin','pev.penetration','path.to.inputs','optim.code','nl.path','path.to.outputs','seed','param.file','taz.charger.combos','charger.file','write.charger.file','reporters','pevi.home','vary.tab','streval','try.nl','debug.reporters','pevi.shared','build.increment','nl.obj','reference.charger.cost','reference.delay.cost','add.charger','args'))
   if(exists('batch.results'))rm('batch.results')
   if(length(vary.tab$`driver-input-file`)==1){
     taz.charger.combos.inds <- which(taz.charger.combos$include)
@@ -70,7 +70,11 @@ run.buildout.batch <- function(driver.input.file){
       NLCommand(paste('add-charger',df$taz,df$level,build.increment[pp('l',df$level)]))
       NLCommand('time:go-until 500')
           
-      total.charger.cost <-  tryCatch(NLReport('total-charger-cost'),error=function(e){ NA })
+      if(args$externaltazs){
+        total.charger.cost <-  tryCatch(NLReport('total-charger-cost-including-external'),error=function(e){ NA })
+      }else{
+        total.charger.cost <-  tryCatch(NLReport('total-charger-cost'),error=function(e){ NA })
+      }
       total.delay.cost <-  tryCatch(NLReport('total-delay-cost'),error=function(e){ NA })
       objective <-  tryCatch(NLReport(nl.obj),error=function(e){ NA })
 
@@ -100,7 +104,11 @@ run.buildout.batch.one.itin <- function(taz.charger.combos.inds){
       NLCommand(paste('add-charger',df$taz,df$level,build.increment[pp('l',df$level)]))
       NLCommand('time:go-until 500')
           
-      total.charger.cost <-  tryCatch(NLReport('total-charger-cost'),error=function(e){ NA })
+      if(args$externaltazs){
+        total.charger.cost <-  tryCatch(NLReport('total-charger-cost-including-external'),error=function(e){ NA })
+      }else{
+        total.charger.cost <-  tryCatch(NLReport('total-charger-cost'),error=function(e){ NA })
+      }
       total.delay.cost <-  tryCatch(NLReport('total-delay-cost'),error=function(e){ NA })
       objective <-  tryCatch(NLReport(nl.obj),error=function(e){ NA })
 
@@ -118,7 +126,7 @@ evaluate.baseline <- function(){
     stop('no cluster started')
   }
   #clusterEvalQ(cl,rm(list=ls()))
-  clusterExport(cl,c( 'run.baseline.batch','run.baseline.batch.one.itin','pev.penetration','path.to.inputs','optim.code','nl.path','path.to.outputs','seed','param.file','taz.charger.combos','charger.file','write.charger.file','reporters','pevi.home','vary.tab','streval','try.nl','debug.reporters','pevi.shared','build.increment','add.charger'))
+  clusterExport(cl,c( 'run.baseline.batch','run.baseline.batch.one.itin','pev.penetration','path.to.inputs','optim.code','nl.path','path.to.outputs','seed','param.file','taz.charger.combos','charger.file','write.charger.file','reporters','pevi.home','vary.tab','streval','try.nl','debug.reporters','pevi.shared','build.increment','add.charger','args'))
   if(exists('batch.results'))rm('batch.results')
   if(length(vary.tab$`driver-input-file`)==1){
     # note this does redundant runs, but we need every node to do the setup actions, but we only keep one result
@@ -175,7 +183,11 @@ run.baseline.batch.one.itin <- function(){
               
   NLCommand('time:go-until 500')
           
-  total.charger.cost <-  tryCatch(NLReport('total-charger-cost'),error=function(e){ NA })
+  if(args$externaltazs){
+    total.charger.cost <-  tryCatch(NLReport('total-charger-cost-including-external'),error=function(e){ NA })
+  }else{
+    total.charger.cost <-  tryCatch(NLReport('total-charger-cost'),error=function(e){ NA })
+  }
   total.delay.cost <-  tryCatch(NLReport('total-delay-cost'),error=function(e){ NA })
 
   data.frame(total.charger.cost = total.charger.cost, total.delay.cost = total.delay.cost, rep=rep)
@@ -219,7 +231,11 @@ run.baseline.batch <- function(driver.input.file){
               
   NLCommand('time:go-until 500')
           
-  total.charger.cost <-  tryCatch(NLReport('total-charger-cost'),error=function(e){ NA })
+  if(args$externaltazs){
+    total.charger.cost <-  tryCatch(NLReport('total-charger-cost-including-external'),error=function(e){ NA })
+  }else{
+    total.charger.cost <-  tryCatch(NLReport('total-charger-cost'),error=function(e){ NA })
+  }
   total.delay.cost <-  tryCatch(NLReport('total-delay-cost'),error=function(e){ NA })
 
   data.frame(total.charger.cost = total.charger.cost, total.delay.cost = total.delay.cost, rep=rep)

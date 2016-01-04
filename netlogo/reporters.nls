@@ -44,6 +44,10 @@ to-report mean-delay
   ]
 end
 
+to-report total-charger-cost-including-external
+  report sum [ [installed-cost] of this-charger-type ] of chargers with [ [level] of this-charger-type > 0 ] * 1000
+end
+
 to-report total-charger-cost 
   report sum [ [installed-cost] of this-charger-type ] of chargers with [ [level] of this-charger-type > 0 and [id] of location > 0] * 1000
 end

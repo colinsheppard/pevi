@@ -382,11 +382,11 @@ for(seed in seeds[seed.inds]){ # COMMENT FOR MANUAL
       opt.iter$iteration <- build.i
       opt.history <- rbind(opt.history,opt.iter)
 			save(opt.history,file=pp(path.to.outputs,'optimization-history.Rdata'))
-      winner.history <- rbind(winner.history,data.frame(opt.iter[1,],cost=NA,num.added=NA,cum.cost=NA))
+      winner.history <- rbind(winner.history,data.frame(opt.iter[1,],cost=NA,num.added=NA,cum.cost=NA,num.evaluated=NA))
       winner.history$num.added[nrow(winner.history)] <- build.increment[grep(tail(winner.history$level,1),names(build.increment))]
       winner.history$cost[nrow(winner.history)] <- charger.info$cost.per.iter[match(winner.history$level[nrow(winner.history)],0:4)]*1000
       winner.history$cum.cost <- cumsum(winner.history$cost)
-      winner.history$num.evaluated <- sum(taz.charger.combos$include)
+      winner.history$num.evaluated[nrow(winner.history)] <- sum(taz.charger.combos$include)
 			save(winner.history,file=pp(path.to.outputs,'winner-history.Rdata'))
 
       build.result$penetration <- pev.penetration
@@ -443,7 +443,7 @@ for(seed in seeds[seed.inds]){ # COMMENT FOR MANUAL
         seed=seed,
         penetration=pev.penetration,
         iteration=build.i,
-        num.evaluated=sum(taz.charger.combos$include),
+        num.evaluated=tail(winner.history$num.evaluated,1),
         delay=tail(winner.history$mean.delay.cost,1),
         cum.cost=tail(winner.history$cum.cost,1),
         obj=current.obj,

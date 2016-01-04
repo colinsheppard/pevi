@@ -13,8 +13,8 @@ optim.code <- 'min-frac-stranded-constrained-by-cost-50-50'
 #                     optimization, the variables are assumed to exist inside module.settings, the
 #                     module name and parameter name are specified (e.g. 'supply.wind','capacity')
 ###################################################################################################
-decision.vars <- data.frame(taz=rep(1:53,3),level=rep(1:3,each=53),lbound=rep(0,53*3),ubound.start=c(rep(3,53),rep(2,53),rep(1,53)),ubound.actual=c(rep(40,53),rep(20,53),rep(5,53)))
-decision.vars$name <-  c(paste("T",1:53,"-L1",sep=""),paste("T",1:53,"-L2",sep=""),paste("T",1:53,"-L3",sep=""))
+decision.vars <- data.frame(taz=rep(1:52,3),level=rep(1:3,each=52),lbound=rep(0,52*3),ubound=c(rep(40,52),rep(20,52),rep(5,52)))
+decision.vars$name <-  c(paste("T",1:52,"-L2",sep=""),paste("T",1:52,"-L3",sep=""))
 
 ###################################################################################################
 # objective.name

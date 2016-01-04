@@ -16,14 +16,26 @@ evaluate.fitness <- function(ptx){
   break.pairs[[i+1]] <- c(breaks[i+1],numrows)
 
   clusterEvalQ(cl,rm(list=ls()))
-  clusterExport(cl,c( 'run.pevi.batch','pev.penetration','path.to.inputs','path.to.outputs','optim.code','nl.path','model.path',
-                      'write.charger.file','reporters','logfiles','results','path.to.pevi','vary.tab','streval','try.nl','debug.reporters',
+  clusterExport(cl,c( 'init.netlogo','run.pevi.batch','pev.penetration','path.to.inputs','path.to.outputs','optim.code','nl.path','model.path',
+                      'pevi.shared','write.charger.file','reporters','logfiles','results','pevi.home','vary.tab','streval','try.nl','debug.reporters',
                       objective.name,'constraint.names','constraint.params','objective.name','objective','all.or.nothing',constraint.names))
+  clusterEvalQ(cl,init.netlogo())
   if(exists('batch.results'))rm('batch.results')
   batch.results<-clusterApply(cl,break.pairs,fun='run.pevi.batch',ptx=ptx)
   batch.results<-unlist(batch.results)
 
   return(batch.results)
+}
+
+init.netlogo <- function(){
+  tryCatch(NLStart(nl.path, gui=F),error=function(err){ NA })
+  NLLoadModel(model.path)
+  for(cmd in paste('set log-',logfiles,' false',sep='')){ NLCommand(cmd) }
+}
+
+quit.netlogo <- function(){
+  #	Quit the NetLogo instance
+	NLQuit()
 }
 
 stop.criteria <- function(fit,gen.num){
@@ -51,11 +63,6 @@ run.pevi.batch <- function(break.pair,ptx){
   i <- 1
   #cat(paste('starting'),file=paste(path.to.outputs,optim.code,"/logfile.txt",sep=''),append=T,fill=T,labels=break.pair.code) 
 
-  tryCatch(NLStart(nl.path, gui=F),error=function(err){ NA })
-  #.jinit(parameters=c("-Xmx2048m","-Xms512m"),force.init = T)
-  NLLoadModel(model.path)
-  for(cmd in paste('set log-',logfiles,' false',sep='')){ NLCommand(cmd) }
-
   results.orig <- results
   for(ptx.i in ll:ul){
     #print(ptx.i)
@@ -67,9 +74,15 @@ run.pevi.batch <- function(break.pair,ptx){
       #print(paste("-",results.i))
       #system('sleep 0.25')
       try.nl('clear-all-and-initialize',break.pair.code)
-      try.nl(paste('set parameter-file "',path.to.inputs,'params.txt"',sep=''),break.pair.code)
-      try.nl(paste('set model-directory "',path.to.pevi,'netlogo/"',sep=''),break.pair.code)
+
+      # Set to fixed-seed 
+      try.nl('set starting-seed 1',break.pair.code)      
+      try.nl('set fix-seed TRUE',break.pair.code)
+
+      try.nl(pp('set param-file-base "',pevi.shared,'"'),break.pair.code)
+      try.nl(pp('set parameter-file "',path.to.inputs,optim.code,'/params.txt"'),break.pair.code)
       try.nl('read-parameter-file',break.pair.code)
+
       for(param in names(vary.tab)){
         if(is.character(vary.tab[1,param])){
           try.nl(paste('set ',param,' "',vary.tab[results.i,param],'"',sep=''),break.pair.code)
@@ -78,13 +91,11 @@ run.pevi.batch <- function(break.pair,ptx){
         }
       }
       try.nl(paste('set charger-input-file "',path.to.inputs,optim.code,'/chargers-ptx',ptx.i,'.txt"',sep=''),break.pair.code)
-      #print("before setup")
-      #system('sleep 0.25')
-      try.nl('random-seed 1',break.pair.code)
-      try.nl('setup',break.pair.code)
+
+      try.nl('setup-in-batch-mode',break.pair.code)
       #print("before go-until")
       #system('sleep 0.25')
-      try.nl('dynamic-scheduler:go-until schedule 500',break.pair.code)
+      try.nl('time:go-until 500',break.pair.code)
       results[results.i,names(reporters)] <- tryCatch(NLDoReport(1,"",reporter = paste("(sentence",paste(reporters,collapse=' '),")"),as.data.frame=T,df.col.names=names(reporters)),error=function(e){ NA })
       #cat(paste('cost: ',paste(results$infrastructure.cost[results.i],collapse=","),sep=''),file=paste(path.to.outputs,optim.code,"/logfile.txt",sep=''),append=T,fill=T,labels=break.pair.code) 
       #cat(paste('frac delayed: ',paste(results$frac.drivers.delayed,collapse=','),sep=''),file=paste(path.to.outputs,optim.code,"/logfile.txt",sep=''),append=T,fill=T,labels=break.pair.code) 
@@ -99,6 +110,9 @@ run.pevi.batch <- function(break.pair,ptx){
   return(batch.results)
 }
 
+
+
+
 try.nl <- function(cmd,break.pair.code=""){
   err <- tryCatch(NLCommand(cmd),error=function(err){ paste("NLCommand('",cmd,"')",sep='') })
   if(!is.null(err)){
@@ -109,8 +123,10 @@ try.nl <- function(cmd,break.pair.code=""){
 }
 
 write.charger.file <- function(num.chargers,ptx.i){
-  chargers <- data.frame(TAZ=1:52,L0=rep(1,52),L1=num.chargers[1:52],L2=num.chargers[1:52],L3=num.chargers[53:104])
-  names(chargers) <- c(";TAZ","L0","L1","L2","L3")
+  chargers <- data.frame(TAZ=1:53,L0=rep(1,53),L1=num.chargers[1:53],L2=num.chargers[54:106],L3=num.chargers[107:159])
+  chargers <- rbind(chargers,data.frame(TAZ=-c(1,2,15,23,26,28,31,39,48,49,51,53),L0=1,L1=0,L2=0,L3=0))
+  chargers$L4 <- 0
+  names(chargers) <- c(";TAZ","L0","L1","L2","L3","L4")
   write.table(chargers,file=paste(path.to.inputs,optim.code,'/chargers-ptx',ptx.i,'.txt',sep=''),sep="\t",row.names=F,quote=F)
 }
 

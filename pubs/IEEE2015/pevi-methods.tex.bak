@@ -592,7 +592,6 @@ This approach was designed to reproduce the statistical properties of two key da
   \item Travel Activity Through Non-Parametric Resampling: Driver itineraries can be synthesized by strategically blending the outputs of a four-step travel demand model with transportation survey data.  Respondents are drawn randomly from the survey pool and their tour is fit into the road network of the region in a manner consistent with the demand for trips as specified by the travel demand outputs. A complete description of this algorithm is available in \cite{sudatta_mohanty_preliminary_2015}. 
 \end{itemize}
 
-
 \subsubsection{Wait Time Event Scheduler}\label{waitSched}
 The wait time submodel is an event scheduler.  It is executed after a driver has performed the $Seek ~Charger$ decision and found none that are available.  The submodel decides whether the driver will attempt to retry finding a charger or, if sufficient charge is available, abandon the charging attempt and schedule a departure.  
 
@@ -949,7 +948,7 @@ The driver itineraries used in PEVI are critical to the realism of the simulatio
 \begin{figure}[!h]
 \centering
 \includegraphics[width=3.5in]{figItinTAZs} 
-\caption{A comparison of the spatial distribution of travel demand (trip departures by TAZ) between the travel demand model used as input to the non-parametric resampling algorithm and the synthesized activity for the Humboldt case study.}
+\caption{A comparison of the spatial distribution of travel demand (trip departures by TAZ) between the travel demand model used as input to the non-parametric resampling algorithm and the synthesized activity for the Humbodlt case study.}
 \label{figItinTAZs}
 \end{figure}
 \begin{figure}[!h]
@@ -1058,11 +1057,11 @@ Because PEVI simulates individual drivers and the mobility needs of drivers are 
 
 \section{Conclusion}
 
-We present a detailed description of the Plug-in Electric Vehicle Infrastructure (PEVI) Model. PEVI is a spatially explicit agent-based microsimulation model that represents charging infrastructure, charging behavior, and competition for scarce EVCS. By leveraging the best available transportation demand data from a region, PEVI provides high resolution insight into emergent outcomes of PEV drivers interacting with EVCS throughout a transportation network. We highlight results from case studies to illustrate how PEVI is used in a heuristic optimization scheme to site regional EVCS and to explore the impact of adoption trends on the need for EVCS and on the electricity grid. 
+We present a detailed description of the Plug-in Electric Vehicle Infrastructure (PEVI) Model. PEVI is a spatially explicit agent-based microsimulation model that represents charging infrastructure, charging behavior, and competition for scarce EVCS. By leveraging the best availble transportation demand data from a region, PEVI provides high resolution insight into emergent outcomes of PEV drivers interacting with EVCS throughout a transportation network. We highlight results from case studies to illustrate how PEVI is used in a heuristic optimization scheme to site regional EVCS and to explore the impact of adoption trends on the need for EVCS and on the electricity grid. 
 
 \section*{Acknowledgment}
 
-The authors would like to thank the following organizations and people who contributed to the development of PEVI and/or provided valuable feedback to the process: from the Schatz Energy Research Center, Jim Zoellick, Charles Chamberlin, Arne Jacobson, Allison Campbell, David Carter, Jerome Carman, and Kevin Fingerman; from the Redwood Coast Energy Authority, Matthew Marshall, Dana Boudreau; from Humboldt State University, Steve Railsback, Margaret Lang, TK Williams, Zak Stanko, Derek Hancey, Jessica Bruce. Funders and other supporters include: California Energy Commission, U.S. Department of Energy and the Clean Energy Ministerial, Humboldt County Association of Governments, Caltrans, Siskiyou Economic Development Council, Shasta Regional Transportation Agency, India Department of Heavy Industries, National Capital Territory of Delhi.
+The authors would like to thank the following organizations and people who contributed to the development of PEVI and/or provided valuable feedback to the process: from the Schatz Energy Reserach Center, Jim Zoellick, Charles Chamberlin, Arne Jacobson, Allison Campbell, David Carter, Jerome Carman, and Kevin Fingerman; from the Redwood Coast Energy Authority, Matthew Marshall, Dana Boudreau; from Humboldt State University, Steve Railsback, Margaret Lang, TK Williams, Zak Stanko, Derek Hancey, Jessica Bruce. Funders and other supporters include: California Energy Commission, U.S. Department of Energy and the Clean Energy Ministerial, Humboldt County Association of Governments, Caltrans, Siskiyou Economic Development Council, Shasta Regional Transportation Agency, India Department of Heavy Industries, National Capital Territory of Delhi.
 
 
 %%% bottom

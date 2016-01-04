@@ -1,11 +1,11 @@
 Sys.setenv(NOAWT=1)
-options(java.parameters="-Xmx30g")
+options(java.parameters="-Xmx10g")
 load.libraries(c('ggplot2','yaml','RNetLogo','plyr','reshape','stringr'))
 
 #exp.name <- commandArgs(trailingOnly=T)[1]
-#exp.name <- 'delhi-smart-quasi-reopt'
-exp.name <- 'glenn-colusa-irreducible-delay-pen4'
-#exp.name <- 'delhi-cost-minimization'
+exp.name <- 'delhi-smart-quasi-reopt'
+exp.name <- 'delhi-roam-threshold'
+exp.name <- 'delhi-test-revised'
 path.to.inputs <- pp(pevi.shared,'data/inputs/compare/',exp.name,'/')
 
 #to.log <- c('pain','charging','need-to-charge')
@@ -87,8 +87,7 @@ if(exp.name=='delhi-animation' | exp.name=='delhi-battery-swap' | exp.name=='con
 
 # start NL
 tryCatch(NLStart(nl.path, gui=F),error=function(err){ NA })
-#model.path <- paste(pevi.home,"netlogo/PEVI.nlogo",sep='')
-model.path <- paste(pevi.home,"netlogo/PEVI-v2.1.2-nocost.nlogo",sep='')
+model.path <- paste(pevi.home,"netlogo/PEVI-v2.1.2.nlogo",sep='')
 NLLoadModel(model.path)
 
 for(cmd in paste('set log-',logfiles,' false',sep='')){ NLCommand(cmd) }

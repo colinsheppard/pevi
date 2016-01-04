@@ -1,4 +1,4 @@
-#!/usr/bin/Rscript --no-save --no-restore
+#!/usr/local/bin/Rscript --no-save --no-restore
 ##############################################################################################################################################
 # Script to conduct the buildout optimization
 ##############################################################################################################################################
@@ -15,11 +15,12 @@ option_list <- list(
   make_option(c("-t", "--hotstart"),action="store_true", type="logical", default=F, help="Set hot.start to TRUE, overriding the value in params.R [%default]"),
   make_option(c("-c", "--correcttwo"),action="store_true", type="logical", default=F, help="Correct 2%, this will delete all 2% results and hot start from iter 1 [%default]"),
   make_option(c("-v", "--version"),type="character", default='2.1.2', help="Version number of PEVI to use [%default]"),
-  make_option(c("-p", "--pushend"),action="store_true", type="logical", default=F, help="Push the stopping criterion [%default]")
+  make_option(c("-p", "--pushend"),action="store_true", type="logical", default=F, help="Push the stopping criterion [%default]"),
+  make_option(c("-e", "--externaltazs"),action="store_true", type="logical", default=F, help="Include external TAZs as decision variables [%default]")
 )
 if(interactive()){
-  setwd(pp(pevi.shared,'data/inputs/optim-new/glenn-colusa-base/'))
-  args<-c('-v','2.1.2')
+  setwd(pp(pevi.shared,'data/inputs/optim-new/delhi-revised-base/'))
+  args<-c('-v','2.1.2','-s','2','-e')
   args <- parse_args(OptionParser(option_list = option_list,usage = "optimize-pevi.R [options]"),positional_arguments=F,args=args)
 }else{
   args <- parse_args(OptionParser(option_list = option_list,usage = "optimize-pevi.R [options]"),positional_arguments=F)
@@ -76,7 +77,13 @@ names(charger.info) <- c('level','charge.rate','energy.price','installed.cost')
 init.charger.file <- pp(pevi.shared,param.file.data$charger.input.file)
 init.charger.buildout <- read.table(init.charger.file,header=T,sep='\t')
 levels.to.vary <- as.numeric(substr(names(build.increment)[build.increment>0],2,2))
-taz.charger.combos <- expand.grid(subset(init.charger.buildout,X.TAZ>0)$X.TAZ,subset(charger.info,level %in% levels.to.vary)$level)
+
+if(args$externaltazs){
+  taz.charger.combos <- expand.grid(init.charger.buildout$X.TAZ,subset(charger.info,level %in% levels.to.vary)$level)
+}else{
+  taz.charger.combos <- expand.grid(subset(init.charger.buildout,X.TAZ>0)$X.TAZ,subset(charger.info,level %in% levels.to.vary)$level)
+}
+
 names(taz.charger.combos) <- c('taz','level')
 taz.charger.combos$include <- T
 taz.charger.combos$key <- pp(taz.charger.combos$taz,'-',taz.charger.combos$level)
@@ -238,7 +245,7 @@ pevi.ver <- ifelse(args$version=="2.0","",pp("-v",args$version))
 model.path <- pp(pevi.home,"netlogo/PEVI",pevi.ver,"-nolog.nlogo")
 if(!exists('cl')){
   print('starting new cluster')
-  cl <- makeCluster(c(rep(list(list(host="localhost")),num.cpu)),type="SOCK")
+  cl <- makeCluster(c(rep(list(list(host="localhost")),min(length(vary.tab.original$`driver-input-file`),num.cpu))),type="SOCK")
   clusterEvalQ(cl,options(java.parameters="-Xmx20g"))
   clusterEvalQ(cl,Sys.setenv(NOAWT=1))
   clusterEvalQ(cl,library('RNetLogo'))
@@ -334,6 +341,7 @@ for(seed in seeds[seed.inds]){ # COMMENT FOR MANUAL
       #########################################################
       
         if(nl.obj == 'marginal-cost-to-reduce-delay'){
+          print('evaluate baseline cost and delay')
           baseline.results <- evaluate.baseline()
           reference.charger.cost <- mean(baseline.results$total.charger.cost)
           reference.delay.cost <- mean(baseline.results$total.delay.cost)
@@ -411,20 +419,16 @@ for(seed in seeds[seed.inds]){ # COMMENT FOR MANUAL
         }
         if(taz.charger.combos$obj[1] < 3){
           current.obj <- taz.charger.combos$obj[1]
-          print(current.obj)
         }else{
           current.obj <- Inf
-          print(current.obj)
           break
         }
       } else {
         # If our objective value has reached a minimum, we're done.
         if(current.obj > taz.charger.combos$obj[1]) {
           current.obj <- taz.charger.combos$obj[1]
-          print(current.obj)
         } else {
           current.obj <- Inf
-          print(current.obj)
           break
         }
       }
@@ -481,7 +485,7 @@ for(seed in seeds[seed.inds]){ # COMMENT FOR MANUAL
 
 if(F){
   # Plots to analyze opt.history
-  load(pp(pevi.shared,"/data/outputs/optim-new/development-seed1/optimization-history.Rdata"))
+  load(pp(pevi.shared,"/data/outputs/optim-new/delhi-revised-base-seed1/optimization-history.Rdata"))
   opt.history <- data.table(opt.history,key=c('penetration','iteration','obj'))
   opt.history[,rank:=1:length(name),by=c('penetration','iteration')]
 

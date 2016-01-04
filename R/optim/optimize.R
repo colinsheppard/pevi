@@ -1,38 +1,41 @@
-library(colinmisc)
+# Note on El Capitan, I had to use the following commands to get libs configured so that rJava and RNetLogo use Java 1.8
+#
+# sudo ln -s $(/usr/libexec/java_home)/jre/lib/server/libjvm.dylib /usr/local/lib
+#
+# sudo R CMD javareconf -n
+#
+# Then I installed rJava 0.9-8 from source available here: https://www.rforge.net/rJava/files/
+
 Sys.setenv(NOAWT=1)
 load.libraries(c('snow','yaml','stringr','RNetLogo'))
 
 base.path <- '/Users/sheppardc/Dropbox/serc/pev-colin/'
 #base.path <- '/Users/critter/Dropbox/serc/pev-colin/'
-location <- 'colin-serc'
-#location <- 'colin-home'
-num.cpu <- 12
-#num.cpu <- 8
 
-path.to.pevi <- paste(base.path,'pevi/',sep='')
-path.to.inputs <- paste(base.path,'pev-shared/data/inputs/optim/',sep='')
-path.to.outputs <- paste(base.path,'pev-shared/data/outputs/optim/',sep='')
-nl.path <- "/Applications/NetLogo\ 5.0.3"
-model.path <- paste(path.to.pevi,"netlogo/PEVI-nolog.nlogo",sep='')
+path.to.inputs <- paste(pevi.shared,'data/inputs/optim-de/',sep='')
+path.to.outputs <- paste(pevi.shared,'data/outputs/optim-de/',sep='')
+nl.path <- "/Applications/NetLogo\ 5.0.5"
+model.path <- paste(pevi.home,"netlogo/PEVI-v2.1.2-nolog.nlogo",sep='')
 
-source(paste(path.to.pevi,"R/optim/optim-functions.R",sep='')) # note this will in turn call optim-config, objectives, and constraints
-source(paste(path.to.pevi,"R/optim/optim-config.R",sep=''))
-source(paste(path.to.pevi,"R/optim/objectives.R",sep=''))
-source(paste(path.to.pevi,"R/optim/constraints.R",sep=''))
-source(paste(path.to.pevi,"R/reporters-loggers.R",sep=''))
+source(paste(pevi.home,"R/optim/optim-functions.R",sep='')) # note this will in turn call optim-config, objectives, and constraints
+source(paste(pevi.home,"R/optim/optim-config.R",sep=''))
+source(paste(pevi.home,"R/optim/objectives.R",sep=''))
+source(paste(pevi.home,"R/optim/constraints.R",sep=''))
+source(paste(pevi.home,"R/reporters-loggers.R",sep=''))
 make.dir(paste(path.to.inputs,optim.code,sep=''))
+make.dir(paste(path.to.outputs,optim.code,sep=''))
 
 # read the parameters and values to vary in the experiment
 vary <- yaml.load(readChar(paste(path.to.inputs,'vary.yaml',sep=''),file.info(paste(path.to.inputs,'vary.yaml',sep=''))$size))
 for(file.param in names(vary)[grep("-file",names(vary))]){
-  vary[[file.param]] <- paste(path.to.pevi,'netlogo/',vary[[file.param]],sep='')
+  vary[[file.param]] <- paste(pevi.shared,"data/inputs/",vary[[file.param]],sep='')
 }
 # setup the data frame containing all combinations of those parameter values
 vary.tab.original <- expand.grid(vary,stringsAsFactors=F)
 
 pev.penetration <- 0.01
 
-for(pev.penetration in c(0.005,0.01,0.02,0.04)){
+for(pev.penetration in c(0.01)){ #c(0.005,0.01,0.02,0.04)){
   print(paste("pen",pev.penetration))
 
   # set the penetration of the driver input files
@@ -45,11 +48,12 @@ for(pev.penetration in c(0.005,0.01,0.02,0.04)){
   # get a snow cluster started
   if(!exists('cl')){
     print('starting new cluster')
-    #cl <- makeCluster(c(rep(list(list(host="localhost",outfile=paste(path.to.outputs,optim.code,"/cluster-out.txt",sep=''))),num.cpu)),type="SOCK")
     cl <- makeCluster(c(rep(list(list(host="localhost")),num.cpu)),type="SOCK")
-    clusterEvalQ(cl,options(java.parameters="-Xmx2048m"))
+    clusterEvalQ(cl,options(java.parameters="-Xmx20g"))
     clusterEvalQ(cl,Sys.setenv(NOAWT=1))
     clusterEvalQ(cl,library('RNetLogo'))
+    clusterExport(cl,c('init.netlogo','model.path','logfiles'))
+    clusterEvalQ(cl,init.netlogo())
   }
 
   # initialize the particles (also called "agents" in DE)
@@ -64,7 +68,7 @@ for(pev.penetration in c(0.005,0.01,0.02,0.04)){
   fit.history <- list()
 
   # we need tighter initial distribution on decision variables to get into the feasible region, but then loosen back up after
-  decision.vars$ubound <- c(rep(2,52),rep(1,52))
+  decision.vars$ubound <- decision.vars$ubound.start
 
   # initialize the particles
   while(all(all.ptx[,c('fitness'),gen.num]==Inf)){
@@ -79,11 +83,7 @@ for(pev.penetration in c(0.005,0.01,0.02,0.04)){
     }
 
     for(i in 1:n){
-      if(i<53){
-        all.ptx[,i,gen.num] <- round(rnorm(np,0,0.4))
-      }else{
-        all.ptx[,i,gen.num] <- round(rnorm(np,0,0.16667))
-      }
+      all.ptx[,i,gen.num] <- round(rnorm(np,0,decision.vars$ubound.start[i]/3))
       all.ptx[,i,gen.num][all.ptx[,i,gen.num]<0] <- 0
       #all.ptx[,i,gen.num] <- sample(seq(decision.vars$lbound[i],decision.vars$ubound[i]),np,replace=T)
     }
@@ -97,15 +97,14 @@ for(pev.penetration in c(0.005,0.01,0.02,0.04)){
     }
   }
   # loosen the bounds back up
-  decision.vars <- data.frame(taz=c(1:52,1:52),level=c(rep(2,52),rep(3,52)),lbound=rep(0,104),ubound=c(rep(10,52),rep(5,52)))
-  decision.vars$name <-  c(paste("T",1:52,"-L2",sep=""),paste("T",1:52,"-L3",sep=""))
+  decision.vars$ubound <- decision.vars$ubound.actual
   save.image(paste(path.to.outputs,optim.code,"/0saved-state-pen",pev.penetration*100,".Rdata",sep=''))
 
   # enter the loop
   while(!stop.criteria(all.ptx[,'fitness',gen.num],gen.num)){
 
     print(paste("gen:",gen.num))
-    source(paste(path.to.pevi,"R/optim/optim-functions.R",sep='')) # allows hot-swapping code
+    source(paste(pevi.home,"R/optim/optim-functions.R",sep='')) # allows hot-swapping code
 
     # initialize the candidate particles from the list of working particles
     cand <- all.ptx[,,gen.num]
@@ -167,7 +166,7 @@ for(pev.penetration in c(0.005,0.01,0.02,0.04)){
     all.ptx[improved.ptx,,gen.num+1] <- cand[improved.ptx,]
 
     print(all.ptx[,'fitness',gen.num])
-    notice.file <- paste(path.to.outputs,optim.code,"/",location,'-pen',pev.penetration*100,'-gen',gen.num,'-fit',roundC(mean(all.ptx[,'fitness',gen.num],na.rm=T),4),'-',format(Sys.time(),"%Y-%m-%d_%H%M%S"),'.csv',sep='')
+    notice.file <- paste(path.to.outputs,optim.code,"/",whoami,'-pen',pev.penetration*100,'-gen',gen.num,'-fit',roundC(mean(all.ptx[,'fitness',gen.num],na.rm=T),4),'-',format(Sys.time(),"%Y-%m-%d_%H%M%S"),'.csv',sep='')
     write.csv(all.ptx[,,gen.num],file=notice.file)
 
     gen.num <- gen.num + 1

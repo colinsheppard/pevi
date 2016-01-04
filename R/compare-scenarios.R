@@ -1,9 +1,11 @@
 Sys.setenv(NOAWT=1)
-options(java.parameters="-Xmx30g")
+options(java.parameters="-Xmx10g")
 load.libraries(c('ggplot2','yaml','RNetLogo','plyr','reshape','stringr'))
 
 #exp.name <- commandArgs(trailingOnly=T)[1]
 exp.name <- 'delhi-smart-quasi-reopt'
+exp.name <- 'delhi-roam-threshold'
+exp.name <- 'delhi-test-revised'
 path.to.inputs <- pp(pevi.shared,'data/inputs/compare/',exp.name,'/')
 
 #to.log <- c('pain','charging','need-to-charge')
@@ -61,7 +63,7 @@ if("vehicle-type-input-file" %in% names(vary)){
 
 # start NL
 tryCatch(NLStart(nl.path, gui=F),error=function(err){ NA })
-model.path <- paste(pevi.home,"netlogo/PEVI.nlogo",sep='')
+model.path <- paste(pevi.home,"netlogo/PEVI-v2.1.2.nlogo",sep='')
 NLLoadModel(model.path)
 
 for(cmd in paste('set log-',logfiles,' false',sep='')){ NLCommand(cmd) }
@@ -70,7 +72,7 @@ for(cmd in paste('set log-',to.log,' true',sep='')){ NLCommand(cmd) }
 logs <- list()
 
 # for every combination of parameters, run the model and capture the summary statistics
-for(results.i in 4:nrow(results)){
+for(results.i in 1:nrow(results)){
 #results.i <- 1
   cat(paste(results.i,""))
   system('sleep 0.01')

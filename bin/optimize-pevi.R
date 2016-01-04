@@ -285,6 +285,7 @@ for(seed in seeds[seed.inds]){ # COMMENT FOR MANUAL
       begin.build.i <- start.iter
     }else{
       #	Initialize the starting infrastructure and write the file to the inputs dir.
+      # NOTE: this starts a FRESH BUILDOUT at EVER PENETRATION LEVEL
       charger.buildout <- init.charger.buildout
       current.obj <- Inf
       begin.build.i <- 1
@@ -310,20 +311,20 @@ for(seed in seeds[seed.inds]){ # COMMENT FOR MANUAL
 		build.i <- begin.build.i
 		for(build.i in begin.build.i:max.chargers.per.pen){ # COMMENT FOR MANUAL
       # at this point, if we're in hot start, drop the history from the current iteration and turn hot start off
-      if(hot.start){
-        reference.charger.cost <- subset(opt.history,penetration==start.pen & iteration==build.i)$mean.charger.cost[1] 
-        reference.delay.cost <- subset(opt.history,penetration==start.pen & iteration==build.i)$mean.delay.cost[1] 
-        opt.history <- subset(opt.history,!(penetration==start.pen & iteration>=start.iter))
-			  save(opt.history,file=pp(path.to.outputs,'optimization-history.Rdata'))
-        winner.history <- subset(winner.history,!(penetration==start.pen & iteration>=start.iter))
-			  save(winner.history,file=pp(path.to.outputs,'winner-history.Rdata'))
-        charger.buildout.history <- subset(charger.buildout.history,!(penetration==start.pen & iter>=start.iter))
-			  save(charger.buildout.history,file=pp(path.to.outputs,'charger-buildout-history.Rdata'))
-        #if(nrow(build.result.history)>0) build.result.history <- subset(build.result.history,!(penetration==start.pen & iteration>=start.iter))
-			  #save(build.result.history,file=pp(path.to.outputs,'build-result-history.Rdata'))
-        write.table(subset(read.csv(pp(path.to.outputs,'buildout-progress.csv')),!(penetration==start.pen & iteration>=start.iter)),file=pp(path.to.outputs,'buildout-progress.csv'),sep=',',row.names=F)
-        hot.start <- F
-      }
+		  if(hot.start){
+			reference.charger.cost <- subset(opt.history,penetration==start.pen & iteration==build.i)$mean.charger.cost[1] 
+			reference.delay.cost <- subset(opt.history,penetration==start.pen & iteration==build.i)$mean.delay.cost[1] 
+			opt.history <- subset(opt.history,!(penetration==start.pen & iteration>=start.iter))
+				  save(opt.history,file=pp(path.to.outputs,'optimization-history.Rdata'))
+			winner.history <- subset(winner.history,!(penetration==start.pen & iteration>=start.iter))
+				  save(winner.history,file=pp(path.to.outputs,'winner-history.Rdata'))
+			charger.buildout.history <- subset(charger.buildout.history,!(penetration==start.pen & iter>=start.iter))
+				  save(charger.buildout.history,file=pp(path.to.outputs,'charger-buildout-history.Rdata'))
+			#if(nrow(build.result.history)>0) build.result.history <- subset(build.result.history,!(penetration==start.pen & iteration>=start.iter))
+				  #save(build.result.history,file=pp(path.to.outputs,'build-result-history.Rdata'))
+			write.table(subset(read.csv(pp(path.to.outputs,'buildout-progress.csv')),!(penetration==start.pen & iteration>=start.iter)),file=pp(path.to.outputs,'buildout-progress.csv'),sep=',',row.names=F)
+			hot.start <- F
+		  }
 			print(paste('build.i = ',build.i))
 
       if(build.i == 1){

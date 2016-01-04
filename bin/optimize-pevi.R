@@ -1,4 +1,4 @@
-#!/usr/bin/Rscript --no-save --no-restore
+#!/usr/local/bin/Rscript --no-save --no-restore
 ##############################################################################################################################################
 # Script to conduct the buildout optimization
 ##############################################################################################################################################
@@ -18,8 +18,8 @@ option_list <- list(
   make_option(c("-p", "--pushend"),action="store_true", type="logical", default=F, help="Push the stopping criterion [%default]")
 )
 if(interactive()){
-  setwd(pp(pevi.shared,'data/inputs/optim-new/delhi-smart-base/'))
-  args<-c('-v','2.1.2')
+  setwd(pp(pevi.shared,'data/inputs/optim-new/delhi-revised-base/'))
+  args<-c('-v','2.1.2','-s','1')
   args <- parse_args(OptionParser(option_list = option_list,usage = "optimize-pevi.R [options]"),positional_arguments=F,args=args)
 }else{
   args <- parse_args(OptionParser(option_list = option_list,usage = "optimize-pevi.R [options]"),positional_arguments=F)
@@ -238,7 +238,7 @@ pevi.ver <- ifelse(args$version=="2.0","",pp("-v",args$version))
 model.path <- pp(pevi.home,"netlogo/PEVI",pevi.ver,"-nolog.nlogo")
 if(!exists('cl')){
   print('starting new cluster')
-  cl <- makeCluster(c(rep(list(list(host="localhost")),num.cpu)),type="SOCK")
+  cl <- makeCluster(c(rep(list(list(host="localhost")),min(length(vary.tab.original$`driver-input-file`),num.cpu))),type="SOCK")
   clusterEvalQ(cl,options(java.parameters="-Xmx20g"))
   clusterEvalQ(cl,Sys.setenv(NOAWT=1))
   clusterEvalQ(cl,library('RNetLogo'))
@@ -296,14 +296,14 @@ for(seed in seeds[seed.inds]){ # COMMENT FOR MANUAL
     # around restricting driver input files based on pen.ratio
 
     # Note that the expectation is that all pev penetrations beyond the first are even multiples of the first
-    #if(pev.penetration == pev.penetrations[1]){
+    if(pev.penetration == pev.penetrations[1]){
       vary.tab <- vary.tab.original
-    #}else{
-      #pen.ratio <- pev.penetration/pev.penetrations[1]
-    	#new.vary <- vary
-    	#new.vary$'driver-input-file' <- new.vary$'driver-input-file'[1:round(length(vary$'driver-input-file')/pen.ratio)]
-    	#vary.tab <- expand.grid(new.vary,stringsAsFactors=F)
-    #}
+    }else{
+      pen.ratio <- pev.penetration/pev.penetrations[1]
+    	new.vary <- vary
+    	new.vary$'driver-input-file' <- new.vary$'driver-input-file'[1:round(length(vary$'driver-input-file')/pen.ratio)]
+    	vary.tab <- expand.grid(new.vary,stringsAsFactors=F)
+    }
     vary.tab$`driver-input-file` <- str_replace(vary.tab$`driver-input-file`,"penXXX",paste("pen",pev.penetration*100,sep=""))
 
     # Start for loop for overall penetration level optimization

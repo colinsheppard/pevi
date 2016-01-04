@@ -20,7 +20,7 @@ option_list <- list(
 )
 if(interactive()){
   setwd(pp(pevi.shared,'data/inputs/optim-new/delhi-revised-base/'))
-  args<-c('-v','2.1.2','-s','2','-e')
+  args<-c('-v','2.1.2','-s','3','-e')
   args <- parse_args(OptionParser(option_list = option_list,usage = "optimize-pevi.R [options]"),positional_arguments=F,args=args)
 }else{
   args <- parse_args(OptionParser(option_list = option_list,usage = "optimize-pevi.R [options]"),positional_arguments=F)
@@ -72,6 +72,7 @@ if(file.exists(pp(args$experimentdir,'taz-names.csv')))taz.names <- read.csv(pp(
 
 charger.info <- read.table(pp(pevi.shared,param.file.data$charger.type.input.file),row.names=NULL,header=T,sep='\t')
 names(charger.info) <- c('level','charge.rate','energy.price','installed.cost')
+charger.info$cost.per.iter <- unlist(build.increment * charger.info$installed.cost)
 
 # initialize infrastructure table, skip data, and the taz/charger combinations
 init.charger.file <- pp(pevi.shared,param.file.data$charger.input.file)
@@ -143,9 +144,7 @@ if(push.end){
   winner.history <- ddply(opt.history,.(penetration,iteration),function(df){
     df[which.min(df$obj),]
   })
-  installed.costs <- read.table(pp(pevi.shared,as.character(param.file.data$charger.type.input.file)),header=T)$installed.cost
-  cost.per.iter <- build.increment * installed.costs
-  winner.history$cost <- unlist(cost.per.iter[match(winner.history$level,0:4)])*1000
+  winner.history$cost <- charger.info$cost.per.iter[match(winner.history$level,0:4)]*1000
   winner.history$num.added <- unlist(build.increment[match(winner.history$level,0:4)])
   winner.history <- as.data.frame(data.table(winner.history,key=c('penetration','iteration')))
   winner.history$cum.cost = cumsum(winner.history$cost)
@@ -226,8 +225,7 @@ if(hot.start){
       df[which.min(df$obj),]
     })
     installed.costs <- read.table(pp(pevi.shared,as.character(param.file.data$charger.type.input.file)),header=T)$installed.cost
-    cost.per.iter <- build.increment * installed.costs
-    winner.history$cost <- unlist(cost.per.iter[match(winner.history$level,0:4)])*1000
+    winner.history$cost <- charger.info$cost.per.iter[match(winner.history$level,0:4)]*1000
     winner.history$num.added <- unlist(build.increment[match(winner.history$level,0:4)])
     winner.history <- as.data.frame(data.table(winner.history,key=c('penetration','iteration')))
     winner.history$cum.cost = cumsum(winner.history$cost)
@@ -352,9 +350,9 @@ for(seed in seeds[seed.inds]){ # COMMENT FOR MANUAL
       }
       
       #	Next is the loop through driver files. the snow parallelization happens here.
-	  build.result <- evaluate.fitness()
+	    build.result <- evaluate.fitness()
 
-	  #########################################################
+	    #########################################################
       # End Netlogo run
       #########################################################
 
@@ -366,7 +364,7 @@ for(seed in seeds[seed.inds]){ # COMMENT FOR MANUAL
 			result.means <- ddply(build.result,.(taz,level),function(df){
         if(nl.obj == 'marginal-cost-to-reduce-delay'){
           the.obj <- (mean(df$total.delay.cost) - reference.delay.cost)/(mean(df$total.charger.cost) - reference.charger.cost)
-          data.frame(obj = the.obj,cv=sd(df$obj)/the.obj,key=pp(df$taz[1],'-',df$level[1]),mean.delay.cost=mean(df$total.delay.cost,na.rm=T),mean.charger.cost=mean(df$total.charger.cost,na.rm=T))
+          data.frame(obj = the.obj,cv=sd(the.obj)/the.obj,key=pp(df$taz[1],'-',df$level[1]),mean.delay.cost=mean(df$total.delay.cost,na.rm=T),mean.charger.cost=mean(df$total.charger.cost,na.rm=T))
         }else{
           data.frame(obj = mean(df$obj),cv=sd(df$obj)/mean(df$obj),key=pp(df$taz[1],'-',df$level[1]),mean.delay.cost=0,mean.charger.cost=0)
         }
@@ -376,7 +374,7 @@ for(seed in seeds[seed.inds]){ # COMMENT FOR MANUAL
       taz.charger.combos$cv[taz.charger.combos$include] <- result.means$cv[combos.in.results]
       taz.charger.combos$mean.delay.cost[taz.charger.combos$include] <- result.means$mean.delay.cost[combos.in.results]
       taz.charger.combos$mean.charger.cost[taz.charger.combos$include] <- result.means$mean.charger.cost[combos.in.results]
-      # sort the results and add key, IMPORTANT, everying below relies on this ordering
+      # sort the results and add key, IMPORTANT, everything below relies on this ordering
       taz.charger.combos <- taz.charger.combos[order(taz.charger.combos$obj),] 
       # ggplot(taz.charger.combos,aes(x=factor(taz),y=obj)) + geom_point() + facet_wrap(~level) 
       
@@ -387,14 +385,11 @@ for(seed in seeds[seed.inds]){ # COMMENT FOR MANUAL
 			save(opt.history,file=pp(path.to.outputs,'optimization-history.Rdata'))
       winner.history <- rbind(winner.history,data.frame(opt.iter[1,],cost=NA,num.added=NA,cum.cost=NA))
       winner.history$num.added[nrow(winner.history)] <- build.increment[grep(tail(winner.history$level,1),names(build.increment))]
-      if(build.i==1){
-        winner.history$cost[nrow(winner.history)] <- winner.history$mean.charger.cost[nrow(winner.history)]
-        winner.history$cum.cost[nrow(winner.history)] <- winner.history$cost[nrow(winner.history)]
-      }else{
-        winner.history$cost[nrow(winner.history)] <- diff(tail(winner.history$mean.charger.cost,2))
-        winner.history$cum.cost[nrow(winner.history)] <- winner.history$cost[nrow(winner.history)] + winner.history$cum.cost[nrow(winner.history)-1]
-      }
+      winner.history$cost[nrow(winner.history)] <- charger.info$cost.per.iter[match(winner.history$level[nrow(winner.history)],0:4)]*1000
+      winner.history$cum.cost <- cumsum(winner.history$cost)
+      winner.history$num.evaluated <- sum(taz.charger.combos$include)
 			save(winner.history,file=pp(path.to.outputs,'winner-history.Rdata'))
+
       build.result$penetration <- pev.penetration
       build.result$iteration <- build.i
       #build.result.history <- rbind(build.result.history,build.result)

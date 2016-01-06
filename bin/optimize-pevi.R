@@ -13,6 +13,7 @@ option_list <- list(
   make_option(c("-d", "--experimentdir"), type="character", default='.', help="Path to the directory containing the files needed to run the optimization (params.txt, vary.yaml, paths.yaml) [\"%default\"]"),
   make_option(c("-s", "--seed"), type="integer", default=-1, help="Override seeds in params.R with a single value, a negative integer means do not override [%default]"),
   make_option(c("-o", "--stopthresh"), type="integer", default=3, help="Stopping criterion for marginal reduction in pain [%default]"),
+  make_option(c("-u", "--numcpu"), type="integer", default=-1, help="Override num.cpu in .Rprofile, a negative integer means do not override [%default]"),
   make_option(c("-t", "--hotstart"),action="store_true", type="logical", default=F, help="Set hot.start to TRUE, overriding the value in params.R [%default]"),
   make_option(c("-c", "--correcttwo"),action="store_true", type="logical", default=F, help="Correct 2%, this will delete all 2% results and hot start from iter 1 [%default]"),
   make_option(c("-v", "--version"),type="character", default='2.1.2', help="Version number of PEVI to use [%default]"),
@@ -42,6 +43,9 @@ if(args$seed>=0){
 }
 if(args$hotstart){
   hot.start <- T
+}
+if(args$numcpu>0){
+  num.cpu <- args$numcpu
 }
 # correct two has been done everywhere now so override to F for safety
 #correct.two <- args$correcttwo 

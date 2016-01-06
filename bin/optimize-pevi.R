@@ -12,6 +12,7 @@ load.libraries(c('optparse','yaml','RNetLogo','plyr','reshape','stringr'),quietl
 option_list <- list(
   make_option(c("-d", "--experimentdir"), type="character", default='.', help="Path to the directory containing the files needed to run the optimization (params.txt, vary.yaml, paths.yaml) [\"%default\"]"),
   make_option(c("-s", "--seed"), type="integer", default=-1, help="Override seeds in params.R with a single value, a negative integer means do not override [%default]"),
+  make_option(c("-o", "--stopthresh"), type="integer", default=3, help="Stopping criterion for marginal reduction in pain [%default]"),
   make_option(c("-t", "--hotstart"),action="store_true", type="logical", default=F, help="Set hot.start to TRUE, overriding the value in params.R [%default]"),
   make_option(c("-c", "--correcttwo"),action="store_true", type="logical", default=F, help="Correct 2%, this will delete all 2% results and hot start from iter 1 [%default]"),
   make_option(c("-v", "--version"),type="character", default='2.1.2', help="Version number of PEVI to use [%default]"),
@@ -20,7 +21,7 @@ option_list <- list(
 )
 if(interactive()){
   setwd(pp(pevi.shared,'data/inputs/optim-new/delhi-revised-base/'))
-  args<-c('-v','2.1.2','-s','3','-e')
+  args<-c('-v','2.1.2','-s','4','-e')
   args <- parse_args(OptionParser(option_list = option_list,usage = "optimize-pevi.R [options]"),positional_arguments=F,args=args)
 }else{
   args <- parse_args(OptionParser(option_list = option_list,usage = "optimize-pevi.R [options]"),positional_arguments=F)
@@ -412,7 +413,7 @@ for(seed in seeds[seed.inds]){ # COMMENT FOR MANUAL
           current.obj <- Inf
           break
         }
-        if(taz.charger.combos$obj[1] < 3){
+        if(taz.charger.combos$obj[1] < args$stopthresh){
           current.obj <- taz.charger.combos$obj[1]
         }else{
           current.obj <- Inf
@@ -429,7 +430,7 @@ for(seed in seeds[seed.inds]){ # COMMENT FOR MANUAL
       }
 			
       #	Now update our infrastructure file for the next round
-			charger.buildout[taz.charger.combos$taz[1],grep(taz.charger.combos$level[1],names(charger.buildout))] <- (charger.buildout[taz.charger.combos$taz[1],grep(taz.charger.combos$level[1],names(charger.buildout))] + build.increment[pp('l',taz.charger.combos$level[1])])
+			charger.buildout[charger.buildout[,1]==taz.charger.combos$taz[1],grep(taz.charger.combos$level[1],names(charger.buildout))] <- (charger.buildout[taz.charger.combos$taz[1],grep(taz.charger.combos$level[1],names(charger.buildout))] + build.increment[pp('l',taz.charger.combos$level[1])])
 			write.table(charger.buildout,charger.file,quote=FALSE,sep='\t',row.names=FALSE)
 			
 			# Create an Rdata file with a data frame holding all buildout information thus far.

@@ -22,7 +22,7 @@ option_list <- list(
 )
 if(interactive()){
   setwd(pp(pevi.shared,'data/inputs/optim-new/delhi-revised-base/'))
-  args<-c('-v','2.1.2','-s','4','-e')
+  args<-c('-s','6','-e','-t','-o','10000')
   args <- parse_args(OptionParser(option_list = option_list,usage = "optimize-pevi.R [options]"),positional_arguments=F,args=args)
 }else{
   args <- parse_args(OptionParser(option_list = option_list,usage = "optimize-pevi.R [options]"),positional_arguments=F)

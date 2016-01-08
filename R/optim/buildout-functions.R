@@ -91,6 +91,30 @@ run.buildout.batch.one.itin <- function(taz.charger.combos.inds){
   driver.input.file <- vary.tab$`driver-input-file`[1]
   rep <- as.numeric(strsplit(strsplit(driver.input.file,'rep')[[1]][2],'-')[[1]][1])
 
+  NLCommand('clear-all-and-initialize') # Clear out the old file
+
+  # Set to fixed-seed if applicable.
+  if(!is.na(seed)){
+    NLCommand(paste('set starting-seed',seed))      
+    NLCommand('set fix-seed TRUE')
+  } else {
+    NLCommand('set fix-seed FALSE')
+  }
+      
+  # The params file pathways are all assumed to be based from pev-shared. We set a param-base variable in NetLogo
+  # to make this happen. The outputs folder is unchanged.
+  NLCommand(pp('set param-file-base "',pevi.shared,'"'))
+  NLCommand(paste('set parameter-file "',param.file,'"',sep=''))
+  NLCommand('read-parameter-file')
+      
+  if(is.character(driver.input.file)){
+    NLCommand(pp('set driver-input-file "',driver.input.file,'"'))
+  }else{
+    NLCommand(pp('set driver-input-file ',driver.input.file,''))
+  }
+  # set the charger input file
+  NLCommand(pp('set charger-input-file "',charger.file,'"'))
+
   # set the reference charger and delay costs
   NLCommand(pp('set reference-charger-cost ',reference.charger.cost))
   NLCommand(pp('set reference-delay-cost ',reference.delay.cost))
@@ -99,7 +123,7 @@ run.buildout.batch.one.itin <- function(taz.charger.combos.inds){
   NLCommand('setup-in-batch-mode')
               
   #	Iterate through every taz/charger combo
-  input.i.result <- ddply(taz.charger.combos[taz.charger.combos.inds,],.(taz,level),function(df) {
+  input.i.result <- ddply(subset(taz.charger.combos,include),.(taz,level),function(df) {
       #	Add the candidate charger, then run the model.
       NLCommand(paste('add-charger',df$taz,df$level,build.increment[pp('l',df$level)]))
       NLCommand('time:go-until 500')
@@ -117,7 +141,7 @@ run.buildout.batch.one.itin <- function(taz.charger.combos.inds){
       NLCommand(paste('remove-charger',df$taz,df$level,build.increment[pp('l',df$level)]))
       data.frame(obj = objective, total.charger.cost = total.charger.cost, total.delay.cost = total.delay.cost)
   }) # end infrastructure testing - charger type count
-  
+	
   return(data.frame(input.i.result,rep=rep))
 }
 

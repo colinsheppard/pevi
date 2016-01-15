@@ -14,8 +14,9 @@ base.path <- '/Users/wave/Dropbox/HSU/'
 optim.path <- 'linked2-50-50' #loops from seed-1 to seed-X
 #optim.code <- 'thresh-1-linked-min-cost-constrained-by-frac-stranded-50-50'
 #optim.code <- 'thresh-2-linked-min-cost-constrained-by-frac-stranded-50-50'
+optim.path <- 'delhi-revised-base-seed1'
 
-for(seed in c(1:4)){
+for(seed in c(1:2)){
   optim.code <- paste(optim.path,"-seed",seed,sep='')
   print(optim.code)
   

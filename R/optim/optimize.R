@@ -33,9 +33,10 @@ for(file.param in names(vary)[grep("-file",names(vary))]){
 # setup the data frame containing all combinations of those parameter values
 vary.tab.original <- expand.grid(vary,stringsAsFactors=F)
 
-pev.penetration <- 0.01
+pev.penetration <- 0.005
 
-for(pev.penetration in c(0.01)){ #c(0.005,0.01,0.02,0.04)){
+
+for(pev.penetration in c(0.005)){ #c(0.005,0.01,0.02,0.04)){
   print(paste("pen",pev.penetration))
 
   # set the penetration of the driver input files
@@ -49,7 +50,7 @@ for(pev.penetration in c(0.01)){ #c(0.005,0.01,0.02,0.04)){
   if(!exists('cl')){
     print('starting new cluster')
     cl <- makeCluster(c(rep(list(list(host="localhost")),num.cpu)),type="SOCK")
-    clusterEvalQ(cl,options(java.parameters="-Xmx20g"))
+    clusterEvalQ(cl,options(java.parameters="-Xmx10g"))
     clusterEvalQ(cl,Sys.setenv(NOAWT=1))
     clusterEvalQ(cl,library('RNetLogo'))
     clusterExport(cl,c('init.netlogo','model.path','logfiles'))
@@ -71,7 +72,7 @@ for(pev.penetration in c(0.01)){ #c(0.005,0.01,0.02,0.04)){
   decision.vars$ubound <- decision.vars$ubound.start
 
   # initialize the particles
-  while(all(all.ptx[,c('fitness'),gen.num]==Inf)){
+  while(!hot.start & all(all.ptx[,c('fitness'),gen.num]==Inf)){
     for(i in 1:10){
       cat('.')
       system('sleep 0.25')
@@ -93,12 +94,34 @@ for(pev.penetration in c(0.01)){ #c(0.005,0.01,0.02,0.04)){
 
     # save the fitness for future use
     for(i in 1:np){
-      fit.history[[paste(all.ptx[,1:n,gen.num],collapse=",")]] <- all.ptx[,'fitness',gen.num]
+      fit.history[[paste(all.ptx[i,1:n,gen.num],collapse=",")]] <- all.ptx[i,'fitness',gen.num]
     }
   }
   # loosen the bounds back up
   decision.vars$ubound <- decision.vars$ubound.actual
-  save.image(paste(path.to.outputs,optim.code,"/0saved-state-pen",pev.penetration*100,".Rdata",sep=''))
+
+  if(hot.start){
+    cl.prev <- cl
+    load(paste(path.to.outputs,optim.code,"/0saved-state-pen",pev.penetration*100,".Rdata",sep=''))
+    rm('cl')
+    cl <- cl.prev
+    rm('cl.prev')
+    old.max.iter <- de.params$max.iter
+    source(paste(pevi.home,"R/optim/optim-config.R",sep=''))
+    gen.num <- gen.num - 1
+    all.ptx.prev <- all.ptx 
+    all.ptx <- array(NA,c(np,n+1,de.params$max.iter+1))
+    colnames(all.ptx) <- c(decision.vars$name,'fitness')
+    all.ptx[,,1:(old.max.iter+1)] <- all.ptx.prev
+    # hack to deal with broken history accounting
+    #for(gen.num in 1:899){
+      #for(i in 1:np){
+        #fit.history[[paste(all.ptx[i,1:n,gen.num],collapse=",")]] <- all.ptx[i,'fitness',gen.num]
+      #}
+    #}
+  }else{
+    save.image(paste(path.to.outputs,optim.code,"/0saved-state-pen",pev.penetration*100,".Rdata",sep=''))
+  }
 
   # enter the loop
   while(!stop.criteria(all.ptx[,'fitness',gen.num],gen.num)){
@@ -142,10 +165,10 @@ for(pev.penetration in c(0.01)){ #c(0.005,0.01,0.02,0.04)){
     cand <- round(cand)
     to.eval <- c()
     for(i in 1:np){
-      if(is.null(fit.history[[paste(cand[i,],collapse=",")]])){
+      if(is.null(fit.history[[paste(cand[i,1:n],collapse=",")]])){
         to.eval <- c(to.eval,i)
       }else{
-        cand[i,'fitness'] <- fit.history[[paste(cand[i,],collapse=",")]]
+        cand[i,'fitness'] <- fit.history[[paste(cand[i,1:n],collapse=",")]]
       }
     }
     
@@ -155,7 +178,7 @@ for(pev.penetration in c(0.01)){ #c(0.005,0.01,0.02,0.04)){
 
     # save the fitness for future use
     for(i in 1:np){
-      fit.history[[paste(cand[i,],collapse=",")]] <- cand[i,'fitness']
+      fit.history[[paste(cand[i,1:n],collapse=",")]] <- cand[i,'fitness']
     }
 
     # test which candidates are better than the previous ptx
@@ -188,8 +211,8 @@ for(pev.penetration in c(0.01)){ #c(0.005,0.01,0.02,0.04)){
 }
 
 # add noise to a previous set of ptx
-all.ptx[,1:n,gen.num] <- all.ptx[,1:n,gen.num] + round(runif(np*n,-3,3))
-for(j in 1:n){
-  all.ptx[all.ptx[,j,gen.num]<decision.vars$lbound[j],j,gen.num] <- decision.vars$lbound[j]
-  all.ptx[all.ptx[,j,gen.num]>decision.vars$ubound[j],j,gen.num] <- decision.vars$ubound[j]
-}
+#all.ptx[,1:n,gen.num] <- all.ptx[,1:n,gen.num] + round(runif(np*n,-3,3))
+#for(j in 1:n){
+  #all.ptx[all.ptx[,j,gen.num]<decision.vars$lbound[j],j,gen.num] <- decision.vars$lbound[j]
+  #all.ptx[all.ptx[,j,gen.num]>decision.vars$ubound[j],j,gen.num] <- decision.vars$ubound[j]
+#}

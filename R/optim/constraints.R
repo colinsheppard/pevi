@@ -35,7 +35,11 @@ frac.stranded.below.thresh <- function(results){
 # the total infrastructure cost is below this max.cost
 ###################################################################################################
 total.cost.below.thresh <- function(results){
-  return(all.or.nothing(mean(results$infrastructure.cost,na.rm=T) < constraint.params$max.cost))
+  if(constraint.params$include.external.chargers){
+    return(all.or.nothing(mean(results$infrastructure.cost.including.external,na.rm=T) < constraint.params$max.cost))
+  }else{
+    return(all.or.nothing(mean(results$infrastructure.cost,na.rm=T) < constraint.params$max.cost))
+  }
 }
 
 ###################################################################################################

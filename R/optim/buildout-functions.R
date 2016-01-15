@@ -123,7 +123,7 @@ run.buildout.batch.one.itin <- function(taz.charger.combos.inds){
   NLCommand('setup-in-batch-mode')
               
   #	Iterate through every taz/charger combo
-  input.i.result <- ddply(subset(taz.charger.combos,include),.(taz,level),function(df) {
+  input.i.result <- ddply(taz.charger.combos[taz.charger.combos.inds,],.(taz,level),function(df) {
       #	Add the candidate charger, then run the model.
       NLCommand(paste('add-charger',df$taz,df$level,build.increment[pp('l',df$level)]))
       NLCommand('time:go-until 500')

@@ -21,3 +21,6 @@ infrastructure.cost <- function(results){
   return(mean(results$infrastructure.cost,na.rm=T))
 }
 
+delay.cost <- function(results){
+  return(mean(results$total.delay.cost,na.rm=T))
+}

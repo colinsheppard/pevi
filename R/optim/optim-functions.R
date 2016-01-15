@@ -55,6 +55,12 @@ objective <- function(results){
   return( streval(paste(objective.name,"(results)",sep='')) + constr )
 }
 
+if(F){
+  # for debugging
+  break.pair <- break.pairs[[1]]
+  ptx.i <- break.pair[1]
+  results.i <- 1
+}
 run.pevi.batch <- function(break.pair,ptx){
   ll<-break.pair[1]
   ul<-break.pair[2]
@@ -123,9 +129,7 @@ try.nl <- function(cmd,break.pair.code=""){
 }
 
 write.charger.file <- function(num.chargers,ptx.i){
-  chargers <- data.frame(TAZ=1:53,L0=rep(1,53),L1=num.chargers[1:53],L2=num.chargers[54:106],L3=num.chargers[107:159])
-  chargers <- rbind(chargers,data.frame(TAZ=-c(1,2,15,23,26,28,31,39,48,49,51,53),L0=1,L1=0,L2=0,L3=0))
-  chargers$L4 <- 0
+  chargers <- data.frame(TAZ=c(1:53,-c(1,2,15,23,26,28,31,39,48,49,51,53)),L0=rep(1,65),L1=num.chargers[1:65],L2=num.chargers[66:130],L3=num.chargers[131:195],L4=0)
   names(chargers) <- c(";TAZ","L0","L1","L2","L3","L4")
   write.table(chargers,file=paste(path.to.inputs,optim.code,'/chargers-ptx',ptx.i,'.txt',sep=''),sep="\t",row.names=F,quote=F)
 }

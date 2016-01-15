@@ -10,6 +10,19 @@ for(n in c(5,10,20,50,100,1000)){
 }
 
 ##########################################################################################
+# Revised after fuel economy fiasco
+load(pp(pevi.shared,'data/inputs/compare/delhi-revised-baseline-pain/logs.Rdata'))
+logs[['results']]$scen <- logs[['results']]$itin.scenario
+logs[['results']]$scen[logs[['results']]$scen=='no-homeless'] <- 'revised-no-homeless'
+logs[['results']]$scen[logs[['results']]$scen=='half-homeless'] <- 'revised-base'
+
+baseline.delay <- ddply(logs[['results']],.(penetration,scen),function(df){
+  data.frame(delay.cost=mean(df$total.delay.cost),min.delay.cost=min(df$total.delay.cost),total.delay=mean(df$total.delay),num.stranded=mean(df$num.stranded))
+})
+save(baseline.delay,file=pp(pevi.shared,'data/inputs/compare/delhi-baseline-pain/mean-delay-and-strand-revised.Rdata'))
+##########################################################################################
+
+##########################################################################################
 #Smart Delhi
 load(pp(pevi.shared,'data/inputs/compare/delhi-baseline-pain/logs-delhi-smart.Rdata'))
 logs[['results']]$vehicle.type.input.file <- NA

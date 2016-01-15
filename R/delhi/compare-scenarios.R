@@ -3,15 +3,17 @@ options(java.parameters="-Xmx30g")
 load.libraries(c('ggplot2','yaml','RNetLogo','plyr','reshape','stringr'))
 
 #exp.name <- commandArgs(trailingOnly=T)[1]
-#exp.name <- 'delhi-baseline-pain'
-exp.name <- 'delhi-smart-charging-demand'
+exp.name <- 'delhi-revised-baseline-pain'
+exp.name <- 'delhi-fuel-economy-mistake'
+exp.name <- 'delhi-revised-de-v-heur'
+#exp.name <- 'delhi-smart-charging-demand'
 #exp.name <- 'delhi-smart-quasi-reopt'
 path.to.inputs <- pp(pevi.shared,'data/inputs/compare/',exp.name,'/')
 
 #to.log <- c()
-#to.log <- 'pain'
-#to.log <- c('pain','charging')
-to.log <- c('pain','charging','trip')
+#to.log <- 'pain' # use this for baseline pain
+to.log <- c('pain','charging')
+#to.log <- c('pain','charging','trip')
 #to.log <- c('pain','charging','tazs','trip') # use this for animations
 
 # load the reporters and loggers needed to summarize runs and disable logging
@@ -33,6 +35,8 @@ if("driver-input-file" %in% names(vary)){
   results$penetration <- as.numeric(unlist(lapply(strsplit(as.character(results$driver.input.file),'-pen',fixed=T),function(x){ unlist(strsplit(x[2],"-rep",fixed=T)[[1]][1]) })))
   results$replicate <- as.numeric(unlist(lapply(strsplit(as.character(results$driver.input.file),'-rep',fixed=T),function(x){ unlist(strsplit(x[2],"-",fixed=T)[[1]][1]) })))
   results$itin.scenario <- unlist(lapply(strsplit(as.character(results$driver.input.file),'/driver-schedule',fixed=T),function(x){ tail(unlist(strsplit(x[1],"/",fixed=T)[[1]]),1) }))
+  redo.inds <- results$itin.scenario == 'consistent'
+  results$itin.scenario[redo.inds] <- unlist(lapply(strsplit(as.character(results$driver.input.file[redo.inds]),'/consistent',fixed=T),function(x){ tail(unlist(strsplit(x[1],"/",fixed=T)[[1]]),1) }))
   results$itin.scenario.named <- results$itin.scenario
   results$itin.scenario.order <- results$itin.scenario
   for(scen.i in names(naming$`driver-input-file`)){
@@ -166,6 +170,8 @@ for(log.file in to.log){
   logs[[log.file]]$penetration <- as.numeric(unlist(lapply(strsplit(as.character(logs[[log.file]]$driver.input.file),'-pen',fixed=T),function(x){ unlist(strsplit(x[2],"-rep",fixed=T)[[1]][1]) })))
   logs[[log.file]]$replicate <- as.numeric(unlist(lapply(strsplit(as.character(logs[[log.file]]$driver.input.file),'-rep',fixed=T),function(x){ unlist(strsplit(x[2],"-",fixed=T)[[1]][1]) })))
   logs[[log.file]]$itin.scenario <- unlist(lapply(strsplit(as.character(logs[[log.file]]$driver.input.file),'/driver-schedule',fixed=T),function(x){ tail(unlist(strsplit(x[1],"/",fixed=T)[[1]]),1) }))
+  redo.inds <- logs[[log.file]]$itin.scenario == 'consistent'
+  logs[[log.file]]$itin.scenario[redo.inds] <- unlist(lapply(strsplit(as.character(logs[[log.file]]$driver.input.file[redo.inds]),'/consistent',fixed=T),function(x){ tail(unlist(strsplit(x[1],"/",fixed=T)[[1]]),1) }))
   logs[[log.file]]$itin.scenario.named <- logs[[log.file]]$itin.scenario
   logs[[log.file]]$itin.scenario.order <- logs[[log.file]]$itin.scenario
   for(scen.i in names(naming$`driver-input-file`)){
@@ -191,11 +197,17 @@ for(log.file in to.log){
 }
 #save(logs,file=paste(path.to.inputs,'logs-veh-scens-v2.1.2.Rdata',sep=''))
 save(logs,file=paste(path.to.inputs,'logs.Rdata',sep=''))
-#load(paste(path.to.inputs,'logs.Rdata',sep=''))
+load(paste(path.to.inputs,'logs.Rdata',sep=''))
 
 #######################################
 # ANALYSIS
 #######################################
+
+############################
+# DE v Heur
+############################
+results <- data.table(logs[['results']])
+results[,list(num.drivers=mean(num.drivers),objective=mean(objective),total.delay=mean(total.delay),total.delay.cost=mean(total.delay.cost),cost=mean(total.charger.cost),cost.including.external=mean(infrastructure.cost.including.external),num.stranded=mean(num.stranded)),by='infrastructure.scenario.named']
 
 ############################
 # Irreducible Delay Analysis
@@ -204,8 +216,10 @@ save(logs,file=paste(path.to.inputs,'logs.Rdata',sep=''))
 #load(paste(path.to.inputs,'logs-v2.1.2.Rdata',sep=''))
 results <- data.table(logs[['results']])
 results[,':='(driver.input.file=NULL,charger.input.file=NULL,itin.scenario=NULL,itin.scenario.named=NULL,itin.scenario.order=NULL)]
-results <- results[!is.na(infrastructure.scenario.named)]
-results <- results[pp('Chargers for ',penetration,'%') == infrastructure.scenario.named]
+if("infrastructure.scenario.named" %in% names(results)){
+  results <- results[!is.na(infrastructure.scenario.named)]
+  results <- results[pp('Chargers for ',penetration,'%') == infrastructure.scenario.named]
+}
 setkey(results,penetration)
 mean.results <- results[,list(num.drivers=mean(num.drivers),objective=mean(objective),total.delay=mean(total.delay),total.delay.cost=mean(total.delay.cost),num.stranded=mean(num.stranded)),by='penetration']
 
@@ -223,6 +237,28 @@ results.veh[,':='(driver.input.file=NULL,vehicle.type.input.file=NULL,itin.scena
 setkey(results.veh,penetration,vehicle.scenario.named)
 mean.results.veh <- results.veh[,list(num.drivers=mean(num.drivers),objective=mean(objective),total.delay=mean(total.delay),total.delay.cost=mean(total.delay.cost),num.stranded=mean(num.stranded)),by=c('penetration','vehicle.scenario.named')]
 mean.results.veh[vehicle.scenario.named=="All High"]
+
+#########################################
+# Load profile before/after fuel economy debacle
+#########################################
+data.table(logs[['charging']])->charging
+charging[,infrastructure.scenario:=NULL]
+charging[,infrastructure.scenario:='old']
+charging[grep('revised',charging$charger.input.file),infrastructure.scenario:='revised']
+charging[,vehicle.scenario:=NULL]
+charging[,vehicle.scenario:='old']
+charging[grep('revised',charging$vehicle.type.input.file),vehicle.scenario:='revised']
+charging <- charging[vehicle.scenario==infrastructure.scenario]
+charging[,kw:=ifelse(charger.level<=1,1.5,ifelse(charger.level==2,6.6,50))]
+charging[,hour.beg:=floor(time)]
+charging[,hour.end:=floor(time+duration)]
+time.to.seg <- function(time,steps.per.hour=12){
+  #floor((time - floor(time/24)*24)*steps.per.hour)/steps.per.hour
+  floor(time) + floor((time - floor(time))*steps.per.hour)/steps.per.hour
+}
+charging.by.hour <- charging[,list(hour=as.vector(unlist(apply(rbind(time,time+duration),2,function(x){ time.to.seg(seq(x[1],x[2],by=1),steps.per.hour=1)}))),kw=kw),by=c('driver','vehicle.scenario','replicate')]
+ggplot(charging.by.hour[hour>30,list(kw.sum=sum(kw)),by=c('vehicle.scenario','replicate','hour')],aes(x=hour-30,y=kw.sum,colour=factor(replicate)))+geom_line()+facet_wrap(~vehicle.scenario)
+
 
 #########################################
 # Home charger availability 50% vs 100%

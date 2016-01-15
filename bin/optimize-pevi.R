@@ -248,7 +248,7 @@ pevi.ver <- ifelse(args$version=="2.0","",pp("-v",args$version))
 model.path <- pp(pevi.home,"netlogo/PEVI",pevi.ver,"-nolog.nlogo")
 if(!exists('cl')){
   print('starting new cluster')
-  cl <- makeCluster(c(rep(list(list(host="localhost")),min(length(vary.tab.original$`driver-input-file`),num.cpu))),type="SOCK")
+  cl <- makeCluster(c(rep(list(list(host="localhost")),num.cpu)),type="SOCK")
   clusterEvalQ(cl,options(java.parameters="-Xmx20g"))
   clusterEvalQ(cl,Sys.setenv(NOAWT=1))
   clusterEvalQ(cl,library('RNetLogo'))

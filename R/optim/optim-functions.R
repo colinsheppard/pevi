@@ -1,8 +1,4 @@
 
-#source(paste(path.to.pevi,"R/optim/optim-config.R",sep=''))
-#source(paste(path.to.pevi,"R/optim/objectives.R",sep=''))
-#source(paste(path.to.pevi,"R/optim/constraints.R",sep=''))
-
 evaluate.fitness <- function(ptx){
   if(!exists('cl')){
     stop('no cluster started')

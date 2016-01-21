@@ -190,6 +190,9 @@ if(hot.start){
   }else{
     source(paste(pevi.home,"R/optim/optim-config.R",sep=''))
   }
+  if(args$constraint>0){
+    constraint.params[['max.cost']] <- args$constraint
+  }
   gen.num <- gen.num - 1
   all.ptx.prev <- all.ptx 
   all.ptx <- array(NA,c(np,n+1,de.params$max.iter+1))

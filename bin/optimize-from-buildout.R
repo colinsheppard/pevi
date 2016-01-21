@@ -20,7 +20,7 @@ option_list <- list(
 )
 if(interactive()){
   setwd(pp(pevi.shared,'data/outputs/optim-new/delhi-revised-base-seed10/'))
-  args<-c('-c','2.25e6')
+  args<-c('-c','2.25e6','-t')
   args <- parse_args(OptionParser(option_list = option_list,usage = "optimize-from-buildout.R [options]"),positional_arguments=F,args=args)
 }else{
   args <- parse_args(OptionParser(option_list = option_list,usage = "optimize-from-buildout.R [options]"),positional_arguments=F)
@@ -179,7 +179,11 @@ if(hot.start){
   cl <- cl.prev
   rm('cl.prev')
   old.max.iter <- de.params$max.iter
-  source(paste(pevi.home,"R/optim/optim-config.R",sep=''))
+  if(file.exists(pp(args$experimentdir,'optim-config.R'))){
+    source(pp(args$experimentdir,'optim-config.R'))
+  }else{
+    source(paste(pevi.home,"R/optim/optim-config.R",sep=''))
+  }
   gen.num <- gen.num - 1
   all.ptx.prev <- all.ptx 
   all.ptx <- array(NA,c(np,n+1,de.params$max.iter+1))

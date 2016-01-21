@@ -29,7 +29,6 @@ if(interactive()){
 if(substr(args$experimentdir,1,1)!="/")args$experimentdir <- pp(getwd(),"/",args$experimentdir)
 if(substr(args$experimentdir,nchar(args$experimentdir),nchar(args$experimentdir)) != "/")args$experimentdir <- pp(args$experimentdir,"/")
 
-exp.name <- head(tail(str_split(tail(str_split(args$experimentdir,'optim-new')[[1]],1),'/')[[1]],3),1)
 
 Sys.setenv(NOAWT=1)
 options(java.parameters=pp("-Xmx",args$jremem,"g"))
@@ -70,6 +69,7 @@ buildout.progress <- data.table(read.csv(pp(args$experimentdir,'buildout-progres
 seed <- tail(buildout.progress$seed,1)
 pev.penetration <- tail(buildout.progress$penetration,1)
 my.cat(pp("pen ",pev.penetration,' seed ',seed))
+exp.name <- pp(optim.scenario,'-seed',seed)
 
 # let commandline args override settings in params.R, optim-config.R, constraints.R
 if(args$hotstart){

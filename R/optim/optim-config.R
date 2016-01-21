@@ -4,9 +4,6 @@
 # Optimization used for exploring everything all together.
 ###################################################################################################
 
-hot.start <- T
-num.cpu <- 6
-
 #optim.code <- 'min-cost-constrained-by-frac-delayed'
 #optim.code <- 'min-cost-constrained-by-frac-stranded-50-50'
 #optim.code <- 'min-frac-stranded-constrained-by-cost-50-50'

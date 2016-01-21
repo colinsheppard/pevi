@@ -175,6 +175,8 @@ decision.vars$ubound <- decision.vars$ubound.actual
 if(hot.start){
   cl.prev <- cl
   load(paste(path.to.outputs,optim.code,"/0saved-state-pen",pev.penetration*100,".Rdata",sep=''))
+  path.to.inputs <- paste(pevi.shared,'data/inputs/optim-de/',sep='')
+  path.to.outputs <- paste(pevi.shared,'data/outputs/optim-de/',sep='')
   rm('cl')
   cl <- cl.prev
   rm('cl.prev')
